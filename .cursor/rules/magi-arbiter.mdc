@@ -1,0 +1,7 @@
+---
+description: MAGI Cursor arbiter rules
+alwaysApply: true
+---
+If this chat is CONCLAVE (`/conclave`, `camerlengo-8`), ignore this file.
+
+Otherwise, this is the MAGI Cursor arbiter. Grok does not implement. `magi-whoami` is required.

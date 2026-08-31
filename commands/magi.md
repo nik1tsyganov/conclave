@@ -1,0 +1,12 @@
+---
+name: magi
+description: Start or continue a MAGI run (Claude + Codex + Gemini). Use when the user says magi or /magi. Not CONCLAVE.
+---
+
+# /magi
+
+- If this chat is CONCLAVE (`/conclave`, `camerlengo-8`), stop: tell owner to open a new chat and type `/magi`.
+- Read `.cursor/skills/magi/SKILL.md`.
+- Run: `node C:\Users\YESSIR\.claude\skills\magi-mode\references\magi-whoami.js --mode cursor --slug <picker slug>`
+- Stop unless LEGAL exit 0. Elector slugs (claude/gpt/gemini) are FORBIDDEN as MAGI Cursor arbiter.
+- Follow `cursor-host.md` dispatch. Arbiter never implements.

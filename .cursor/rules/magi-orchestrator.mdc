@@ -1,0 +1,7 @@
+---
+description: MAGI orchestrator rules
+alwaysApply: true
+---
+If this chat is CONCLAVE, ignore this file.
+
+Otherwise, read `engineering-orchestrator` then `magi-mode`/`magi-dispatch`/`mix-mode` and the five discipline skills listed in `SKILL.md`.

@@ -1,0 +1,13 @@
+{
+  "name": "magi-cursor-plugin",
+  "version": "0.1.0",
+  "type": "commonjs",
+  "description": "MAGI tri-seat (Claude + Codex + Gemini) Cursor plugin",
+  "scripts": {
+    "test": "node --test tools/hog-check.test.js tools/plugin-check.test.js"
+  },
+  "keywords": ["magi", "multi-vendor", "cursor", "dispatch"],
+  "author": "Nikita Tsyganov",
+  "license": "MIT",
+  "repository": "https://github.com/nik1tsyganov/magi.git"
+}

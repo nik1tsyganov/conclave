@@ -1,0 +1,12 @@
+---
+description: MAGI activation rules
+alwaysApply: true
+---
+If this chat is CONCLAVE, ignore this file.
+
+Otherwise:
+- Three-vendor implement split before first write.
+- 60% floor.
+- Idle Casper = FAILED.
+- WRITE AUDIT required.
+- `hog-check` required.
