@@ -61,7 +61,19 @@ After implement rows, write `magi-dispatch-log.jsonl` at the project root `{vend
 - Do not run `magi-battery.js` or `mix-run.js` under plain node.
 - Parse check only: `node C:\Users\YESSIR\.claude\workflows\checks\magi-workflow-cli.mjs`
 
+## Packs (efficiency, not routers)
+
+Cursor Task seats may use these local Cursor plugin packs as efficiency skills; they do not replace MAGI dispatch:
+
+- Team Kit: `check-compiler-errors`, `deslop`, `verify-this`, `control-cli`, `control-ui`, `ci-watcher`, `fix-ci`, `loop-on-ci`
+- Superpowers: `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `receiving-code-review`
+
+CLI seats (`cursor-cli`) cannot load Cursor plugins; they run the equivalent project checks directly (typecheck, tests, WRITE AUDIT). The arbiter may use Team Kit in its own Cursor chat after a merge.
+
+Do not use as routers: `using-superpowers`, `dispatching-parallel-agents`, `executing-plans`, `subagent-driven-development`, `brainstorming`, `review-and-ship`, `new-branch-and-pr`, `agents-memory-updater`. Continual Learning remains owner-invoked `/continual-learning` only.
+
+See `~\.cursor\rules\cursor-packs.mdc`.
+
 ## Other
 
-- Packs are installed under `~\.cursor\plugins\local\` (cursor-team-kit, superpowers, continual-learning). Use them as defaults per `~\.cursor\rules\cursor-packs.mdc`. They do not replace MAGI dispatch. Continual Learning auto-`AGENTS.md` is forbidden.
 - Put the SCOPE block from `engineering-orchestrator` in every seat brief.

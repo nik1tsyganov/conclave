@@ -3,7 +3,7 @@ name: implementer
 description: |
   Implements changes using Context7 for library basics and the installed skills for repo-specific patterns.
 tools: Read, Edit, Write, Glob, Grep, Bash
-skills: implement, fix, infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks, magi-mode, magi-dispatch, mix-mode
+skills: implement, fix, infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks, magi-mode, magi-dispatch, mix-mode, check-compiler-errors, deslop, verification-before-completion
 ---
 
 # implementer

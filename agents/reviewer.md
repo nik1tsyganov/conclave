@@ -3,7 +3,7 @@ name: reviewer
 description: |
   Reviews code for bugs, regressions, security issues, missing tests, and mismatch with repo patterns.
 tools: Read, Edit, Write, Glob, Grep, Bash
-skills: infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks, magi-mode, magi-dispatch, mix-mode
+skills: infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks, magi-mode, magi-dispatch, mix-mode, check-compiler-errors, deslop, verification-before-completion
 ---
 
 # reviewer

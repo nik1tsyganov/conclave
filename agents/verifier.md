@@ -3,7 +3,7 @@ name: verifier
 description: |
   Requires real evidence — command output, test results, screenshots, checks — before work can advance.
 tools: Read, Edit, Write, Glob, Grep, Bash
-skills: infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks, magi-mode, magi-dispatch, mix-mode
+skills: infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks, magi-mode, magi-dispatch, mix-mode, check-compiler-errors, deslop, verification-before-completion
 ---
 
 # verifier

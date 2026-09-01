@@ -67,6 +67,8 @@ function check() {
     'graph-engineering',
     '60%',
     'activation-check',
+    'check-compiler-errors',
+    'cursor-packs.mdc',
   ];
   for (const s of skillStrings) {
     if (!skill.includes(s)) {

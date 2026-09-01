@@ -30,3 +30,7 @@ A Codex+Gemini pair is a **duo**, not a full MAGI panel. Record `degraded=true` 
 - Every MAGI Gemini `agy` dispatch MUST pass `--add-dir C:\Users\YESSIR\.claude\skills` (and `C:\Users\YESSIR\.claude\docs` if docs are needed). Name `magi-mode` and `magi-dispatch` in the brief. Close stdin after piping the prompt (`agy` hangs if stdin is left open).
 - Codex reads `~\.codex\skills\magi-mode` (already mirrored). The brief must name `magi-mode`, `magi-dispatch`, `mix-mode`, the 60% vendor floor, WRITE AUDIT, and `activation-check`.
 - Never Cursor Task to claude/gpt/gemini slugs in this mode — that would spend exhausted Cursor model usage.
+
+## Cursor plugin boundary
+
+CLI seats cannot load Cursor plugins. They still run the project's own typecheck, tests, and WRITE AUDIT. The Grok arbiter may use Team Kit in its own Cursor chat after the merge.
