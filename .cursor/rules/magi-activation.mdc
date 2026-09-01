@@ -1,7 +1,6 @@
 ---
 description: MAGI activation rules
-alwaysApply: false
-globs: magi/**,magi-probe/**,magi-kit/**,.cursor/skills/magi/**,commands/magi.md
+alwaysApply: true
 ---
 If this chat is CONCLAVE, ignore this file.
 

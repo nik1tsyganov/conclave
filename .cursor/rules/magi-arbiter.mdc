@@ -1,7 +1,6 @@
 ---
-description: MAGI Cursor arbiter rules
-alwaysApply: false
-globs: magi/**,magi-probe/**,magi-kit/**,.cursor/skills/magi/**,commands/magi.md
+description: MAGI Cursor arbiter rules. Always on in every Cursor workspace; ignore in CONCLAVE chats.
+alwaysApply: true
 ---
 If this chat is CONCLAVE (`/conclave`, `camerlengo-8`), ignore this file.
 

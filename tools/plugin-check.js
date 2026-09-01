@@ -105,16 +105,20 @@ function check() {
   ];
   for (const rel of ruleFiles) {
     const text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
-    if (text.includes('alwaysApply: true')) {
-      console.error(`${rel} contains alwaysApply: true`);
+    if (text.includes('alwaysApply: false')) {
+      console.error(`${rel} contains alwaysApply: false`);
       return 1;
     }
-    if (!text.includes('alwaysApply: false')) {
-      console.error(`${rel} missing alwaysApply: false`);
+    if (!text.includes('alwaysApply: true')) {
+      console.error(`${rel} missing alwaysApply: true`);
       return 1;
     }
-    if (!text.includes('globs:')) {
-      console.error(`${rel} missing globs:`);
+    if (text.includes('globs:')) {
+      console.error(`${rel} contains globs:`);
+      return 1;
+    }
+    if (!text.includes('CONCLAVE')) {
+      console.error(`${rel} missing CONCLAVE ignore discriminator`);
       return 1;
     }
   }

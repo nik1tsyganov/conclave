@@ -64,6 +64,19 @@ try {
   copyDir(path.join(ROOT, 'commands'), path.join(DEST, 'commands'));
   copyDir(path.join(ROOT, 'tools'), path.join(DEST, 'tools'));
 
+  const USER_RULES_DIR = path.join(os.homedir(), '.cursor', 'rules');
+  fs.mkdirSync(USER_RULES_DIR, { recursive: true });
+  for (const ruleFile of ['magi-arbiter.mdc', 'magi-activation.mdc', 'magi-orchestrator.mdc']) {
+    const src = path.join(ROOT, '.cursor', 'rules', ruleFile);
+    const dst = path.join(USER_RULES_DIR, ruleFile);
+    copyFile(src, dst);
+    if (!fs.existsSync(dst)) {
+      console.error(`INSTALL INCOMPLETE — user rule missing: ${dst}`);
+      process.exit(1);
+    }
+  }
+  console.log(`MAGI user rules installed at ${USER_RULES_DIR}`);
+
   const CLAUDE_CMD_SRC = path.join(ROOT, 'claude-commands', 'magi.md');
   const CLAUDE_CMD_DIR = path.join(os.homedir(), '.claude', 'commands');
   const CLAUDE_CMD_DEST = path.join(CLAUDE_CMD_DIR, 'magi.md');
@@ -122,7 +135,7 @@ try {
   console.log(`MAGI plugin installed at ${DEST}`);
   console.log('  skill:  magi + cursor-host reference');
   console.log(`  user:   ${USER_SKILL}`);
-  console.log('  rules:  arbiter, activation, orchestrator');
+  console.log('  rules:  arbiter, activation, orchestrator (plugin + ~/.cursor/rules)');
   console.log('  agents: 9 seat briefs');
   console.log('  command: /magi');
   console.log('');
