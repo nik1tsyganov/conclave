@@ -64,6 +64,23 @@ try {
   copyDir(path.join(ROOT, 'commands'), path.join(DEST, 'commands'));
   copyDir(path.join(ROOT, 'tools'), path.join(DEST, 'tools'));
 
+  const CLAUDE_CMD_SRC = path.join(ROOT, 'claude-commands', 'magi.md');
+  const CLAUDE_CMD_DIR = path.join(os.homedir(), '.claude', 'commands');
+  const CLAUDE_CMD_DEST = path.join(CLAUDE_CMD_DIR, 'magi.md');
+  const KIT_CMD_DIR = path.join('C:\\src', 'magi-kit', 'claude', 'commands');
+  const KIT_CMD_DEST = path.join(KIT_CMD_DIR, 'magi.md');
+
+  copyFile(CLAUDE_CMD_SRC, CLAUDE_CMD_DEST);
+  if (!fs.existsSync(CLAUDE_CMD_DEST)) {
+    console.error('INSTALL INCOMPLETE — claude command missing');
+    process.exit(1);
+  }
+  copyFile(CLAUDE_CMD_SRC, KIT_CMD_DEST);
+  if (!fs.existsSync(KIT_CMD_DEST)) {
+    console.error('INSTALL INCOMPLETE — magi-kit claude command missing');
+    process.exit(1);
+  }
+
   if (fs.existsSync(USER_SKILL)) fs.rmSync(USER_SKILL, { recursive: true, force: true });
   copyDir(path.join(ROOT, '.cursor', 'skills', 'magi'), USER_SKILL);
 

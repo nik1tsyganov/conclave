@@ -1,7 +1,10 @@
 ---
 description: MAGI orchestrator rules
-alwaysApply: true
+alwaysApply: false
+globs: magi/**,magi-probe/**,magi-kit/**,.cursor/skills/magi/**,commands/magi.md
 ---
 If this chat is CONCLAVE, ignore this file.
 
 Otherwise, read `engineering-orchestrator` then `magi-mode`/`magi-dispatch`/`mix-mode` and the five discipline skills listed in `SKILL.md`.
+
+Canonical command for any repo: `node C:\src\magi\tools\activation-check.js magi-dispatch-log.jsonl`.

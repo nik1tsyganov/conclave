@@ -24,6 +24,7 @@ function check() {
     '.cursor/rules/magi-activation.mdc',
     '.cursor/rules/magi-orchestrator.mdc',
     'commands/magi.md',
+    'claude-commands/magi.md',
     'tools/install-plugin.js',
     'tools/plugin-check.js',
     'tools/hog-check.js',
@@ -75,6 +76,37 @@ function check() {
   if (!cmd.includes('magi-whoami')) {
     console.error('commands/magi.md missing magi-whoami');
     return 1;
+  }
+
+  const claudeCmd = fs.readFileSync(path.join(ROOT, 'claude-commands/magi.md'), 'utf8');
+  if (!claudeCmd.includes('magi-whoami')) {
+    console.error('claude-commands/magi.md missing magi-whoami');
+    return 1;
+  }
+  if (!claudeCmd.includes('claude-code')) {
+    console.error('claude-commands/magi.md missing claude-code');
+    return 1;
+  }
+
+  const ruleFiles = [
+    '.cursor/rules/magi-arbiter.mdc',
+    '.cursor/rules/magi-activation.mdc',
+    '.cursor/rules/magi-orchestrator.mdc',
+  ];
+  for (const rel of ruleFiles) {
+    const text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+    if (text.includes('alwaysApply: true')) {
+      console.error(`${rel} contains alwaysApply: true`);
+      return 1;
+    }
+    if (!text.includes('alwaysApply: false')) {
+      console.error(`${rel} missing alwaysApply: false`);
+      return 1;
+    }
+    if (!text.includes('globs:')) {
+      console.error(`${rel} missing globs:`);
+      return 1;
+    }
   }
 
   console.log('PLUGIN CHECK OK');

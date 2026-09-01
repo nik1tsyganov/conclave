@@ -50,7 +50,7 @@ Enforce the 60% floor per vendor.
 
 Each implementer must paste WRITE AUDIT (`git diff --stat` + `git status --porcelain`).
 
-After implement rows, write `tools/dispatch-log.jsonl` `{vendor, role:"implement"}` (gitignored) and run `node tools/activation-check.js`. Exit 1 = FAILED activation. Do not use `dispatch-log.pass.jsonl` as a live log.
+After implement rows, write `magi-dispatch-log.jsonl` at the project root `{vendor, role:"implement"}` (gitignored) and run `node C:\src\magi\tools\activation-check.js magi-dispatch-log.jsonl`. Exit 1 = FAILED activation. Do not use `dispatch-log.pass.jsonl` as a live log.
 
 ## Illegal returns
 

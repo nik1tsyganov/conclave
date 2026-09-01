@@ -1,6 +1,7 @@
 ---
 description: MAGI activation rules
-alwaysApply: true
+alwaysApply: false
+globs: magi/**,magi-probe/**,magi-kit/**,.cursor/skills/magi/**,commands/magi.md
 ---
 If this chat is CONCLAVE, ignore this file.
 
@@ -10,3 +11,4 @@ Otherwise:
 - Idle Casper = FAILED.
 - WRITE AUDIT required.
 - `activation-check` required (calls `hog-check`).
+- Canonical command for any repo: `node C:\src\magi\tools\activation-check.js magi-dispatch-log.jsonl`.

@@ -17,3 +17,13 @@ The arbiter writes one JSONL row per dispatched seat to the project's `telemetry
 ```
 
 Only the lead writes telemetry; do not let a seat write its own row.
+
+## Activation check
+
+After implement dispatches, the lead writes one JSONL row per implement unit `{vendor, role:"implement"}` to `magi-dispatch-log.jsonl` at the project root (gitignored; do not commit secrets). Then run the activation check:
+
+```bash
+node C:\src\magi\tools\activation-check.js magi-dispatch-log.jsonl
+```
+
+`activation-check.js` rejects checked-in fixtures, then calls `hog-check.js` to enforce the 60% vendor floor. Exit 0 = `FLOOR HOLDS`; exit 1 = `FAILED activation`.
