@@ -28,6 +28,8 @@ function check() {
     'tools/plugin-check.js',
     'tools/hog-check.js',
     'tools/hog-check.test.js',
+    'tools/activation-check.js',
+    'tools/activation-check.test.js',
     'tools/plugin-check.test.js',
     'tools/dispatch-log.pass.jsonl',
     'tools/dispatch-log.fail.jsonl',
@@ -56,8 +58,11 @@ function check() {
     'magi-mode',
     'magi-dispatch',
     'mix-mode',
+    'dispatch-efficiency',
+    'task-retrospective',
     'graph-engineering',
     '60%',
+    'activation-check',
   ];
   for (const s of skillStrings) {
     if (!skill.includes(s)) {

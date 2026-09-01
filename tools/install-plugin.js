@@ -62,6 +62,7 @@ try {
   copyDir(path.join(ROOT, '.cursor', 'rules'), path.join(DEST, 'rules'));
   copyDir(path.join(ROOT, 'agents'), path.join(DEST, 'agents'));
   copyDir(path.join(ROOT, 'commands'), path.join(DEST, 'commands'));
+  copyDir(path.join(ROOT, 'tools'), path.join(DEST, 'tools'));
 
   if (fs.existsSync(USER_SKILL)) fs.rmSync(USER_SKILL, { recursive: true, force: true });
   copyDir(path.join(ROOT, '.cursor', 'skills', 'magi'), USER_SKILL);
@@ -74,6 +75,8 @@ try {
     'rules/magi-activation.mdc',
     'rules/magi-orchestrator.mdc',
     'commands/magi.md',
+    'tools/hog-check.js',
+    'tools/activation-check.js',
     'agents/implementer.md',
     'agents/verifier.md',
     'agents/reviewer.md',

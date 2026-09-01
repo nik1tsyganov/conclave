@@ -9,4 +9,4 @@ Otherwise:
 - 60% floor.
 - Idle Casper = FAILED.
 - WRITE AUDIT required.
-- `hog-check` required.
+- `activation-check` required (calls `hog-check`).

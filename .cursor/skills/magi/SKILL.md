@@ -18,8 +18,10 @@ Read these files in order:
 7. `C:\Users\YESSIR\.claude\skills\magi-mode\SKILL.md`
 8. `C:\Users\YESSIR\.claude\skills\magi-dispatch\SKILL.md`
 9. `C:\Users\YESSIR\.claude\skills\mix-mode\SKILL.md`
-10. `C:\Users\YESSIR\.claude\skills\codex-bridge\SKILL.md` when dispatching Codex
-11. `C:\Users\YESSIR\.claude\skills\gemini-bridge\SKILL.md` when dispatching Gemini
+10. `C:\Users\YESSIR\.claude\skills\dispatch-efficiency\SKILL.md`
+11. `C:\Users\YESSIR\.claude\skills\task-retrospective\SKILL.md`
+12. `C:\Users\YESSIR\.claude\skills\codex-bridge\SKILL.md` when dispatching Codex
+13. `C:\Users\YESSIR\.claude\skills\gemini-bridge\SKILL.md` when dispatching Gemini
 
 ## MAGI is not CONCLAVE
 
@@ -48,7 +50,7 @@ Enforce the 60% floor per vendor.
 
 Each implementer must paste WRITE AUDIT (`git diff --stat` + `git status --porcelain`).
 
-After implement rows, write `tools/dispatch-log.jsonl` `{vendor, role:"implement"}` (gitignored) and run `node tools/hog-check.js tools/dispatch-log.jsonl`. Exit 1 = FAILED activation. Do not use `dispatch-log.pass.jsonl` as a live log.
+After implement rows, write `tools/dispatch-log.jsonl` `{vendor, role:"implement"}` (gitignored) and run `node tools/activation-check.js`. Exit 1 = FAILED activation. Do not use `dispatch-log.pass.jsonl` as a live log.
 
 ## Illegal returns
 
