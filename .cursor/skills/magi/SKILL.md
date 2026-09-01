@@ -59,5 +59,5 @@ After implement rows, write `magi-dispatch-log.jsonl` at the project root `{vend
 
 ## Other
 
-- Do not install Superpowers / Team Kit / Continual Learning packs.
+- Packs are installed under `~\.cursor\plugins\local\` (cursor-team-kit, superpowers, continual-learning). Use them as defaults per `~\.cursor\rules\cursor-packs.mdc`. They do not replace MAGI dispatch. Continual Learning auto-`AGENTS.md` is forbidden.
 - Put the SCOPE block from `engineering-orchestrator` in every seat brief.
