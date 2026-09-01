@@ -20,7 +20,7 @@ Read these files in order:
 9. `C:\Users\YESSIR\.claude\skills\mix-mode\SKILL.md`
 10. `C:\Users\YESSIR\.claude\skills\dispatch-efficiency\SKILL.md`
 11. `C:\Users\YESSIR\.claude\skills\task-retrospective\SKILL.md`
-12. `.cursor/skills/magi/references/cursor-cli.md`
+12. `references/cursor-cli.md`
 13. `C:\Users\YESSIR\.claude\skills\codex-bridge\SKILL.md` when dispatching Codex
 14. `C:\Users\YESSIR\.claude\skills\gemini-bridge\SKILL.md` when dispatching Gemini
 15. `C:\Users\YESSIR\.claude\skills\claude-bridge\SKILL.md` when attempting Claude (NOT OPERATIONAL on this machine)

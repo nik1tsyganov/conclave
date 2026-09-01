@@ -76,6 +76,14 @@ function check() {
   }
 
   const magiCliSkill = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi-cli/SKILL.md'), 'utf8');
+  if (!magiCliSkill.includes('references/cursor-cli.md')) {
+    console.error('magi-cli SKILL.md missing required co-located reference: references/cursor-cli.md');
+    return 1;
+  }
+  if (magiCliSkill.includes('.cursor/skills/magi/references/cursor-cli.md')) {
+    console.error('magi-cli SKILL.md contains stale required-reading path: .cursor/skills/magi/references/cursor-cli.md');
+    return 1;
+  }
   for (const s of ['cursor-cli', 'magi-whoami']) {
     if (!magiCliSkill.includes(s)) {
       console.error(`magi-cli SKILL.md missing required string: ${s}`);
