@@ -27,3 +27,8 @@ node C:\src\magi\tools\activation-check.js magi-dispatch-log.jsonl
 ```
 
 `activation-check.js` rejects checked-in fixtures, then calls `hog-check.js` to enforce the 60% vendor floor. Exit 0 = `FLOOR HOLDS`; exit 1 = `FAILED activation`.
+
+## Agent discovery
+
+- Claude Code reaches the MAGI seats via wrappers already in `C:\Users\YESSIR\.claude\agents\` (same stems as the plugin agents).
+- Cursor Task uses the MAGI plugin `agents/` directory when the plugin is enabled (copied to `C:\Users\YESSIR\.cursor\plugins\local\magi\agents`). Keep both copies. Do not delete the plugin agents.

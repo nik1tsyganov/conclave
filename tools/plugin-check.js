@@ -88,6 +88,16 @@ function check() {
     return 1;
   }
 
+  const cursorHost = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi/references/cursor-host.md'), 'utf8');
+  if (!cursorHost.includes('.claude/agents') && !cursorHost.includes('.claude\\agents\\')) {
+    console.error('cursor-host.md missing .claude/agents path');
+    return 1;
+  }
+  if (!cursorHost.includes('plugins/local/magi/agents') && !cursorHost.includes('plugins\\local\\magi\\agents')) {
+    console.error('cursor-host.md missing plugins/local/magi/agents path');
+    return 1;
+  }
+
   const ruleFiles = [
     '.cursor/rules/magi-arbiter.mdc',
     '.cursor/rules/magi-activation.mdc',
