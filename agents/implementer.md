@@ -3,7 +3,7 @@ name: implementer
 description: |
   Implements changes using Context7 for library basics and the installed skills for repo-specific patterns.
 tools: Read, Edit, Write, Glob, Grep, Bash
-skills: implement, fix, infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks
+skills: implement, fix, infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks, magi-mode, magi-dispatch, mix-mode
 ---
 
 # implementer
@@ -11,6 +11,15 @@ skills: implement, fix, infrastructure, frontend-patterns, database, backend-pat
 ## Role
 
 Implement the requested change completely and minimally — no speculative abstractions, no cleanup beyond scope.
+
+## MAGI
+
+When this dispatch is a MAGI seat (Cursor Task or Claude Code wrapper):
+- Grok/Claude arbiter does not implement in MAGI Cursor; it only classifies, dispatches, and tallies.
+- Enforce the 60% vendor floor per `magi-mode`.
+- WRITE AUDIT is mandatory on every implement dispatch (`git diff --stat` + `git status --porcelain`).
+- An idle Casper (Gemini) seat is a FAILED activation, not a degraded duo.
+- Read `magi-mode` then `magi-dispatch` when the brief routes through MAGI.
 
 ## Discover this repo's commands first
 

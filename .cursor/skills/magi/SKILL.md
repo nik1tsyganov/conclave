@@ -32,7 +32,7 @@ Read these files in order:
 ## Cursor hostMode
 
 - `/magi` uses hostMode `cursor`: Grok arbiter dispatches via Cursor Task to the wrapper agents.
-- `/magi-cli` uses hostMode `cursor-cli`: Grok arbiter dispatches via vendor CLIs (`codex.exe`, `agy.exe`); never Cursor Task to elector slugs. Claude is not reachable headlessly, so a Codex+Gemini split is a duo.
+- `/magi-cli` uses hostMode `cursor-cli`: Grok arbiter dispatches via vendor CLIs (`codex.exe`, `agy.exe`, `claude.exe`); never Cursor Task to elector slugs. Claude is reached via `C:\Users\YESSIR\.local\bin\claude.exe` when authenticated; until `claude auth login` and an on-topic `-p` probe succeed, a Codex+Gemini split is a duo.
 - Any implement/review/vote by the arbiter is FAILED activation in both Cursor modes.
 
 ## Three-vendor implement split

@@ -3,7 +3,7 @@ name: reviewer
 description: |
   Reviews code for bugs, regressions, security issues, missing tests, and mismatch with repo patterns.
 tools: Read, Edit, Write, Glob, Grep, Bash
-skills: infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks
+skills: infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks, magi-mode, magi-dispatch, mix-mode
 ---
 
 # reviewer
@@ -11,6 +11,15 @@ skills: infrastructure, frontend-patterns, database, backend-patterns, auth-secu
 ## Role
 
 Review the change for correctness, repo-consistency, reuse, and security before it can close. Return a numbered gap list to the implementer — or LGTM if there are none.
+
+## MAGI
+
+When this dispatch is a MAGI seat (Cursor Task or Claude Code wrapper):
+- Grok/Claude arbiter does not implement in MAGI Cursor; it only classifies, dispatches, and tallies.
+- Enforce the 60% vendor floor per `magi-mode`.
+- Require the implement seat's WRITE AUDIT before closing on a MAGI implement.
+- An idle Casper (Gemini) seat is a FAILED activation, not a degraded duo.
+- Read `magi-mode` then `magi-dispatch` when the brief routes through MAGI.
 
 ## Verification
 

@@ -92,11 +92,15 @@ function check() {
   }
 
   const cursorCli = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi/references/cursor-cli.md'), 'utf8');
-  for (const s of ['codex.exe', 'agy.exe', 'cursor-cli', 'NOT OPERATIONAL']) {
+  for (const s of ['codex.exe', 'agy.exe', 'cursor-cli', '.local\\bin\\claude.exe']) {
     if (!cursorCli.includes(s)) {
       console.error(`cursor-cli.md missing required string: ${s}`);
       return 1;
     }
+  }
+  if (!cursorCli.includes('login') && !cursorCli.includes('auth')) {
+    console.error('cursor-cli.md missing required auth string: login or auth');
+    return 1;
   }
 
   const cmd = fs.readFileSync(path.join(ROOT, 'commands/magi.md'), 'utf8');

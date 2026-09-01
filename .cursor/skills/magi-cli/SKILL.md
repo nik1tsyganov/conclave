@@ -23,7 +23,7 @@ Read these files in order:
 12. `references/cursor-cli.md`
 13. `C:\Users\YESSIR\.claude\skills\codex-bridge\SKILL.md` when dispatching Codex
 14. `C:\Users\YESSIR\.claude\skills\gemini-bridge\SKILL.md` when dispatching Gemini
-15. `C:\Users\YESSIR\.claude\skills\claude-bridge\SKILL.md` when attempting Claude (NOT OPERATIONAL on this machine)
+15. `C:\Users\YESSIR\.claude\skills\claude-bridge\SKILL.md` when attempting Claude (binary present 2026-09-01; headless auth required)
 
 ## MAGI is not CONCLAVE
 
@@ -35,7 +35,7 @@ Read these files in order:
 
 - Grok classifies, briefs, dispatches, lead-writes telemetry, tallies.
 - All seat dispatches go through vendor CLIs (`codex.exe`, `agy.exe`), never Cursor Task to claude/gpt/gemini slugs.
-- Claude is not reachable headlessly; a Codex+Gemini split is a degraded duo. Record `degraded=true` and name the reduction reason.
+- Claude is reachable via `C:\Users\YESSIR\.local\bin\claude.exe` when authenticated; until `claude auth login` and an on-topic `-p` probe succeed, a Codex+Gemini split is a degraded duo. Record `degraded=true` and name the reduction reason.
 - Any implement/review/vote by the arbiter is FAILED activation.
 
 ## Three-vendor implement split (degraded when Claude is unavailable)
@@ -44,11 +44,11 @@ Before the first write, split implement across the reachable vendors:
 
 - Intake/cluster A → Codex CLI via `codex.exe`
 - Intake/cluster B → Gemini CLI via `agy.exe`
-- Intake/cluster C → Claude CLI is NOT OPERATIONAL; record `degraded=true` and redistribute its work to Codex/Gemini or pause.
+- Intake/cluster C → Claude CLI is at `C:\Users\YESSIR\.local\bin\claude.exe`, auth required; record `degraded=true` and redistribute its work to Codex/Gemini or pause.
 
 Permute if needed; Casper must not be idle.
 
-While capacity-state `distributionBreaker` is tripped, do not give Claude the majority of implement units (Claude is unreachable in this mode; the floor applies to the two reachable vendors).
+While capacity-state `distributionBreaker` is tripped, do not give Claude the majority of implement units (Claude is auth-required in this mode; the floor applies to the two reachable vendors until `claude auth login` and an on-topic `-p` probe succeed).
 
 Enforce the 60% floor per vendor.
 

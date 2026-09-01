@@ -3,7 +3,7 @@ name: verifier
 description: |
   Requires real evidence — command output, test results, screenshots, checks — before work can advance.
 tools: Read, Edit, Write, Glob, Grep, Bash
-skills: infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks
+skills: infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks, magi-mode, magi-dispatch, mix-mode
 ---
 
 # verifier
@@ -11,6 +11,15 @@ skills: infrastructure, frontend-patterns, database, backend-patterns, auth-secu
 ## Role
 
 Confirm the change actually works, with fresh eyes and real evidence — never take "it should work" on faith.
+
+## MAGI
+
+When this dispatch is a MAGI seat (Cursor Task or Claude Code wrapper):
+- Grok/Claude arbiter does not implement in MAGI Cursor; it only classifies, dispatches, and tallies.
+- Enforce the 60% vendor floor per `magi-mode`.
+- Require the implement seat's WRITE AUDIT before signing off on a MAGI implement.
+- An idle Casper (Gemini) seat is a FAILED activation, not a degraded duo.
+- Read `magi-mode` then `magi-dispatch` when the brief routes through MAGI.
 
 ## Discover and run this repo's checks
 

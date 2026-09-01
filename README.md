@@ -7,8 +7,8 @@ Original MAGI tri-seat panel (Claude + Codex + Gemini) as a local Cursor plugin.
 - The Grok arbiter routes, briefs, and tallies; it does **not** implement, review, verify, or vote.
 - Claude Code still uses the same MAGI policy: run `magi-whoami --mode claude-code` there. This plugin is the Cursor surface.
 - `/magi` = MAGI Cursor (hostMode `cursor`): Grok arbiter dispatches via Cursor Task to the wrapper agents.
-- `/magi-cli` = MAGI Cursor CLI (hostMode `cursor-cli`): Grok arbiter dispatches via vendor CLIs (`codex.exe`, `agy.exe`) when Cursor Task usage is exhausted. Never Cursor Task to elector slugs in this mode. Claude is not reachable headlessly, so a Codex+Gemini split is a degraded duo.
-- Codex-led MAGI is a duo (no headless Claude CLI); it uses the `magi-mode` skill directly. Claude-hosted MAGI is the full tri-seat.
+- `/magi-cli` = MAGI Cursor CLI (hostMode `cursor-cli`): Grok arbiter dispatches via vendor CLIs (`codex.exe`, `agy.exe`, `claude.exe`) when Cursor Task usage is exhausted. Never Cursor Task to elector slugs in this mode. The Claude CLI is installed at `C:\Users\YESSIR\.local\bin\claude.exe`; login is required for the Claude seat, so a Codex+Gemini split is a degraded duo until auth succeeds.
+- Codex-led MAGI is a duo (Claude CLI is installed at `C:\Users\YESSIR\.local\bin\claude.exe` but auth is required); it uses the `magi-mode` skill directly. Claude-hosted MAGI is the full tri-seat.
 - **MAGI plugin rules are `alwaysApply: true` in every Cursor workspace.** The three rules (`magi-arbiter`, `magi-activation`, `magi-orchestrator`) ship with the plugin and are copied to `~/.cursor/rules/magi-*.mdc` by the installer, matching CONCLAVE's always-on `commit-and-push` user rule. CONCLAVE chats ignore MAGI rules via the first-line discriminator. Do not glob MAGI rules to magi-only trees.
 
 ## Installation

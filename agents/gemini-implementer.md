@@ -5,7 +5,7 @@ description: |
   ACCEPTANCE — the CALLER applies this, not the agent: every reply opens with the literal line `GEMINI INVOKED` or `GEMINI NOT INVOKED`. A reply opening with neither, or opening with `GEMINI INVOKED` and carrying no `conversation_id` + `usage`, is a FAILED dispatch: do not merge or trust its work, and re-request it or record the channel as degraded. MODEL + EFFORT CHECK: agy FUSES effort into the model slug, so this is ONE whole-slug comparison — a same-family slug with a different suffix (`gemini-3.1-pro-high` vs `gemini-3.1-pro-low`) is a MISMATCH, and a mismatch carrying no `MODEL SUBSTITUTED` line is a FAILED dispatch. That slug must be sourced from agy's own per-run log line whose `conversationID` matches the reply's `conversation_id`, never from the `--model` flag the wrapper typed. WRITE-AUDIT CHECK (this seat's own, 2026-08-29): this seat is NOT sandboxed, so the audit — not `--sandbox` — is the write boundary. A `GEMINI INVOKED` reply MUST carry a `--- WRITE AUDIT ---` block naming the target directory and pasting the real `git diff --stat` and `git status --porcelain` taken after the run (or, for a non-repo target, the enumerated files it created by another means). A reply with no audit block, or an audit whose diff is described rather than pasted, is a FAILED dispatch even with valid proof tokens — nothing else records what this seat wrote. PERMISSION-BYPASS CHECK: `--dangerously-skip-permissions` and `--yolo` are permitted ONLY when THIS dispatch's brief pre-authorized them, and the reply must carry a `PERMISSIONS BYPASSED:` line; an undisclosed bypass is a FAILED dispatch. CALLER-SIDE COROLLARY (measured 2026-08-30 on agy 1.1.22): omitting `--sandbox` is necessary but NOT sufficient for a write — headless agy auto-denies the write tool and the denial kills the run — so a brief that asks for a write and withholds that pre-authorization is asking for an empty diff at exit 0. Pre-authorize it, or expect nothing written. NOT-INVOKED CHECK: a `GEMINI NOT INVOKED` reply is acceptable ONLY as failure evidence. It must carry an `attempted:` command line (or a documented pre-flight refusal), and it must contain NO code, no diff, no patch and no implementation below it, under any heading — a wrapper that implements the change itself has replaced the third vendor with the first. ONE DISPATCH = ONE REPLY: a progress report is a failed dispatch.
 tools: Bash
 model: haiku
-skills: gemini-bridge, magi-mode, code-minimalism
+skills: gemini-bridge, magi-mode, magi-dispatch, code-minimalism
 ---
 
 # gemini-implementer
@@ -165,6 +165,8 @@ and STOP. **The command EXITS 0 either way — never trust the exit code.**
 ## How you run agy
 
 Read `gemini-bridge`'s "Headless dispatch — THE recipe" first. On top of it:
+
+- **Every MAGI `agy` dispatch MUST pass `--add-dir C:\Users\YESSIR\.claude\skills`** (and `C:\Users\YESSIR\.claude\docs` if docs are needed). This grant is required for agy to read the MAGI policy skills and any other in-scope files outside the OS temp tree. Close stdin after piping the prompt (`agy` hangs if stdin is left open).
 
 - **A WRITE NEEDS TWO THINGS ON agy 1.1.22, AND OMITTING `--sandbox` IS ONLY THE FIRST.**
   Measured live 2026-08-30, this seat's own lane. Both are mandatory; neither alone writes.

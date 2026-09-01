@@ -10,4 +10,4 @@ description: Start or continue a MAGI Cursor CLI run (hostMode `cursor-cli`). Us
 - Read `.cursor/skills/magi-cli/SKILL.md` and `references/cursor-cli.md`.
 - Never Cursor Task to claude/gpt/gemini slugs — this mode spends vendor CLIs only (`codex.exe`, `agy.exe`). Grok does not implement.
 - Three-vendor split via CLIs; activation-check (`node C:\src\magi\tools\activation-check.js magi-dispatch-log.jsonl`) and 60% floor same as `/magi`.
-- Claude CLI is NOT OPERATIONAL on this machine (`claude-bridge` has no headless CLI). A Codex+Gemini split is a degraded duo; record `degraded=true` and name the reduction reason.
+- Claude CLI is installed at `C:\Users\YESSIR\.local\bin\claude.exe` (binary present 2026-09-01); headless auth required. A Codex+Gemini split is a degraded duo until `claude auth login` and an on-topic `-p` probe succeed; record `degraded=true` and name the reduction reason.
