@@ -1,9 +1,9 @@
 ---
-name: magi
-description: MAGI in Cursor. Use when the user says magi or /magi. Grok routes Claude+Codex+Gemini. Not CONCLAVE.
+name: magi-cli
+description: MAGI Cursor CLI mode. Use when the user says magi-cli or /magi-cli. Grok arbiter dispatches via vendor CLIs; never Cursor Task to elector slugs. Not CONCLAVE.
 ---
 
-# MAGI in Cursor
+# MAGI in Cursor CLI mode (`/magi-cli`)
 
 ## Required reading (LIVE files — read from these paths, do not copy)
 
@@ -20,8 +20,10 @@ Read these files in order:
 9. `C:\Users\YESSIR\.claude\skills\mix-mode\SKILL.md`
 10. `C:\Users\YESSIR\.claude\skills\dispatch-efficiency\SKILL.md`
 11. `C:\Users\YESSIR\.claude\skills\task-retrospective\SKILL.md`
-12. `C:\Users\YESSIR\.claude\skills\codex-bridge\SKILL.md` when dispatching Codex
-13. `C:\Users\YESSIR\.claude\skills\gemini-bridge\SKILL.md` when dispatching Gemini
+12. `.cursor/skills/magi/references/cursor-cli.md`
+13. `C:\Users\YESSIR\.claude\skills\codex-bridge\SKILL.md` when dispatching Codex
+14. `C:\Users\YESSIR\.claude\skills\gemini-bridge\SKILL.md` when dispatching Gemini
+15. `C:\Users\YESSIR\.claude\skills\claude-bridge\SKILL.md` when attempting Claude (NOT OPERATIONAL on this machine)
 
 ## MAGI is not CONCLAVE
 
@@ -29,23 +31,24 @@ Read these files in order:
 - Do not dispatch `camerlengo-8`.
 - Run `magi-whoami` before activation.
 
-## Cursor hostMode
+## Cursor hostMode (`cursor-cli`)
 
-- `/magi` uses hostMode `cursor`: Grok arbiter dispatches via Cursor Task to the wrapper agents.
-- `/magi-cli` uses hostMode `cursor-cli`: Grok arbiter dispatches via vendor CLIs (`codex.exe`, `agy.exe`); never Cursor Task to elector slugs. Claude is not reachable headlessly, so a Codex+Gemini split is a duo.
-- Any implement/review/vote by the arbiter is FAILED activation in both Cursor modes.
+- Grok classifies, briefs, dispatches, lead-writes telemetry, tallies.
+- All seat dispatches go through vendor CLIs (`codex.exe`, `agy.exe`), never Cursor Task to claude/gpt/gemini slugs.
+- Claude is not reachable headlessly; a Codex+Gemini split is a degraded duo. Record `degraded=true` and name the reduction reason.
+- Any implement/review/vote by the arbiter is FAILED activation.
 
-## Three-vendor implement split
+## Three-vendor implement split (degraded when Claude is unavailable)
 
-Before the first write, split implement across THREE vendors:
+Before the first write, split implement across the reachable vendors:
 
-- Intake/cluster A → Task subagent_type `codex-implementer`
-- B → `gemini-implementer`
-- C → `implementer`
+- Intake/cluster A → Codex CLI via `codex.exe`
+- Intake/cluster B → Gemini CLI via `agy.exe`
+- Intake/cluster C → Claude CLI is NOT OPERATIONAL; record `degraded=true` and redistribute its work to Codex/Gemini or pause.
 
 Permute if needed; Casper must not be idle.
 
-While capacity-state `distributionBreaker` is tripped, do not give Claude the majority of implement units.
+While capacity-state `distributionBreaker` is tripped, do not give Claude the majority of implement units (Claude is unreachable in this mode; the floor applies to the two reachable vendors).
 
 Enforce the 60% floor per vendor.
 

@@ -1,0 +1,13 @@
+---
+name: magi-cli
+description: Start or continue a MAGI Cursor CLI run (hostMode `cursor-cli`). Use when the user says magi-cli or /magi-cli. Not CONCLAVE, not `/magi` Task mode.
+---
+
+# /magi-cli
+
+- If this chat is CONCLAVE (`/conclave`, `camerlengo-8`), stop: tell owner to open a new chat and type `/magi` or `/magi-cli`.
+- Run `node C:\Users\YESSIR\.claude\skills\magi-mode\references\magi-whoami.js --mode cursor-cli --slug <picker slug>`. Stop unless LEGAL. Elector slugs are FORBIDDEN as MAGI Cursor CLI arbiter; Grok only.
+- Read `.cursor/skills/magi-cli/SKILL.md` and `references/cursor-cli.md`.
+- Never Cursor Task to claude/gpt/gemini slugs — this mode spends vendor CLIs only (`codex.exe`, `agy.exe`). Grok does not implement.
+- Three-vendor split via CLIs; activation-check (`node C:\src\magi\tools\activation-check.js magi-dispatch-log.jsonl`) and 60% floor same as `/magi`.
+- Claude CLI is NOT OPERATIONAL on this machine (`claude-bridge` has no headless CLI). A Codex+Gemini split is a degraded duo; record `degraded=true` and name the reduction reason.

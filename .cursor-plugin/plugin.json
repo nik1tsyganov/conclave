@@ -1,6 +1,6 @@
 {
   "name": "magi",
-  "description": "Original MAGI tri-seat (Claude + Codex + Gemini). Cursor Grok arbiter routes; it does not implement. Not CONCLAVE.",
+  "description": "MAGI Cursor. Grok arbiter. `/magi` = Task. Not CONCLAVE.",
   "version": "0.1.0",
   "author": { "name": "Nikita Tsyganov" },
   "repository": "https://github.com/nik1tsyganov/magi.git",

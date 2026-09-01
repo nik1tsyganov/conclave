@@ -20,10 +20,13 @@ function check() {
     '.cursor-plugin/plugin.json',
     '.cursor/skills/magi/SKILL.md',
     '.cursor/skills/magi/references/cursor-host.md',
+    '.cursor/skills/magi/references/cursor-cli.md',
+    '.cursor/skills/magi-cli/SKILL.md',
     '.cursor/rules/magi-arbiter.mdc',
     '.cursor/rules/magi-activation.mdc',
     '.cursor/rules/magi-orchestrator.mdc',
     'commands/magi.md',
+    'commands/magi-cli.md',
     'claude-commands/magi.md',
     'tools/install-plugin.js',
     'tools/plugin-check.js',
@@ -72,9 +75,39 @@ function check() {
     }
   }
 
+  const magiCliSkill = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi-cli/SKILL.md'), 'utf8');
+  for (const s of ['cursor-cli', 'magi-whoami']) {
+    if (!magiCliSkill.includes(s)) {
+      console.error(`magi-cli SKILL.md missing required string: ${s}`);
+      return 1;
+    }
+  }
+
+  const cursorCli = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi/references/cursor-cli.md'), 'utf8');
+  for (const s of ['codex.exe', 'agy.exe', 'cursor-cli', 'NOT OPERATIONAL']) {
+    if (!cursorCli.includes(s)) {
+      console.error(`cursor-cli.md missing required string: ${s}`);
+      return 1;
+    }
+  }
+
   const cmd = fs.readFileSync(path.join(ROOT, 'commands/magi.md'), 'utf8');
   if (!cmd.includes('magi-whoami')) {
     console.error('commands/magi.md missing magi-whoami');
+    return 1;
+  }
+  if (!cmd.includes('--mode cursor')) {
+    console.error('commands/magi.md missing --mode cursor');
+    return 1;
+  }
+
+  const cmdCli = fs.readFileSync(path.join(ROOT, 'commands/magi-cli.md'), 'utf8');
+  if (!cmdCli.includes('magi-whoami')) {
+    console.error('commands/magi-cli.md missing magi-whoami');
+    return 1;
+  }
+  if (!cmdCli.includes('--mode cursor-cli')) {
+    console.error('commands/magi-cli.md missing --mode cursor-cli');
     return 1;
   }
 

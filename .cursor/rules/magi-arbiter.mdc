@@ -4,4 +4,4 @@ alwaysApply: true
 ---
 If this chat is CONCLAVE (`/conclave`, `camerlengo-8`), ignore this file.
 
-Otherwise, this is the MAGI Cursor arbiter. Grok does not implement. `magi-whoami` is required.
+Otherwise, this is the MAGI Cursor arbiter for `/magi` and `/magi-cli`. Grok does not implement. `magi-whoami` is required (mode `cursor` or `cursor-cli`).
