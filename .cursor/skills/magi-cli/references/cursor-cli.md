@@ -45,6 +45,8 @@ The Magi CLI Claude seat runs **`--model fable --effort xhigh`**. Verified live 
 - Codex reads `~\.codex\skills\magi-mode` (already mirrored). The brief must name `magi-mode`, `magi-dispatch`, `mix-mode`, the 60% vendor floor, WRITE AUDIT, and `activation-check`.
 - Never Cursor Task to claude/gpt/gemini slugs in this mode — that would spend exhausted Cursor model usage.
 
+After each vendor-CLI dispatch, the arbiter appends exactly one telemetry row with `hostMode: cursor-cli` and `routedBy: arbiter` by running `node C:\src\magi\tools\telemetry-append.js --row '<json>'` in the same turn; seats never write their own rows. The vendor-native proof rides the row — Codex `session id` + `tokens used`, Gemini `conversation_id` + `usage`, Claude the on-topic capture plus the model/effort as dispatched — in the `proofId` / `vendorSideTokens` / `note` fields. A dispatch with no row is invisible to `node C:\src\magi\tools\telemetry-stats.js`, so an unrecorded dispatch is a capture-health finding, never a saving.
+
 ## Cursor plugin boundary
 
 CLI seats cannot load Cursor plugins. They still run the project's own typecheck, tests, and WRITE AUDIT. The Grok arbiter may use Team Kit in its own Cursor chat after the merge.

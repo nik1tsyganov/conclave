@@ -44,13 +44,28 @@ contested; do not convene a vote-everything panel.
 
 ## Lead-written telemetry
 
-The arbiter writes one JSONL row per dispatched seat to the project's `telemetry/dispatches.jsonl` if the project has a `telemetry` directory; otherwise fall back to `C:\src\magi\telemetry\dispatches.jsonl`. Each row carries at least:
+The arbiter writes one JSONL row per dispatched seat. When the project has its own `telemetry` directory, the arbiter passes `--log <project>\telemetry\dispatches.jsonl`; otherwise it uses the tool's default, `C:\src\magi\telemetry\dispatches.jsonl` (the tool does not pick a project path by itself). Each row carries at least:
 
 ```json
 { "vendor": "anthropic|openai|google", "role": "implement|verify|review", "hostMode": "cursor", "routedBy": "arbiter" }
 ```
 
-Only the lead writes telemetry; do not let a seat write its own row.
+Write and read rows mechanically, never by hand-editing the log:
+
+```bash
+node C:\src\magi\tools\telemetry-append.js --row '<json>'
+node C:\src\magi\tools\telemetry-stats.js
+```
+
+`hostMode` and `routedBy` are required; `telemetry-append.js` rejects a row
+without them. Token fields (`vendorSideTokens`, `totalTokens`) are a positive
+number or `null` — missing telemetry stays absent or `null`, never `0`, and a
+`0` is rejected. The default file is `C:\src\magi\telemetry\dispatches.jsonl`
+(gitignored; never commit rows); pass `--log <path>` to append to a
+project-local `telemetry/dispatches.jsonl` instead. Only the lead writes
+telemetry; do not let a seat write its own row. No hook captures dispatches in
+Cursor — a row exists only because the lead ran `telemetry-append.js` in the
+same turn as the dispatch.
 
 ## Activation check
 

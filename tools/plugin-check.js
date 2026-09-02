@@ -47,6 +47,12 @@ function check() {
     'tools/activation-check.js',
     'tools/activation-check.test.js',
     'tools/plugin-check.test.js',
+    'tools/telemetry-append.js',
+    'tools/telemetry-append.test.js',
+    'tools/telemetry-stats.js',
+    'tools/telemetry-stats.test.js',
+    'tools/telemetry-selftest.test.js',
+    'telemetry/README.md',
     'tools/dispatch-log.pass.jsonl',
     'tools/dispatch-log.fail.jsonl',
     'agents/implementer.md',
@@ -107,9 +113,15 @@ function check() {
 
   const cursorCli = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi/references/cursor-cli.md'), 'utf8');
   const magiCliRef = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi-cli/references/cursor-cli.md'), 'utf8');
-  
+
+  if (cursorCli !== magiCliRef) {
+    console.error('cursor-cli.md copies diverge: .cursor/skills/magi/references/cursor-cli.md != .cursor/skills/magi-cli/references/cursor-cli.md');
+    return 1;
+  }
+
+
   for (const ref of [cursorCli, magiCliRef]) {
-    for (const s of ['codex.exe', 'agy.exe', 'cursor-cli', '.local\\bin\\claude.exe', 'fable', 'xhigh']) {
+    for (const s of ['codex.exe', 'agy.exe', 'cursor-cli', '.local\\bin\\claude.exe', 'fable', 'xhigh', 'telemetry-append.js']) {
       if (!ref.includes(s)) {
         console.error(`cursor-cli.md missing required string: ${s}`);
         return 1;
@@ -165,6 +177,8 @@ function check() {
     'gpt-5.6-sol-medium',
     'gemini-3.1-pro',
     'host-resolver',
+    'telemetry-append.js',
+    'telemetry-stats.js',
   ]) {
     if (!cursorHost.includes(s)) {
       console.error(`cursor-host.md missing required string: ${s}`);

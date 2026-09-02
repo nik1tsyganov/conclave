@@ -1,4 +1,5 @@
 node_modules
 telemetry/_tmp-*.json
+telemetry/dispatches.jsonl
 tools/dispatch-log.jsonl
 magi-dispatch-log.jsonl
