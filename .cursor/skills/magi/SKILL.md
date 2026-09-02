@@ -22,6 +22,8 @@ Read these files in order:
 11. `C:\Users\YESSIR\.claude\skills\task-retrospective\SKILL.md`
 12. `C:\Users\YESSIR\.claude\skills\codex-bridge\SKILL.md` when dispatching Codex
 13. `C:\Users\YESSIR\.claude\skills\gemini-bridge\SKILL.md` when dispatching Gemini
+14. `.cursor/skills/magi/references/cursor-cli.md` (used after a host trip)
+15. `C:\Users\YESSIR\.claude\skills\claude-bridge\SKILL.md` (needed when tripped)
 
 ## MAGI is not CONCLAVE
 
@@ -31,19 +33,29 @@ Read these files in order:
 
 ## Cursor hostMode
 
-- `/magi` uses hostMode `cursor`: Grok arbiter dispatches via Cursor Task to the wrapper agents.
+- `/magi` uses hostMode `cursor`: Grok arbiter dispatches native Cursor Task
+  seats. Each Task uses `implementer`, `reviewer`, or `verifier` and MUST set
+  `model` to `claude-opus-5-thinking-high`, `gpt-5.6-sol-medium`, or
+  `gemini-3.1-pro` for the assigned vendor. Never Task a `codex-*` or `gemini-*`
+  CLI wrapper in this mode.
 - `/magi-cli` uses hostMode `cursor-cli`: Grok arbiter dispatches via vendor CLIs (`codex.exe`, `agy.exe`, `claude.exe`); never Cursor Task to elector slugs. Claude is reached via `C:\Users\YESSIR\.local\bin\claude.exe` when authenticated; until `claude auth login` and an on-topic `-p` probe succeed, a Codex+Gemini split is a duo.
 - Any implement/review/vote by the arbiter is FAILED activation in both Cursor modes.
+- Before each Cursor elector Task, and after a Task fails with usage or quota
+  language, run `node C:\src\magi\tools\host-resolver.js`. If it trips, send
+  remaining seats through `cursor-cli`; do not persist a global mode.
 
 ## Three-vendor implement split
 
 Before the first write, split implement across THREE vendors:
 
-- Intake/cluster A → Task subagent_type `codex-implementer`
-- B → `gemini-implementer`
-- C → `implementer`
+- Intake/cluster A → Task `implementer`, model `gpt-5.6-sol-medium`
+- B → Task `implementer`, model `gemini-3.1-pro`
+- C → Task `implementer`, model `claude-opus-5-thinking-high`
 
-Permute if needed; Casper must not be idle.
+Permute the vendors across implement units; Casper must not be idle. Review and
+verification use the same model table with Task `reviewer` and `verifier`.
+Review goes to the vendors other than the author. Add the third reviewer only
+when the task class or owner marks the review contested.
 
 While capacity-state `distributionBreaker` is tripped, do not give Claude the majority of implement units.
 

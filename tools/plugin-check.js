@@ -30,6 +30,7 @@ function check() {
     'claude-commands/magi.md',
     'tools/install-plugin.js',
     'tools/plugin-check.js',
+    'tools/host-resolver.js',
     'tools/hog-check.js',
     'tools/hog-check.test.js',
     'tools/activation-check.js',
@@ -94,15 +95,19 @@ function check() {
   }
 
   const cursorCli = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi/references/cursor-cli.md'), 'utf8');
-  for (const s of ['codex.exe', 'agy.exe', 'cursor-cli', '.local\\bin\\claude.exe']) {
-    if (!cursorCli.includes(s)) {
-      console.error(`cursor-cli.md missing required string: ${s}`);
+  const magiCliRef = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi-cli/references/cursor-cli.md'), 'utf8');
+  
+  for (const ref of [cursorCli, magiCliRef]) {
+    for (const s of ['codex.exe', 'agy.exe', 'cursor-cli', '.local\\bin\\claude.exe', 'fable', 'xhigh']) {
+      if (!ref.includes(s)) {
+        console.error(`cursor-cli.md missing required string: ${s}`);
+        return 1;
+      }
+    }
+    if (!ref.includes('login') && !ref.includes('auth')) {
+      console.error('cursor-cli.md missing required auth string: login or auth');
       return 1;
     }
-  }
-  if (!cursorCli.includes('login') && !cursorCli.includes('auth')) {
-    console.error('cursor-cli.md missing required auth string: login or auth');
-    return 1;
   }
 
   const cmd = fs.readFileSync(path.join(ROOT, 'commands/magi.md'), 'utf8');
@@ -143,6 +148,17 @@ function check() {
   if (!cursorHost.includes('plugins/local/magi/agents') && !cursorHost.includes('plugins\\local\\magi\\agents')) {
     console.error('cursor-host.md missing plugins/local/magi/agents path');
     return 1;
+  }
+  for (const s of [
+    'claude-opus-5-thinking-high',
+    'gpt-5.6-sol-medium',
+    'gemini-3.1-pro',
+    'host-resolver',
+  ]) {
+    if (!cursorHost.includes(s)) {
+      console.error(`cursor-host.md missing required string: ${s}`);
+      return 1;
+    }
   }
 
   const ruleFiles = [

@@ -9,6 +9,15 @@ description: Start or continue a MAGI Cursor run (hostMode `cursor`). Use when t
 - Read `.cursor/skills/magi/SKILL.md`.
 - Run: `node C:\Users\YESSIR\.claude\skills\magi-mode\references\magi-whoami.js --mode cursor --slug <picker slug>`
 - Stop unless LEGAL exit 0. Elector slugs (claude/gpt/gemini) are FORBIDDEN as MAGI Cursor arbiter.
-- Follow `cursor-host.md` dispatch. Arbiter never implements.
+- Follow `cursor-host.md` dispatch. Arbiter never implements, reviews, verifies, or votes.
+- Before each elector Task, run `node C:\src\magi\tools\host-resolver.js`; run it
+  again after usage/quota failures with `node C:\src\magi\tools\host-resolver.js --from cursor --error-text "<exact error>"`. If it trips, route remaining seats through
+  `cursor-cli` without persisting a global mode.
+- Dispatch Task `implementer` with required model overrides
+  `claude-opus-5-thinking-high`, `gpt-5.6-sol-medium`, and `gemini-3.1-pro`.
+  Permute implementation across vendors; Casper must not be idle.
+- Use Task `reviewer` and `verifier` with the same model table. Review goes to
+  vendors other than the author; add a third reviewer only when contested.
+- Never Task `codex-*` or `gemini-*` CLI wrapper agents in hostMode `cursor`.
 - After implement dispatches, write one JSONL row per implement unit `{vendor, role:"implement"}` to `magi-dispatch-log.jsonl` at the project root (gitignored; do not commit secrets).
 - Run the activation check: `node C:\src\magi\tools\activation-check.js magi-dispatch-log.jsonl`.

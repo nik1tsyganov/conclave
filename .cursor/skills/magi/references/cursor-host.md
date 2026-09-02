@@ -1,12 +1,46 @@
 # Cursor host
 
-Cursor Task: `subagent_type` is the MAGI agent stem. Valid stems are the three implementers (`codex-implementer`, `gemini-implementer`, `implementer`) and the verify/review wrappers (`codex-verifier`, `gemini-verifier`, `verifier`, `codex-reviewer`, `gemini-reviewer`, `reviewer`). Never omit model.
+`/magi` uses native Cursor Task models. For every elector dispatch, set the role
+with `subagent_type` and set `model` from this table. Never omit `model`.
 
-Codex high uses CLI `-c model_reasoning_effort=high` when that seat runs via wrapper.
+| Seat | `subagent_type` by role | Required `model` |
+|---|---|---|
+| Balthasar (Anthropic) | `implementer` / `reviewer` / `verifier` | `claude-opus-5-thinking-high` |
+| Melchior (OpenAI) | `implementer` / `reviewer` / `verifier` | `gpt-5.6-sol-medium` |
+| Casper (Google) | `implementer` / `reviewer` / `verifier` | `gemini-3.1-pro` |
 
-Gemini seated slug `gemini-3.1-pro-high`; Flash is not Casper evidence.
+In hostMode `cursor`, never Task `codex-implementer`, `gemini-implementer`,
+`codex-reviewer`, `gemini-reviewer`, `codex-verifier`, or `gemini-verifier`.
+Those agents remain installed for Claude Code and CLI-backed modes.
 
-Proof: Codex session id + tokens; Gemini conversation_id + usage + log slug check.
+Proof in this mode is the Cursor Task `model` slug plus the implementer's WRITE
+AUDIT. Do not require or claim a CLI session id, conversation id, token count, or
+other CLI proof token.
+
+## Per-dispatch host failsafe
+
+Before each Cursor Task to an elector slug, run:
+
+```bash
+node C:\src\magi\tools\host-resolver.js
+```
+
+Run it again when a Task fails with usage or quota language:
+
+```bash
+node C:\src\magi\tools\host-resolver.js --from cursor --error-text "<exact error>"
+```
+
+If the resolver
+trips, route all remaining seats through hostMode `cursor-cli`. Do not persist a
+global mode; the decision is per dispatch.
+
+## Multi-vendor review
+
+Review uses the vendors other than the implement author. Permute implementation
+across vendors so one vendor does not always implement while the other two only
+grade. Add the third reviewer only when the task class or owner marks the review
+contested; do not convene a vote-everything panel.
 
 ## Lead-written telemetry
 
@@ -34,5 +68,5 @@ Cursor Task seats run `check-compiler-errors` and `deslop` when they edited code
 
 ## Agent discovery
 
-- Claude Code reaches the MAGI seats via wrappers already in `C:\Users\YESSIR\.claude\agents\` (same stems as the plugin agents).
-- Cursor Task uses the MAGI plugin `agents/` directory when the plugin is enabled (copied to `C:\Users\YESSIR\.cursor\plugins\local\magi\agents`). Keep both copies. Do not delete the plugin agents.
+- Claude Code reaches the MAGI seats via wrappers already in `C:\Users\YESSIR\.claude\agents\`.
+- Cursor Task uses `implementer`, `reviewer`, and `verifier` from the MAGI plugin `agents/` directory when enabled (copied to `C:\Users\YESSIR\.cursor\plugins\local\magi\agents`). Keep all plugin agents; the CLI wrapper agents still serve other host modes.

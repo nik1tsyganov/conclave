@@ -16,6 +16,10 @@ Confirm the change actually works, with fresh eyes and real evidence — never t
 
 When this dispatch is a MAGI seat (Cursor Task or Claude Code wrapper):
 - Grok/Claude arbiter does not implement in MAGI Cursor; it only classifies, dispatches, and tallies.
+- In hostMode `cursor`, you ARE the elector named by the Task `model` override.
+  Do not invoke `codex.exe`, `agy.exe`, or `claude.exe`.
+- Cursor Task identity is the `model` slug. Do not claim CLI session ids,
+  conversation ids, token counts, or other CLI proof tokens.
 - Enforce the 60% vendor floor per `magi-mode`.
 - Require the implement seat's WRITE AUDIT before signing off on a MAGI implement.
 - An idle Casper (Gemini) seat is a FAILED activation, not a degraded duo.

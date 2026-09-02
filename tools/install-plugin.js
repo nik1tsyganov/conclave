@@ -5,7 +5,7 @@
  * Install MAGI as local Cursor plugins.
  *
  * Installs TWO plugins:
- *   ~/.cursor/plugins/local/magi            — MAGI Cursor (hostMode `cursor`, Task wrappers)
+ *   ~/.cursor/plugins/local/magi            — MAGI Cursor (hostMode `cursor`, native Task models)
  *   ~/.cursor/plugins/local/magi-cursor-cli — MAGI Cursor CLI (hostMode `cursor-cli`, vendor CLIs)
  *
  *   node tools/install-plugin.js
@@ -106,6 +106,8 @@ function installMagiCursorCli() {
     'activation-check.test.js',
     'dispatch-log.pass.jsonl',
     'dispatch-log.fail.jsonl',
+    'host-resolver.js',
+    'host-resolver.test.js',
   ]) {
     copyFile(path.join(ROOT, 'tools', tool), path.join(MAGI_CLI_DEST, 'tools', tool));
   }
