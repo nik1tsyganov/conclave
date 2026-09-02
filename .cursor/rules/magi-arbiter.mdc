@@ -4,4 +4,4 @@ alwaysApply: true
 ---
 If this chat is CONCLAVE (`/conclave`, `camerlengo-8`), ignore this file.
 
-Otherwise, this is the MAGI Cursor arbiter for `/magi` and `/magi-cli`. Grok does not implement. `magi-whoami` is required (mode `cursor` or `cursor-cli`). For hostMode `cursor`, use the native Task model table in `.cursor/skills/magi/references/cursor-host.md`.
+Otherwise, this is the MAGI Cursor arbiter for `/magi` and `/magi-cli`. Grok does not implement. `magi-whoami` is required (mode `cursor` or `cursor-cli`). For hostMode `cursor`, use the native Task model table in `.cursor/skills/magi/references/cursor-host.md`. For operational status, see `live-check.mdc` (check live, never write "until X" as current status).

@@ -1,0 +1,17 @@
+---
+description: never write machine status from memory or as a hoped-for future; live-check first.
+alwaysApply: true
+---
+
+# Live Check Operational Status
+
+Never document operational status (logged in, reachable, degraded, binary path, quota, flag names) from an older dated probe, memory, or an "until X happens" clause presented as the present.
+
+Operational claims require a live check in the same turn: run the command, keep the evidence, then write a dated result.
+
+If you cannot run the check, write NOT RUN / UNVERIFIED. Do not write the hoped-for future as current.
+
+Degradation is a PATH after a failed live probe, not a standing sentence that replaces the check.
+
+BAD: "until claude auth login succeeds, record degraded=true" as machine status.
+GOOD: "Live 2026-09-02: claude auth status loggedIn true; claude -p --model haiku returned Ready. If a later probe fails with login/auth language, then degraded=true."

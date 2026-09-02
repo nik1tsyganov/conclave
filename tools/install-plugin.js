@@ -115,7 +115,7 @@ function installMagiCursorCli() {
 
 function installUserGlobals() {
   fs.mkdirSync(USER_RULES_DIR, { recursive: true });
-  for (const ruleFile of ['magi-arbiter.mdc', 'magi-activation.mdc', 'magi-orchestrator.mdc']) {
+  for (const ruleFile of ['magi-arbiter.mdc', 'magi-activation.mdc', 'magi-orchestrator.mdc', 'live-check.mdc']) {
     const src = path.join(ROOT, '.cursor', 'rules', ruleFile);
     const dst = path.join(USER_RULES_DIR, ruleFile);
     copyFile(src, dst);
@@ -147,6 +147,7 @@ function checkMagi() {
     'rules/magi-arbiter.mdc',
     'rules/magi-activation.mdc',
     'rules/magi-orchestrator.mdc',
+    'rules/live-check.mdc',
     'commands/magi.md',
     'commands/magi-cli.md',
     'tools/hog-check.js',
@@ -177,6 +178,7 @@ function checkMagiCli() {
     'rules/magi-arbiter.mdc',
     'rules/magi-activation.mdc',
     'rules/magi-orchestrator.mdc',
+    'rules/live-check.mdc',
     'commands/magi-cli.md',
     'tools/hog-check.js',
     'tools/activation-check.js',
@@ -206,14 +208,14 @@ try {
   console.log(`MAGI Cursor plugin installed at ${MAGI_DEST}`);
   console.log('  skill:  magi + cursor-host + cursor-cli reference');
   console.log('  user:   ' + USER_SKILL_MAGI);
-  console.log('  rules:  arbiter, activation, orchestrator (plugin + ~/.cursor/rules)');
+  console.log('  rules:  arbiter, activation, orchestrator, live-check (plugin + ~/.cursor/rules)');
   console.log('  agents: 9 seat briefs');
   console.log('  commands: /magi, /magi-cli');
   console.log('');
   console.log(`MAGI Cursor CLI plugin installed at ${MAGI_CLI_DEST}`);
   console.log('  skill:  magi-cli + cursor-cli reference');
   console.log('  user:   ' + USER_SKILL_MAGI_CLI);
-  console.log('  rules:  arbiter, activation, orchestrator');
+  console.log('  rules:  arbiter, activation, orchestrator, live-check');
   console.log('  agents: none (CLI mode)');
   console.log('  command: /magi-cli');
   console.log('');

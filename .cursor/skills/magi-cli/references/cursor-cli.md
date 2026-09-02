@@ -9,7 +9,7 @@
 - `C:\Users\YESSIR\.claude\skills\magi-dispatch\SKILL.md`
 - `C:\Users\YESSIR\.claude\skills\codex-bridge\SKILL.md` when dispatching Codex
 - `C:\Users\YESSIR\.claude\skills\gemini-bridge\SKILL.md` when dispatching Gemini
-- `C:\Users\YESSIR\.claude\skills\claude-bridge\SKILL.md` — binary present 2026-09-01 at `C:\Users\YESSIR\.local\bin\claude.exe`; dispatch with `--model fable --effort xhigh`; headless auth required, see `claude-bridge` operational status
+- `C:\Users\YESSIR\.claude\skills\claude-bridge\SKILL.md` — dispatch through `C:\Users\YESSIR\.local\bin\claude.exe -p --model fable --effort xhigh`; run the live auth and headless probes first
 
 ## How the arbiter reaches each seat
 
@@ -17,9 +17,9 @@
 |---|---|---|---|
 | Melchior (codex) | OpenAI | `codex exec` | `C:\Users\YESSIR\tools\bin\codex.exe` |
 | Casper (gemini) | Google | `agy` | `C:\Users\YESSIR\tools\bin\agy.exe` |
-| Balthasar (claude) | Anthropic | `claude --model fable --effort xhigh` | `C:\Users\YESSIR\.local\bin\claude.exe` — binary present 2026-09-01; headless auth required, `degraded=true` until an on-topic `-p` probe |
+| Balthasar (claude) | Anthropic | `claude -p --model fable --effort xhigh` | `C:\Users\YESSIR\.local\bin\claude.exe` — reachable; re-run the live auth and headless probes before dispatch |
 
-A Codex+Gemini pair is a **duo**, not a full MAGI panel. Record `degraded=true` and name the reduction reason.
+Live 2026-09-02: `claude auth status` reported `loggedIn: true`, `authMethod: claude.ai`, and `subscriptionType: max`; `claude -p --model haiku` returned `ready`. Re-run both probes in the session that will dispatch. If a later probe returns login/auth language, an empty capture, or off-topic text, record `degraded=true`, include the probe text, and only then treat Codex+Gemini as a **duo**, not a full MAGI panel.
 
 ## Claude seat model and effort (owner 2026-09-02)
 
@@ -28,7 +28,7 @@ The Magi CLI Claude seat runs **`--model fable --effort xhigh`**. Verified live 
 - The owner said "Extra". **`extra` is not a Claude Code effort name** — the rung below `max` is `xhigh`, so this mode uses `xhigh`.
 - **`max` is not the default here.** Effort is a behavioral signal, not a published price multiplier; the extra cost is extra thinking and output volume. Anthropic publishes no multiplier figure, and community reports of 3–5x over `high` are UNVERIFIED — do not quote a number as fact.
 - This overlay applies to `hostModes.modes.cursor-cli` only. The global seat `seats.balthasar-2` in `magi-seats.json` still reads model `opus`, effort `high`; changing it is a MAGI DECISION, not a host-mode overlay.
-- Auth is still required. Until `claude auth login` and an on-topic `-p` probe succeed, the Claude seat is `degraded=true` with reason `claude auth login required` — Fable at `xhigh` does not change that. A missing login is NOT RUN, never a pass.
+- The live probes establish reachability for the current session; Fable at `xhigh` does not replace them. If either later probe fails, do not dispatch Claude; activate the documented degraded path and record the captured probe text.
 
 ## Why a `/magi` session can land here mid-task
 

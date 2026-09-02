@@ -12,6 +12,16 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 
+function containsForbidden(text, needles) {
+  const lowerText = text.toLowerCase();
+  for (const needle of needles) {
+    if (lowerText.includes(needle.toLowerCase())) {
+      return needle;
+    }
+  }
+  return null;
+}
+
 function check() {
   const required = [
     'package.json',
@@ -25,6 +35,7 @@ function check() {
     '.cursor/rules/magi-arbiter.mdc',
     '.cursor/rules/magi-activation.mdc',
     '.cursor/rules/magi-orchestrator.mdc',
+    '.cursor/rules/live-check.mdc',
     'commands/magi.md',
     'commands/magi-cli.md',
     'claude-commands/magi.md',
@@ -165,6 +176,7 @@ function check() {
     '.cursor/rules/magi-arbiter.mdc',
     '.cursor/rules/magi-activation.mdc',
     '.cursor/rules/magi-orchestrator.mdc',
+    '.cursor/rules/live-check.mdc',
   ];
   for (const rel of ruleFiles) {
     const text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
@@ -180,8 +192,54 @@ function check() {
       console.error(`${rel} contains globs:`);
       return 1;
     }
-    if (!text.includes('CONCLAVE')) {
+    if (rel !== '.cursor/rules/live-check.mdc' && !text.includes('CONCLAVE')) {
       console.error(`${rel} missing CONCLAVE ignore discriminator`);
+      return 1;
+    }
+  }
+
+  const forbidAuth = [
+    'not logged in',
+    'headless auth required',
+    'auth required',
+    'no headless claude cli exists',
+    'until `claude auth login`',
+    'until claude auth login'
+  ];
+
+  const cueDocsTargetA = ['README.md', '.cursor/skills/magi/SKILL.md'];
+  const cueDocsTargetB = [
+    '.cursor/skills/magi-cli/SKILL.md',
+    '.cursor/skills/magi/references/cursor-cli.md',
+    '.cursor/skills/magi-cli/references/cursor-cli.md',
+    'commands/magi-cli.md',
+    'claude-commands/magi.md'
+  ];
+
+  for (const rel of [...cueDocsTargetA, ...cueDocsTargetB]) {
+    if (rel === '.cursor/rules/live-check.mdc') continue;
+    const content = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+    const matched = containsForbidden(content, forbidAuth);
+    if (matched) {
+      console.error(`${rel} contains forbidden string: ${matched}`);
+      return 1;
+    }
+  }
+
+  for (const rel of cueDocsTargetA) {
+    const content = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+    const lowerContent = content.toLowerCase();
+    if (!lowerContent.includes('claude auth status') && !lowerContent.includes('logged in') && !lowerContent.includes('loggedin') && !lowerContent.includes('live check')) {
+      console.error(`${rel} missing live-check cue`);
+      return 1;
+    }
+  }
+
+  for (const rel of cueDocsTargetB) {
+    const content = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+    const lowerContent = content.toLowerCase();
+    if (!lowerContent.includes('claude auth status') && !lowerContent.includes('loggedin') && !lowerContent.includes('live 2026-09-02')) {
+      console.error(`${rel} missing live-check cue`);
       return 1;
     }
   }
@@ -190,4 +248,8 @@ function check() {
   return 0;
 }
 
-process.exit(check());
+if (require.main === module) {
+  process.exit(check());
+}
+
+module.exports = { check, containsForbidden };

@@ -38,7 +38,7 @@ Read these files in order:
   `model` to `claude-opus-5-thinking-high`, `gpt-5.6-sol-medium`, or
   `gemini-3.1-pro` for the assigned vendor. Never Task a `codex-*` or `gemini-*`
   CLI wrapper in this mode.
-- `/magi-cli` uses hostMode `cursor-cli`: Grok arbiter dispatches via vendor CLIs (`codex.exe`, `agy.exe`, `claude.exe`); never Cursor Task to elector slugs. Claude is reached via `C:\Users\YESSIR\.local\bin\claude.exe` when authenticated; until `claude auth login` and an on-topic `-p` probe succeed, a Codex+Gemini split is a duo.
+- `/magi-cli` uses hostMode `cursor-cli`: Grok arbiter dispatches via vendor CLIs (`codex.exe`, `agy.exe`, `claude.exe`); never Cursor Task to elector slugs. Magi CLI reaches Claude through `C:\Users\YESSIR\.local\bin\claude.exe -p --model fable --effort xhigh`. Live 2026-09-02: `claude auth status` reported `loggedIn: true` (`claude.ai`, Max), and the headless Haiku probe returned `ready`. Re-run both checks in the dispatching session. Only a later probe that returns login/auth language, an empty capture, or off-topic text sets `degraded=true`; name that probe text and treat Codex+Gemini as a duo.
 - Any implement/review/vote by the arbiter is FAILED activation in both Cursor modes.
 - Before each Cursor elector Task, and after a Task fails with usage or quota
   language, run `node C:\src\magi\tools\host-resolver.js`. If it trips, send

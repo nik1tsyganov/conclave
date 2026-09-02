@@ -23,7 +23,7 @@ Read these files in order:
 12. `references/cursor-cli.md`
 13. `C:\Users\YESSIR\.claude\skills\codex-bridge\SKILL.md` when dispatching Codex
 14. `C:\Users\YESSIR\.claude\skills\gemini-bridge\SKILL.md` when dispatching Gemini
-15. `C:\Users\YESSIR\.claude\skills\claude-bridge\SKILL.md` when attempting Claude (binary present 2026-09-01; dispatch `--model fable --effort xhigh`; headless auth required)
+15. `C:\Users\YESSIR\.claude\skills\claude-bridge\SKILL.md` when dispatching Claude (`C:\Users\YESSIR\.local\bin\claude.exe -p --model fable --effort xhigh`; run the live auth and headless probes first)
 
 ## MAGI is not CONCLAVE
 
@@ -35,7 +35,7 @@ Read these files in order:
 
 - Grok classifies, briefs, dispatches, lead-writes telemetry, tallies.
 - All seat dispatches go through vendor CLIs (`codex.exe`, `agy.exe`, `claude.exe`), never Cursor Task to claude/gpt/gemini slugs.
-- Claude is reachable via `C:\Users\YESSIR\.local\bin\claude.exe` with **`--model fable --effort xhigh`** (owner 2026-09-02) when authenticated; until `claude auth login` and an on-topic `-p` probe succeed, a Codex+Gemini split is a degraded duo. Record `degraded=true` and name the reduction reason.
+- Claude is reachable via **`C:\Users\YESSIR\.local\bin\claude.exe -p --model fable --effort xhigh`** (owner 2026-09-02). Live 2026-09-02: `claude auth status` reported `loggedIn: true`, `authMethod: claude.ai`, and `subscriptionType: max`; `claude -p --model haiku` returned `ready`. Re-run both probes in the session that will dispatch. If a later probe returns login/auth language, an empty capture, or off-topic text, record `degraded=true`, include the probe text, and only then treat Codex+Gemini as a duo.
 - **`extra` is not a Claude Code effort name.** Live `claude.exe --help` (2026-09-02) lists `low, medium, high, xhigh, max`, so the rung below `max` is `xhigh`. Do not default this mode to `max`: effort is a behavioral signal, not a published price multiplier, and community 3–5x cost claims are UNVERIFIED.
 - The overlay lives in `magi-seats.json` → `hostModes.modes.cursor-cli`. The global `seats.balthasar-2` still reads model `opus`, effort `high`.
 - A `/magi` session may land in this mode mid-task when `node C:\src\magi\tools\host-resolver.js` reports Cursor Task usage tripped; from that point, `references/cursor-cli.md` governs the rest of the run.
@@ -47,11 +47,11 @@ Before the first write, split implement across the reachable vendors:
 
 - Intake/cluster A → Codex CLI via `codex.exe`
 - Intake/cluster B → Gemini CLI via `agy.exe`
-- Intake/cluster C → Claude CLI at `C:\Users\YESSIR\.local\bin\claude.exe` with `--model fable --effort xhigh`, auth required; record `degraded=true` and redistribute its work to Codex/Gemini or pause.
+- Intake/cluster C → Claude CLI at `C:\Users\YESSIR\.local\bin\claude.exe -p --model fable --effort xhigh`; run the live probes before dispatch.
 
 Permute if needed; Casper must not be idle.
 
-While capacity-state `distributionBreaker` is tripped, do not give Claude the majority of implement units (Claude is auth-required in this mode; the floor applies to the two reachable vendors until `claude auth login` and an on-topic `-p` probe succeed).
+While capacity-state `distributionBreaker` is tripped, do not give Claude the majority of implement units.
 
 Enforce the 60% floor per vendor.
 

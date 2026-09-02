@@ -11,9 +11,9 @@ Original MAGI tri-seat panel (Claude + Codex + Gemini) as a local Cursor plugin.
   with the frontier model override for that vendor:
   `claude-opus-5-thinking-high`, `gpt-5.6-sol-medium`, or `gemini-3.1-pro`.
   It does not use the `codex-*` or `gemini-*` CLI wrappers.
-- `/magi-cli` = MAGI Cursor CLI (hostMode `cursor-cli`): Grok arbiter dispatches via vendor CLIs (`codex.exe`, `agy.exe`, `claude.exe`) when Cursor Task usage is exhausted. Never Cursor Task to elector slugs in this mode. The Claude CLI is installed at `C:\Users\YESSIR\.local\bin\claude.exe`; login is required for the Claude seat, so a Codex+Gemini split is a degraded duo until auth succeeds.
-- Codex-led MAGI is a duo (Claude CLI is installed at `C:\Users\YESSIR\.local\bin\claude.exe` but auth is required); it uses the `magi-mode` skill directly. Claude-hosted MAGI is the full tri-seat.
-- **MAGI plugin rules are `alwaysApply: true` in every Cursor workspace.** The three rules (`magi-arbiter`, `magi-activation`, `magi-orchestrator`) ship with the plugin and are copied to `~/.cursor/rules/magi-*.mdc` by the installer, matching CONCLAVE's always-on `commit-and-push` user rule. CONCLAVE chats ignore MAGI rules via the first-line discriminator. Do not glob MAGI rules to magi-only trees.
+- `/magi-cli` = MAGI Cursor CLI (hostMode `cursor-cli`): Grok arbiter dispatches via vendor CLIs (`codex.exe`, `agy.exe`, `claude.exe`) when Cursor Task usage is exhausted. Never Cursor Task to elector slugs in this mode. Magi CLI dispatches Claude through `C:\Users\YESSIR\.local\bin\claude.exe -p --model fable --effort xhigh`. Live 2026-09-02: `claude auth status` reported `loggedIn: true` (`claude.ai`, Max), and the headless Haiku probe returned `ready`. Re-run both checks in the dispatching session.
+- Codex-led MAGI can reach Claude at that command. If a later probe returns login/auth language, an empty capture, or off-topic text, record `degraded=true` with the probe text; only then is Codex+Gemini a duo. Claude-hosted MAGI is the full tri-seat.
+- **MAGI plugin rules are `alwaysApply: true` in every Cursor workspace.** Four rules (`magi-arbiter`, `magi-activation`, `magi-orchestrator`, and `live-check`) ship with the plugin and are copied to `~/.cursor/rules/` by the installer, matching CONCLAVE's always-on `commit-and-push` user rule. The three named MAGI rules ignore CONCLAVE chats via the first-line discriminator; `live-check` applies everywhere. Do not glob MAGI rules to magi-only trees.
 
 ## Installation
 
