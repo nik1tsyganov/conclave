@@ -50,12 +50,19 @@ The idle watch — when a silent vendor child is a hang and when it is not — l
 
 Each implementer pastes a WRITE AUDIT (`git diff --stat` + `git status --porcelain`).
 
-The lead writes a JSONL row per implement unit `{vendor, role:"implement"}` to `magi-dispatch-log.jsonl` at the project root (gitignored; do not commit secrets).
+For product work, the lead writes each JSONL row per implement unit
+`{vendor, role:"implement"}` to `projects/<slug>/magi-dispatch-log.jsonl`.
+MAGI-kit work uses this repository's root `magi-dispatch-log.jsonl`. Both paths
+are gitignored; do not commit secrets.
 
 Then run the activation check:
 
 ```bash
-node C:\src\magi\tools\activation-check.js magi-dispatch-log.jsonl
+# Product work:
+node C:\src\magi\tools\activation-check.js projects/<slug>/magi-dispatch-log.jsonl
+
+# MAGI-kit work:
+node C:\src\magi\tools\activation-check.js C:\src\magi\magi-dispatch-log.jsonl
 ```
 
 `activation-check.js` rejects the checked-in fixtures, then calls `hog-check.js` to enforce the 60% vendor floor. Exit 0 means `FLOOR HOLDS`; exit 1 means `FAILED activation`.
@@ -65,6 +72,11 @@ node C:\src\magi\tools\activation-check.js magi-dispatch-log.jsonl
 - Claude Code reaches the MAGI seats via wrapper agents already installed in `C:\Users\YESSIR\.claude\agents\` (same stems as the plugin agents).
 - Cursor Task uses the MAGI Cursor plugin `agents/` directory when the plugin is enabled (copied to `C:\Users\YESSIR\.cursor\plugins\local\magi\agents`). Keep both copies. Do not delete the plugin agents.
 - `/magi-cli` uses vendor CLIs (`C:\Users\YESSIR\tools\bin\codex.exe`, `C:\Users\YESSIR\tools\bin\agy.exe`) and does not use the wrapper agents.
+
+## Product work tracking
+
+Product repositories do not carry MAGI policy or run records. Project-specific
+slice graphs, floor notes, and dispatch logs live under [`projects/`](projects/).
 
 ## magi-probe playbooks
 

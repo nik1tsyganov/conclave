@@ -69,11 +69,13 @@ same turn as the dispatch.
 
 ## Activation check
 
-After implement dispatches, the lead writes one JSONL row per implement unit `{vendor, role:"implement"}` to `magi-dispatch-log.jsonl` at the project root (gitignored; do not commit secrets). Then run the activation check:
+After implement dispatches, the lead writes one JSONL row per implement unit `{vendor, role:"implement"}` to `magi-dispatch-log.jsonl` (gitignored; do not commit secrets). Then run the activation check:
 
 ```bash
-node C:\src\magi\tools\activation-check.js magi-dispatch-log.jsonl
+node C:\src\magi\tools\activation-check.js <log path>
 ```
+
+Log path: product-repo runs write `C:\src\magi\projects\<slug>\magi-dispatch-log.jsonl`, never a log inside the product repo; MAGI-kit work uses `C:\src\magi\magi-dispatch-log.jsonl`. See `C:\src\magi\projects\README.md`.
 
 `activation-check.js` rejects checked-in fixtures, then calls `hog-check.js` to enforce the 60% vendor floor. Exit 0 = `FLOOR HOLDS`; exit 1 = `FAILED activation`.
 

@@ -19,5 +19,6 @@ description: Start or continue a MAGI Cursor run (hostMode `cursor`). Use when t
 - Use Task `reviewer` and `verifier` with the same model table. Review goes to
   vendors other than the author; add a third reviewer only when contested.
 - Never Task `codex-*` or `gemini-*` CLI wrapper agents in hostMode `cursor`.
-- After implement dispatches, write one JSONL row per implement unit `{vendor, role:"implement"}` to `magi-dispatch-log.jsonl` at the project root (gitignored; do not commit secrets).
-- Run the activation check: `node C:\src\magi\tools\activation-check.js magi-dispatch-log.jsonl`.
+- After implement dispatches, write one JSONL row per implement unit `{vendor, role:"implement"}` to `magi-dispatch-log.jsonl` (gitignored; do not commit secrets).
+- Log path: product-repo runs write `C:\src\magi\projects\<slug>\magi-dispatch-log.jsonl`, never a log inside the product repo; MAGI-kit work uses `C:\src\magi\magi-dispatch-log.jsonl`. See `C:\src\magi\projects\README.md`.
+- Run the activation check: `node C:\src\magi\tools\activation-check.js <log path>`.
