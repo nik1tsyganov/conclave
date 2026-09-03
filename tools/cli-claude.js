@@ -14,12 +14,25 @@
  * On-topic judgment stays with the arbiter: code proves the post-exit
  * capture is non-empty and free of login/auth language; the proof carries
  * the capture so the arbiter can judge topicality.
+ *
+ * buildLaunch encodes the MEASURED 2026-09-02 write dispatch (PID recorded,
+ * files landed) so permission-mode and --add-dir are code, not a
+ * hand-composed wrapper:
+ *   claude.exe -p --model fable --effort xhigh
+ *     --permission-mode bypassPermissions --add-dir C:\src\magi
+ *     --output-format text
+ * Prompt via stdin from a brief FILE. Never --continue / --resume. The
+ * bypass grant is scoped: --add-dir must stay under C:\src\magi.
  */
 
+const path = require('node:path');
 const { containsForbidden } = require('./plugin-check.js');
 
 const CLAUDE_BIN = 'C:\\Users\\YESSIR\\.local\\bin\\claude.exe';
 const DEFAULT_MODEL = 'fable';
+// The only root --permission-mode bypassPermissions is pre-authorized for
+// (owner grant, 2026-09-02): MAGI implement writes under C:\src\magi.
+const MAGI_ROOT = 'C:\\src\\magi';
 // Claude Code effort levels per `claude.exe --help` (verified live 2026-09-02).
 // The owner's "Extra" is not one of them - the rung below max is xhigh - and
 // the cursor-cli overlay pins xhigh: max is NOT the default here.
@@ -38,8 +51,28 @@ function assertEffort(effort) {
   }
 }
 
+function resolveAddDir(cwd) {
+  if (typeof cwd !== 'string' || cwd.length === 0) {
+    throw new Error('cwd must be a non-empty path: --add-dir names the write scope explicitly');
+  }
+  // Resolve before checking so traversal ("..") cannot smuggle the add-dir
+  // outside the pre-authorized root; emit the resolved form so the string
+  // checked and the string dispatched are the same one. Windows paths compare
+  // case-insensitively.
+  const resolved = path.win32.resolve(cwd);
+  const lower = resolved.toLowerCase();
+  const root = MAGI_ROOT.toLowerCase();
+  if (lower !== root && !lower.startsWith(root + '\\')) {
+    throw new Error(
+      `--permission-mode bypassPermissions is pre-authorized under ${MAGI_ROOT} only; ` +
+        `refusing --add-dir ${resolved}`
+    );
+  }
+  return resolved;
+}
+
 function buildLaunch(opts = {}) {
-  const { briefPath, model = DEFAULT_MODEL, effort = DEFAULT_EFFORT } = opts;
+  const { briefPath, model = DEFAULT_MODEL, effort = DEFAULT_EFFORT, cwd = MAGI_ROOT } = opts;
   if (typeof briefPath !== 'string' || briefPath.length === 0) {
     throw new Error(
       'briefPath is required: the prompt travels as a file over stdin, never as argv bytes'
@@ -49,11 +82,25 @@ function buildLaunch(opts = {}) {
   if (opts.continue || opts.resume) {
     throw new Error('fresh run only: --continue / --resume are never part of a MAGI dispatch');
   }
-  const args = ['-p', '--model', model, '--effort', effort];
-  // Strict === true: only an explicit, pre-authorized boolean widens permissions.
-  if (opts.bypassPermissions === true) {
-    args.push('--dangerously-skip-permissions');
+  if ('bypassPermissions' in opts) {
+    // The old contract read this flag; under the new one both values would
+    // silently mean something different, so any use of it fails loudly.
+    throw new Error(
+      'bypassPermissions option retired: the measured write dispatch always runs ' +
+        `--permission-mode bypassPermissions, scoped by --add-dir under ${MAGI_ROOT}`
+    );
   }
+  // The measured 2026-09-02 MAGI write dispatch (PID recorded, files landed):
+  // -p --model fable --effort xhigh --permission-mode bypassPermissions
+  // --add-dir C:\src\magi --output-format text, prompt via stdin from a file.
+  const args = [
+    '-p',
+    '--model', model,
+    '--effort', effort,
+    '--permission-mode', 'bypassPermissions',
+    '--add-dir', resolveAddDir(cwd),
+    '--output-format', 'text',
+  ];
   return {
     binary: CLAUDE_BIN,
     args,
@@ -136,6 +183,7 @@ module.exports = {
   DEFAULT_MODEL,
   DEFAULT_EFFORT,
   IDLE_LIMIT_MS,
+  MAGI_ROOT,
   AUTH_NEEDLES,
   buildLaunch,
   assessCapture,

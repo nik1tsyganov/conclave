@@ -1,11 +1,22 @@
 'use strict';
 
 // Tests for tools/cli-claude.js - the MAGI Claude CLI capture-health recipe.
-// The 2026-09-02 kill at 31 minutes of 0-byte capture was a FALSE HANG:
-// `claude -p` buffers stdout until exit, so a healthy fable/xhigh implement
-// runs for ~30 minutes with a 0-byte capture. These tests encode the corrected
-// law: 0 bytes on a RUNNING child is OK at any elapsed time; 0 bytes AFTER
-// exit is EMPTY_CAPTURE / FAIL, and files landing never rescues it.
+//
+// Launch shape: buildLaunch encodes the MEASURED 2026-09-02 write dispatch
+// (PID recorded, files landed):
+//   claude.exe -p --model fable --effort xhigh
+//     --permission-mode bypassPermissions --add-dir C:\src\magi
+//     --output-format text
+// with the prompt travelling via stdin from a brief FILE. The bypass is
+// pre-authorized for MAGI implement writes under C:\src\magi ONLY, so
+// buildLaunch refuses an --add-dir outside that root.
+//
+// Capture health: the 2026-09-02 kill at 31 minutes of 0-byte capture was a
+// FALSE HANG - `claude -p` buffers stdout until exit, so a healthy fable/xhigh
+// implement runs for ~30 minutes with a 0-byte capture. These tests encode the
+// corrected law: 0 bytes on a RUNNING child is OK at any elapsed time; 0 bytes
+// AFTER exit (including an idle-watch kill at the 20-minute limit) is
+// EMPTY_CAPTURE / FAIL, and files landing never rescues it.
 // No test spends a -p model call; the only spawn is `claude.exe --help`,
 // skipped when the binary is absent.
 
@@ -20,6 +31,7 @@ const {
   DEFAULT_MODEL,
   DEFAULT_EFFORT,
   IDLE_LIMIT_MS,
+  MAGI_ROOT,
   AUTH_NEEDLES,
   buildLaunch,
   assessCapture,
@@ -27,21 +39,76 @@ const {
   parseProof,
 } = require('./cli-claude.js');
 
-test('constants: binary path, cursor-cli overlay defaults, idle limit', () => {
+test('constants: binary path, cursor-cli overlay defaults, idle limit, magi root', () => {
   assert.strictEqual(CLAUDE_BIN, 'C:\\Users\\YESSIR\\.local\\bin\\claude.exe');
   assert.strictEqual(DEFAULT_MODEL, 'fable');
   assert.strictEqual(DEFAULT_EFFORT, 'xhigh');
   assert.strictEqual(IDLE_LIMIT_MS, 20 * 60 * 1000);
+  assert.strictEqual(MAGI_ROOT, 'C:\\src\\magi');
   assert.deepStrictEqual(CLAUDE_EFFORTS, ['low', 'medium', 'high', 'xhigh', 'max']);
   assert.ok(AUTH_NEEDLES.length >= 3);
 });
 
-test('buildLaunch: fable/xhigh overlay, print mode, prompt via stdin file', () => {
+test('buildLaunch: default args are the measured write dispatch, prompt via stdin file', () => {
   const launch = buildLaunch({ briefPath: 'C:\\src\\magi\\out\\brief.md' });
   assert.strictEqual(launch.binary, CLAUDE_BIN);
-  assert.deepStrictEqual(launch.args, ['-p', '--model', 'fable', '--effort', 'xhigh']);
+  assert.deepStrictEqual(launch.args, [
+    '-p',
+    '--model', 'fable',
+    '--effort', 'xhigh',
+    '--permission-mode', 'bypassPermissions',
+    '--add-dir', 'C:\\src\\magi',
+    '--output-format', 'text',
+  ]);
   assert.strictEqual(launch.stdinFile, 'C:\\src\\magi\\out\\brief.md');
   assert.deepStrictEqual(launch.stdio, ['pipe', 'pipe', 'pipe']);
+});
+
+test('buildLaunch: --add-dir carries opts.cwd, resolved, when given', () => {
+  const launch = buildLaunch({ briefPath: 'brief.md', cwd: 'C:\\src\\magi\\out' });
+  const i = launch.args.indexOf('--add-dir');
+  assert.notStrictEqual(i, -1);
+  assert.strictEqual(launch.args[i + 1], 'C:\\src\\magi\\out');
+});
+
+test('buildLaunch: --add-dir outside C:\\src\\magi is refused - bypass is scoped', () => {
+  for (const cwd of [
+    'C:\\src\\signal-sim',
+    'C:\\src\\magi\\..\\signal-sim',
+    'C:\\src\\magistrate', // prefix trap: starts with the root's characters
+    'C:\\',
+    'C:\\Users\\YESSIR',
+  ]) {
+    assert.throws(
+      () => buildLaunch({ briefPath: 'brief.md', cwd }),
+      /pre-authorized under C:\\src\\magi only/,
+      `cwd ${cwd} must be refused`
+    );
+  }
+});
+
+test('buildLaunch: --add-dir accepts the root case-insensitively and after traversal back in', () => {
+  for (const cwd of ['c:\\SRC\\magi', 'C:\\src\\magi\\', 'C:\\src\\magi\\out\\..']) {
+    const launch = buildLaunch({ briefPath: 'brief.md', cwd });
+    assert.ok(launch.args.includes('--add-dir'), `cwd ${cwd} must be dispatchable`);
+  }
+});
+
+test('buildLaunch: permission mode is the measured --permission-mode, never the dangerous flag', () => {
+  const launch = buildLaunch({ briefPath: 'brief.md' });
+  const i = launch.args.indexOf('--permission-mode');
+  assert.notStrictEqual(i, -1);
+  assert.strictEqual(launch.args[i + 1], 'bypassPermissions');
+  assert.ok(!launch.args.includes('--dangerously-skip-permissions'));
+});
+
+test('buildLaunch: retired bypassPermissions option throws instead of drifting silently', () => {
+  // Old contract: default = no bypass, bypassPermissions:true = dangerous flag.
+  // New contract: --permission-mode bypassPermissions is always on (pre-authorized).
+  // A caller still passing the old option - either value - gets a loud error,
+  // never a silently different permission semantic.
+  assert.throws(() => buildLaunch({ briefPath: 'brief.md', bypassPermissions: true }), /retired/);
+  assert.throws(() => buildLaunch({ briefPath: 'brief.md', bypassPermissions: false }), /retired/);
 });
 
 test('buildLaunch: fresh run - no --continue / --resume, ever', () => {
@@ -77,20 +144,6 @@ test('buildLaunch: requires a brief file path', () => {
   assert.throws(() => buildLaunch(), /briefPath/);
   assert.throws(() => buildLaunch({}), /briefPath/);
   assert.throws(() => buildLaunch({ briefPath: '' }), /briefPath/);
-});
-
-test('buildLaunch: no permission bypass unless bypassPermissions is exactly true', () => {
-  const flag = '--dangerously-skip-permissions';
-  assert.ok(!buildLaunch({ briefPath: 'brief.md' }).args.includes(flag));
-  assert.ok(!buildLaunch({ briefPath: 'brief.md', bypassPermissions: false }).args.includes(flag));
-  for (const truthy of [1, 'true', 'yes', {}]) {
-    assert.ok(
-      !buildLaunch({ briefPath: 'brief.md', bypassPermissions: truthy }).args.includes(flag),
-      `truthy non-boolean ${JSON.stringify(truthy)} must not widen permissions`
-    );
-  }
-  const launch = buildLaunch({ briefPath: 'brief.md', bypassPermissions: true });
-  assert.strictEqual(launch.args[launch.args.length - 1], flag);
 });
 
 test('assessCapture: empty capture is FAIL, never success', () => {
@@ -148,6 +201,15 @@ test('assessIdleCapture: 0 bytes AFTER exit is EMPTY_CAPTURE / FAIL', () => {
   assert.match(res.reason, /FAIL/);
 });
 
+test('assessIdleCapture: idle-watch kill at the 20-minute limit with 0 bytes is EMPTY_CAPTURE', () => {
+  // The idle-watch (cli-idle.js) kills by PID; once the child is DOWN, a
+  // 0-byte capture at IDLE_LIMIT_MS is EMPTY_CAPTURE - files landing never
+  // rescues it.
+  const res = assessIdleCapture({ byteLength: 0, runningMs: IDLE_LIMIT_MS, running: false });
+  assert.strictEqual(res.verdict, 'EMPTY_CAPTURE');
+  assert.match(res.reason, /files landing never rescues it/);
+});
+
 test('assessIdleCapture: output present is never EMPTY_CAPTURE, running or exited', () => {
   assert.strictEqual(
     assessIdleCapture({ byteLength: 1, runningMs: 31 * 60 * 1000, running: true }).verdict,
@@ -187,13 +249,10 @@ test('parseProof: proof is the on-topic capture + model/effort as dispatched', (
   assert.strictEqual(res.proof.capture, capture);
 });
 
-test('parseProof: never invents vendorSideTokens 0 - unmeasured is null or absent', () => {
+test('parseProof: vendorSideTokens is null - unmeasured, never an invented 0', () => {
   const res = parseProof({ captureText: 'on-topic answer', model: 'fable', effort: 'xhigh' });
   assert.notStrictEqual(res.proof.vendorSideTokens, 0);
-  assert.ok(
-    res.proof.vendorSideTokens === null || !Object.hasOwn(res.proof, 'vendorSideTokens'),
-    'vendorSideTokens must be null or omitted, never a made-up number'
-  );
+  assert.strictEqual(res.proof.vendorSideTokens, null);
 });
 
 test('parseProof: empty capture yields no proof - files landing cannot rescue it', () => {
@@ -231,6 +290,9 @@ test(
     assert.ok(r.stdout.length > 0, '--help stdout must not be empty');
     assert.match(r.stdout, /--model/);
     assert.match(r.stdout, /--effort/);
+    assert.match(r.stdout, /--permission-mode/);
+    assert.match(r.stdout, /--add-dir/);
+    assert.match(r.stdout, /--output-format/);
     assert.strictEqual(assessCapture(r.stdout).verdict, 'PASS');
   }
 );
