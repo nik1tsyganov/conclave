@@ -165,13 +165,30 @@ function parseCodexLog(logText, requestedSandbox = CODEX_SANDBOX) {
     };
   }
 
-  const sessionMatch = log.match(/^[ \t]*session id[ \t]*:[ \t]*(\S+)[ \t]*$/im);
-  const tokensMatch = log.match(
-    /^[ \t]*tokens used[ \t]*:?[ \t]*(?:\r?\n[ \t]*)?([0-9][0-9,]*)[ \t]*$/im,
+  const sessionMatch = codexBannerHeader(log).match(
+    /^[ \t]*session id[ \t]*:[ \t]*(\S+)[ \t]*$/im,
   );
+  const lines = log.split(/\r?\n/).map((line) => line.trim());
+  let tokensText = null;
+
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (/^tokens used:?$/i.test(lines[i])) {
+      tokensText = lines.slice(i + 1).find((line) => /^[0-9][0-9,]*$/.test(line));
+      break;
+    }
+  }
+
+  if (!tokensText) {
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+      const sameLineMatch = lines[i].match(/^tokens used:\s*([0-9][0-9,]*)$/i);
+      if (!sameLineMatch) continue;
+      tokensText = sameLineMatch[1];
+      break;
+    }
+  }
   const missing = [];
   if (!sessionMatch) missing.push('session id');
-  if (!tokensMatch) missing.push('tokens used');
+  if (!tokensText) missing.push('tokens used');
   if (missing.length > 0) {
     return { ok: false, code: 'PROOF_MISSING', missing };
   }
@@ -180,7 +197,7 @@ function parseCodexLog(logText, requestedSandbox = CODEX_SANDBOX) {
     ok: true,
     sandbox: actualSandbox,
     sessionId: sessionMatch[1],
-    tokensUsed: Number(tokensMatch[1].replaceAll(',', '')),
+    tokensUsed: Number(tokensText.replaceAll(',', '')),
   };
 }
 
@@ -326,7 +343,7 @@ function runChild(launch, io, inspectCodex = false, dependencies = {}) {
       }
     }
 
-    let log = '';
+    const logs = { stdout: '', stderr: '' };
     let wedge = null;
     let watchTimer;
     let settled = false;
@@ -359,14 +376,14 @@ function runChild(launch, io, inspectCodex = false, dependencies = {}) {
       if (Number.isInteger(child.pid)) kill(child.pid);
     }
 
-    function collect(writer) {
+    function collect(stream, writer) {
       return (chunk) => {
         if (writer && typeof writer.write === 'function') writer.write(chunk);
-        log += chunk.toString('utf8');
+        logs[stream] += chunk.toString('utf8');
         stdioBytes += Buffer.byteLength(chunk);
         lastStdioAtMs = now();
         if (inspectCodex && !wedge) {
-          const actualSandbox = parseSandbox(log);
+          const actualSandbox = parseSandbox(logs.stderr);
           if (actualSandbox && actualSandbox !== launch.requestedSandbox) {
             wedge = {
               ok: false,
@@ -381,8 +398,8 @@ function runChild(launch, io, inspectCodex = false, dependencies = {}) {
       };
     }
 
-    if (child.stdout) child.stdout.on('data', collect(io.stdout));
-    if (child.stderr) child.stderr.on('data', collect(io.stderr));
+    if (child.stdout) child.stdout.on('data', collect('stdout', io.stdout));
+    if (child.stderr) child.stderr.on('data', collect('stderr', io.stderr));
     child.once('error', fail);
 
     let decide;
@@ -462,7 +479,7 @@ function runChild(launch, io, inspectCodex = false, dependencies = {}) {
         return;
       }
 
-      const proof = parseCodexLog(log, launch.requestedSandbox);
+      const proof = parseCodexLog(logs.stderr, launch.requestedSandbox);
       if (!proof.ok) {
         const detail = proof.code === 'PROOF_MISSING' ? `: ${proof.missing.join(', ')}` : '';
         io.stderr.write(`${proof.code}${detail}\n`);

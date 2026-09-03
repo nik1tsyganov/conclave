@@ -31,7 +31,7 @@ function writePointerFile(briefPath, destPath) {
 }
 
 function assertPointerLaunch(haystack, briefBody, briefPath) {
-    if (briefBody.length > 80 && haystack.includes(briefBody)) {
+    if (briefBody.length > 0 && haystack.includes(briefBody)) {
         throw new Error('Launch payload contains brief body, expected only pointer');
     }
     const resolvedPath = path.resolve(briefPath);

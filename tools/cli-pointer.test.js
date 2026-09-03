@@ -47,13 +47,26 @@ test('assertPointerLaunch', () => {
     const briefPath = './brief.md';
     const resolvedPath = path.resolve(briefPath);
     const body = 'x'.repeat(100);
+    const shortBody = 'y'.repeat(40);
 
     assert.doesNotThrow(() => {
         assertPointerLaunch(`pointer to ${resolvedPath}`, body, briefPath);
     });
 
+    assert.doesNotThrow(() => {
+        assertPointerLaunch(`pointer to ${resolvedPath}`, shortBody, briefPath);
+    });
+
+    assert.doesNotThrow(() => {
+        assertPointerLaunch(`pointer to ${resolvedPath}`, '', briefPath);
+    });
+
     assert.throws(() => {
         assertPointerLaunch(`pointer with body ${body} and ${resolvedPath}`, body, briefPath);
+    }, /contains brief body/);
+
+    assert.throws(() => {
+        assertPointerLaunch(`pointer with body ${shortBody} and ${resolvedPath}`, shortBody, briefPath);
     }, /contains brief body/);
 
     assert.throws(() => {

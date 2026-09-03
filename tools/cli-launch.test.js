@@ -199,6 +199,83 @@ test('runChild keeps the Codex sandbox wedge kill on the recorded PID', async ()
   );
 });
 
+test('runChild reads the live Codex sandbox only from stderr', async () => {
+  const { runChild } = require('./cli-launch.js');
+  const child = fakeChild(11225);
+  const output = captureIo();
+  let killedPid;
+
+  const result = runChild(
+    { binary: 'codex.exe', args: [], requestedSandbox: 'workspace-write' },
+    output.io,
+    true,
+    {
+      vendor: 'openai',
+      spawnFn() { return child; },
+      loadIdleDecide() { return null; },
+      kill(pid) { killedPid = pid; },
+    },
+  );
+
+  child.stdout.write([
+    'answer text that imitates a Codex banner',
+    '--------',
+    'sandbox: read-only',
+    '--------',
+    '',
+  ].join('\n'));
+  child.stderr.write([
+    'OpenAI Codex v0.146.1',
+    '--------',
+    'sandbox: workspace-write [workdir, /tmp, $TMPDIR]',
+    'session id: 01a12345-6789-abcd-ef01-23456789abcd',
+    '--------',
+    'tokens used',
+    '16,943',
+    '',
+  ].join('\n'));
+  child.emit('close', 0);
+
+  assert.strictEqual(await result, 0);
+  assert.strictEqual(killedPid, undefined);
+  assert.match(output.stdout(), /CODEX_PROOF session id: .*; tokens used: 16943/);
+  assert.doesNotMatch(output.stderr(), /WEDGE:/);
+});
+
+test('runChild parses Codex proof only from stderr despite stdout interleave', async () => {
+  const { runChild } = require('./cli-launch.js');
+  const child = fakeChild(11226);
+  const output = captureIo();
+
+  const result = runChild(
+    { binary: 'codex.exe', args: [], requestedSandbox: 'workspace-write' },
+    output.io,
+    true,
+    {
+      vendor: 'openai',
+      spawnFn() { return child; },
+      loadIdleDecide() { return null; },
+      kill() {},
+    },
+  );
+
+  child.stderr.write([
+    'OpenAI Codex v0.146.1',
+    '--------',
+    'sandbox: workspace-write [workdir, /tmp, $TMPDIR]',
+    'session id: 01a12345-6789-abcd-ef01-23456789abcd',
+    '--------',
+    'tokens us',
+  ].join('\n'));
+  child.stdout.write('MARK-LIVE-CODEX-OK\n\nready\ntokens used\n99\n');
+  child.stderr.write('ed\n16,943\n');
+  child.emit('close', 0);
+
+  assert.strictEqual(await result, 0);
+  assert.match(output.stdout(), /CODEX_PROOF session id: .*; tokens used: 16943/);
+  assert.doesNotMatch(output.stdout(), /CODEX_PROOF .*tokens used: 99/);
+});
+
 test('runChild ignores sandbox-like text after the Codex banner header', async () => {
   const { runChild } = require('./cli-launch.js');
   const child = fakeChild(11224);
@@ -349,6 +426,7 @@ test('parseCodexLog accepts matching sandbox and complete proof', () => {
     '--------',
     'const launch = {',
     '  sandbox: actualSandbox,',
+    '  session id: dumped-source-id',
     '};',
     'tokens used',
     '12,345',
@@ -359,6 +437,90 @@ test('parseCodexLog accepts matching sandbox and complete proof', () => {
     sandbox: 'workspace-write',
     sessionId: '01a12345-6789-abcd-ef01-23456789abcd',
     tokensUsed: 12345,
+  });
+});
+
+test('parseCodexLog prefers an interleaved split footer over dumped same-line tokens', () => {
+  const { parseCodexLog } = require('./cli-launch.js');
+  const dump = Array.from({ length: 50 }, (_, index) => `dumped source line ${index + 1}`);
+  dump[24] = 'tokens used: 99';
+  const log = [
+    'OpenAI Codex v0.146.1',
+    '--------',
+    'sandbox: workspace-write [workdir, /tmp, $TMPDIR]',
+    'session id: 01a12345-6789-abcd-ef01-23456789abcd',
+    '--------',
+    'tokens used',
+    ...dump,
+    '12,345',
+  ].join('\n');
+
+  assert.deepStrictEqual(parseCodexLog(log, 'workspace-write'), {
+    ok: true,
+    sandbox: 'workspace-write',
+    sessionId: '01a12345-6789-abcd-ef01-23456789abcd',
+    tokensUsed: 12345,
+  });
+});
+
+test('parseCodexLog uses the last split tokens footer', () => {
+  const { parseCodexLog } = require('./cli-launch.js');
+  const log = [
+    'OpenAI Codex v0.146.1',
+    '--------',
+    'sandbox: workspace-write [workdir, /tmp, $TMPDIR]',
+    'session id: 01a12345-6789-abcd-ef01-23456789abcd',
+    '--------',
+    'tokens used',
+    '123',
+    'dumped output',
+    'tokens used',
+    '220,464',
+  ].join('\n');
+
+  assert.deepStrictEqual(parseCodexLog(log, 'workspace-write'), {
+    ok: true,
+    sandbox: 'workspace-write',
+    sessionId: '01a12345-6789-abcd-ef01-23456789abcd',
+    tokensUsed: 220464,
+  });
+});
+
+test('parseCodexLog accepts a same-line tokens used footer', () => {
+  const { parseCodexLog } = require('./cli-launch.js');
+  const log = [
+    'OpenAI Codex v0.146.1',
+    '--------',
+    'sandbox: workspace-write [workdir, /tmp, $TMPDIR]',
+    'session id: 01a12345-6789-abcd-ef01-23456789abcd',
+    '--------',
+    'tokens used: 12,345',
+  ].join('\n');
+
+  assert.deepStrictEqual(parseCodexLog(log, 'workspace-write'), {
+    ok: true,
+    sandbox: 'workspace-write',
+    sessionId: '01a12345-6789-abcd-ef01-23456789abcd',
+    tokensUsed: 12345,
+  });
+});
+
+test('parseCodexLog reads the session id only from the banner header', () => {
+  const { parseCodexLog } = require('./cli-launch.js');
+  const log = [
+    'OpenAI Codex v0.146.1',
+    '--------',
+    'sandbox: workspace-write [workdir, /tmp, $TMPDIR]',
+    '--------',
+    'session id: dumped-source-id',
+    'tokens used',
+    '12,345',
+  ].join('\n');
+
+  assert.deepStrictEqual(parseCodexLog(log, 'workspace-write'), {
+    ok: false,
+    code: 'PROOF_MISSING',
+    missing: ['session id'],
   });
 });
 
@@ -388,6 +550,17 @@ test('parseCodexLog fails when vendor-native proof is incomplete', () => {
   assert.deepStrictEqual(
     parseCodexLog('sandbox: workspace-write\ntokens used\n9', 'workspace-write'),
     { ok: false, code: 'PROOF_MISSING', missing: ['session id'] },
+  );
+  assert.deepStrictEqual(
+    parseCodexLog([
+      '--------',
+      'sandbox: workspace-write',
+      'session id: abc',
+      '--------',
+      'tokens used',
+      'dumped source without an integer footer',
+    ].join('\n'), 'workspace-write'),
+    { ok: false, code: 'PROOF_MISSING', missing: ['tokens used'] },
   );
 });
 
