@@ -61,6 +61,8 @@ While capacity-state `distributionBreaker` is tripped, do not give Claude the ma
 
 Enforce the 60% floor per vendor.
 
+Project slice lists do NOT assign vendors. Ignore any `implement`/`verify` vendor column in a project `SLICES.md` or plan doc: vendors come from the MAGI class table plus the live floor at dispatch, and a project plan never beats the class table. The only valid owner override is `vendorOverride` on that run's `graph.json` node, recorded there — not in a doc. Canonical policy: `mix-mode` → `distributionFloor.projectSlicePolicy`. Pointer only; do not restate or fork it here.
+
 Each implementer must paste WRITE AUDIT (`git diff --stat` + `git status --porcelain`).
 
 After implement rows, write `magi-dispatch-log.jsonl` at the project root `{vendor, role:"implement"}` (gitignored) and run `node C:\src\magi\tools\activation-check.js magi-dispatch-log.jsonl`. Exit 1 = FAILED activation. Do not use `dispatch-log.pass.jsonl` as a live log.
