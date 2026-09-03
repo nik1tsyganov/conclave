@@ -11,3 +11,4 @@ Otherwise:
 - WRITE AUDIT required.
 - `activation-check` required (calls `hog-check`).
 - Canonical command for any repo: `node C:\src\magi\tools\activation-check.js magi-dispatch-log.jsonl`.
+- Project slices/graphs define units, dependencies, and write scope, not vendors: follow mix-mode `distributionFloor.projectSlicePolicy` at dispatch (class table + live floor), ignore project `SLICES.md` implement/verify columns, and accept only `vendorOverride` on that run's `graph.json`.
