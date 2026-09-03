@@ -3,6 +3,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 
 const CODEX_BINARY = 'C:\\Users\\YESSIR\\tools\\bin\\codex.exe';
@@ -24,7 +25,7 @@ function usage() {
     '',
     'Options:',
     '  --vendor <openai|google|anthropic>  Vendor to launch (default: openai)',
-    '  --brief <file>                     Prompt file sent through stdin',
+    '  --brief <file>                     Brief file referenced by a pointer file on stdin',
     '  --cwd <directory>                  Vendor working directory',
     '  --capture <file>                   Final-response capture file',
     '  --model <slug>                     Model override',
@@ -48,12 +49,49 @@ function requireValue(value, name) {
   return value;
 }
 
+function fallbackInspectBrief(briefPath) {
+  const resolvedPath = path.resolve(briefPath);
+  const buffer = fs.readFileSync(resolvedPath);
+  return {
+    briefPath: resolvedPath,
+    bytes: buffer.length,
+    sha256: crypto.createHash('sha256').update(buffer).digest('hex'),
+    firstLine: buffer.toString('utf8').match(/^[^\n]*/)?.[0] || '',
+  };
+}
+
+function fallbackPointerText(info) {
+  return `Read ${info.briefPath} in full. Bytes: ${info.bytes}. SHA-256: ${info.sha256}. Follow it. Repeat its first line verbatim before anything else.\n`;
+}
+
+function loadPointerHelpers() {
+  const modulePath = path.join(__dirname, 'cli-pointer.js');
+  if (fs.existsSync(modulePath)) return require('./cli-pointer.js');
+  return { inspectBrief: fallbackInspectBrief, pointerText: fallbackPointerText };
+}
+
+function prepareBriefPointer(brief) {
+  const briefPath = path.resolve(brief);
+  if (!fs.existsSync(briefPath) || !fs.statSync(briefPath).isFile()) {
+    const error = new Error(`--brief file does not exist: ${briefPath}`);
+    error.code = 'ARGUMENT_ERROR';
+    throw error;
+  }
+
+  const { inspectBrief, pointerText } = loadPointerHelpers();
+  const info = inspectBrief(briefPath);
+  const pointerFile = `${info.briefPath}.pointer.md`;
+  fs.writeFileSync(pointerFile, pointerText(info), 'utf8');
+  return { ...info, pointerFile };
+}
+
 function buildCodexLaunch(options) {
   const brief = requireValue(options.brief, '--brief');
   const cwd = requireValue(options.cwd, '--cwd');
   const capture = requireValue(options.capture, '--capture');
   const model = options.model || DEFAULT_CODEX_MODEL;
   const effort = options.effort || DEFAULT_CODEX_EFFORT;
+  const pointer = prepareBriefPointer(brief);
 
   return {
     binary: CODEX_BINARY,
@@ -69,7 +107,11 @@ function buildCodexLaunch(options) {
       '-o', capture,
       '-',
     ],
-    stdinFile: brief,
+    stdinFile: pointer.pointerFile,
+    delivery: 'pointer',
+    briefPath: pointer.briefPath,
+    pointerFile: pointer.pointerFile,
+    bytes: pointer.bytes,
     requestedSandbox: CODEX_SANDBOX,
   };
 }
@@ -78,8 +120,18 @@ function cleanLog(logText) {
   return String(logText).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
 }
 
+function codexBannerHeader(logText) {
+  const lines = cleanLog(logText).split(/\r?\n/);
+  const opening = lines.findIndex((line) => line.trim() === '--------');
+  if (opening === -1) return lines.slice(0, 30).join('\n');
+  const closingOffset = lines.slice(opening + 1).findIndex((line) => line.trim() === '--------');
+  if (closingOffset === -1) return '';
+  const closing = opening + 1 + closingOffset;
+  return lines.slice(opening + 1, closing).join('\n');
+}
+
 function parseSandbox(logText) {
-  const match = cleanLog(logText).match(/^[ \t]*sandbox[ \t]*:[ \t]*(\S+)[ \t]*$/im);
+  const match = codexBannerHeader(logText).match(/^[ \t]*sandbox[ \t]*:[ \t]*([^\s[]+)/im);
   return match ? match[1] : null;
 }
 
@@ -221,6 +273,10 @@ function parseArgs(argv) {
 function printableLaunch(launch) {
   const result = { binary: launch.binary, args: launch.args };
   if (launch.stdinFile) result.stdinFile = launch.stdinFile;
+  if (launch.delivery) result.delivery = launch.delivery;
+  if (launch.briefPath) result.briefPath = launch.briefPath;
+  if (launch.pointerFile) result.pointerFile = launch.pointerFile;
+  if (Object.hasOwn(launch, 'bytes')) result.bytes = launch.bytes;
   if (launch.requestedSandbox) result.requestedSandbox = launch.requestedSandbox;
   return result;
 }

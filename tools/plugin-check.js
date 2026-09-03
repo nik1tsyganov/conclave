@@ -56,6 +56,8 @@ function check() {
     'tools/cli-launch.test.js',
     'tools/cli-idle.js',
     'tools/cli-idle.test.js',
+    'tools/cli-pointer.js',
+    'tools/cli-pointer.test.js',
     'tools/cli-claude.js',
     'tools/cli-claude.test.js',
     'tools/cli-gemini.js',

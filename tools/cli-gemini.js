@@ -1,8 +1,13 @@
 const fs = require('fs');
+const path = require('path');
+const { inspectBrief, pointerText } = require('./cli-pointer.js');
 
-function buildArgs(briefText, model = 'gemini-3.1-pro-high', options = {}) {
-    if (briefText.length > 30000) {
+function buildArgs(briefOrPointer, model = 'gemini-3.1-pro-high', options = {}) {
+    if (briefOrPointer.length > 30000) {
         throw new Error('Argument list too long');
+    }
+    if (briefOrPointer.length > 2000 && !briefOrPointer.startsWith('Read ')) {
+        throw new Error('Magi CLI does not put brief bodies in argv; use buildLaunch({ briefPath }).');
     }
     
     const env = Object.assign({}, process.env);
@@ -18,11 +23,21 @@ function buildArgs(briefText, model = 'gemini-3.1-pro-high', options = {}) {
     const args = [
         '--model', model,
         '--output-format', 'json',
-        '--print-timeout', '20m',
-        '--dangerously-skip-permissions',
-        '--add-dir', 'C:\\Users\\YESSIR\\.claude\\skills',
-        '--add-dir', cwd
+        '--print-timeout', '20m'
     ];
+
+    if (options.sandbox === true) {
+        args.push('--sandbox');
+    } else {
+        args.push('--dangerously-skip-permissions');
+    }
+
+    args.push('--add-dir', 'C:\\Users\\YESSIR\\.claude\\skills');
+    args.push('--add-dir', cwd);
+
+    if (options.briefDir) {
+        args.push('--add-dir', options.briefDir);
+    }
 
     if (options.extraDirs && Array.isArray(options.extraDirs)) {
         for (const dir of options.extraDirs) {
@@ -30,7 +45,7 @@ function buildArgs(briefText, model = 'gemini-3.1-pro-high', options = {}) {
         }
     }
 
-    args.push('-p', briefText);
+    args.push('-p', briefOrPointer);
 
     return {
         binary: 'C:\\Users\\YESSIR\\tools\\bin\\agy.exe',
@@ -40,9 +55,12 @@ function buildArgs(briefText, model = 'gemini-3.1-pro-high', options = {}) {
     };
 }
 
-function buildLaunch({ briefPath, model, extraDirs, cwd }) {
-    const briefText = fs.readFileSync(briefPath, 'utf8');
-    return buildArgs(briefText, model, { extraDirs, cwd });
+function buildLaunch({ briefPath, model, cwd, extraDirs, sandbox }) {
+    const info = inspectBrief(briefPath);
+    const pText = pointerText(info);
+    const briefDir = path.dirname(info.briefPath);
+    
+    return buildArgs(pText, model, { cwd, extraDirs, sandbox, briefDir });
 }
 
 function parseEnvelope(jsonStr) {

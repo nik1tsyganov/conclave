@@ -11,16 +11,36 @@ const test = require('node:test');
 
 const launcherPath = path.join(__dirname, 'cli-launch.js');
 
-test('buildCodexLaunch uses the Codex binary and sends the brief through stdin', () => {
+test('buildCodexLaunch sends a short disk pointer through stdin', (t) => {
   const { buildCodexLaunch } = require('./cli-launch.js');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-cli-launch-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const briefPath = path.join(directory, 'brief.md');
+  const briefBody = Array.from(
+    { length: 5000 },
+    (_, index) => String.fromCharCode(0x1000 + index),
+  ).join('');
+  fs.writeFileSync(briefPath, briefBody, 'utf8');
+
   const launch = buildCodexLaunch({
-    brief: 'C:\\tmp\\brief.md',
+    brief: briefPath,
     cwd: 'C:\\src\\magi',
     capture: 'C:\\tmp\\capture.txt',
   });
+  const resolvedBriefPath = path.resolve(briefPath);
+  const pointerFile = `${resolvedBriefPath}.pointer.md`;
+  const pointer = fs.readFileSync(pointerFile, 'utf8');
 
   assert.strictEqual(launch.binary, 'C:\\Users\\YESSIR\\tools\\bin\\codex.exe');
-  assert.strictEqual(launch.stdinFile, 'C:\\tmp\\brief.md');
+  assert.strictEqual(launch.delivery, 'pointer');
+  assert.strictEqual(launch.briefPath, resolvedBriefPath);
+  assert.strictEqual(launch.pointerFile, pointerFile);
+  assert.strictEqual(launch.stdinFile, pointerFile);
+  assert.strictEqual(launch.bytes, Buffer.byteLength(briefBody, 'utf8'));
+  assert.match(pointer, new RegExp(resolvedBriefPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(pointer, /Bytes: \d+/);
+  assert.match(pointer, /SHA-256: [a-f0-9]{64}/);
+  assert.ok(!pointer.includes(briefBody));
   assert.deepStrictEqual(launch.args, [
     'exec',
     '--skip-git-repo-check',
@@ -34,7 +54,20 @@ test('buildCodexLaunch uses the Codex binary and sends the brief through stdin',
     '-',
   ]);
   assert.strictEqual(launch.args.at(-1), '-');
-  assert.ok(!launch.args.includes('C:\\tmp\\brief.md'));
+  assert.ok(!launch.args.includes(briefBody));
+});
+
+test('buildCodexLaunch rejects a missing brief as an argument error', () => {
+  const { buildCodexLaunch } = require('./cli-launch.js');
+
+  assert.throws(
+    () => buildCodexLaunch({
+      brief: path.join(os.tmpdir(), 'magi-cli-launch-missing-brief.md'),
+      cwd: 'C:\\src\\magi',
+      capture: 'C:\\tmp\\capture.txt',
+    }),
+    (error) => error.code === 'ARGUMENT_ERROR',
+  );
 });
 
 function fakeChild(pid = 4321) {
@@ -142,15 +175,67 @@ test('runChild keeps the Codex sandbox wedge kill on the recorded PID', async ()
     },
   );
 
-  child.stderr.write('sandbox: read-only\n');
+  child.stderr.write([
+    'OpenAI Codex v0.146.1',
+    '--------',
+    'sandbox: read-only',
+    '--------',
+    '',
+  ].join('\n'));
   child.emit('close', null);
 
   assert.strictEqual(await result, 1);
   assert.strictEqual(killedPid, 11223);
   assert.strictEqual(
     output.stderr(),
-    'sandbox: read-only\nWEDGE: requested sandbox workspace-write, got read-only\n',
+    [
+      'OpenAI Codex v0.146.1',
+      '--------',
+      'sandbox: read-only',
+      '--------',
+      'WEDGE: requested sandbox workspace-write, got read-only',
+      '',
+    ].join('\n'),
   );
+});
+
+test('runChild ignores sandbox-like text after the Codex banner header', async () => {
+  const { runChild } = require('./cli-launch.js');
+  const child = fakeChild(11224);
+  const output = captureIo();
+  let killedPid;
+
+  const result = runChild(
+    { binary: 'codex.exe', args: [], requestedSandbox: 'workspace-write' },
+    output.io,
+    true,
+    {
+      vendor: 'openai',
+      spawnFn() { return child; },
+      loadIdleDecide() { return null; },
+      kill(pid) { killedPid = pid; },
+    },
+  );
+
+  child.stderr.write([
+    'OpenAI Codex v0.146.1',
+    '--------',
+    'sandbox: workspace-write [workdir, /tmp, $TMPDIR]',
+    'session id: 01a12345-6789-abcd-ef01-23456789abcd',
+    '--------',
+    'const launch = {',
+    '  sandbox: actualSandbox,',
+    '};',
+    'tokens used',
+    '99',
+    '',
+  ].join('\n'));
+  child.emit('close', 0);
+
+  assert.strictEqual(await result, 0);
+  assert.strictEqual(killedPid, undefined);
+  assert.match(output.stdout(), /CODEX_PROOF session id: .*; tokens used: 99/);
+  assert.doesNotMatch(output.stderr(), /WEDGE:/);
 });
 
 test('runChild does not pipe a brief when the vendor ignores stdin', async () => {
@@ -259,9 +344,12 @@ test('parseCodexLog accepts matching sandbox and complete proof', () => {
   const log = [
     'OpenAI Codex v0.146.1',
     '--------',
-    'sandbox: workspace-write',
+    'sandbox: workspace-write [workdir, /tmp, $TMPDIR]',
     'session id: 01a12345-6789-abcd-ef01-23456789abcd',
     '--------',
+    'const launch = {',
+    '  sandbox: actualSandbox,',
+    '};',
     'tokens used',
     '12,345',
   ].join('\r\n');
@@ -464,11 +552,16 @@ test('google dry-run uses the sibling model flag without spawning a vendor', (t)
   assert.ok(launch.args.includes(directory));
 });
 
-test('CLI dry-run prints argv without spawning Codex', () => {
+test('CLI dry-run prints pointer delivery without spawning Codex', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-cli-launch-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const briefPath = path.join(directory, 'brief.md');
+  fs.writeFileSync(briefPath, 'dry-run brief', 'utf8');
+
   const result = spawnSync(process.execPath, [
     launcherPath,
     '--vendor', 'openai',
-    '--brief', 'C:\\tmp\\brief.md',
+    '--brief', briefPath,
     '--cwd', 'C:\\src\\magi',
     '--capture', 'C:\\tmp\\capture.txt',
     '--dry-run',
@@ -477,7 +570,11 @@ test('CLI dry-run prints argv without spawning Codex', () => {
   assert.strictEqual(result.status, 0, result.stderr);
   const launch = JSON.parse(result.stdout);
   assert.strictEqual(launch.binary, 'C:\\Users\\YESSIR\\tools\\bin\\codex.exe');
-  assert.strictEqual(launch.stdinFile, 'C:\\tmp\\brief.md');
+  assert.strictEqual(launch.delivery, 'pointer');
+  assert.strictEqual(launch.briefPath, path.resolve(briefPath));
+  assert.strictEqual(launch.pointerFile, `${path.resolve(briefPath)}.pointer.md`);
+  assert.strictEqual(launch.stdinFile, launch.pointerFile);
+  assert.strictEqual(launch.bytes, Buffer.byteLength('dry-run brief'));
   assert.strictEqual(launch.args.at(-1), '-');
   assert.ok(launch.args.includes('memories.use_memories=false'));
   assert.ok(launch.args.includes('memories.generate_memories=false'));

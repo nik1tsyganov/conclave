@@ -1,11 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
+const path = require('path');
 const { buildArgs, buildLaunch, parseEnvelope, parseLogModel } = require('./cli-gemini.js');
+const { assertPointerLaunch } = require('./cli-pointer.js');
 
 test('buildArgs: standard launch', () => {
-    const brief = 'this is a test brief';
-    const launch = buildArgs(brief, 'gemini-3.1-pro-high', { extraDirs: ['C:\\src\\test'] });
+    const pointer = 'Read C:\\path.md in full. Bytes: 10. SHA-256: abc. Follow it. Repeat its first line verbatim before anything else.\n';
+    const launch = buildArgs(pointer, 'gemini-3.1-pro-high', { extraDirs: ['C:\\src\\test'] });
     
     assert.strictEqual(launch.binary, 'C:\\Users\\YESSIR\\tools\\bin\\agy.exe');
     assert.ok(launch.args.includes('--print-timeout'));
@@ -20,7 +22,7 @@ test('buildArgs: standard launch', () => {
     assert.ok(launch.args.includes('gemini-3.1-pro-high'));
     assert.ok(!launch.args.includes('-m'));
     assert.ok(launch.args.includes('-p'));
-    assert.ok(launch.args.includes(brief));
+    assert.ok(launch.args.includes(pointer));
     assert.ok(launch.args.includes('--dangerously-skip-permissions'));
     
     assert.deepStrictEqual(launch.stdio, ['ignore', 'pipe', 'pipe']);
@@ -30,10 +32,24 @@ test('buildArgs: standard launch', () => {
 });
 
 test('buildArgs: custom cwd', () => {
-    const brief = 'this is a test brief';
-    const launch = buildArgs(brief, 'gemini-3.1-pro-high', { cwd: 'C:\\src\\other' });
+    const pointer = 'Read C:\\path.md in full. Bytes: 10. SHA-256: abc. Follow it. Repeat its first line verbatim before anything else.\n';
+    const launch = buildArgs(pointer, 'gemini-3.1-pro-high', { cwd: 'C:\\src\\other' });
     assert.ok(launch.args.includes('C:\\src\\other'));
     assert.ok(!launch.args.includes('C:\\src\\magi'));
+});
+
+test('buildArgs: sandbox true', () => {
+    const pointer = 'Read C:\\path.md in full. Bytes: 10. SHA-256: abc. Follow it. Repeat its first line verbatim before anything else.\n';
+    const launch = buildArgs(pointer, 'gemini-3.1-pro-high', { sandbox: true });
+    assert.ok(launch.args.includes('--sandbox'));
+    assert.ok(!launch.args.includes('--dangerously-skip-permissions'));
+});
+
+test('buildArgs: rejects payloads over 2000 chars', () => {
+    const large = 'x'.repeat(2001);
+    assert.throws(() => {
+        buildArgs(large, 'gemini-3.1-pro-high');
+    }, /Magi CLI does not put brief bodies in argv/);
 });
 
 test('buildArgs: rejects payloads over 30000 chars', () => {
@@ -43,14 +59,30 @@ test('buildArgs: rejects payloads over 30000 chars', () => {
     }, /Argument list too long/);
 });
 
-test('buildLaunch: reads from file', () => {
+test('buildLaunch: reads from file and generates pointer text', () => {
     const tempPath = './temp-brief-test.md';
-    fs.writeFileSync(tempPath, 'file brief text');
+    const hugeBody = 'x'.repeat(40000);
+    fs.writeFileSync(tempPath, hugeBody);
     try {
         const launch = buildLaunch({ briefPath: tempPath, model: 'gemini-3.1-pro-high', extraDirs: ['test'] });
-        assert.ok(launch.args.includes('file brief text'));
+        
         assert.ok(launch.args.includes('--add-dir'));
         assert.ok(launch.args.includes('test'));
+        
+        const resolvedPath = path.resolve(tempPath);
+        const expectedDir = path.dirname(resolvedPath);
+        assert.ok(launch.args.includes(expectedDir));
+
+        const pIndex = launch.args.indexOf('-p');
+        const pValue = launch.args[pIndex + 1];
+        
+        // Use the utility to verify
+        assertPointerLaunch(pValue, hugeBody, tempPath);
+        
+        assert.ok(pValue.includes('Read '));
+        assert.ok(pValue.includes('Bytes: 40000'));
+        assert.ok(pValue.includes('SHA-256: '));
+        
     } finally {
         fs.unlinkSync(tempPath);
     }

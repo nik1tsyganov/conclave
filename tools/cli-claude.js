@@ -21,18 +21,28 @@
  *   claude.exe -p --model fable --effort xhigh
  *     --permission-mode bypassPermissions --add-dir C:\src\magi
  *     --output-format text
- * Prompt via stdin from a brief FILE. Never --continue / --resume. The
- * bypass grant is scoped: --add-dir must stay under C:\src\magi.
+ * The brief BODY never rides stdin or argv: buildLaunch writes
+ * `<brief>.pointer.md` beside the brief (tools/cli-pointer.js) and pipes only
+ * that short path+bytes+hash pointer; the model Reads the brief file itself.
+ * A second --add-dir names the brief's parent directory, which must sit under
+ * C:\src\magi or under the lead-written MAGI bus temp root - a brief parented
+ * anywhere else is refused (never --add-dir C:\Users or a drive root).
+ * Never --continue / --resume. The bypass grant is scoped: the cwd --add-dir
+ * must stay under C:\src\magi.
  */
 
 const path = require('node:path');
 const { containsForbidden } = require('./plugin-check.js');
+const { writePointerFile } = require('./cli-pointer.js');
 
 const CLAUDE_BIN = 'C:\\Users\\YESSIR\\.local\\bin\\claude.exe';
 const DEFAULT_MODEL = 'fable';
 // The only root --permission-mode bypassPermissions is pre-authorized for
 // (owner grant, 2026-09-02): MAGI implement writes under C:\src\magi.
 const MAGI_ROOT = 'C:\\src\\magi';
+// Where lead-written MAGI bus briefs live. A brief's parent directory must be
+// under MAGI_ROOT or under this bus root for the pointer launch to add-dir it.
+const MAGI_BUS_ROOT = 'C:\\Users\\YESSIR\\AppData\\Local\\Temp\\magi-bus';
 // Claude Code effort levels per `claude.exe --help` (verified live 2026-09-02).
 // The owner's "Extra" is not one of them - the rung below max is xhigh - and
 // the cursor-cli overlay pins xhigh: max is NOT the default here.
@@ -71,11 +81,33 @@ function resolveAddDir(cwd) {
   return resolved;
 }
 
+function isUnderRoot(lowerPath, root) {
+  const lowerRoot = root.toLowerCase();
+  return lowerPath === lowerRoot || lowerPath.startsWith(lowerRoot + '\\');
+}
+
+function resolveBriefDir(briefPath) {
+  // Resolve before checking so traversal ("..") cannot smuggle the parent
+  // outside the two pointer zones; prefix checks use root + '\\' so
+  // C:\src\magistrate or magi-bus-evil never match. Windows paths compare
+  // case-insensitively.
+  const resolved = path.win32.resolve(briefPath);
+  const dir = path.win32.dirname(resolved);
+  const lower = dir.toLowerCase();
+  if (!isUnderRoot(lower, MAGI_ROOT) && !isUnderRoot(lower, MAGI_BUS_ROOT)) {
+    throw new Error(
+      `brief parent ${dir} is outside the pointer zones (${MAGI_ROOT}, ${MAGI_BUS_ROOT}); ` +
+        'refusing to --add-dir it'
+    );
+  }
+  return { resolved, dir };
+}
+
 function buildLaunch(opts = {}) {
   const { briefPath, model = DEFAULT_MODEL, effort = DEFAULT_EFFORT, cwd = MAGI_ROOT } = opts;
   if (typeof briefPath !== 'string' || briefPath.length === 0) {
     throw new Error(
-      'briefPath is required: the prompt travels as a file over stdin, never as argv bytes'
+      'briefPath is required: the brief travels as a FILE the model Reads; only a short pointer rides stdin'
     );
   }
   assertEffort(effort);
@@ -92,19 +124,29 @@ function buildLaunch(opts = {}) {
   }
   // The measured 2026-09-02 MAGI write dispatch (PID recorded, files landed):
   // -p --model fable --effort xhigh --permission-mode bypassPermissions
-  // --add-dir C:\src\magi --output-format text, prompt via stdin from a file.
+  // --add-dir C:\src\magi --output-format text. Cheap validation and both
+  // zone checks run BEFORE any disk write, so a refused launch leaves no
+  // pointer file behind.
+  const addDir = resolveAddDir(cwd);
+  const { resolved: resolvedBrief, dir: briefDir } = resolveBriefDir(briefPath);
+  // Only the pointer rides stdin: path + bytes + hash, one short line that
+  // closes. The model reaches the brief body through --add-dir and Reads it.
+  const pointerPath = writePointerFile(resolvedBrief);
   const args = [
     '-p',
     '--model', model,
     '--effort', effort,
     '--permission-mode', 'bypassPermissions',
-    '--add-dir', resolveAddDir(cwd),
-    '--output-format', 'text',
+    '--add-dir', addDir,
   ];
+  if (briefDir.toLowerCase() !== addDir.toLowerCase()) {
+    args.push('--add-dir', briefDir);
+  }
+  args.push('--output-format', 'text');
   return {
     binary: CLAUDE_BIN,
     args,
-    stdinFile: briefPath,
+    stdinFile: pointerPath,
     stdio: ['pipe', 'pipe', 'pipe'],
   };
 }
@@ -184,6 +226,7 @@ module.exports = {
   DEFAULT_EFFORT,
   IDLE_LIMIT_MS,
   MAGI_ROOT,
+  MAGI_BUS_ROOT,
   AUTH_NEEDLES,
   buildLaunch,
   assessCapture,
