@@ -36,6 +36,7 @@ The Magi CLI Claude seat runs **`--model fable --effort xhigh`**. Verified live 
 
 ## Mechanics
 
+- The arbiter launches vendor CLIs through `node C:\src\magi\tools\cli-launch.js` with `--pid-file`, so the child's PID is recorded at spawn. Idle policy lives in `tools/cli-idle.js`: Claude and Gemini buffer stdout until exit, so an empty capture on a running child is **not** a hang at any elapsed time; Codex streams, so its idle stdio can be. Kill only the recorded PID — never by image name.
 - Prompt via **stdin**, never as a positional argument. See `codex-bridge` and `gemini-bridge` for the exact recipes — the Codex and Gemini recipes are **unchanged** by the 2026-09-02 Claude overlay.
 - Claude dispatch shape: pipe the prompt into `claude -p --model fable --effort xhigh`, capture to a file, then check the capture is non-empty AND on-topic. Mechanics in `claude-bridge`.
 - Capture vendor-native proof on every dispatch: Codex `session id` + `tokens used`; Gemini `conversation_id` + `usage` + per-run log slug check; Claude the captured on-topic reply plus the model/effort the dispatch passed.

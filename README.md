@@ -41,6 +41,11 @@ Then in Cursor: **Developer: Reload Window**, open **Customize**, and enable bot
    Review and verification use Task `reviewer` and `verifier` with the same
    required model overrides. In `/magi-cli`, the arbiter uses vendor CLIs.
 
+## Launch
+
+Run `node tools/cli-launch.js --help` for the vendor-CLI launch options.
+The idle watch — when a silent vendor child is a hang and when it is not — lives in `tools/cli-launch.js` and `tools/cli-idle.js`.
+
 ## After implement dispatches
 
 Each implementer pastes a WRITE AUDIT (`git diff --stat` + `git status --porcelain`).
