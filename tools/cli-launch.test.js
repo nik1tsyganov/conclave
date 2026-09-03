@@ -402,8 +402,12 @@ test('loadVendorModule reports MODULE_MISSING for an absent sibling', () => {
   );
 });
 
-test('CLI exits 2 with MODULE_MISSING when a requested sibling is absent', async () => {
+test('CLI exits 2 with MODULE_MISSING when a requested sibling is absent', async (t) => {
   const { main } = require('./cli-launch.js');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-cli-launch-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const briefPath = path.join(directory, 'brief.md');
+  fs.writeFileSync(briefPath, 'module-missing test brief', 'utf8');
   let stderr = '';
   const io = {
     stdout: { write() {} },
@@ -413,7 +417,7 @@ test('CLI exits 2 with MODULE_MISSING when a requested sibling is absent', async
   missing.code = 'MODULE_MISSING';
 
   const code = await main(
-    ['--vendor', 'google', '--brief', 'unused'],
+    ['--vendor', 'google', '--brief', briefPath],
     io,
     { loadVendorModule() { throw missing; } },
   );
@@ -422,8 +426,12 @@ test('CLI exits 2 with MODULE_MISSING when a requested sibling is absent', async
   assert.match(stderr, /^MODULE_MISSING:/);
 });
 
-test('CLI delegates anthropic dry-runs to the sibling buildLaunch export', async () => {
+test('CLI delegates anthropic dry-runs to the sibling buildLaunch export', async (t) => {
   const { main } = require('./cli-launch.js');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-cli-launch-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const briefPath = path.join(directory, 'brief.md');
+  fs.writeFileSync(briefPath, 'anthropic dry-run test brief', 'utf8');
   let stdout = '';
   let received;
   const io = {
@@ -440,7 +448,7 @@ test('CLI delegates anthropic dry-runs to the sibling buildLaunch export', async
   const code = await main(
     [
       '--vendor', 'anthropic',
-      '--brief', 'C:\\tmp\\brief.md',
+      '--brief', briefPath,
       '--cwd', 'C:\\src\\magi',
       '--model', 'fable',
       '--effort', 'xhigh',
@@ -452,12 +460,12 @@ test('CLI delegates anthropic dry-runs to the sibling buildLaunch export', async
 
   assert.strictEqual(code, 0);
   assert.deepStrictEqual(received, {
-    briefPath: 'C:\\tmp\\brief.md',
+    briefPath,
     model: 'fable',
     effort: 'xhigh',
     cwd: 'C:\\src\\magi',
   });
-  assert.strictEqual(JSON.parse(stdout).stdinFile, 'C:\\tmp\\brief.md');
+  assert.strictEqual(JSON.parse(stdout).stdinFile, briefPath);
 });
 
 test('CLI passes cwd to a sibling buildArgs export', async (t) => {
@@ -494,8 +502,12 @@ test('CLI passes cwd to a sibling buildArgs export', async (t) => {
   assert.deepStrictEqual(received, ['test brief', 'gemini-test', { cwd: directory }]);
 });
 
-test('CLI uses sibling env and falls back to the requested cwd', async () => {
+test('CLI uses sibling env and falls back to the requested cwd', async (t) => {
   const { main } = require('./cli-launch.js');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-cli-launch-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const briefPath = path.join(directory, 'brief.md');
+  fs.writeFileSync(briefPath, 'sibling env test brief', 'utf8');
   const child = fakeChild();
   const env = { TEST_VENDOR_ENV: 'kept' };
   let spawnOptions;
@@ -504,7 +516,7 @@ test('CLI uses sibling env and falls back to the requested cwd', async () => {
   const result = main(
     [
       '--vendor', 'anthropic',
-      '--brief', 'brief.md',
+      '--brief', briefPath,
       '--cwd', 'C:\\src\\requested',
     ],
     output.io,

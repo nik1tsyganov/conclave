@@ -70,13 +70,31 @@ function loadPointerHelpers() {
   return { inspectBrief: fallbackInspectBrief, pointerText: fallbackPointerText };
 }
 
-function prepareBriefPointer(brief) {
-  const briefPath = path.resolve(brief);
-  if (!fs.existsSync(briefPath) || !fs.statSync(briefPath).isFile()) {
+function validateBriefFile(brief) {
+  const briefPath = path.resolve(requireValue(brief, '--brief'));
+  let stat;
+  try {
+    stat = fs.statSync(briefPath);
+  } catch {
     const error = new Error(`--brief file does not exist: ${briefPath}`);
     error.code = 'ARGUMENT_ERROR';
     throw error;
   }
+  if (!stat.isFile()) {
+    const error = new Error(`--brief file does not exist: ${briefPath}`);
+    error.code = 'ARGUMENT_ERROR';
+    throw error;
+  }
+  if (stat.size === 0) {
+    const error = new Error(`--brief file is empty: ${briefPath}`);
+    error.code = 'ARGUMENT_ERROR';
+    throw error;
+  }
+  return briefPath;
+}
+
+function prepareBriefPointer(brief) {
+  const briefPath = validateBriefFile(brief);
 
   const { inspectBrief, pointerText } = loadPointerHelpers();
   const info = inspectBrief(briefPath);
@@ -499,6 +517,7 @@ async function main(argv = process.argv.slice(2), io = process, dependencies = {
       io.stdout.write(`${usage()}\n`);
       return 0;
     }
+    options.brief = validateBriefFile(options.brief);
 
     if (options.vendor !== 'openai') {
       return await runSiblingVendor(options, io, dependencies);

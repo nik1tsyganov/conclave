@@ -17,6 +17,24 @@ Proof in this mode is the Cursor Task `model` slug plus the implementer's WRITE
 AUDIT. Do not require or claim a CLI session id, conversation id, token count, or
 other CLI proof token.
 
+## Brief delivery
+
+Write each seat's brief to a file first — under the session's magi-bus
+directory or the repo — never into the Task `prompt`. The Task `prompt` carries
+only the pointer sentence built by `tools/task-delivery.js`:
+
+```bash
+node -e "console.log(require('C:/src/magi/tools/task-delivery.js').buildTaskPrompt(process.argv[1]).prompt)" "<brief path>"
+```
+
+`buildTaskPrompt` refuses a missing brief file and an empty (0-byte) brief.
+Before dispatch, check the prompt with `assertTaskPrompt(prompt, briefBody,
+briefPath)`; it refuses a prompt that contains the brief body (when the body is
+over 80 chars), a prompt missing the resolved brief path, and a prompt over
+2000 chars. Never paste the brief body into `prompt` — a pasted body drifts
+from the file it came from, breaks on quoting, and overflows the Task prompt
+window.
+
 ## Per-dispatch host failsafe
 
 Before each Cursor Task to an elector slug, run:
