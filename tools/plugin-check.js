@@ -37,7 +37,9 @@ function check() {
     '.cursor/skills/magi/SKILL.md',
     '.cursor/skills/magi/references/cursor-host.md',
     '.cursor/skills/magi/references/cursor-cli.md',
+    '.cursor/skills/magi/references/brief-rules-block.md',
     '.cursor/skills/magi-cli/SKILL.md',
+    '.cursor/skills/magi-cli/references/brief-rules-block.md',
     '.cursor/rules/magi-arbiter.mdc',
     '.cursor/rules/magi-activation.mdc',
     '.cursor/rules/magi-orchestrator.mdc',
@@ -67,6 +69,9 @@ function check() {
     'tools/cli-launch.test.js',
     'tools/cli-smoke.js',
     'tools/cli-smoke.test.js',
+    'tools/cli-brief-rules-check.js',
+    'tools/cli-brief-rules-check.test.js',
+    'tools/templates/brief-rules-block.md',
     'tools/cli-delivery-fail.test.js',
     'tools/cli-idle.js',
     'tools/cli-idle.test.js',
@@ -156,6 +161,7 @@ function check() {
     'activation-check',
     'check-compiler-errors',
     'cursor-packs.mdc',
+    'brief-rules-block',
   ];
   for (const s of skillStrings) {
     if (!skill.includes(s)) {
@@ -167,6 +173,10 @@ function check() {
   const magiCliSkill = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi-cli/SKILL.md'), 'utf8');
   if (!magiCliSkill.includes('references/cursor-cli.md')) {
     console.error('magi-cli SKILL.md missing required co-located reference: references/cursor-cli.md');
+    return 1;
+  }
+  if (!magiCliSkill.includes('references/brief-rules-block.md')) {
+    console.error('magi-cli SKILL.md missing required co-located reference: references/brief-rules-block.md');
     return 1;
   }
   if (magiCliSkill.includes('.cursor/skills/magi/references/cursor-cli.md')) {
@@ -188,9 +198,37 @@ function check() {
     return 1;
   }
 
+  const briefRulesMagi = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi/references/brief-rules-block.md'), 'utf8');
+  const briefRulesCli = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi-cli/references/brief-rules-block.md'), 'utf8');
+  const briefRulesTemplate = fs.readFileSync(path.join(ROOT, 'tools/templates/brief-rules-block.md'), 'utf8');
+  if (briefRulesMagi !== briefRulesCli) {
+    console.error('brief-rules-block.md copies diverge: magi/references != magi-cli/references');
+    return 1;
+  }
+  if (briefRulesMagi !== briefRulesTemplate) {
+    console.error('brief-rules-block.md copies diverge: magi/references != tools/templates');
+    return 1;
+  }
+  for (const s of [
+    'RULES',
+    'magi-cli-rules',
+    'STANDING.md',
+    'C:\\src\\ai-ops-vault\\projects\\magi-cli-rules\\STANDING.md',
+    'magi-mode',
+    'magi-dispatch',
+    'Casper',
+    'agy',
+    'cli-brief-rules-check.js',
+  ]) {
+    if (!briefRulesMagi.includes(s)) {
+      console.error(`brief-rules-block.md missing required string: ${s}`);
+      return 1;
+    }
+  }
+
 
   for (const ref of [cursorCli, magiCliRef]) {
-    for (const s of ['codex.exe', 'agy.exe', 'cursor-cli', '.local\\bin\\claude.exe', 'fable', 'xhigh', 'telemetry-append.js']) {
+    for (const s of ['codex.exe', 'agy.exe', 'cursor-cli', '.local\\bin\\claude.exe', 'fable', 'xhigh', 'telemetry-append.js', 'cli-brief-rules-check.js', 'extraDirs', 'magi-cli-rules']) {
       if (!ref.includes(s)) {
         console.error(`cursor-cli.md missing required string: ${s}`);
         return 1;

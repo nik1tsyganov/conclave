@@ -46,6 +46,14 @@ Then in Cursor: **Developer: Reload Window**, open **Customize**, and enable bot
 Run `node tools/cli-launch.js --help` for the vendor-CLI launch options.
 The idle watch — when a silent vendor child is a hang and when it is not — lives in `tools/cli-launch.js` and `tools/cli-idle.js`.
 
+Every Magi CLI seat brief MUST include the RULES block from
+`.cursor/skills/magi/references/brief-rules-block.md`. Check with
+`node tools/cli-brief-rules-check.js --brief <file>`. `tools/cli-smoke.js`
+fails closed when those markers are missing. When
+`C:\src\ai-ops-vault\projects\magi-cli-rules` is on the host, the arbiter
+SHOULD pass it as Gemini/`agy` `extraDirs`. Do not pass that vault (or
+`C:\Users`) as Claude `--add-dir`.
+
 ## After implement dispatches
 
 Each implementer pastes a WRITE AUDIT (`git diff --stat` + `git status --porcelain`).

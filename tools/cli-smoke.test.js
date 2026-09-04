@@ -16,8 +16,12 @@ const {
   main,
 } = require('./cli-smoke.js');
 
+function rulesMarkers() {
+  return 'magi-cli-rules magi-mode magi-dispatch';
+}
+
 function uniqueBody() {
-  return `UNIQUE-SMOKE-${crypto.randomUUID()}-`.padEnd(200, 'b');
+  return `${rulesMarkers()}\nUNIQUE-SMOKE-${crypto.randomUUID()}-`.padEnd(200, 'b');
 }
 
 function makeBrief(t, body) {
@@ -92,6 +96,25 @@ test('a missing brief exits 2 with ARGUMENT_ERROR', async () => {
 
   assert.strictEqual(code, 2, io.stderrText);
   assert.match(io.stderrText, /^ARGUMENT_ERROR:/);
+});
+
+test('a brief without the RULES markers fails closed before any dry-run', async (t) => {
+  const briefPath = makeBrief(t, `UNIQUE-SMOKE-${crypto.randomUUID()}-`.padEnd(200, 'b'));
+  const io = capture();
+  let spawned = false;
+
+  const code = await main(
+    ['--brief', briefPath, '--cwd', 'C:\\src\\magi'],
+    io,
+    { spawnFn() { spawned = true; throw new Error('vendor process spawned'); } },
+  );
+
+  assert.strictEqual(code, 1, io.stderrText);
+  assert.strictEqual(spawned, false, 'missing RULES must not reach a vendor spawn');
+  assert.match(io.stderrText, /brief missing RULES markers/);
+  assert.match(io.stderrText, /magi-cli-rules\|STANDING\.md/);
+  assert.match(io.stderrText, /magi-mode/);
+  assert.match(io.stderrText, /magi-dispatch/);
 });
 
 test('a missing --brief flag exits 2 with ARGUMENT_ERROR', async () => {

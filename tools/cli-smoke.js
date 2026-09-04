@@ -7,17 +7,19 @@
  * Proves pointer delivery for all three vendor launchers without spending a
  * live seat: calls cli-launch.js main() with --dry-run for openai, google,
  * and anthropic (in-process require, no vendor child process), then fails
- * closed if any printed plan leaks the brief body into an argument or a
- * stdin file, if the OpenAI plan is not pointer delivery or pipes the brief
- * path itself, or if the google -p value is the brief body.
+ * closed if the brief is missing the Magi CLI RULES markers, if any printed
+ * plan leaks the brief body into an argument or a stdin file, if the OpenAI
+ * plan is not pointer delivery or pipes the brief path itself, or if the
+ * google -p value is the brief body.
  *
- * Exit 0 smoke ok; 1 leak or plan defect; 2 ARGUMENT_ERROR.
+ * Exit 0 smoke ok; 1 leak, plan defect, or missing RULES; 2 ARGUMENT_ERROR.
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
 
 const { main: launchMain } = require('./cli-launch.js');
+const { checkBriefText, formatMissing } = require('./cli-brief-rules-check.js');
 
 const VENDORS = ['openai', 'google', 'anthropic'];
 
@@ -26,8 +28,9 @@ function usage() {
     'Usage: node tools/cli-smoke.js --brief <file> --cwd <dir>',
     '',
     'Dry-runs the openai, google, and anthropic launch plans through',
-    'cli-launch.js (no vendor process spawns) and fails on any brief-body',
-    'leak into arguments or stdin files.',
+    'cli-launch.js (no vendor process spawns) and fails closed if the brief',
+    'is missing the Magi CLI RULES markers or if any brief-body leaks into',
+    'arguments or stdin files.',
   ].join('\n');
 }
 
@@ -138,6 +141,12 @@ async function main(argv = process.argv.slice(2), io = process, dependencies = {
       body = fs.readFileSync(briefPath, 'utf8');
     } catch {
       throw argumentError(`--brief file does not exist: ${briefPath}`);
+    }
+    if (body.length > 0) {
+      const rules = checkBriefText(body);
+      if (!rules.ok) {
+        throw smokeError(formatMissing(rules.missing));
+      }
     }
 
     const vendors = [];
