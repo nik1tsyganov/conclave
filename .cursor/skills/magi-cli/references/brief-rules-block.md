@@ -11,6 +11,6 @@ COMMS: receipt ACK + handoff envelope.
 hostMode: cursor-cli. Floor: ≤60% per vendor; activation-check on dispatch-log.
 ```
 
-Fail-closed markers (cli-brief-rules-check.js): magi-mode, magi-dispatch, mix-mode, casper_via=agy (google), RULES/INDEX (or magi-cli-rules/STANDING), WRITE AUDIT or R07, engineering-orchestrator or SCOPE, implement and/or testing, one of codex-bridge|claude-bridge|gemini-bridge. Exit 0 ok; 1 missing markers; 2 ARGUMENT_ERROR.
+Fail-closed markers (cli-brief-rules-check.js): magi-mode, magi-dispatch, mix-mode, casper_via=agy (google), RULES/INDEX (or magi-cli-rules/STANDING), WRITE AUDIT or R07, engineering-orchestrator, testing, one of codex-bridge|claude-bridge|gemini-bridge. --role implement also requires implement. Disk skill names only. Exit 0 ok; 1 missing markers; 2 ARGUMENT_ERROR.
 
 SoT: ai-ops-vault `projects/magi-cli-rules/RULES/` (R01–R21); Research-CLI-RULES-BRIEF-PIN.md §E.

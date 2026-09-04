@@ -31,8 +31,8 @@ const ALL_MARKER_IDS = [
   'mix-mode',
   'casper_via=agy',
   'WRITE AUDIT|R07',
-  'engineering-orchestrator|SCOPE',
-  'implement|testing',
+  'engineering-orchestrator',
+  'testing',
   'codex-bridge|claude-bridge|gemini-bridge',
 ];
 
@@ -117,20 +117,21 @@ test('missing RULES/INDEX, magi-cli-rules, and STANDING is listed', () => {
   assert.deepStrictEqual(result.missing, ['RULES/INDEX|magi-cli-rules|STANDING']);
 });
 
-test('H7 Skills extras: SCOPE satisfies engineering-orchestrator', () => {
+test('H7 Skills extras: SCOPE does not satisfy engineering-orchestrator', () => {
   const result = checkBriefText(legalBrief().replace('engineering-orchestrator', 'SCOPE'));
-  assert.deepStrictEqual(result, { ok: true, missing: [] });
+  assert.strictEqual(result.ok, false);
+  assert.deepStrictEqual(result.missing, ['engineering-orchestrator']);
 });
 
-test('H7 Skills extras: testing alone satisfies implement|testing', () => {
+test('H7 Skills extras: review brief with testing and no implement passes', () => {
   const result = checkBriefText(legalBrief().replace(', implement, testing,', ', testing,'));
   assert.deepStrictEqual(result, { ok: true, missing: [] });
 });
 
-test('H7 Skills extras: missing implement and testing is listed', () => {
-  const result = checkBriefText(legalBrief().replace(', implement, testing,', ', '));
+test('H7 Skills extras: missing testing is listed', () => {
+  const result = checkBriefText(legalBrief().replace(', implement, testing,', ', implement, '));
   assert.strictEqual(result.ok, false);
-  assert.deepStrictEqual(result.missing, ['implement|testing']);
+  assert.deepStrictEqual(result.missing, ['testing']);
 });
 
 test('H7 Skills extras: missing every bridge is listed', () => {
@@ -185,8 +186,8 @@ test('main exits 1 and lists missing markers', (t) => {
   assert.match(io.stderrText, /mix-mode/);
   assert.match(io.stderrText, /casper_via=agy/);
   assert.match(io.stderrText, /WRITE AUDIT\|R07/);
-  assert.match(io.stderrText, /engineering-orchestrator\|SCOPE/);
-  assert.match(io.stderrText, /implement\|testing/);
+  assert.match(io.stderrText, /engineering-orchestrator/);
+  assert.match(io.stderrText, /testing/);
   assert.match(io.stderrText, /codex-bridge\|claude-bridge\|gemini-bridge/);
 });
 

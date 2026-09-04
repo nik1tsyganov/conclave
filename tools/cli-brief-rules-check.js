@@ -11,11 +11,10 @@
  *
  * Exit 0 rules ok; 1 missing markers; 2 ARGUMENT_ERROR.
  *
- * Skills: extras (H7 seatSkillsLine SoT, vault#21):
- *   engineering-orchestrator OR SCOPE
- *   implement and/or testing (anyOf; review-only may omit implement)
- *   one of codex-bridge | claude-bridge | gemini-bridge
- * Optional --role implement additionally requires the implement token.
+ * Skills: extras (H7 seatSkillsLine SoT, vault#21 MERGED):
+ *   engineering-orchestrator, testing, and one vendor bridge on every brief
+ *   --role implement additionally requires the implement token
+ * Disk skill names only — no Cursor Superpowers / Team Kit tokens.
  */
 
 const fs = require('node:fs');
@@ -60,14 +59,12 @@ const REQUIRED_MARKERS = Object.freeze([
     anyOf: Object.freeze(['WRITE AUDIT', 'R07']),
   },
   {
-    // H7 / vault#21 seatSkillsLine extras. SCOPE-only briefs still pass.
-    id: 'engineering-orchestrator|SCOPE',
-    anyOf: Object.freeze(['engineering-orchestrator', 'SCOPE']),
+    id: 'engineering-orchestrator',
+    anyOf: Object.freeze(['engineering-orchestrator']),
   },
   {
-    // Implement seats name both; review-only may name testing only.
-    id: 'implement|testing',
-    anyOf: Object.freeze(['implement', 'testing']),
+    id: 'testing',
+    anyOf: Object.freeze(['testing']),
   },
   {
     id: 'codex-bridge|claude-bridge|gemini-bridge',
@@ -84,9 +81,9 @@ function usage() {
     'Existing RULES groups: magi-mode, magi-dispatch, mix-mode, casper_via=agy,',
     'RULES/INDEX or magi-cli-rules or STANDING, WRITE AUDIT or R07.',
     '',
-    'Skills: extras (vault#21 seatSkillsLine): engineering-orchestrator or SCOPE,',
-    'implement and/or testing, and one of codex-bridge|claude-bridge|gemini-bridge.',
-    '--role implement also requires the implement token (not testing alone).',
+    'Skills: extras (vault#21 seatSkillsLine): engineering-orchestrator, testing,',
+    'and one of codex-bridge|claude-bridge|gemini-bridge on the Skills: line.',
+    '--role implement also requires the implement token.',
   ].join('\n');
 }
 
