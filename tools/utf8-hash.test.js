@@ -57,4 +57,50 @@ describe('utf8-hash', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('strips one leading U+FEFF (Conclave parity); cli-pointer keeps the raw-buffer digest', () => {
+    const dir = mkdtempSync(path.join(ROOT, 'temp-utf8-bom-'));
+    try {
+      const body = 'BOM-FIRST\nsecond line\n';
+      const bomPath = path.join(dir, 'bom.md');
+      const plainPath = path.join(dir, 'plain.md');
+      writeFileSync(bomPath, `\uFEFF${body}`, 'utf8');
+      writeFileSync(plainPath, body, 'utf8');
+
+      assert.strictEqual(readUtf8File(bomPath), `\uFEFF${body}`);
+      assert.strictEqual(readUtf8File(plainPath), body);
+
+      assert.strictEqual(sha256Utf8(`\uFEFF${body}`), sha256Utf8(body));
+      assert.strictEqual(sha256Utf8File(bomPath), sha256Utf8(body));
+      assert.strictEqual(sha256Utf8File(plainPath), sha256Utf8(body));
+      assert.strictEqual(sha256Utf8File(bomPath), sha256Utf8File(plainPath));
+
+      assert.strictEqual(firstLineUtf8(`\uFEFF${body}`), 'BOM-FIRST');
+      assert.strictEqual(firstLineUtf8File(bomPath), 'BOM-FIRST');
+      assert.strictEqual(firstLineUtf8File(plainPath), 'BOM-FIRST');
+      assert.strictEqual(firstLineUtf8('\uFEFFhello'), 'hello');
+
+      // Only one leading BOM is stripped (Conclave). A second leading
+      // U+FEFF is hashed; a mid-text U+FEFF is never stripped.
+      assert.strictEqual(
+        sha256Utf8('\uFEFF\uFEFFx'),
+        crypto.createHash('sha256').update('\uFEFFx', 'utf8').digest('hex')
+      );
+      assert.notStrictEqual(sha256Utf8('\uFEFF\uFEFFx'), sha256Utf8('x'));
+      assert.notStrictEqual(sha256Utf8('a\uFEFFb'), sha256Utf8('ab'));
+
+      // Pointer identity still hashes the raw buffer, including EF BB BF.
+      const pointerBom = inspectBrief(bomPath);
+      const pointerPlain = inspectBrief(plainPath);
+      assert.strictEqual(pointerBom.sha256, rawBufferHash(bomPath));
+      assert.strictEqual(pointerPlain.sha256, rawBufferHash(plainPath));
+      assert.strictEqual(pointerPlain.sha256, sha256Utf8File(plainPath));
+      assert.notStrictEqual(pointerBom.sha256, sha256Utf8File(bomPath));
+      assert.notStrictEqual(pointerBom.sha256, pointerPlain.sha256);
+      assert.strictEqual(pointerBom.firstLine, `\uFEFFBOM-FIRST`);
+      assert.strictEqual(pointerPlain.firstLine, 'BOM-FIRST');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
