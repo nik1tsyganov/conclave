@@ -22,3 +22,4 @@ description: Start or continue a MAGI Cursor run (hostMode `cursor`). Use when t
 - After implement dispatches, write one JSONL row per implement unit `{vendor, role:"implement"}` to `magi-dispatch-log.jsonl` (gitignored; do not commit secrets).
 - Log path: product-repo runs write `C:\src\magi\projects\<slug>\magi-dispatch-log.jsonl`, never a log inside the product repo; MAGI-kit work uses `C:\src\magi\magi-dispatch-log.jsonl`. See `C:\src\magi\projects\README.md`.
 - Run the activation check: `node C:\src\magi\tools\activation-check.js <log path>`.
+- Tally POSITION with `node C:\src\magi\tools\position-tally.js`. Do not hand-count. Passage is `>=2 APPROVE` among eligible electors; `ABSTAIN` never toward passage; else `DEADLOCK`.

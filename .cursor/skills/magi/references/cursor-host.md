@@ -97,6 +97,16 @@ Log path: product-repo runs write `C:\src\magi\projects\<slug>\magi-dispatch-log
 
 `activation-check.js` rejects checked-in fixtures, then calls `hog-check.js` to enforce the 60% vendor floor. Exit 0 = `FLOOR HOLDS`; exit 1 = `FAILED activation`.
 
+## POSITION tally
+
+After the panel returns POSITION ballots, tally them with the shared passage tool. Do not hand-count. Gate-role reviews (implementer / reviewer / verifier) stay advisory.
+
+```bash
+node C:\src\magi\tools\position-tally.js --ballots '<json>' --json
+```
+
+Passage is `>=2 APPROVE` among eligible electors; `ABSTAIN` never toward passage; else `DEADLOCK`. `--author-vendor` recuses the implement author. `--degraded` is the cursor-cli Claude fail path only. See README.md for the CONCLAVE alignment note.
+
 ## After implement
 
 Cursor Task seats run `check-compiler-errors` and `deslop` when they edited code, and `verification-before-completion` before claiming done.

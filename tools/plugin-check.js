@@ -67,6 +67,8 @@ function check() {
     'tools/cli-gemini.test.js',
     'tools/task-delivery.js',
     'tools/task-delivery.test.js',
+    'tools/position-tally.js',
+    'tools/position-tally.test.js',
     'telemetry/README.md',
     'tools/dispatch-log.pass.jsonl',
     'tools/dispatch-log.fail.jsonl',

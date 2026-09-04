@@ -108,6 +108,8 @@ function installMagiCursorCli() {
     'dispatch-log.fail.jsonl',
     'host-resolver.js',
     'host-resolver.test.js',
+    'position-tally.js',
+    'position-tally.test.js',
   ]) {
     copyFile(path.join(ROOT, 'tools', tool), path.join(MAGI_CLI_DEST, 'tools', tool));
   }
@@ -182,6 +184,7 @@ function checkMagiCli() {
     'commands/magi-cli.md',
     'tools/hog-check.js',
     'tools/activation-check.js',
+    'tools/position-tally.js',
   ];
   const missing = required.filter((rel) => !fs.existsSync(path.join(MAGI_CLI_DEST, rel)));
   if (missing.length) {
