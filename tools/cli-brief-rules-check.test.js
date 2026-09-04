@@ -25,14 +25,19 @@ const TEMPLATE_PATHS = [
 ];
 
 const ALL_MARKER_IDS = [
-  'RULES/INDEX.md|magi-cli-rules|STANDING.md',
+  'RULES/INDEX',
   'magi-mode',
   'magi-dispatch',
-  'casper_via=agy',
+  'mix-mode',
+  'casper_via=agy|Vendor:',
+  'WRITE AUDIT|R07',
 ];
 
 function legalBrief(overrides = '') {
-  return ['magi-cli-rules magi-mode magi-dispatch casper_via=agy', overrides].join(' ').trim();
+  return [
+    'RULES/INDEX.md magi-mode magi-dispatch mix-mode casper_via=agy WRITE AUDIT',
+    overrides,
+  ].join(' ').trim();
 }
 
 function makeBrief(t, body) {
@@ -55,56 +60,58 @@ test('a brief with the full RULES marker set passes', () => {
   assert.deepStrictEqual(result, { ok: true, missing: [] });
 });
 
-test('the STANDING.md path satisfies the vault marker without naming magi-cli-rules', () => {
-  const result = checkBriefText(`Read ${STANDING_PATH}. magi-mode magi-dispatch casper_via=agy`);
-  assert.deepStrictEqual(result, { ok: true, missing: [] });
-});
-
-test('STANDING.md plus the other required markers is enough', () => {
-  const result = checkBriefText('Read STANDING.md. magi-mode magi-dispatch casper_via=agy');
-  assert.deepStrictEqual(result, { ok: true, missing: [] });
-});
-
-test('RULES/INDEX.md satisfies the vault marker without STANDING.md or magi-cli-rules', () => {
-  const result = checkBriefText('Read RULES/INDEX.md. magi-mode magi-dispatch casper_via=agy');
-  assert.deepStrictEqual(result, { ok: true, missing: [] });
-});
-
-test('VENDOR.md plus agy card text does not satisfy Casper without casper_via=agy', () => {
+test('a Vendor: line satisfies Casper without casper_via=agy', () => {
   const result = checkBriefText(
-    'magi-cli-rules magi-mode magi-dispatch VENDOR.md Casper is agy (agy.exe)',
+    'RULES/INDEX.md magi-mode magi-dispatch mix-mode Vendor: agy WRITE AUDIT',
+  );
+  assert.deepStrictEqual(result, { ok: true, missing: [] });
+});
+
+test('R07 satisfies the WRITE AUDIT marker', () => {
+  const result = checkBriefText(
+    'RULES/INDEX.md magi-mode magi-dispatch mix-mode casper_via=agy R07',
+  );
+  assert.deepStrictEqual(result, { ok: true, missing: [] });
+});
+
+test('STANDING.md without RULES/INDEX does not satisfy the pack marker', () => {
+  const result = checkBriefText(
+    `Read ${STANDING_PATH}. magi-mode magi-dispatch mix-mode casper_via=agy WRITE AUDIT`,
   );
   assert.strictEqual(result.ok, false);
-  assert.deepStrictEqual(result.missing, ['casper_via=agy']);
+  assert.deepStrictEqual(result.missing, ['RULES/INDEX']);
 });
 
-test('PATH gemini does not satisfy casper_via=agy', () => {
-  const result = checkBriefText('magi-cli-rules magi-mode magi-dispatch gemini');
+test('PATH gemini does not satisfy casper_via=agy or Vendor:', () => {
+  const result = checkBriefText(
+    'RULES/INDEX.md magi-mode magi-dispatch mix-mode gemini WRITE AUDIT',
+  );
   assert.strictEqual(result.ok, false);
-  assert.deepStrictEqual(result.missing, ['casper_via=agy']);
-});
-
-test('pointer/receipt/envelope and mix-mode are not required markers', () => {
-  const result = checkBriefText('magi-cli-rules magi-mode magi-dispatch casper_via=agy');
-  assert.deepStrictEqual(result, { ok: true, missing: [] });
+  assert.deepStrictEqual(result.missing, ['casper_via=agy|Vendor:']);
 });
 
 test('missing magi-mode is listed', () => {
-  const result = checkBriefText('magi-cli-rules magi-dispatch casper_via=agy');
+  const result = checkBriefText('RULES/INDEX.md magi-dispatch mix-mode casper_via=agy WRITE AUDIT');
   assert.strictEqual(result.ok, false);
   assert.deepStrictEqual(result.missing, ['magi-mode']);
 });
 
 test('missing magi-dispatch is listed', () => {
-  const result = checkBriefText('magi-cli-rules magi-mode casper_via=agy');
+  const result = checkBriefText('RULES/INDEX.md magi-mode mix-mode casper_via=agy WRITE AUDIT');
   assert.strictEqual(result.ok, false);
   assert.deepStrictEqual(result.missing, ['magi-dispatch']);
 });
 
-test('missing vault pack markers is listed as RULES/INDEX.md|magi-cli-rules|STANDING.md', () => {
-  const result = checkBriefText('magi-mode magi-dispatch casper_via=agy');
+test('missing mix-mode is listed', () => {
+  const result = checkBriefText('RULES/INDEX.md magi-mode magi-dispatch casper_via=agy WRITE AUDIT');
   assert.strictEqual(result.ok, false);
-  assert.deepStrictEqual(result.missing, ['RULES/INDEX.md|magi-cli-rules|STANDING.md']);
+  assert.deepStrictEqual(result.missing, ['mix-mode']);
+});
+
+test('missing RULES/INDEX is listed', () => {
+  const result = checkBriefText('magi-mode magi-dispatch mix-mode casper_via=agy WRITE AUDIT');
+  assert.strictEqual(result.ok, false);
+  assert.deepStrictEqual(result.missing, ['RULES/INDEX']);
 });
 
 test('an empty brief is missing every marker', () => {
@@ -136,9 +143,11 @@ test('main exits 1 and lists missing markers', (t) => {
   const code = main(['--brief', briefPath], io);
   assert.strictEqual(code, 1, io.stderrText);
   assert.match(io.stderrText, /^RULES_FAIL:/);
-  assert.match(io.stderrText, /RULES\/INDEX\.md\|magi-cli-rules\|STANDING\.md/);
+  assert.match(io.stderrText, /RULES\/INDEX/);
   assert.match(io.stderrText, /magi-dispatch/);
-  assert.match(io.stderrText, /casper_via=agy/);
+  assert.match(io.stderrText, /mix-mode/);
+  assert.match(io.stderrText, /casper_via=agy\|Vendor:/);
+  assert.match(io.stderrText, /WRITE AUDIT\|R07/);
 });
 
 test('a missing --brief flag exits 2 with ARGUMENT_ERROR', () => {

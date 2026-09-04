@@ -17,7 +17,7 @@ const {
 } = require('./cli-smoke.js');
 
 function rulesMarkers() {
-  return 'magi-cli-rules magi-mode magi-dispatch casper_via=agy';
+  return 'RULES/INDEX.md magi-mode magi-dispatch mix-mode casper_via=agy WRITE AUDIT';
 }
 
 function uniqueBody() {
@@ -112,10 +112,12 @@ test('a brief without the RULES markers fails closed before any dry-run', async 
   assert.strictEqual(code, 1, io.stderrText);
   assert.strictEqual(spawned, false, 'missing RULES must not reach a vendor spawn');
   assert.match(io.stderrText, /brief missing RULES markers/);
-  assert.match(io.stderrText, /RULES\/INDEX\.md\|magi-cli-rules\|STANDING\.md/);
+  assert.match(io.stderrText, /RULES\/INDEX/);
   assert.match(io.stderrText, /magi-mode/);
   assert.match(io.stderrText, /magi-dispatch/);
-  assert.match(io.stderrText, /casper_via=agy/);
+  assert.match(io.stderrText, /mix-mode/);
+  assert.match(io.stderrText, /casper_via=agy\|Vendor:/);
+  assert.match(io.stderrText, /WRITE AUDIT\|R07/);
 });
 
 test('a missing --brief flag exits 2 with ARGUMENT_ERROR', async () => {

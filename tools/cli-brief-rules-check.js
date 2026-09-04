@@ -21,9 +21,8 @@ const RULES_INDEX = 'RULES/INDEX.md';
 
 const REQUIRED_MARKERS = Object.freeze([
   {
-    // Pack index, vault project, or standing path. Research MUST-name list.
-    id: 'RULES/INDEX.md|magi-cli-rules|STANDING.md',
-    anyOf: Object.freeze(['RULES/INDEX.md', 'RULES\\INDEX.md', 'magi-cli-rules', 'STANDING.md']),
+    id: 'RULES/INDEX',
+    anyOf: Object.freeze(['RULES/INDEX.md', 'RULES/INDEX', 'RULES\\INDEX.md']),
   },
   {
     id: 'magi-mode',
@@ -34,9 +33,17 @@ const REQUIRED_MARKERS = Object.freeze([
     anyOf: Object.freeze(['magi-dispatch']),
   },
   {
-    // Casper is agy.exe, not PATH gemini. VENDOR.md in the pack must carry this.
-    id: 'casper_via=agy',
-    anyOf: Object.freeze(['casper_via=agy']),
+    id: 'mix-mode',
+    anyOf: Object.freeze(['mix-mode']),
+  },
+  {
+    // Research pin: casper_via=agy if google, or a Vendor: line on every seat.
+    id: 'casper_via=agy|Vendor:',
+    anyOf: Object.freeze(['casper_via=agy', 'Vendor:']),
+  },
+  {
+    id: 'WRITE AUDIT|R07',
+    anyOf: Object.freeze(['WRITE AUDIT', 'R07']),
   },
 ]);
 
@@ -45,8 +52,8 @@ function usage() {
     'Usage: node tools/cli-brief-rules-check.js --brief <file>',
     '',
     'Fails closed unless the brief contains the Magi CLI RULES markers:',
-    'magi-mode, magi-dispatch, casper_via=agy, and RULES/INDEX.md or',
-    'magi-cli-rules or STANDING.md.',
+    'magi-mode, magi-dispatch, mix-mode, casper_via=agy or Vendor:,',
+    'RULES/INDEX, and WRITE AUDIT or R07.',
   ].join('\n');
 }
 

@@ -6,7 +6,7 @@ directory and pass `--add-dir <briefDir>` to every Magi CLI vendor so CLI
 seats can Read `magi-mode` and `magi-dispatch` without Cursor plugins.
 
 Authoritative pack under `briefDir` (Research handoff): `BRIEF.md`,
-`VENDOR.md` (`casper_via=agy`), `RULES/INDEX.md`, and R01..R20 bodies.
+`VENDOR.md` (`casper_via=agy`), `RULES/INDEX.md`, and R01..R21 bodies.
 The pointer may hash `BRIEF.md` + `RULES/INDEX.md`. Materializing that
 pack into the brief dir is still this ticket — do **not** implement the
 copy/add-dir-all-vendors helper in this tree now.

@@ -95,4 +95,4 @@ Tally panel POSITION with `node C:\src\magi\tools\position-tally.js`. Do not han
 ## Other
 
 - Put the SCOPE block from `engineering-orchestrator` in every seat brief.
-- Every Magi CLI seat brief MUST include the RULES block from `.cursor/skills/magi/references/brief-rules-block.md` and MUST name `magi-mode`, `magi-dispatch`, and `engineering-orchestrator` SCOPE. Name `mix-mode` on Codex (recommended on all). Name the vendor bridge when dispatching that vendor. Pack: `BRIEF.md`, `VENDOR.md` (`casper_via=agy`), `RULES/INDEX.md` + R01..R20. Fail closed with `node C:\src\magi\tools\cli-brief-rules-check.js --brief <file>` (`cli-smoke.js` runs the same check).
+- Every Magi CLI seat brief MUST paste the STANDING RULES block from `.cursor/skills/magi/references/brief-rules-block.md` (fill SCOPE / Vendor / Bridges at dispatch). Fail closed with `node C:\src\magi\tools\cli-brief-rules-check.js --brief <file>` (`cli-smoke.js` runs the same check).
