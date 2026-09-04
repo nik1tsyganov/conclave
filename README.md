@@ -67,6 +67,28 @@ node C:\src\magi\tools\activation-check.js C:\src\magi\magi-dispatch-log.jsonl
 
 `activation-check.js` rejects the checked-in fixtures, then calls `hog-check.js` to enforce the 60% vendor floor. Exit 0 means `FLOOR HOLDS`; exit 1 means `FAILED activation`.
 
+## POSITION tally
+
+The arbiter tallies POSITION mechanically. Do not hand-count.
+
+```bash
+node C:\src\magi\tools\position-tally.js --ballots '[{"elector":"anthropic","position":"APPROVE"},{"elector":"openai","position":"APPROVE"},{"elector":"google","position":"ABSTAIN"}]'
+```
+
+`--file` accepts a JSON array, a `{ "ballots": [...] }` object, or JSONL. `--degraded` is the cursor-cli Claude fail path (Codex+Gemini duo). `--author-vendor <vendor>` recuses that elector (protocol 6). `--json` prints the full result.
+
+Rules encoded here (same passage arithmetic MAGI and CONCLAVE share for later AI-ops reuse):
+
+- Eligible electors are `anthropic`, `openai`, and `google`. The Grok arbiter never votes.
+- Passage is `>=2 APPROVE` among eligible electors.
+- `ABSTAIN` never counts toward passage.
+- When fewer than 2 eligible electors cast a counted POSITION, the verdict is `NOT_PANEL` with `degraded=true` and `reason=quorumFloor` (shared CONCLAVE quorum floor). Destructive gates stay fail closed. This is not `DEADLOCK`.
+- Once quorum is met and APPROVE stays below 2, the verdict is `DEADLOCK`. There is no panel `REJECTED` verdict.
+- `implementer` / `reviewer` / `verifier` (also telemetry `implement` / `review` / `verify`) are gate roles. They may ride a ballot for audit. They do not create a vote and they do not change eligibility.
+- Degraded duo marks Claude (`anthropic`) ineligible only. Idle Casper is `FAILED activation`, not a duo — the tool refuses `--degraded-vendor google`.
+
+Intentional MAGI-vs-CONCLAVE differences: elector names are the three MAGI vendors, not CONCLAVE cardinal seats; the Claude-fail duo input (`--degraded`) is MAGI cursor-cli only; this repo does not run `session-whoami.js` or `camerlengo-8`. Passage arithmetic and the `NOT_PANEL` / `degraded` / `quorumFloor` result shape are shared on purpose.
+
 ## Agent discovery
 
 - Claude Code reaches the MAGI seats via wrapper agents already installed in `C:\Users\YESSIR\.claude\agents\` (same stems as the plugin agents).

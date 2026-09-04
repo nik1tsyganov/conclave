@@ -87,6 +87,10 @@ Do not use as routers: `using-superpowers`, `dispatching-parallel-agents`, `exec
 
 See `~\.cursor\rules\cursor-packs.mdc`.
 
+## POSITION tally
+
+Tally panel POSITION with `node C:\src\magi\tools\position-tally.js`. Do not hand-count. Passage is `>=2 APPROVE` among eligible electors; `ABSTAIN` never toward passage; counted eligible ballots below 2 is `NOT_PANEL` (`degraded=true`, `quorumFloor`); else `DEADLOCK`. Gate roles (implementer / reviewer / verifier) are advisory. `--degraded` is the cursor-cli Claude fail path only.
+
 ## Other
 
 - Put the SCOPE block from `engineering-orchestrator` in every seat brief.

@@ -81,6 +81,10 @@ Do not use as routers: `using-superpowers`, `dispatching-parallel-agents`, `exec
 
 See `~\.cursor\rules\cursor-packs.mdc`.
 
+## POSITION tally
+
+Tally panel POSITION with `node C:\src\magi\tools\position-tally.js`. Do not hand-count. Passage is `>=2 APPROVE` among eligible electors; `ABSTAIN` never toward passage; counted eligible ballots below 2 is `NOT_PANEL` (`degraded=true`, `quorumFloor`); else `DEADLOCK`. After a documented Claude fail path, pass `--degraded`. Idle Casper is not that path.
+
 ## Other
 
 - Put the SCOPE block from `engineering-orchestrator` in every seat brief.

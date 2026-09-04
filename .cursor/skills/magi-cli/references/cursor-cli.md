@@ -50,6 +50,8 @@ The Magi CLI Claude seat runs **`--model fable --effort xhigh`**. Verified live 
 
 After each vendor-CLI dispatch, the arbiter appends exactly one telemetry row with `hostMode: cursor-cli` and `routedBy: arbiter` by running `node C:\src\magi\tools\telemetry-append.js --row '<json>'` in the same turn; seats never write their own rows. The vendor-native proof rides the row — Codex `session id` + `tokens used`, Gemini `conversation_id` + `usage`, Claude the on-topic capture plus the model/effort as dispatched — in the `proofId` / `vendorSideTokens` / `note` fields. A dispatch with no row is invisible to `node C:\src\magi\tools\telemetry-stats.js`, so an unrecorded dispatch is a capture-health finding, never a saving.
 
+Tally POSITION with `node C:\src\magi\tools\position-tally.js`. Do not hand-count. Passage is `>=2 APPROVE` among eligible electors; `ABSTAIN` never toward passage; counted eligible ballots below 2 is `NOT_PANEL` (`degraded=true`, `quorumFloor`); else `DEADLOCK`. After a documented Claude fail path (`degraded=true` plus the probe text), pass `--degraded` so Claude is ineligible and Codex+Gemini are the duo. Idle Casper is not that path.
+
 ## Cursor plugin boundary
 
 CLI seats cannot load Cursor plugins. They still run the project's own typecheck, tests, and WRITE AUDIT. The Grok arbiter may use Team Kit in its own Cursor chat after the merge.
