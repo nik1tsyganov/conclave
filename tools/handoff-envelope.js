@@ -7,6 +7,12 @@
  * Append-only seat handoff rows for telemetry/handoffs.jsonl. This is not
  * the dispatch-row contract in telemetry/schema.json. No Conclave join key.
  *
+ * Cursor Task returns via chat reply only — there is no Task capture
+ * module (unlike Magi CLI --capture). Persistence is the explicit
+ * appendFile from recordHandoff / appendHandoff. Do not invent a hook.
+ *
+ * briefSha256 and outputSha256s are UTF-8 SHA-256 (tools/utf8-hash.js).
+ *
  *   node tools/handoff-envelope.js --row '<json>' [--log PATH]
  *   node tools/handoff-envelope.js --file row.json [--log PATH]
  *   node tools/handoff-envelope.js --validate --row '<json>'
@@ -14,9 +20,9 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
 const { inspectBrief } = require('./cli-pointer.js');
 const { assertHostMode, assertInJail } = require('./magi-bus-path.js');
+const { sha256Utf8File } = require('./utf8-hash.js');
 
 const SCHEMA_ID = 'handoff-envelope.v1';
 const SYSTEMS = Object.freeze(['magi', 'magi-cli']);
@@ -120,18 +126,16 @@ function systemFromHostMode(hostMode) {
   throw new HandoffError(`unhandled hostMode: ${_exhaustive}`);
 }
 
-function hashFile(filePath) {
-  const buffer = fs.readFileSync(filePath);
-  return crypto.createHash('sha256').update(buffer).digest('hex');
-}
-
 function inspectJailedBrief(briefPath) {
   const resolved = assertInJail(briefPath, 'briefPath');
   const info = inspectBrief(resolved);
   if (info.bytes === 0) {
     throw new HandoffError(`Brief file is empty: ${info.briefPath}`);
   }
-  return info;
+  return {
+    briefPath: info.briefPath,
+    sha256Utf8: sha256Utf8File(resolved),
+  };
 }
 
 function normalizeOutputPaths(outputPaths) {
@@ -151,7 +155,7 @@ function normalizeOutputSha256s(outputPaths, outputSha256s) {
   const normalized = {};
   for (const outputPath of outputPaths) {
     const provided = Object.hasOwn(hashes, outputPath) ? hashes[outputPath] : undefined;
-    const actual = hashFile(outputPath);
+    const actual = sha256Utf8File(outputPath);
     if (provided !== undefined && provided !== actual) {
       throw new HandoffError(`outputSha256s mismatch for ${outputPath}`);
     }
@@ -189,7 +193,7 @@ function buildHandoff(input) {
   }
 
   const info = inspectJailedBrief(input.briefPath);
-  if (input.briefSha256 !== undefined && input.briefSha256 !== info.sha256) {
+  if (input.briefSha256 !== undefined && input.briefSha256 !== info.sha256Utf8) {
     throw new HandoffError('briefSha256 does not match brief');
   }
 
@@ -201,7 +205,7 @@ function buildHandoff(input) {
     seat: requireNonEmptyString(input.seat, 'seat'),
     status: input.status,
     briefPath: info.briefPath,
-    briefSha256: info.sha256,
+    briefSha256: info.sha256Utf8,
     outputPaths,
     outputSha256s: normalizeOutputSha256s(outputPaths, input.outputSha256s),
     nextOwner: requireString(input.nextOwner === undefined ? '' : input.nextOwner, 'nextOwner'),
@@ -244,7 +248,7 @@ function validateHandoff(envelope) {
   if (envelope.briefPath !== info.briefPath) {
     throw new HandoffError('invalid briefPath');
   }
-  if (envelope.briefSha256 !== info.sha256) {
+  if (envelope.briefSha256 !== info.sha256Utf8) {
     throw new HandoffError('briefSha256 does not match brief');
   }
 
@@ -266,6 +270,12 @@ function appendHandoff(envelope, logPath) {
   fs.mkdirSync(path.dirname(resolved), { recursive: true });
   fs.appendFileSync(resolved, `${JSON.stringify(envelope)}\n`, 'utf8');
   return resolved;
+}
+
+function recordHandoff(input, logPath) {
+  const envelope = input && input.schema === SCHEMA_ID ? (validateHandoff(input), input) : buildHandoff(input);
+  const handoffLog = appendHandoff(envelope, logPath);
+  return { envelope, handoffLog };
 }
 
 function parseArgs(args) {
@@ -316,12 +326,12 @@ function main(argv) {
     fail(`invalid JSON: ${error.message}`);
   }
   try {
-    const envelope = raw.schema === SCHEMA_ID ? (validateHandoff(raw), raw) : buildHandoff(raw);
-    if (!validateOnly) {
-      const dest = appendHandoff(envelope, logPath);
-      console.log(`HANDOFF ${envelope.status} ${envelope.dispatchId}/${envelope.seat} ${dest}`);
-    } else {
+    if (validateOnly) {
+      const envelope = raw.schema === SCHEMA_ID ? (validateHandoff(raw), raw) : buildHandoff(raw);
       console.log(`HANDOFF VALID ${envelope.dispatchId}/${envelope.seat}`);
+    } else {
+      const { envelope, handoffLog } = recordHandoff(raw, logPath);
+      console.log(`HANDOFF ${envelope.status} ${envelope.dispatchId}/${envelope.seat} ${handoffLog}`);
     }
     return 0;
   } catch (error) {
@@ -343,4 +353,5 @@ module.exports = {
   buildHandoff,
   validateHandoff,
   appendHandoff,
+  recordHandoff,
 };

@@ -22,7 +22,10 @@ const {
   buildHandoff,
   validateHandoff,
   appendHandoff,
+  recordHandoff,
 } = require('./handoff-envelope.js');
+const { sha256Utf8File } = require('./utf8-hash.js');
+const { inspectBrief } = require('./cli-pointer.js');
 
 const node = process.execPath;
 const helper = path.join(__dirname, 'handoff-envelope.js');
@@ -114,7 +117,26 @@ describe('handoff-envelope', () => {
       const dest = appendHandoff(envelope, log);
       assert.strictEqual(dest, path.resolve(log));
       assert.strictEqual(readFileSync(log, 'utf8'), `${JSON.stringify(envelope)}\n`);
+
+      const recorded = recordHandoff({
+        dispatchId: 'h1-disk',
+        hostMode: 'cursor',
+        seat: 'implementer',
+        status: 'done',
+        briefPath,
+        outputPaths: [outputPath],
+        nextOwner: 'reviewer',
+        ts: '2026-09-04T09:00:01.000Z',
+      }, log);
+      assert.ok(existsSyncSafe(recorded.handoffLog));
+      assert.strictEqual(readFileSync(log, 'utf8').trim().split('\n').length, 2);
     });
+    const handoff = require('./handoff-envelope.js');
+    assert.strictEqual(Object.hasOwn(handoff, 'capture'), false);
+    assert.strictEqual(typeof handoff.recordHandoff, 'function');
+    const src = readFileSync(path.join(__dirname, 'handoff-envelope.js'), 'utf8');
+    assert.match(src, /no Task capture/);
+    assert.doesNotMatch(src, /function captureTask/);
   });
 
   it('accepts magi-cli system and empty outputs for a blocked handoff', () => {
@@ -234,6 +256,27 @@ describe('handoff-envelope', () => {
     }
   });
 
+  it('hashes invalid UTF-8 outputs as decoded text, not the raw buffer', () => {
+    withTempDir((dir) => {
+      const { briefPath } = seedBrief(dir);
+      const outputPath = path.join(dir, 'out.bin.md');
+      writeFileSync(outputPath, Buffer.from([0x6f, 0x6b, 0x0a, 0xff]));
+      const envelope = buildHandoff({
+        dispatchId: 'utf8-out',
+        system: 'magi',
+        seat: 'implementer',
+        status: 'done',
+        briefPath,
+        outputPaths: [outputPath],
+        nextOwner: 'reviewer',
+        ts: '2026-09-04T09:02:30.000Z',
+      });
+      const resolved = path.resolve(outputPath);
+      assert.strictEqual(envelope.outputSha256s[resolved], sha256Utf8File(outputPath));
+      assert.notStrictEqual(envelope.outputSha256s[resolved], inspectBrief(outputPath).sha256);
+    });
+  });
+
   it('CLI validates and appends; --validate does not write', () => {
     withTempDir((dir) => {
       const { briefPath } = seedBrief(dir);
@@ -274,5 +317,14 @@ function existsOrEmpty(filePath) {
     return false;
   } catch {
     return true;
+  }
+}
+
+function existsSyncSafe(filePath) {
+  try {
+    readFileSync(filePath);
+    return true;
+  } catch {
+    return false;
   }
 }

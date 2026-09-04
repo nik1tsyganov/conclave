@@ -7,6 +7,13 @@
  * Conclave-aligned ACK that a seat opened the pointer brief: dispatchId,
  * seat, briefPath, briefSha256, firstLineEcho, ts. No Conclave join key.
  *
+ * Cursor Task returns via chat reply only — there is no Task capture
+ * module (unlike Magi CLI --capture). Persistence is the explicit disk
+ * write from acknowledgeReceipt / writeReceipt. Do not invent a hook.
+ *
+ * briefSha256 is UTF-8 SHA-256 (tools/utf8-hash.js), not the raw-buffer
+ * hash cli-pointer.js prints on the pointer line.
+ *
  * Works for hostMode cursor and cursor-cli. Does not replace Task/CLI
  * pointer delivery (cli-pointer.js / task-delivery.js).
  *
@@ -19,6 +26,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { inspectBrief } = require('./cli-pointer.js');
 const { assertHostMode, assertInJail } = require('./magi-bus-path.js');
+const { sha256Utf8File } = require('./utf8-hash.js');
 
 const SCHEMA_ID = 'receipt.v1';
 const REQUIRED = Object.freeze([
@@ -98,7 +106,11 @@ function inspectJailedBrief(briefPath) {
   if (info.bytes === 0) {
     throw new ReceiptError(`Brief file is empty: ${info.briefPath}`);
   }
-  return info;
+  return {
+    briefPath: info.briefPath,
+    firstLine: info.firstLine,
+    sha256Utf8: sha256Utf8File(resolved),
+  };
 }
 
 function buildReceipt(input) {
@@ -122,7 +134,7 @@ function buildReceipt(input) {
     dispatchId: requireNonEmptyString(input.dispatchId, 'dispatchId'),
     seat: requireNonEmptyString(input.seat, 'seat'),
     briefPath: info.briefPath,
-    briefSha256: info.sha256,
+    briefSha256: info.sha256Utf8,
     firstLineEcho,
     ts: input.ts === undefined ? new Date().toISOString() : requireIsoTimestamp(input.ts),
   };
@@ -155,7 +167,7 @@ function validateReceipt(receipt) {
   if (receipt.briefPath !== info.briefPath) {
     throw new ReceiptError('invalid briefPath');
   }
-  if (receipt.briefSha256 !== info.sha256) {
+  if (receipt.briefSha256 !== info.sha256Utf8) {
     throw new ReceiptError('briefSha256 does not match brief');
   }
   if (receipt.firstLineEcho !== info.firstLine) {
@@ -174,6 +186,12 @@ function writeReceipt(receipt, destPath) {
   fs.mkdirSync(path.dirname(resolved), { recursive: true });
   fs.writeFileSync(resolved, `${JSON.stringify(receipt)}\n`, 'utf8');
   return resolved;
+}
+
+function acknowledgeReceipt(input, destPath) {
+  const receipt = buildReceipt(input);
+  const receiptPath = writeReceipt(receipt, destPath);
+  return { receipt, receiptPath };
 }
 
 function parseArgs(args) {
@@ -233,15 +251,14 @@ function main(argv) {
     if (!parsed.dispatchId || !parsed.seat || !parsed.briefPath) {
       fail('required: --dispatch-id --seat --brief', 2);
     }
-    const receipt = buildReceipt({
+    const { receipt, receiptPath } = acknowledgeReceipt({
       dispatchId: parsed.dispatchId,
       seat: parsed.seat,
       briefPath: parsed.briefPath,
       firstLineEcho: parsed.firstLineEcho,
       hostMode: parsed.hostMode,
-    });
-    const dest = writeReceipt(receipt, parsed.outPath);
-    console.log(`RECEIPT ACK ${receipt.dispatchId}/${receipt.seat} ${dest}`);
+    }, parsed.outPath);
+    console.log(`RECEIPT ACK ${receipt.dispatchId}/${receipt.seat} ${receiptPath}`);
     return 0;
   } catch (error) {
     if (error instanceof ReceiptError || error.message) {
@@ -261,4 +278,5 @@ module.exports = {
   buildReceipt,
   validateReceipt,
   writeReceipt,
+  acknowledgeReceipt,
 };

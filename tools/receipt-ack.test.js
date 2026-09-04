@@ -16,7 +16,15 @@ const {
 const { tmpdir } = require('node:os');
 const { inspectBrief, pointerText } = require('./cli-pointer.js');
 const { buildTaskPrompt, assertTaskPrompt } = require('./task-delivery.js');
-const { SCHEMA_ID, ReceiptError, buildReceipt, validateReceipt, writeReceipt } = require('./receipt-ack.js');
+const { sha256Utf8File } = require('./utf8-hash.js');
+const {
+  SCHEMA_ID,
+  ReceiptError,
+  buildReceipt,
+  validateReceipt,
+  writeReceipt,
+  acknowledgeReceipt,
+} = require('./receipt-ack.js');
 
 const node = process.execPath;
 const helper = path.join(__dirname, 'receipt-ack.js');
@@ -83,20 +91,31 @@ describe('receipt-ack', () => {
     });
   });
 
-  it('fills firstLineEcho from the brief and writes a jailed receipt file', () => {
+  it('acknowledgeReceipt is an explicit disk write, not a Task capture hook', () => {
     withTempDir((dir) => {
       const briefPath = path.join(dir, 'brief.md');
       writeFileSync(briefPath, 'Echo me\nbody');
-      const receipt = buildReceipt({
+      const destPath = path.join(dir, 'ack.json');
+      const { receipt, receiptPath } = acknowledgeReceipt({
         dispatchId: 'd-write',
         seat: 'melchior-2',
         briefPath,
         ts: '2026-09-04T08:01:00.000Z',
-      });
-      const dest = writeReceipt(receipt);
-      assert.strictEqual(dest, `${path.resolve(briefPath)}.receipt.json`);
-      assert.deepStrictEqual(JSON.parse(readFileSync(dest, 'utf8')), receipt);
+        hostMode: 'cursor',
+      }, destPath);
+      assert.strictEqual(receiptPath, path.resolve(destPath));
+      assert.ok(existsSync(receiptPath));
+      assert.deepStrictEqual(JSON.parse(readFileSync(receiptPath, 'utf8')), receipt);
+      assert.strictEqual(writeReceipt(receipt, destPath), receiptPath);
     });
+    const ack = require('./receipt-ack.js');
+    assert.strictEqual(Object.hasOwn(ack, 'capture'), false);
+    assert.strictEqual(Object.hasOwn(ack, 'captureTask'), false);
+    assert.strictEqual(typeof ack.acknowledgeReceipt, 'function');
+    const src = readFileSync(path.join(__dirname, 'receipt-ack.js'), 'utf8');
+    assert.match(src, /no Task capture/);
+    assert.match(src, /explicit disk/);
+    assert.doesNotMatch(src, /function captureTask/);
   });
 
   it('rejects a mismatched first-line echo, empty brief, and invented join keys', () => {
@@ -236,11 +255,29 @@ describe('receipt-ack', () => {
         ts: '2026-09-04T08:04:00.000Z',
         hostMode: 'cursor',
       });
+      assert.strictEqual(receipt.briefSha256, sha256Utf8File(briefPath));
       assert.strictEqual(receipt.briefSha256, info.sha256);
       assert.strictEqual(receipt.firstLineEcho, info.firstLine);
     } finally {
       if (existsSync(briefPath)) unlinkSync(briefPath);
     }
+  });
+
+  it('hashes invalid UTF-8 as decoded text, not the raw pointer buffer', () => {
+    withTempDir((dir) => {
+      const briefPath = path.join(dir, 'invalid.md');
+      writeFileSync(briefPath, Buffer.from([0x46, 0x49, 0x52, 0x53, 0x54, 0x0a, 0xff]));
+      const pointer = inspectBrief(briefPath);
+      const receipt = buildReceipt({
+        dispatchId: 'utf8-div',
+        seat: 'reviewer',
+        briefPath,
+        firstLineEcho: pointer.firstLine,
+        ts: '2026-09-04T08:04:30.000Z',
+      });
+      assert.strictEqual(receipt.briefSha256, sha256Utf8File(briefPath));
+      assert.notStrictEqual(receipt.briefSha256, pointer.sha256);
+    });
   });
 
   it('validateReceipt rejects a stale hash after the brief changes', () => {

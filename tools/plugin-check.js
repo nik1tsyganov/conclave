@@ -86,6 +86,8 @@ function check() {
     'tools/receipt-ack.test.js',
     'tools/handoff-envelope.js',
     'tools/handoff-envelope.test.js',
+    'tools/utf8-hash.js',
+    'tools/utf8-hash.test.js',
     'telemetry/README.md',
     'tools/dispatch-log.pass.jsonl',
     'tools/dispatch-log.fail.jsonl',
