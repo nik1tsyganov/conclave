@@ -60,7 +60,7 @@ Cursor Task returns via chat reply only. There is no Task capture module (unlike
 
 Receipt ACKs (`receipt.v1`, `tools/receipt-ack.js`) prove a seat opened the pointer brief (first-line echo + SHA-256) for hostMode `cursor` and `cursor-cli`. They are not dispatch rows and are not Conclave join keys. Pointer delivery remains `cli-pointer.js` / `task-delivery.js`.
 
-`briefSha256` / `outputSha256s` are UTF-8 SHA-256 (`tools/utf8-hash.js`: decode the file as UTF-8, then hash that string as UTF-8). That is the Conclave-aligned encoding. `cli-pointer.js` still hashes the raw buffer for pointer identity.
+`briefSha256` / `outputSha256s` are UTF-8 SHA-256 (`tools/utf8-hash.js`: decode the file as UTF-8, strip one leading U+FEFF, then hash that string as UTF-8). That is the Conclave-aligned encoding. `cli-pointer.js` still hashes the raw buffer for pointer identity (BOM bytes included).
 
 ## Self-Evaluation Questions
 
