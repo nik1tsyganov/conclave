@@ -7,17 +7,20 @@
  * Proves pointer delivery for all three vendor launchers without spending a
  * live seat: calls cli-launch.js main() with --dry-run for openai, google,
  * and anthropic (in-process require, no vendor child process), then fails
- * closed if any printed plan leaks the brief body into an argument or a
- * stdin file, if the OpenAI plan is not pointer delivery or pipes the brief
- * path itself, or if the google -p value is the brief body.
+ * closed if the brief is missing the Magi CLI RULES markers, if any printed
+ * plan leaks the brief body into an argument or a stdin file, if the OpenAI
+ * plan is not pointer delivery or pipes the brief path itself, if the
+ * google -p value is the brief body, or if the google plan is missing
+ * `--add-dir ...\.claude\skills` (DevOps/harness: agy must see MAGI skills).
  *
- * Exit 0 smoke ok; 1 leak or plan defect; 2 ARGUMENT_ERROR.
+ * Exit 0 smoke ok; 1 leak, plan defect, or missing RULES; 2 ARGUMENT_ERROR.
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
 
 const { main: launchMain } = require('./cli-launch.js');
+const { checkBriefText, formatMissing } = require('./cli-brief-rules-check.js');
 
 const VENDORS = ['openai', 'google', 'anthropic'];
 
@@ -26,8 +29,10 @@ function usage() {
     'Usage: node tools/cli-smoke.js --brief <file> --cwd <dir>',
     '',
     'Dry-runs the openai, google, and anthropic launch plans through',
-    'cli-launch.js (no vendor process spawns) and fails on any brief-body',
-    'leak into arguments or stdin files.',
+    'cli-launch.js (no vendor process spawns) and fails closed if the brief',
+    'is missing the Magi CLI RULES markers, if any brief-body leaks into',
+    'arguments or stdin files, or if the google plan is missing',
+    '--add-dir ...\\.claude\\skills.',
   ].join('\n');
 }
 
@@ -90,12 +95,31 @@ function assertOpenaiPlan(plan, briefPath) {
   }
 }
 
+const GOOGLE_SKILLS_ADD_DIR_NEEDLE = '.claude\\skills';
+
+function googlePlanHasSkillsAddDir(args) {
+  const list = args || [];
+  for (let index = 0; index < list.length; index += 1) {
+    if (list[index] !== '--add-dir') continue;
+    const dir = String(list[index + 1] || '').replace(/\//g, '\\').toLowerCase();
+    if (dir.includes(GOOGLE_SKILLS_ADD_DIR_NEEDLE.toLowerCase())) return true;
+  }
+  return false;
+}
+
 function assertGooglePlan(plan, body) {
   const args = plan.args || [];
   const flagIndex = args.indexOf('-p');
   const value = flagIndex === -1 ? null : args[flagIndex + 1];
   if (body.length > 0 && value === body) {
     throw smokeError('google -p value is the brief body, expected a pointer');
+  }
+  // DevOps/harness: live agy launches MUST --add-dir ...\.claude\skills.
+  // Smoke asserts that grant on the google dry-run plan (no vendor spend).
+  if (!googlePlanHasSkillsAddDir(args)) {
+    throw smokeError(
+      `google plan missing --add-dir ...\\${GOOGLE_SKILLS_ADD_DIR_NEEDLE} (agy must see MAGI skills)`,
+    );
   }
 }
 
@@ -139,6 +163,12 @@ async function main(argv = process.argv.slice(2), io = process, dependencies = {
     } catch {
       throw argumentError(`--brief file does not exist: ${briefPath}`);
     }
+    if (body.length > 0) {
+      const rules = checkBriefText(body);
+      if (!rules.ok) {
+        throw smokeError(formatMissing(rules.missing));
+      }
+    }
 
     const vendors = [];
     for (const vendor of VENDORS) {
@@ -175,10 +205,12 @@ if (require.main === module) {
 }
 
 module.exports = {
+  GOOGLE_SKILLS_ADD_DIR_NEEDLE,
   VENDORS,
   assertGooglePlan,
   assertNoBodyLeak,
   assertOpenaiPlan,
+  googlePlanHasSkillsAddDir,
   main,
   parseArgs,
 };

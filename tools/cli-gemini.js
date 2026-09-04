@@ -39,6 +39,8 @@ function buildArgs(briefOrPointer, model = 'gemini-3.1-pro-high', options = {}) 
         args.push('--add-dir', options.briefDir);
     }
 
+    // Arbiter SHOULD pass C:\src\ai-ops-vault\projects\magi-cli-rules here
+    // when that vault dir is on the host. Optional; do not invent it.
     if (options.extraDirs && Array.isArray(options.extraDirs)) {
         for (const dir of options.extraDirs) {
             args.push('--add-dir', dir);

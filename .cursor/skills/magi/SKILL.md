@@ -23,7 +23,8 @@ Read these files in order:
 12. `C:\Users\YESSIR\.claude\skills\codex-bridge\SKILL.md` when dispatching Codex
 13. `C:\Users\YESSIR\.claude\skills\gemini-bridge\SKILL.md` when dispatching Gemini
 14. `.cursor/skills/magi/references/cursor-cli.md` (used after a host trip)
-15. `C:\Users\YESSIR\.claude\skills\claude-bridge\SKILL.md` (needed when tripped)
+15. `.cursor/skills/magi/references/brief-rules-block.md` (mandatory RULES block on every Magi CLI seat brief)
+16. `C:\Users\YESSIR\.claude\skills\claude-bridge\SKILL.md` (needed when tripped)
 
 ## MAGI is not CONCLAVE
 
@@ -94,3 +95,4 @@ Tally panel POSITION with `node C:\src\magi\tools\position-tally.js`. Do not han
 ## Other
 
 - Put the SCOPE block from `engineering-orchestrator` in every seat brief.
+- Every Magi CLI seat brief MUST paste the STANDING RULES block from `.cursor/skills/magi/references/brief-rules-block.md` (fill SCOPE / Vendor / Bridges at dispatch). Fail closed with `node C:\src\magi\tools\cli-brief-rules-check.js --brief <file>` (`cli-smoke.js` runs the same check).

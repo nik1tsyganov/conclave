@@ -21,9 +21,10 @@ Read these files in order:
 10. `C:\Users\YESSIR\.claude\skills\dispatch-efficiency\SKILL.md`
 11. `C:\Users\YESSIR\.claude\skills\task-retrospective\SKILL.md`
 12. `references/cursor-cli.md`
-13. `C:\Users\YESSIR\.claude\skills\codex-bridge\SKILL.md` when dispatching Codex
-14. `C:\Users\YESSIR\.claude\skills\gemini-bridge\SKILL.md` when dispatching Gemini
-15. `C:\Users\YESSIR\.claude\skills\claude-bridge\SKILL.md` when dispatching Claude (`C:\Users\YESSIR\.local\bin\claude.exe -p --model fable --effort xhigh`; run the live auth and headless probes first)
+13. `references/brief-rules-block.md` (mandatory RULES block on every Magi CLI seat brief)
+14. `C:\Users\YESSIR\.claude\skills\codex-bridge\SKILL.md` when dispatching Codex
+15. `C:\Users\YESSIR\.claude\skills\gemini-bridge\SKILL.md` when dispatching Gemini
+16. `C:\Users\YESSIR\.claude\skills\claude-bridge\SKILL.md` when dispatching Claude (`C:\Users\YESSIR\.local\bin\claude.exe -p --model fable --effort xhigh`; run the live auth and headless probes first)
 
 ## MAGI is not CONCLAVE
 
@@ -88,3 +89,4 @@ Tally panel POSITION with `node C:\src\magi\tools\position-tally.js`. Do not han
 ## Other
 
 - Put the SCOPE block from `engineering-orchestrator` in every seat brief.
+- Every Magi CLI seat brief MUST paste the STANDING RULES block from `references/brief-rules-block.md` (fill SCOPE / Vendor / Bridges at dispatch). Fail closed with `node C:\src\magi\tools\cli-brief-rules-check.js --brief <file>` (`cli-smoke.js` runs the same check).

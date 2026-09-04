@@ -16,8 +16,12 @@ const {
   main,
 } = require('./cli-smoke.js');
 
+function rulesMarkers() {
+  return 'RULES/INDEX.md magi-mode magi-dispatch mix-mode casper_via=agy WRITE AUDIT';
+}
+
 function uniqueBody() {
-  return `UNIQUE-SMOKE-${crypto.randomUUID()}-`.padEnd(200, 'b');
+  return `${rulesMarkers()}\nUNIQUE-SMOKE-${crypto.randomUUID()}-`.padEnd(200, 'b');
 }
 
 function makeBrief(t, body) {
@@ -94,6 +98,28 @@ test('a missing brief exits 2 with ARGUMENT_ERROR', async () => {
   assert.match(io.stderrText, /^ARGUMENT_ERROR:/);
 });
 
+test('a brief without the RULES markers fails closed before any dry-run', async (t) => {
+  const briefPath = makeBrief(t, `UNIQUE-SMOKE-${crypto.randomUUID()}-`.padEnd(200, 'b'));
+  const io = capture();
+  let spawned = false;
+
+  const code = await main(
+    ['--brief', briefPath, '--cwd', 'C:\\src\\magi'],
+    io,
+    { spawnFn() { spawned = true; throw new Error('vendor process spawned'); } },
+  );
+
+  assert.strictEqual(code, 1, io.stderrText);
+  assert.strictEqual(spawned, false, 'missing RULES must not reach a vendor spawn');
+  assert.match(io.stderrText, /brief missing RULES markers/);
+  assert.match(io.stderrText, /RULES\/INDEX\|magi-cli-rules\|STANDING/);
+  assert.match(io.stderrText, /magi-mode/);
+  assert.match(io.stderrText, /magi-dispatch/);
+  assert.match(io.stderrText, /mix-mode/);
+  assert.match(io.stderrText, /casper_via=agy/);
+  assert.match(io.stderrText, /WRITE AUDIT\|R07/);
+});
+
 test('a missing --brief flag exits 2 with ARGUMENT_ERROR', async () => {
   const io = capture();
 
@@ -135,11 +161,21 @@ test('an openai plan fails without pointer delivery or when it pipes the brief i
   );
 });
 
-test('a google -p value equal to the brief body fails; a pointer -p passes', () => {
+test('a google -p value equal to the brief body fails; a pointer -p with skills add-dir passes', () => {
   const body = uniqueBody();
   assert.throws(
     () => assertGooglePlan({ args: ['--model', 'gemini-3.1-pro-high', '-p', body] }, body),
     /-p value is the brief body/,
   );
-  assertGooglePlan({ args: ['-p', 'Read C:\\brief.md in full.'] }, body);
+  assertGooglePlan({
+    args: ['--add-dir', 'C:\\Users\\YESSIR\\.claude\\skills', '-p', 'Read C:\\brief.md in full.'],
+  }, body);
+});
+
+test('a google plan without --add-dir ...\\.claude\\skills fails closed', () => {
+  const body = uniqueBody();
+  assert.throws(
+    () => assertGooglePlan({ args: ['-p', 'Read C:\\brief.md in full.'] }, body),
+    /missing --add-dir/,
+  );
 });
