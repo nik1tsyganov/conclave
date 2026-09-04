@@ -112,7 +112,7 @@ Passage is `>=2 APPROVE` among eligible electors; `ABSTAIN` never toward passage
 
 ## After implement
 
-Cursor Task seats run `check-compiler-errors` and `deslop` when they edited code, and `verification-before-completion` before claiming done.
+Cursor Task seats run `check-compiler-errors` and `deslop` when they edited code, and `verification-before-completion` before claiming done. Seats should `acknowledgeReceipt` (`tools/receipt-ack.js`) before claiming done.
 
 ## Agent discovery
 

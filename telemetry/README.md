@@ -52,6 +52,16 @@ Adapter envelope (`validate-telemetry.js --adapt`):
 
 Unified ingest stores this envelope next to Conclave rows keyed by `schemaId` + `sourceSystem`. A later owner-supplied map may add named field copies; it must not add a join key that this repo does not already have.
 
+## Handoff envelope (not a dispatch row)
+
+Seat-to-seat durability uses `handoff-envelope.v1` via `tools/handoff-envelope.js`, appended to `handoffs.jsonl` (gitignored). `telemetry/schema.json` stays the dispatch-row contract only; do not validate handoff rows with `validate-telemetry.js`.
+
+Cursor Task returns via chat reply only. There is no Task capture module (unlike Magi CLI `--capture`). Receipt ACKs and handoff rows exist only because `acknowledgeReceipt` / `recordHandoff` write a file. Do not invent a Task capture hook.
+
+Receipt ACKs (`receipt.v1`, `tools/receipt-ack.js`) prove a seat opened the pointer brief (first-line echo + SHA-256) for hostMode `cursor` and `cursor-cli`. They are not dispatch rows and are not Conclave join keys. Pointer delivery remains `cli-pointer.js` / `task-delivery.js`.
+
+`briefSha256` / `outputSha256s` are UTF-8 SHA-256 (`tools/utf8-hash.js`: decode the file as UTF-8, then hash that string as UTF-8). That is the Conclave-aligned encoding. `cli-pointer.js` still hashes the raw buffer for pointer identity.
+
 ## Self-Evaluation Questions
 
 This telemetry exists to answer these self-eval questions:
