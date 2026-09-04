@@ -245,7 +245,7 @@ function check() {
 
 
   for (const ref of [cursorCli, magiCliRef]) {
-    for (const s of ['codex.exe', 'agy.exe', 'cursor-cli', '.local\\bin\\claude.exe', 'fable', 'xhigh', 'telemetry-append.js', 'cli-brief-rules-check.js', 'extraDirs', 'magi-cli-rules', 'RULES/INDEX.md', 'casper_via=agy']) {
+    for (const s of ['codex.exe', 'agy.exe', 'cursor-cli', '.local\\bin\\claude.exe', 'fable', 'xhigh', 'telemetry-append.js', 'cli-brief-rules-check.js', 'extraDirs', 'magi-cli-rules', 'RULES/INDEX.md', 'casper_via=agy', 'src/index.js', 'loadApi', 'PR_BODY.md']) {
       if (!ref.includes(s)) {
         console.error(`cursor-cli.md missing required string: ${s}`);
         return 1;

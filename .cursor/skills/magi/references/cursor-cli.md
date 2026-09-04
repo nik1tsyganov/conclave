@@ -39,6 +39,7 @@ The Magi CLI Claude seat runs **`--model fable --effort xhigh`**. Verified live 
 - The arbiter launches vendor CLIs through `node C:\src\magi\tools\cli-launch.js` with `--pid-file`, so the child's PID is recorded at spawn. Idle policy lives in `tools/cli-idle.js`: Claude and Gemini buffer stdout until exit, so an empty capture on a running child is **not** a hang at any elapsed time; Codex streams, so its idle stdio can be. Kill only the recorded PID — never by image name.
 - Briefs are **files**, never inline payload: `cli-launch.js` / `cli-pointer.js` send only a path+bytes+hash pointer on stdin (or `agy -p`); the vendor reads the brief file itself. See `codex-bridge` and `gemini-bridge` for the exact recipes.
 - Every Magi CLI seat brief MUST paste the STANDING RULES block from `.cursor/skills/magi/references/brief-rules-block.md` (fill SCOPE / Vendor / Bridges at dispatch). Fail closed: `magi-mode`, `magi-dispatch`, `mix-mode`, `casper_via=agy`, `RULES/INDEX` or `magi-cli-rules` or `STANDING`, and `WRITE AUDIT` or `R07`. Pack: `BRIEF.md`, `VENDOR.md`, `RULES/INDEX.md` + R01..R21. `node C:\src\magi\tools\cli-brief-rules-check.js --brief <file>` before dispatch.
+- Every Magi CLI **implement** seat brief MUST also include the `src/index.js` re-export / `PR_BODY.md` / full fixture `BRIEF.md` lines (see Implement seat briefs below). Do not abbreviate to `Implement src/X.js + PR_BODY.md`.
 - Before a live Magi CLI seat, run `node C:\src\magi\tools\cli-smoke.js --brief <file> --cwd <cwd>`: it dry-runs all three vendors through `cli-launch.js` (no vendor process spawns, no seat spent) and fails closed if the RULES markers are missing, if any brief-body leaks into args or stdin files, if the OpenAI plan is not pointer delivery, if a google `-p` carries the body, or if the google plan is missing `--add-dir ...\.claude\skills` (DevOps/harness: agy must see MAGI skills).
 - Claude dispatch shape: `tools/cli-claude.js buildLaunch` writes `<brief>.pointer.md` beside the brief and pipes only that pointer into `claude -p --model fable --effort xhigh`; `--add-dir` names `C:\src\magi` plus the brief's parent directory (allowed only under the repo or the `magi-bus` temp root — never `C:\Users` or a drive root). Capture to a file, then check the capture is non-empty AND on-topic. Mechanics in `claude-bridge`.
 - Capture vendor-native proof on every dispatch: Codex `session id` + `tokens used`; Gemini `conversation_id` + `usage` + per-run log slug check; Claude the captured on-topic reply plus the model/effort the dispatch passed.
@@ -53,6 +54,18 @@ The Magi CLI Claude seat runs **`--model fable --effort xhigh`**. Verified live 
 After each vendor-CLI dispatch, the arbiter appends exactly one telemetry row with `hostMode: cursor-cli` and `routedBy: arbiter` by running `node C:\src\magi\tools\telemetry-append.js --row '<json>'` in the same turn; seats never write their own rows. The vendor-native proof rides the row — Codex `session id` + `tokens used`, Gemini `conversation_id` + `usage`, Claude the on-topic capture plus the model/effort as dispatched — in the `proofId` / `vendorSideTokens` / `note` fields. A dispatch with no row is invisible to `node C:\src\magi\tools\telemetry-stats.js`, so an unrecorded dispatch is a capture-health finding, never a saving.
 
 Tally POSITION with `node C:\src\magi\tools\position-tally.js`. Do not hand-count. Passage is `>=2 APPROVE` among eligible electors; `ABSTAIN` never toward passage; counted eligible ballots below 2 is `NOT_PANEL` (`degraded=true`, `quorumFloor`); else `DEADLOCK`. After a documented Claude fail path (`degraded=true` plus the probe text), pass `--degraded` so Claude is ineligible and Codex+Gemini are the duo. Idle Casper is not that path.
+
+## Implement seat briefs
+
+Every Magi CLI **implement** seat brief MUST include these lines (or equivalent). Do not abbreviate the implement line to `Implement src/X.js + PR_BODY.md`. Fixture `BRIEF.md` already says to re-export from `src/index.js`; accept `loadApi` requires `typeof api.<fn> === 'function'`. Leaving starter `module.exports = {}` fails BENCH T1/T1b.
+
+```text
+MUST: Implement the feature module AND re-export the public API from src/index.js (accept loadApi requires typeof api.<fn> === 'function'). Do not leave starter module.exports = {}.
+MUST: Write PR_BODY.md at worktree root (2-4 sentences) when the fixture requires it.
+MUST: Read fixture BRIEF.md in full; the inline implement line must not drop the re-export requirement.
+```
+
+Paste from `tools/templates/implement-brief-export-must.md`. Review and verify briefs do not need this block.
 
 ## Cursor plugin boundary
 

@@ -8,6 +8,7 @@ description: Start or continue a MAGI Cursor CLI run (hostMode `cursor-cli`). Us
 - If this chat is CONCLAVE (`/conclave`, `camerlengo-8`), stop: tell owner to open a new chat and type `/magi` or `/magi-cli`.
 - Run `node C:\Users\YESSIR\.claude\skills\magi-mode\references\magi-whoami.js --mode cursor-cli --slug <picker slug>`. Stop unless LEGAL. Elector slugs are FORBIDDEN as MAGI Cursor CLI arbiter; Grok only.
 - Read `.cursor/skills/magi-cli/SKILL.md`, `references/cursor-cli.md`, and `references/brief-rules-block.md`. Every Magi CLI seat brief MUST include that RULES block. Fail closed with `node C:\src\magi\tools\cli-brief-rules-check.js --brief <file>`.
+- Implement seat briefs MUST include the `src/index.js` re-export / `PR_BODY.md` / full fixture `BRIEF.md` lines (`tools/templates/implement-brief-export-must.md`). Do not drop the re-export requirement from the inline implement line; accept `loadApi` requires `typeof api.<fn> === 'function'`.
 - Never Cursor Task to claude/gpt/gemini slugs — this mode spends vendor CLIs only (`codex.exe`, `agy.exe`, `claude.exe`). Grok does not implement.
 - Three-vendor split via CLIs; activation-check (`node C:\src\magi\tools\activation-check.js <log path>`) and 60% floor same as `/magi`.
 - Log path: product-repo runs write `C:\src\magi\projects\<slug>\magi-dispatch-log.jsonl`, never a log inside the product repo; MAGI-kit work uses `C:\src\magi\magi-dispatch-log.jsonl`. See `C:\src\magi\projects\README.md`.
