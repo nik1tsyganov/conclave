@@ -44,9 +44,9 @@ const REQUIRED_MARKERS = Object.freeze([
     anyOf: Object.freeze(['mix-mode']),
   },
   {
-    // Research pin: casper_via=agy if google, or a Vendor: line on every seat.
-    id: 'casper_via=agy|Vendor:',
-    anyOf: Object.freeze(['casper_via=agy', 'Vendor:']),
+    // Research pin: casper_via=agy (google via agy). PATH gemini is not enough.
+    id: 'casper_via=agy',
+    anyOf: Object.freeze(['casper_via=agy']),
   },
   {
     id: 'WRITE AUDIT|R07',

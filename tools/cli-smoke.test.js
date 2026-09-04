@@ -116,7 +116,7 @@ test('a brief without the RULES markers fails closed before any dry-run', async 
   assert.match(io.stderrText, /magi-mode/);
   assert.match(io.stderrText, /magi-dispatch/);
   assert.match(io.stderrText, /mix-mode/);
-  assert.match(io.stderrText, /casper_via=agy\|Vendor:/);
+  assert.match(io.stderrText, /casper_via=agy/);
   assert.match(io.stderrText, /WRITE AUDIT\|R07/);
 });
 
