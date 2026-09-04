@@ -31,11 +31,17 @@ const ALL_MARKER_IDS = [
   'mix-mode',
   'casper_via=agy',
   'WRITE AUDIT|R07',
+  'engineering-orchestrator',
+  'testing',
+  'codex-bridge|claude-bridge|gemini-bridge',
 ];
+
+const SKILLS_EXTRAS = 'Skills: magi-mode, magi-dispatch, mix-mode, engineering-orchestrator, implement, testing, codex-bridge.';
 
 function legalBrief(overrides = '') {
   return [
     'RULES/INDEX.md magi-mode magi-dispatch mix-mode casper_via=agy WRITE AUDIT',
+    SKILLS_EXTRAS,
     overrides,
   ].join(' ').trim();
 }
@@ -61,64 +67,89 @@ test('a brief with the full RULES marker set passes', () => {
 });
 
 test('a Vendor: line does not satisfy casper_via=agy', () => {
-  const result = checkBriefText(
-    'RULES/INDEX.md magi-mode magi-dispatch mix-mode Vendor: agy WRITE AUDIT',
-  );
+  const result = checkBriefText(legalBrief().replace('casper_via=agy', 'Vendor: agy'));
   assert.strictEqual(result.ok, false);
   assert.deepStrictEqual(result.missing, ['casper_via=agy']);
 });
 
 test('R07 satisfies the WRITE AUDIT marker', () => {
-  const result = checkBriefText(
-    'RULES/INDEX.md magi-mode magi-dispatch mix-mode casper_via=agy R07',
-  );
+  const result = checkBriefText(legalBrief().replace('WRITE AUDIT', 'R07'));
   assert.deepStrictEqual(result, { ok: true, missing: [] });
 });
 
 test('STANDING.md satisfies the pack marker without RULES/INDEX', () => {
-  const result = checkBriefText(
-    `Read ${STANDING_PATH}. magi-mode magi-dispatch mix-mode casper_via=agy WRITE AUDIT`,
-  );
+  const result = checkBriefText(legalBrief().replace('RULES/INDEX.md', `Read ${STANDING_PATH}.`));
   assert.deepStrictEqual(result, { ok: true, missing: [] });
 });
 
 test('magi-cli-rules satisfies the pack marker without RULES/INDEX', () => {
-  const result = checkBriefText(
-    'magi-cli-rules magi-mode magi-dispatch mix-mode casper_via=agy WRITE AUDIT',
-  );
+  const result = checkBriefText(legalBrief().replace('RULES/INDEX.md', 'magi-cli-rules'));
   assert.deepStrictEqual(result, { ok: true, missing: [] });
 });
 
 test('PATH gemini does not satisfy casper_via=agy', () => {
-  const result = checkBriefText(
-    'RULES/INDEX.md magi-mode magi-dispatch mix-mode gemini WRITE AUDIT',
-  );
+  const result = checkBriefText(legalBrief().replace('casper_via=agy', 'gemini'));
   assert.strictEqual(result.ok, false);
   assert.deepStrictEqual(result.missing, ['casper_via=agy']);
 });
 
 test('missing magi-mode is listed', () => {
-  const result = checkBriefText('RULES/INDEX.md magi-dispatch mix-mode casper_via=agy WRITE AUDIT');
+  const result = checkBriefText(legalBrief().replace(/magi-mode/g, 'MODE-X'));
   assert.strictEqual(result.ok, false);
   assert.deepStrictEqual(result.missing, ['magi-mode']);
 });
 
 test('missing magi-dispatch is listed', () => {
-  const result = checkBriefText('RULES/INDEX.md magi-mode mix-mode casper_via=agy WRITE AUDIT');
+  const result = checkBriefText(legalBrief().replace(/magi-dispatch/g, 'DISPATCH-X'));
   assert.strictEqual(result.ok, false);
   assert.deepStrictEqual(result.missing, ['magi-dispatch']);
 });
 
 test('missing mix-mode is listed', () => {
-  const result = checkBriefText('RULES/INDEX.md magi-mode magi-dispatch casper_via=agy WRITE AUDIT');
+  const result = checkBriefText(legalBrief().replace(/mix-mode/g, 'duo'));
   assert.strictEqual(result.ok, false);
   assert.deepStrictEqual(result.missing, ['mix-mode']);
 });
 
 test('missing RULES/INDEX, magi-cli-rules, and STANDING is listed', () => {
-  const result = checkBriefText('magi-mode magi-dispatch mix-mode casper_via=agy WRITE AUDIT');
+  const result = checkBriefText(legalBrief().replace('RULES/INDEX.md', ''));
   assert.strictEqual(result.ok, false);
   assert.deepStrictEqual(result.missing, ['RULES/INDEX|magi-cli-rules|STANDING']);
+});
+
+test('H7 Skills extras: SCOPE does not satisfy engineering-orchestrator', () => {
+  const result = checkBriefText(legalBrief().replace('engineering-orchestrator', 'SCOPE'));
+  assert.strictEqual(result.ok, false);
+  assert.deepStrictEqual(result.missing, ['engineering-orchestrator']);
+});
+
+test('H7 Skills extras: review brief with testing and no implement passes', () => {
+  const result = checkBriefText(legalBrief().replace(', implement, testing,', ', testing,'));
+  assert.deepStrictEqual(result, { ok: true, missing: [] });
+});
+
+test('H7 Skills extras: missing testing is listed', () => {
+  const result = checkBriefText(legalBrief().replace(', implement, testing,', ', implement, '));
+  assert.strictEqual(result.ok, false);
+  assert.deepStrictEqual(result.missing, ['testing']);
+});
+
+test('H7 Skills extras: missing every bridge is listed', () => {
+  const result = checkBriefText(legalBrief().replace(', codex-bridge.', '.'));
+  assert.strictEqual(result.ok, false);
+  assert.deepStrictEqual(result.missing, ['codex-bridge|claude-bridge|gemini-bridge']);
+});
+
+test('--role implement fails when only testing is named', () => {
+  const body = legalBrief().replace(', implement, testing,', ', testing,');
+  const result = checkBriefText(body, { role: 'implement' });
+  assert.strictEqual(result.ok, false);
+  assert.deepStrictEqual(result.missing, ['implement']);
+});
+
+test('--role implement passes when implement is named', () => {
+  const result = checkBriefText(legalBrief(), { role: 'implement' });
+  assert.deepStrictEqual(result, { ok: true, missing: [] });
 });
 
 test('an empty brief is missing every marker', () => {
@@ -155,6 +186,9 @@ test('main exits 1 and lists missing markers', (t) => {
   assert.match(io.stderrText, /mix-mode/);
   assert.match(io.stderrText, /casper_via=agy/);
   assert.match(io.stderrText, /WRITE AUDIT\|R07/);
+  assert.match(io.stderrText, /engineering-orchestrator/);
+  assert.match(io.stderrText, /testing/);
+  assert.match(io.stderrText, /codex-bridge\|claude-bridge\|gemini-bridge/);
 });
 
 test('a missing --brief flag exits 2 with ARGUMENT_ERROR', () => {
