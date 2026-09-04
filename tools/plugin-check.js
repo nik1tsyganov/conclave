@@ -222,8 +222,8 @@ function check() {
     'R07',
     'receipt ACK',
     'handoff envelope',
-    'BRIEF.md',
-    'VENDOR.md',
+    'magi-cli-rules',
+    'STANDING',
     'cli-brief-rules-check.js',
   ]) {
     if (!briefRulesMagi.includes(s)) {

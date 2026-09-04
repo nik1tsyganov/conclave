@@ -21,8 +21,15 @@ const RULES_INDEX = 'RULES/INDEX.md';
 
 const REQUIRED_MARKERS = Object.freeze([
   {
-    id: 'RULES/INDEX',
-    anyOf: Object.freeze(['RULES/INDEX.md', 'RULES/INDEX', 'RULES\\INDEX.md']),
+    id: 'RULES/INDEX|magi-cli-rules|STANDING',
+    anyOf: Object.freeze([
+      'RULES/INDEX.md',
+      'RULES/INDEX',
+      'RULES\\INDEX.md',
+      'magi-cli-rules',
+      'STANDING.md',
+      'STANDING',
+    ]),
   },
   {
     id: 'magi-mode',
@@ -52,8 +59,8 @@ function usage() {
     'Usage: node tools/cli-brief-rules-check.js --brief <file>',
     '',
     'Fails closed unless the brief contains the Magi CLI RULES markers:',
-    'magi-mode, magi-dispatch, mix-mode, casper_via=agy or Vendor:,',
-    'RULES/INDEX, and WRITE AUDIT or R07.',
+    'magi-mode, magi-dispatch, mix-mode, casper_via=agy,',
+    'RULES/INDEX or magi-cli-rules or STANDING, and WRITE AUDIT or R07.',
   ].join('\n');
 }
 

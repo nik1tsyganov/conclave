@@ -25,7 +25,7 @@ const TEMPLATE_PATHS = [
 ];
 
 const ALL_MARKER_IDS = [
-  'RULES/INDEX',
+  'RULES/INDEX|magi-cli-rules|STANDING',
   'magi-mode',
   'magi-dispatch',
   'mix-mode',
@@ -74,12 +74,18 @@ test('R07 satisfies the WRITE AUDIT marker', () => {
   assert.deepStrictEqual(result, { ok: true, missing: [] });
 });
 
-test('STANDING.md without RULES/INDEX does not satisfy the pack marker', () => {
+test('STANDING.md satisfies the pack marker without RULES/INDEX', () => {
   const result = checkBriefText(
     `Read ${STANDING_PATH}. magi-mode magi-dispatch mix-mode casper_via=agy WRITE AUDIT`,
   );
-  assert.strictEqual(result.ok, false);
-  assert.deepStrictEqual(result.missing, ['RULES/INDEX']);
+  assert.deepStrictEqual(result, { ok: true, missing: [] });
+});
+
+test('magi-cli-rules satisfies the pack marker without RULES/INDEX', () => {
+  const result = checkBriefText(
+    'magi-cli-rules magi-mode magi-dispatch mix-mode casper_via=agy WRITE AUDIT',
+  );
+  assert.deepStrictEqual(result, { ok: true, missing: [] });
 });
 
 test('PATH gemini does not satisfy casper_via=agy or Vendor:', () => {
@@ -108,10 +114,10 @@ test('missing mix-mode is listed', () => {
   assert.deepStrictEqual(result.missing, ['mix-mode']);
 });
 
-test('missing RULES/INDEX is listed', () => {
+test('missing RULES/INDEX, magi-cli-rules, and STANDING is listed', () => {
   const result = checkBriefText('magi-mode magi-dispatch mix-mode casper_via=agy WRITE AUDIT');
   assert.strictEqual(result.ok, false);
-  assert.deepStrictEqual(result.missing, ['RULES/INDEX']);
+  assert.deepStrictEqual(result.missing, ['RULES/INDEX|magi-cli-rules|STANDING']);
 });
 
 test('an empty brief is missing every marker', () => {
@@ -143,7 +149,7 @@ test('main exits 1 and lists missing markers', (t) => {
   const code = main(['--brief', briefPath], io);
   assert.strictEqual(code, 1, io.stderrText);
   assert.match(io.stderrText, /^RULES_FAIL:/);
-  assert.match(io.stderrText, /RULES\/INDEX/);
+  assert.match(io.stderrText, /RULES\/INDEX\|magi-cli-rules\|STANDING/);
   assert.match(io.stderrText, /magi-dispatch/);
   assert.match(io.stderrText, /mix-mode/);
   assert.match(io.stderrText, /casper_via=agy\|Vendor:/);

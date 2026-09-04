@@ -112,7 +112,7 @@ test('a brief without the RULES markers fails closed before any dry-run', async 
   assert.strictEqual(code, 1, io.stderrText);
   assert.strictEqual(spawned, false, 'missing RULES must not reach a vendor spawn');
   assert.match(io.stderrText, /brief missing RULES markers/);
-  assert.match(io.stderrText, /RULES\/INDEX/);
+  assert.match(io.stderrText, /RULES\/INDEX\|magi-cli-rules\|STANDING/);
   assert.match(io.stderrText, /magi-mode/);
   assert.match(io.stderrText, /magi-dispatch/);
   assert.match(io.stderrText, /mix-mode/);
