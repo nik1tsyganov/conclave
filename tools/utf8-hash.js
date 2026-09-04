@@ -34,11 +34,9 @@ function sha256Utf8File(filePath) {
   return sha256Utf8(readUtf8File(filePath));
 }
 
-/**
- * Conclave inspectBrief first-line: `text.split(/\r?\n/)[0]`, then strip a
- * leftover CR. Receipt/handoff firstLineEcho uses this. cli-pointer.js still
- * takes `/^[^\n]*/` for pointer identity — leave that raw-buffer path alone.
- */
+// Conclave inspectBrief first-line: split on \r?\n, then strip a leftover CR.
+// Receipt/handoff firstLineEcho uses this. cli-pointer.js still matches through
+// the first LF only for pointer identity — leave that raw-buffer path alone.
 function firstLineUtf8(text) {
   if (typeof text !== 'string') {
     throw new Error('firstLineUtf8 requires a UTF-8 string');
