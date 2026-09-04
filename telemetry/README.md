@@ -2,7 +2,16 @@
 
 This directory holds the self-evaluation telemetry log for MAGI Cursor CLI dispatches.
 
-Because Cursor has no capture hook, the Grok arbiter lead-writes a row to `dispatches.jsonl` after every CLI/Task dispatch using `tools/telemetry-append.js`. 
+Because Cursor has no capture hook, the Grok arbiter lead-writes a row to `dispatches.jsonl` after every CLI/Task dispatch using `tools/telemetry-append.js`.
+
+The formal row contract is `telemetry/schema.json`. Validate a row or JSONL log with:
+
+```bash
+node tools/validate-telemetry.js --row '<json>'
+node tools/validate-telemetry.js --log telemetry/dispatches.jsonl
+```
+
+`--adapt` wraps a valid Magi row in the ingest envelope below. It does not rewrite Magi fields into Conclave names.
 
 ## Required Fields
 
@@ -11,6 +20,37 @@ As per `cursor-host.md`, each log row must include:
 - `role`: The seat's role (e.g. implement, verify, review)
 - `hostMode`: The host context string
 - `routedBy`: `arbiter`
+
+## Adapter contract toward Conclave / unified AI-ops ingest
+
+Magi rows and Conclave/Claude-host hook rows are **different schemas**. Magi is lead-written (`routedBy: arbiter`, optional `capturedBy: lead`). Conclave's hook-fed file is `C:\Users\YESSIR\.claude\docs\telemetry\dispatch-telemetry.jsonl` and is not dual-written here.
+
+Do **not** invent a join key. `vendor`, `role`, `date`, `dispatchId`, `proofId`, token fields, and host mode do not identify a Conclave hook row. Correlating on those values forges a session that was never shared.
+
+| Magi field | Unified ingest | Safe join to Conclave? |
+|---|---|---|
+| `vendor` | stay on the Magi payload as `magi.vendor` | No. Same vendor string is not a shared session. |
+| `role` | stay as `magi.role` | No. Role vocabulary is Magi-native (`implement`/`verify`/`review`). |
+| `hostMode` | Magi-only (`cursor` / `cursor-cli`) | No Conclave equivalent in this repo. |
+| `routedBy` | Magi-only (`arbiter`) | No. Conclave capture is hook-fed, not arbiter-routed. |
+| `capturedBy` | Magi-only (`lead` if present) | No. `lead` and hook capture are different writers. |
+| `vendorSideTokens` / `totalTokens` | Magi measured tokens or `null` | No. Missing Magi tokens stay absent/`null`, never `0`, and are not Conclave hook tokens. |
+| `date` | UTC calendar date if present | No. A shared calendar day is not a shared run. |
+| extra properties (`task`, `dispatchId`, `proofId`, `note`, …) | preserved on the Magi payload | No. Extra keys are Magi-local unless a later owner map names them. |
+
+Adapter envelope (`validate-telemetry.js --adapt`):
+
+```json
+{
+  "schemaId": "magi-dispatch/v1",
+  "sourceSystem": "magi",
+  "correlationPolicy": "none",
+  "joinKeys": [],
+  "payload": { "vendor": "openai", "role": "implement", "hostMode": "cursor-cli", "routedBy": "arbiter" }
+}
+```
+
+Unified ingest stores this envelope next to Conclave rows keyed by `schemaId` + `sourceSystem`. A later owner-supplied map may add named field copies; it must not add a join key that this repo does not already have.
 
 ## Self-Evaluation Questions
 

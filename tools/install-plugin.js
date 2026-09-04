@@ -18,6 +18,12 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const {
+  INSTALLED_MAGI_SURFACE,
+  INSTALLED_MAGI_CLI_SURFACE,
+  applySurfaceFields,
+  checkManifestSurface,
+} = require('./plugin-surface.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const PLUGINS_DIR = path.join(os.homedir(), '.cursor', 'plugins', 'local');
@@ -54,20 +60,55 @@ function writeManifest(dest, manifest) {
   fs.writeFileSync(path.join(dest, '.cursor-plugin', 'plugin.json'), JSON.stringify(manifest, null, 2) + '\n');
 }
 
+function magiCursorManifest() {
+  return applySurfaceFields(
+    {
+      name: 'magi',
+      displayName: 'MAGI Cursor',
+      description:
+        'Original MAGI tri-seat (Claude + Codex + Gemini). Cursor Grok arbiter routes; it does not implement. Not CONCLAVE.',
+      version: '0.1.0',
+      author: { name: 'Nikita Tsyganov' },
+      repository: 'https://github.com/nik1tsyganov/magi.git',
+      license: 'MIT',
+      keywords: ['magi', 'multi-vendor', 'cursor', 'dispatch'],
+    },
+    INSTALLED_MAGI_SURFACE,
+  );
+}
+
+function magiCliManifest() {
+  return applySurfaceFields(
+    {
+      name: 'magi-cursor-cli',
+      displayName: 'MAGI Cursor CLI',
+      description:
+        'Grok arbiter + vendor CLIs (codex.exe, agy.exe) when Cursor Task usage is exhausted. Not CONCLAVE.',
+      version: '0.1.0',
+      author: { name: 'Nikita Tsyganov' },
+      repository: 'https://github.com/nik1tsyganov/magi.git',
+      license: 'MIT',
+      keywords: ['magi', 'magi-cli', 'multi-vendor', 'cursor', 'cli'],
+    },
+    INSTALLED_MAGI_CLI_SURFACE,
+  );
+}
+
+function readInstalledManifest(dest) {
+  const rel = '.cursor-plugin/plugin.json';
+  const full = path.join(dest, rel);
+  if (!fs.existsSync(full)) return { ok: false, error: `missing ${rel}` };
+  try {
+    return { ok: true, manifest: JSON.parse(fs.readFileSync(full, 'utf8')), error: null };
+  } catch (error) {
+    return { ok: false, error: `invalid ${rel}: ${error.message}` };
+  }
+}
+
 function installMagiCursor() {
   ensureClean(MAGI_DEST);
 
-  writeManifest(MAGI_DEST, {
-    name: 'magi',
-    displayName: 'MAGI Cursor',
-    description:
-      'Original MAGI tri-seat (Claude + Codex + Gemini). Cursor Grok arbiter routes; it does not implement. Not CONCLAVE.',
-    version: '0.1.0',
-    author: { name: 'Nikita Tsyganov' },
-    repository: 'https://github.com/nik1tsyganov/magi.git',
-    license: 'MIT',
-    keywords: ['magi', 'multi-vendor', 'cursor', 'dispatch'],
-  });
+  writeManifest(MAGI_DEST, magiCursorManifest());
 
   copyDir(path.join(ROOT, '.cursor', 'skills'), path.join(MAGI_DEST, 'skills'));
   copyDir(path.join(ROOT, '.cursor', 'rules'), path.join(MAGI_DEST, 'rules'));
@@ -82,17 +123,7 @@ function installMagiCursor() {
 function installMagiCursorCli() {
   ensureClean(MAGI_CLI_DEST);
 
-  writeManifest(MAGI_CLI_DEST, {
-    name: 'magi-cursor-cli',
-    displayName: 'MAGI Cursor CLI',
-    description:
-      'Grok arbiter + vendor CLIs (codex.exe, agy.exe) when Cursor Task usage is exhausted. Not CONCLAVE.',
-    version: '0.1.0',
-    author: { name: 'Nikita Tsyganov' },
-    repository: 'https://github.com/nik1tsyganov/magi.git',
-    license: 'MIT',
-    keywords: ['magi', 'magi-cli', 'multi-vendor', 'cursor', 'cli'],
-  });
+  writeManifest(MAGI_CLI_DEST, magiCliManifest());
 
   copyDir(path.join(ROOT, '.cursor', 'skills', 'magi-cli'), path.join(MAGI_CLI_DEST, 'skills', 'magi-cli'));
   copyDir(path.join(ROOT, '.cursor', 'rules'), path.join(MAGI_CLI_DEST, 'rules'));
@@ -168,6 +199,16 @@ function checkMagi() {
     for (const m of missing) console.error(`  ${m}`);
     process.exit(1);
   }
+  const written = readInstalledManifest(MAGI_DEST);
+  if (!written.ok) {
+    console.error(`INSTALL INCOMPLETE — magi ${written.error}`);
+    process.exit(1);
+  }
+  const surface = checkManifestSurface(written.manifest, INSTALLED_MAGI_SURFACE);
+  if (!surface.ok) {
+    console.error(`INSTALL INCOMPLETE — magi ${surface.error}`);
+    process.exit(1);
+  }
 }
 
 function checkMagiCli() {
@@ -193,9 +234,19 @@ function checkMagiCli() {
     console.error('INSTALL INCOMPLETE — magi-cursor-cli must not have an agents/ directory');
     process.exit(1);
   }
+  const written = readInstalledManifest(MAGI_CLI_DEST);
+  if (!written.ok) {
+    console.error(`INSTALL INCOMPLETE — magi-cursor-cli ${written.error}`);
+    process.exit(1);
+  }
+  const surface = checkManifestSurface(written.manifest, INSTALLED_MAGI_CLI_SURFACE);
+  if (!surface.ok) {
+    console.error(`INSTALL INCOMPLETE — magi-cursor-cli ${surface.error}`);
+    process.exit(1);
+  }
 }
 
-try {
+function main() {
   fs.mkdirSync(PLUGINS_DIR, { recursive: true });
 
   installMagiCursor();
@@ -220,7 +271,22 @@ try {
   console.log('  command: /magi-cli');
   console.log('');
   console.log('Reload the Cursor window (Developer: Reload Window), then open Customize and enable both MAGI Cursor and MAGI Cursor CLI.');
-  process.exit(0);
-} catch (error) {
-  bail(error instanceof Error ? error.message : String(error));
 }
+
+if (require.main === module) {
+  try {
+    main();
+    process.exit(0);
+  } catch (error) {
+    bail(error instanceof Error ? error.message : String(error));
+  }
+}
+
+module.exports = {
+  magiCursorManifest,
+  magiCliManifest,
+  writeManifest,
+  readInstalledManifest,
+  checkMagi,
+  checkMagiCli,
+};

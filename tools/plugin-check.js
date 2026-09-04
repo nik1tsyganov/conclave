@@ -9,6 +9,12 @@
 
 const fs = require('fs');
 const path = require('path');
+const {
+  SOURCE_SURFACE,
+  INSTALLED_MAGI_SURFACE,
+  INSTALLED_MAGI_CLI_SURFACE,
+  checkManifestSurface,
+} = require('./plugin-surface.js');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -40,6 +46,8 @@ function check() {
     'commands/magi-cli.md',
     'claude-commands/magi.md',
     'tools/install-plugin.js',
+    'tools/install-plugin.test.js',
+    'tools/plugin-surface.js',
     'tools/plugin-check.js',
     'tools/host-resolver.js',
     'tools/hog-check.js',
@@ -52,6 +60,9 @@ function check() {
     'tools/telemetry-stats.js',
     'tools/telemetry-stats.test.js',
     'tools/telemetry-selftest.test.js',
+    'tools/validate-telemetry.js',
+    'tools/validate-telemetry.test.js',
+    'telemetry/schema.json',
     'tools/cli-launch.js',
     'tools/cli-launch.test.js',
     'tools/cli-smoke.js',
@@ -86,6 +97,39 @@ function check() {
       console.error(`MISSING: ${rel}`);
       return 1;
     }
+  }
+
+  const sourceManifestPath = path.join(ROOT, '.cursor-plugin/plugin.json');
+  let sourceManifest;
+  try {
+    sourceManifest = JSON.parse(fs.readFileSync(sourceManifestPath, 'utf8'));
+  } catch (error) {
+    console.error(`plugin.json invalid JSON: ${error.message}`);
+    return 1;
+  }
+  const sourceSurface = checkManifestSurface(sourceManifest, SOURCE_SURFACE);
+  if (!sourceSurface.ok) {
+    console.error(sourceSurface.error);
+    return 1;
+  }
+  for (const rel of Object.values(SOURCE_SURFACE)) {
+    const resolved = path.resolve(ROOT, rel);
+    if (!fs.existsSync(resolved)) {
+      console.error(`plugin.json surface path missing on disk: ${rel}`);
+      return 1;
+    }
+  }
+
+  const { magiCursorManifest, magiCliManifest } = require('./install-plugin.js');
+  const installedMagi = checkManifestSurface(magiCursorManifest(), INSTALLED_MAGI_SURFACE);
+  if (!installedMagi.ok) {
+    console.error(`install-plugin magi ${installedMagi.error}`);
+    return 1;
+  }
+  const installedCli = checkManifestSurface(magiCliManifest(), INSTALLED_MAGI_CLI_SURFACE);
+  if (!installedCli.ok) {
+    console.error(`install-plugin magi-cursor-cli ${installedCli.error}`);
+    return 1;
   }
 
   const skill = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi/SKILL.md'), 'utf8');
@@ -194,6 +238,7 @@ function check() {
     'host-resolver',
     'telemetry-append.js',
     'telemetry-stats.js',
+    'validate-telemetry.js',
   ]) {
     if (!cursorHost.includes(s)) {
       console.error(`cursor-host.md missing required string: ${s}`);
