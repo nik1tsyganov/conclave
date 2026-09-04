@@ -90,3 +90,4 @@ Tally panel POSITION with `node C:\src\magi\tools\position-tally.js`. Do not han
 
 - Put the SCOPE block from `engineering-orchestrator` in every seat brief.
 - Every Magi CLI seat brief MUST paste the STANDING RULES block from `references/brief-rules-block.md` (fill SCOPE / Vendor / Bridges at dispatch). Fail closed with `node C:\src\magi\tools\cli-brief-rules-check.js --brief <file>` (`cli-smoke.js` runs the same check).
+- Every Magi CLI **implement** seat brief MUST include the `src/index.js` re-export, `PR_BODY.md`, and full fixture `BRIEF.md` MUST lines (paste `tools/templates/implement-brief-export-must.md` or equivalent). Do not abbreviate to `Implement src/X.js + PR_BODY.md`. Accept `loadApi` requires `typeof api.<fn> === 'function'`; do not leave starter `module.exports = {}`.
