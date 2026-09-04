@@ -12,6 +12,9 @@
  *
  * Passage: >=2 APPROVE among eligible electors.
  * ABSTAIN never counts toward passage.
+ * Quorum floor (shared with CONCLAVE tally-panel): when fewer than 2
+ * eligible electors cast a counted POSITION, verdict is NOT_PANEL with
+ * degraded=true and reason quorumFloor — fail closed, not DEADLOCK.
  * Else DEADLOCK. There is no panel REJECTED verdict.
  *
  * Electors are the three vendors (anthropic / openai / google). The Grok
@@ -48,10 +51,12 @@ const FORBIDDEN_ELECTORS = Object.freeze([
   'lead',
 ]);
 const PASSAGE_THRESHOLD = 2;
+const QUORUM_FLOOR = 2;
 const DEGRADED_VENDOR = 'anthropic';
 const VERDICT = Object.freeze({
   PASSAGE: 'PASSAGE',
   DEADLOCK: 'DEADLOCK',
+  NOT_PANEL: 'NOT_PANEL',
 });
 
 class TallyError extends Error {
@@ -204,12 +209,33 @@ function tally(input) {
   }
 
   const missing = eligible.filter((elector) => !counted.some((ballot) => ballot.elector === elector));
-  const passed = approveCount >= PASSAGE_THRESHOLD;
-  const verdict = passed ? VERDICT.PASSAGE : VERDICT.DEADLOCK;
+  const duoDegraded = [...ineligible.values()].includes('degraded-claude');
+  const quorumMet = counted.length >= QUORUM_FLOOR;
+  const passed = quorumMet && approveCount >= PASSAGE_THRESHOLD;
+
+  let verdict;
+  let reason = null;
+  let degraded = duoDegraded;
+  if (!quorumMet) {
+    // Shared CONCLAVE quorum floor: a seat-down panel is not a panel.
+    // Destructive gates stay fail closed — never PASSAGE, never a false DEADLOCK.
+    verdict = VERDICT.NOT_PANEL;
+    degraded = true;
+    reason = 'quorumFloor';
+  } else if (passed) {
+    verdict = VERDICT.PASSAGE;
+    reason = duoDegraded ? 'degraded-claude' : null;
+  } else {
+    verdict = VERDICT.DEADLOCK;
+    reason = duoDegraded ? 'degraded-claude' : null;
+  }
 
   return {
     verdict,
+    degraded,
+    reason,
     threshold: PASSAGE_THRESHOLD,
+    quorumFloor: QUORUM_FLOOR,
     approveCount,
     abstainCount,
     rejectCount,
@@ -337,10 +363,13 @@ function formatText(result) {
   const missing = result.missingElectors.join(',') || '-';
   return [
     `verdict: ${result.verdict}`,
+    `degraded: ${result.degraded}`,
+    `reason: ${result.reason || '-'}`,
     `approve: ${result.approveCount}`,
     `abstain: ${result.abstainCount}`,
     `reject: ${result.rejectCount}`,
     `threshold: ${result.threshold}`,
+    `quorumFloor: ${result.quorumFloor}`,
     `eligible: ${result.eligibleElectors.join(',')}`,
     `ineligible: ${ineligible}`,
     `missing: ${missing}`,
@@ -352,9 +381,10 @@ function usage() {
     'Usage: node tools/position-tally.js --ballots \'<json>\' [--degraded] [--author-vendor <vendor>] [--json]',
     '       node tools/position-tally.js --file <path> [--degraded] [--author-vendor <vendor>] [--json]',
     '',
-    'Passage: >=2 APPROVE among eligible electors. ABSTAIN never toward passage. Else DEADLOCK.',
+    'Passage: >=2 APPROVE among eligible electors. ABSTAIN never toward passage.',
+    'Counted eligible ballots < 2 => NOT_PANEL degraded=true reason=quorumFloor. Else DEADLOCK.',
     'Electors: anthropic | openai | google. Arbiter cannot vote.',
-    'Exit 0 PASSAGE, 1 DEADLOCK, 2 invalid input.',
+    'Exit 0 PASSAGE, 1 DEADLOCK or NOT_PANEL (fail closed), 2 invalid input.',
   ].join('\n');
 }
 
@@ -390,6 +420,7 @@ module.exports = {
   GATE_ROLES,
   FORBIDDEN_ELECTORS,
   PASSAGE_THRESHOLD,
+  QUORUM_FLOOR,
   DEGRADED_VENDOR,
   VERDICT,
   TallyError,

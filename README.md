@@ -82,11 +82,12 @@ Rules encoded here (same passage arithmetic MAGI and CONCLAVE share for later AI
 - Eligible electors are `anthropic`, `openai`, and `google`. The Grok arbiter never votes.
 - Passage is `>=2 APPROVE` among eligible electors.
 - `ABSTAIN` never counts toward passage.
-- Anything else is `DEADLOCK`. There is no panel `REJECTED` verdict.
+- When fewer than 2 eligible electors cast a counted POSITION, the verdict is `NOT_PANEL` with `degraded=true` and `reason=quorumFloor` (shared CONCLAVE quorum floor). Destructive gates stay fail closed. This is not `DEADLOCK`.
+- Once quorum is met and APPROVE stays below 2, the verdict is `DEADLOCK`. There is no panel `REJECTED` verdict.
 - `implementer` / `reviewer` / `verifier` (also telemetry `implement` / `review` / `verify`) are gate roles. They may ride a ballot for audit. They do not create a vote and they do not change eligibility.
 - Degraded duo marks Claude (`anthropic`) ineligible only. Idle Casper is `FAILED activation`, not a duo — the tool refuses `--degraded-vendor google`.
 
-Intentional MAGI-vs-CONCLAVE differences: elector names are the three MAGI vendors, not CONCLAVE cardinal seats; the degraded path is MAGI cursor-cli Claude-fail only; this repo does not run `session-whoami.js` or `camerlengo-8`. Passage arithmetic is shared on purpose.
+Intentional MAGI-vs-CONCLAVE differences: elector names are the three MAGI vendors, not CONCLAVE cardinal seats; the Claude-fail duo input (`--degraded`) is MAGI cursor-cli only; this repo does not run `session-whoami.js` or `camerlengo-8`. Passage arithmetic and the `NOT_PANEL` / `degraded` / `quorumFloor` result shape are shared on purpose.
 
 ## Agent discovery
 

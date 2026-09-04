@@ -105,7 +105,7 @@ After the panel returns POSITION ballots, tally them with the shared passage too
 node C:\src\magi\tools\position-tally.js --ballots '<json>' --json
 ```
 
-Passage is `>=2 APPROVE` among eligible electors; `ABSTAIN` never toward passage; else `DEADLOCK`. `--author-vendor` recuses the implement author. `--degraded` is the cursor-cli Claude fail path only. See README.md for the CONCLAVE alignment note.
+Passage is `>=2 APPROVE` among eligible electors; `ABSTAIN` never toward passage. Counted eligible ballots below 2 is `NOT_PANEL` (`degraded=true`, `reason=quorumFloor`) — fail closed, shared with CONCLAVE. Else `DEADLOCK`. `--author-vendor` recuses the implement author. `--degraded` is the cursor-cli Claude fail path only. Idle Casper is `FAILED activation`, not a duo. See README.md for the CONCLAVE alignment note.
 
 ## After implement
 

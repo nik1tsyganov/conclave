@@ -11,6 +11,7 @@ const {
   tally,
   TallyError,
   PASSAGE_THRESHOLD,
+  QUORUM_FLOOR,
   DEGRADED_VENDOR,
   VERDICT,
 } = require('./position-tally.js');
@@ -37,8 +38,9 @@ function runCli(args, extra = {}) {
 }
 
 describe('position-tally rules', () => {
-  it('uses a 2-of-3 passage threshold', () => {
+  it('uses a 2-of-3 passage threshold and a matching quorum floor', () => {
     assert.strictEqual(PASSAGE_THRESHOLD, 2);
+    assert.strictEqual(QUORUM_FLOOR, 2);
     assert.strictEqual(DEGRADED_VENDOR, 'anthropic');
   });
 
@@ -47,6 +49,8 @@ describe('position-tally rules', () => {
     assert.strictEqual(result.verdict, VERDICT.PASSAGE);
     assert.strictEqual(result.approveCount, 3);
     assert.strictEqual(result.passed, true);
+    assert.strictEqual(result.degraded, false);
+    assert.strictEqual(result.reason, null);
     assert.deepStrictEqual(result.eligibleElectors, ['anthropic', 'openai', 'google']);
   });
 
@@ -98,11 +102,31 @@ describe('position-tally rules', () => {
     assert.deepStrictEqual(result.missingElectors, ['google']);
   });
 
-  it('deadlocks an empty panel', () => {
+  it('emits NOT_PANEL + degraded quorumFloor when only one eligible elector voted', () => {
+    const result = tally([ballot('anthropic', 'APPROVE')]);
+    assert.strictEqual(result.verdict, VERDICT.NOT_PANEL);
+    assert.strictEqual(result.degraded, true);
+    assert.strictEqual(result.reason, 'quorumFloor');
+    assert.strictEqual(result.approveCount, 1);
+    assert.strictEqual(result.passed, false);
+    assert.deepStrictEqual(result.missingElectors, ['openai', 'google']);
+  });
+
+  it('emits NOT_PANEL on an empty panel — fail closed, not a false DEADLOCK', () => {
     const result = tally({ ballots: [] });
-    assert.strictEqual(result.verdict, VERDICT.DEADLOCK);
+    assert.strictEqual(result.verdict, VERDICT.NOT_PANEL);
+    assert.strictEqual(result.degraded, true);
+    assert.strictEqual(result.reason, 'quorumFloor');
     assert.strictEqual(result.approveCount, 0);
     assert.deepStrictEqual(result.missingElectors, ['anthropic', 'openai', 'google']);
+  });
+
+  it('still deadlocks once quorum is met and APPROVE stays below two', () => {
+    const result = tally([ballot('anthropic', 'APPROVE'), ballot('openai', 'ABSTAIN')]);
+    assert.strictEqual(result.verdict, VERDICT.DEADLOCK);
+    assert.strictEqual(result.degraded, false);
+    assert.strictEqual(result.approveCount, 1);
+    assert.strictEqual(result.abstainCount, 1);
   });
 });
 
@@ -114,6 +138,8 @@ describe('position-tally degraded duo (cursor-cli Claude fail)', () => {
     });
     assert.strictEqual(result.verdict, VERDICT.PASSAGE);
     assert.strictEqual(result.approveCount, 2);
+    assert.strictEqual(result.degraded, true);
+    assert.strictEqual(result.reason, 'degraded-claude');
     assert.deepStrictEqual(result.eligibleElectors, ['openai', 'google']);
     assert.deepStrictEqual(result.ineligible, [{ elector: 'anthropic', reason: 'degraded-claude' }]);
     assert.strictEqual(result.ignored.length, 1);
@@ -148,6 +174,18 @@ describe('position-tally degraded duo (cursor-cli Claude fail)', () => {
         return true;
       },
     );
+  });
+
+  it('fail-closes a degraded duo when a remaining seat is down (NOT_PANEL)', () => {
+    const result = tally({
+      ballots: [ballot('openai', 'APPROVE')],
+      degraded: true,
+    });
+    assert.strictEqual(result.verdict, VERDICT.NOT_PANEL);
+    assert.strictEqual(result.degraded, true);
+    assert.strictEqual(result.reason, 'quorumFloor');
+    assert.strictEqual(result.approveCount, 1);
+    assert.deepStrictEqual(result.missingElectors, ['google']);
   });
 });
 
@@ -194,6 +232,23 @@ describe('position-tally vote roles and recusal', () => {
     assert.strictEqual(result.approveCount, 1);
   });
 
+  it('fail-closes duo-degraded plus recusal when counted eligible ballots drop below quorum', () => {
+    const result = tally({
+      ballots: trio('APPROVE', 'APPROVE', 'APPROVE'),
+      degraded: true,
+      authorVendor: 'openai',
+    });
+    assert.strictEqual(result.verdict, VERDICT.NOT_PANEL);
+    assert.strictEqual(result.degraded, true);
+    assert.strictEqual(result.reason, 'quorumFloor');
+    assert.strictEqual(result.approveCount, 1);
+    assert.deepStrictEqual(result.eligibleElectors, ['google']);
+    assert.deepStrictEqual(
+      result.ineligible.map((row) => row.reason).sort(),
+      ['author-recusal', 'degraded-claude'],
+    );
+  });
+
   it('rejects an arbiter ballot as an illegal elector', () => {
     assert.throws(
       () => tally([ballot('arbiter', 'APPROVE'), ballot('openai', 'APPROVE')]),
@@ -228,6 +283,15 @@ describe('position-tally CLI', () => {
     const r = runCli(['--ballots', JSON.stringify(trio('APPROVE', 'ABSTAIN', 'REJECT'))]);
     assert.strictEqual(r.status, 1);
     assert.match(r.stdout, /verdict: DEADLOCK/);
+  });
+
+  it('exits 1 fail-closed for NOT_PANEL quorum floor', () => {
+    const r = runCli(['--ballots', JSON.stringify([ballot('openai', 'APPROVE')]), '--json']);
+    assert.strictEqual(r.status, 1);
+    const out = JSON.parse(r.stdout);
+    assert.strictEqual(out.verdict, 'NOT_PANEL');
+    assert.strictEqual(out.degraded, true);
+    assert.strictEqual(out.reason, 'quorumFloor');
   });
 
   it('exits 2 on illegal arbiter input', () => {
