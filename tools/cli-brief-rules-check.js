@@ -2,13 +2,20 @@
 'use strict';
 
 /**
- * Magi CLI brief RULES gate.
+ * Magi CLI brief RULES + Skills gate.
  *
  * Fail-closed: a seat brief is legal only when it carries the vault RULES
- * markers. CLI seats cannot load Cursor plugins, so standing rules arrive
- * through the brief (see .cursor/skills/magi/references/brief-rules-block.md).
+ * markers and the Backend / vault#21 Skills: extras. CLI seats cannot load
+ * Cursor plugins, so standing rules arrive through the brief
+ * (see .cursor/skills/magi/references/brief-rules-block.md).
  *
  * Exit 0 rules ok; 1 missing markers; 2 ARGUMENT_ERROR.
+ *
+ * Skills: extras (H7 seatSkillsLine SoT, vault#21):
+ *   engineering-orchestrator OR SCOPE
+ *   implement and/or testing (anyOf; review-only may omit implement)
+ *   one of codex-bridge | claude-bridge | gemini-bridge
+ * Optional --role implement additionally requires the implement token.
  */
 
 const fs = require('node:fs');
@@ -52,15 +59,34 @@ const REQUIRED_MARKERS = Object.freeze([
     id: 'WRITE AUDIT|R07',
     anyOf: Object.freeze(['WRITE AUDIT', 'R07']),
   },
+  {
+    // H7 / vault#21 seatSkillsLine extras. SCOPE-only briefs still pass.
+    id: 'engineering-orchestrator|SCOPE',
+    anyOf: Object.freeze(['engineering-orchestrator', 'SCOPE']),
+  },
+  {
+    // Implement seats name both; review-only may name testing only.
+    id: 'implement|testing',
+    anyOf: Object.freeze(['implement', 'testing']),
+  },
+  {
+    id: 'codex-bridge|claude-bridge|gemini-bridge',
+    anyOf: Object.freeze(['codex-bridge', 'claude-bridge', 'gemini-bridge']),
+  },
 ]);
 
 function usage() {
   return [
-    'Usage: node tools/cli-brief-rules-check.js --brief <file>',
+    'Usage: node tools/cli-brief-rules-check.js --brief <file> [--role implement|review]',
     '',
-    'Fails closed unless the brief contains the Magi CLI RULES markers:',
-    'magi-mode, magi-dispatch, mix-mode, casper_via=agy,',
-    'RULES/INDEX or magi-cli-rules or STANDING, and WRITE AUDIT or R07.',
+    'Exit 0 rules ok. Exit 1 missing markers (FAIL FIRE). Exit 2 ARGUMENT_ERROR.',
+    '',
+    'Existing RULES groups: magi-mode, magi-dispatch, mix-mode, casper_via=agy,',
+    'RULES/INDEX or magi-cli-rules or STANDING, WRITE AUDIT or R07.',
+    '',
+    'Skills: extras (vault#21 seatSkillsLine): engineering-orchestrator or SCOPE,',
+    'implement and/or testing, and one of codex-bridge|claude-bridge|gemini-bridge.',
+    '--role implement also requires the implement token (not testing alone).',
   ].join('\n');
 }
 
@@ -77,7 +103,7 @@ function rulesError(message) {
 }
 
 function parseArgs(argv) {
-  const options = { help: false };
+  const options = { help: false, role: null };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     if (flag === '--help' || flag === '-h') {
@@ -88,6 +114,16 @@ function parseArgs(argv) {
         throw argumentError(`${flag} requires a value`);
       }
       options.brief = value;
+      index += 1;
+    } else if (flag === '--role') {
+      const value = argv[index + 1];
+      if (!value || value.startsWith('--')) {
+        throw argumentError(`${flag} requires a value`);
+      }
+      if (value !== 'implement' && value !== 'review') {
+        throw argumentError('--role must be implement or review');
+      }
+      options.role = value;
       index += 1;
     } else {
       throw argumentError(`Unknown option: ${flag}`);
@@ -103,7 +139,7 @@ function markerHolds(marker, text) {
   return Array.isArray(marker.anyOf) && marker.anyOf.some((needle) => text.includes(needle));
 }
 
-function missingMarkers(text) {
+function missingMarkers(text, opts) {
   if (typeof text !== 'string') {
     return REQUIRED_MARKERS.map((marker) => marker.id);
   }
@@ -113,15 +149,18 @@ function missingMarkers(text) {
       missing.push(marker.id);
     }
   }
+  if (opts && opts.role === 'implement' && !text.includes('implement')) {
+    missing.push('implement');
+  }
   return missing;
 }
 
-function checkBriefText(text) {
-  const missing = missingMarkers(text);
+function checkBriefText(text, opts) {
+  const missing = missingMarkers(text, opts);
   return { ok: missing.length === 0, missing };
 }
 
-function checkBriefFile(briefPath) {
+function checkBriefFile(briefPath, opts) {
   const resolved = path.resolve(briefPath);
   let body;
   try {
@@ -129,7 +168,7 @@ function checkBriefFile(briefPath) {
   } catch {
     throw argumentError(`--brief file does not exist: ${resolved}`);
   }
-  return { ...checkBriefText(body), briefPath: resolved };
+  return { ...checkBriefText(body, opts), briefPath: resolved };
 }
 
 function formatMissing(missing) {
@@ -146,7 +185,7 @@ function main(argv = process.argv.slice(2), io = process) {
     if (typeof options.brief !== 'string' || options.brief.length === 0) {
       throw argumentError('--brief is required');
     }
-    const result = checkBriefFile(options.brief);
+    const result = checkBriefFile(options.brief, { role: options.role });
     if (!result.ok) {
       throw rulesError(formatMissing(result.missing));
     }
