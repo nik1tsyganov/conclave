@@ -80,8 +80,12 @@ describe('utf8-hash', () => {
       assert.strictEqual(firstLineUtf8File(plainPath), 'BOM-FIRST');
       assert.strictEqual(firstLineUtf8('\uFEFFhello'), 'hello');
 
-      // Only one leading BOM is stripped (Conclave).
-      assert.strictEqual(sha256Utf8('\uFEFF\uFEFFx'), sha256Utf8('\uFEFFx'));
+      // Only one leading BOM is stripped (Conclave). A second leading
+      // U+FEFF is hashed; a mid-text U+FEFF is never stripped.
+      assert.strictEqual(
+        sha256Utf8('\uFEFF\uFEFFx'),
+        crypto.createHash('sha256').update('\uFEFFx', 'utf8').digest('hex')
+      );
       assert.notStrictEqual(sha256Utf8('\uFEFF\uFEFFx'), sha256Utf8('x'));
       assert.notStrictEqual(sha256Utf8('a\uFEFFb'), sha256Utf8('ab'));
 
