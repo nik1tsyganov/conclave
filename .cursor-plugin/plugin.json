@@ -5,5 +5,9 @@
   "author": { "name": "Nikita Tsyganov" },
   "repository": "https://github.com/nik1tsyganov/magi.git",
   "keywords": ["magi", "multi-vendor", "cursor", "dispatch"],
-  "license": "MIT"
+  "license": "MIT",
+  "skills": "./.cursor/skills/",
+  "rules": "./.cursor/rules/",
+  "agents": "./agents/",
+  "commands": "./commands/"
 }

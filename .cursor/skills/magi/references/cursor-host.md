@@ -73,7 +73,10 @@ Write and read rows mechanically, never by hand-editing the log:
 ```bash
 node C:\src\magi\tools\telemetry-append.js --row '<json>'
 node C:\src\magi\tools\telemetry-stats.js
+node C:\src\magi\tools\validate-telemetry.js --log <path>
 ```
+
+The formal row schema is `telemetry/schema.json`. `validate-telemetry.js` checks that schema. `--adapt` wraps a valid Magi row for unified ingest; it does not invent a join key toward Conclave hook rows. See `telemetry/README.md`.
 
 `hostMode` and `routedBy` are required; `telemetry-append.js` rejects a row
 without them. Token fields (`vendorSideTokens`, `totalTokens`) are a positive
