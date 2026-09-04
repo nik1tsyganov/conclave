@@ -17,23 +17,13 @@ const path = require('node:path');
 const STANDING_PATH = 'C:\\src\\ai-ops-vault\\projects\\magi-cli-rules\\STANDING.md';
 const RULES_DIR = 'C:\\src\\ai-ops-vault\\projects\\magi-cli-rules';
 const VENDOR_MD = 'VENDOR.md';
-
-function hasAgyCardText(text) {
-  if (typeof text !== 'string') return false;
-  if (text.includes('agy.exe')) return true;
-  return /\bCasper\b/i.test(text) && /\bagy\b/i.test(text);
-}
-
-function hasCasperVia(text) {
-  if (typeof text !== 'string') return false;
-  if (text.includes('casper_via=agy')) return true;
-  return text.includes(VENDOR_MD) && hasAgyCardText(text);
-}
+const RULES_INDEX = 'RULES/INDEX.md';
 
 const REQUIRED_MARKERS = Object.freeze([
   {
-    id: 'magi-cli-rules|STANDING.md',
-    anyOf: Object.freeze(['magi-cli-rules', 'STANDING.md']),
+    // Pack index, vault project, or standing path. Research MUST-name list.
+    id: 'RULES/INDEX.md|magi-cli-rules|STANDING.md',
+    anyOf: Object.freeze(['RULES/INDEX.md', 'RULES\\INDEX.md', 'magi-cli-rules', 'STANDING.md']),
   },
   {
     id: 'magi-mode',
@@ -44,10 +34,9 @@ const REQUIRED_MARKERS = Object.freeze([
     anyOf: Object.freeze(['magi-dispatch']),
   },
   {
-    // Casper is agy.exe, not PATH gemini. Prefer casper_via=agy.
-    // Alternate: VENDOR.md plus Casper/agy card text (agy.exe or Casper+agy).
-    id: 'casper_via=agy|VENDOR.md+agy-card',
-    match: hasCasperVia,
+    // Casper is agy.exe, not PATH gemini. VENDOR.md in the pack must carry this.
+    id: 'casper_via=agy',
+    anyOf: Object.freeze(['casper_via=agy']),
   },
 ]);
 
@@ -56,8 +45,8 @@ function usage() {
     'Usage: node tools/cli-brief-rules-check.js --brief <file>',
     '',
     'Fails closed unless the brief contains the Magi CLI RULES markers:',
-    'magi-mode, magi-dispatch, STANDING.md or magi-cli-rules,',
-    'and casper_via=agy (or VENDOR.md plus Casper/agy card text).',
+    'magi-mode, magi-dispatch, casper_via=agy, and RULES/INDEX.md or',
+    'magi-cli-rules or STANDING.md.',
   ].join('\n');
 }
 
@@ -163,13 +152,12 @@ if (require.main === module) {
 module.exports = {
   REQUIRED_MARKERS,
   RULES_DIR,
+  RULES_INDEX,
   STANDING_PATH,
   VENDOR_MD,
   checkBriefFile,
   checkBriefText,
   formatMissing,
-  hasAgyCardText,
-  hasCasperVia,
   main,
   missingMarkers,
   parseArgs,
