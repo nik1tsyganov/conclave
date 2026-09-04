@@ -52,6 +52,12 @@ Adapter envelope (`validate-telemetry.js --adapt`):
 
 Unified ingest stores this envelope next to Conclave rows keyed by `schemaId` + `sourceSystem`. A later owner-supplied map may add named field copies; it must not add a join key that this repo does not already have.
 
+## Handoff envelope (not a dispatch row)
+
+Seat-to-seat durability uses `handoff-envelope.v1` via `tools/handoff-envelope.js`, appended to `handoffs.jsonl` (gitignored). `telemetry/schema.json` stays the dispatch-row contract only; do not validate handoff rows with `validate-telemetry.js`.
+
+Receipt ACKs (`receipt.v1`, `tools/receipt-ack.js`) prove a seat opened the pointer brief (first-line echo + SHA-256) for hostMode `cursor` and `cursor-cli`. They are not dispatch rows and are not Conclave join keys. Pointer delivery remains `cli-pointer.js` / `task-delivery.js`.
+
 ## Self-Evaluation Questions
 
 This telemetry exists to answer these self-eval questions:
