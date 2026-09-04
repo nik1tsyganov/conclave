@@ -30,6 +30,24 @@ const REQUIRED_MARKERS = Object.freeze([
     id: 'magi-dispatch',
     anyOf: Object.freeze(['magi-dispatch']),
   },
+  {
+    // Casper is agy.exe, not PATH gemini. Prefer casper_via=agy; plain agy also holds.
+    id: 'casper_via=agy|agy',
+    anyOf: Object.freeze(['casper_via=agy', 'agy']),
+  },
+  {
+    // Delivery / ACK / handoff names from this repo. Loose so briefs stay non-brittle.
+    id: 'pointer|cli-pointer',
+    anyOf: Object.freeze(['cli-pointer', 'pointer']),
+  },
+  {
+    id: 'receipt|receipt.v1',
+    anyOf: Object.freeze(['receipt.v1', 'receipt']),
+  },
+  {
+    id: 'envelope|handoff-envelope',
+    anyOf: Object.freeze(['handoff-envelope.v1', 'handoff-envelope', 'envelope']),
+  },
 ]);
 
 function usage() {
@@ -37,7 +55,8 @@ function usage() {
     'Usage: node tools/cli-brief-rules-check.js --brief <file>',
     '',
     'Fails closed unless the brief contains the Magi CLI RULES markers:',
-    'magi-cli-rules or STANDING.md, plus magi-mode and magi-dispatch.',
+    'magi-cli-rules or STANDING.md, magi-mode, magi-dispatch,',
+    'casper_via=agy or agy, plus pointer, receipt, and envelope.',
   ].join('\n');
 }
 

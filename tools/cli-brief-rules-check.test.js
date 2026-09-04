@@ -24,6 +24,24 @@ const TEMPLATE_PATHS = [
   path.join(ROOT, 'tools', 'templates', 'brief-rules-block.md'),
 ];
 
+const ALL_MARKER_IDS = [
+  'magi-cli-rules|STANDING.md',
+  'magi-mode',
+  'magi-dispatch',
+  'casper_via=agy|agy',
+  'pointer|cli-pointer',
+  'receipt|receipt.v1',
+  'envelope|handoff-envelope',
+];
+
+function legalBrief(overrides = '') {
+  return [
+    'magi-cli-rules magi-mode magi-dispatch',
+    'casper_via=agy pointer receipt envelope',
+    overrides,
+  ].join(' ').trim();
+}
+
 function makeBrief(t, body) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-brief-rules-'));
   const briefPath = path.join(directory, 'brief.md');
@@ -39,45 +57,74 @@ function capture() {
   return io;
 }
 
-test('a brief with magi-cli-rules, magi-mode, and magi-dispatch passes', () => {
-  const result = checkBriefText('Follow magi-cli-rules, magi-mode, and magi-dispatch.');
+test('a brief with the full RULES marker set passes', () => {
+  const result = checkBriefText(legalBrief());
   assert.deepStrictEqual(result, { ok: true, missing: [] });
 });
 
 test('the STANDING.md path satisfies the vault marker without naming magi-cli-rules', () => {
-  const result = checkBriefText(`Read ${STANDING_PATH}. Follow magi-mode and magi-dispatch.`);
+  const result = checkBriefText(
+    `Read ${STANDING_PATH}. magi-mode magi-dispatch casper_via=agy pointer receipt envelope`,
+  );
   assert.deepStrictEqual(result, { ok: true, missing: [] });
 });
 
-test('STANDING.md plus magi-mode and magi-dispatch is enough', () => {
-  const result = checkBriefText('Read STANDING.md. Follow magi-mode and magi-dispatch.');
+test('STANDING.md plus the other required markers is enough', () => {
+  const result = checkBriefText(
+    'Read STANDING.md. magi-mode magi-dispatch casper_via=agy pointer receipt envelope',
+  );
+  assert.deepStrictEqual(result, { ok: true, missing: [] });
+});
+
+test('explicit agy satisfies Casper without casper_via=agy', () => {
+  const result = checkBriefText(
+    'magi-cli-rules magi-mode magi-dispatch agy.exe pointer receipt envelope',
+  );
+  assert.deepStrictEqual(result, { ok: true, missing: [] });
+});
+
+test('PATH gemini does not satisfy the Casper/agy marker', () => {
+  const result = checkBriefText(
+    'magi-cli-rules magi-mode magi-dispatch gemini pointer receipt envelope',
+  );
+  assert.strictEqual(result.ok, false);
+  assert.deepStrictEqual(result.missing, ['casper_via=agy|agy']);
+});
+
+test('schema ids cli-pointer, receipt.v1, and handoff-envelope.v1 satisfy comms markers', () => {
+  const result = checkBriefText(
+    'magi-cli-rules magi-mode magi-dispatch casper_via=agy cli-pointer receipt.v1 handoff-envelope.v1',
+  );
   assert.deepStrictEqual(result, { ok: true, missing: [] });
 });
 
 test('missing magi-mode is listed', () => {
-  const result = checkBriefText('magi-cli-rules and magi-dispatch only');
+  const result = checkBriefText('magi-cli-rules magi-dispatch casper_via=agy pointer receipt envelope');
   assert.strictEqual(result.ok, false);
   assert.deepStrictEqual(result.missing, ['magi-mode']);
 });
 
 test('missing magi-dispatch is listed', () => {
-  const result = checkBriefText('magi-cli-rules and magi-mode only');
+  const result = checkBriefText('magi-cli-rules magi-mode casper_via=agy pointer receipt envelope');
   assert.strictEqual(result.ok, false);
   assert.deepStrictEqual(result.missing, ['magi-dispatch']);
 });
 
 test('missing both vault markers is listed as magi-cli-rules|STANDING.md', () => {
-  const result = checkBriefText('magi-mode and magi-dispatch only');
+  const result = checkBriefText('magi-mode magi-dispatch casper_via=agy pointer receipt envelope');
   assert.strictEqual(result.ok, false);
   assert.deepStrictEqual(result.missing, ['magi-cli-rules|STANDING.md']);
 });
 
+test('missing pointer, receipt, or envelope is listed', () => {
+  const base = 'magi-cli-rules magi-mode magi-dispatch casper_via=agy';
+  assert.deepStrictEqual(checkBriefText(`${base} receipt envelope`).missing, ['pointer|cli-pointer']);
+  assert.deepStrictEqual(checkBriefText(`${base} pointer envelope`).missing, ['receipt|receipt.v1']);
+  assert.deepStrictEqual(checkBriefText(`${base} pointer receipt`).missing, ['envelope|handoff-envelope']);
+});
+
 test('an empty brief is missing every marker', () => {
-  assert.deepStrictEqual(missingMarkers(''), [
-    'magi-cli-rules|STANDING.md',
-    'magi-mode',
-    'magi-dispatch',
-  ]);
+  assert.deepStrictEqual(missingMarkers(''), ALL_MARKER_IDS);
 });
 
 test('checkBriefFile reads the path and reports missing markers', (t) => {
@@ -85,16 +132,12 @@ test('checkBriefFile reads the path and reports missing markers', (t) => {
   const result = checkBriefFile(briefPath);
   assert.strictEqual(result.ok, false);
   assert.strictEqual(result.briefPath, path.resolve(briefPath));
-  assert.deepStrictEqual(result.missing, [
-    'magi-cli-rules|STANDING.md',
-    'magi-mode',
-    'magi-dispatch',
-  ]);
+  assert.deepStrictEqual(result.missing, ALL_MARKER_IDS);
   assert.match(formatMissing(result.missing), /magi-mode/);
 });
 
 test('main exits 0 and prints JSON for a legal brief', (t) => {
-  const briefPath = makeBrief(t, 'magi-cli-rules magi-mode magi-dispatch');
+  const briefPath = makeBrief(t, legalBrief());
   const io = capture();
   const code = main(['--brief', briefPath], io);
   assert.strictEqual(code, 0, io.stderrText);
@@ -111,6 +154,7 @@ test('main exits 1 and lists missing markers', (t) => {
   assert.match(io.stderrText, /^RULES_FAIL:/);
   assert.match(io.stderrText, /magi-cli-rules\|STANDING\.md/);
   assert.match(io.stderrText, /magi-dispatch/);
+  assert.match(io.stderrText, /casper_via=agy\|agy/);
 });
 
 test('a missing --brief flag exits 2 with ARGUMENT_ERROR', () => {
@@ -128,7 +172,7 @@ test('a missing brief file exits 2 with ARGUMENT_ERROR', () => {
 });
 
 test('the CLI entry prints one JSON report and exits 0', (t) => {
-  const briefPath = makeBrief(t, 'magi-cli-rules magi-mode magi-dispatch');
+  const briefPath = makeBrief(t, legalBrief());
   const result = spawnSync(process.execPath, [checkPath, '--brief', briefPath], {
     encoding: 'utf8',
   });

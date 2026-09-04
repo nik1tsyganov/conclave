@@ -218,6 +218,10 @@ function check() {
     'magi-dispatch',
     'Casper',
     'agy',
+    'casper_via=agy',
+    'cli-pointer',
+    'receipt.v1',
+    'handoff-envelope.v1',
     'cli-brief-rules-check.js',
   ]) {
     if (!briefRulesMagi.includes(s)) {
