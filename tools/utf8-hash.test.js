@@ -6,7 +6,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const { mkdtempSync, writeFileSync, rmSync } = require('node:fs');
 const { inspectBrief } = require('./cli-pointer.js');
-const { HASH_ENCODING, sha256Utf8, readUtf8File, sha256Utf8File } = require('./utf8-hash.js');
+const { HASH_ENCODING, sha256Utf8, readUtf8File, sha256Utf8File, firstLineUtf8, firstLineUtf8File } = require('./utf8-hash.js');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -39,6 +39,20 @@ describe('utf8-hash', () => {
       assert.strictEqual(sha256Utf8File(invalidPath), sha256Utf8(decoded));
       assert.notStrictEqual(sha256Utf8File(invalidPath), rawBufferHash(invalidPath));
       assert.notStrictEqual(sha256Utf8File(invalidPath), inspectBrief(invalidPath).sha256);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('splits firstLine on /\\r?\\n/ and strips CR; pointer inspectBrief keeps CR', () => {
+    const dir = mkdtempSync(path.join(ROOT, 'temp-utf8-cr-'));
+    try {
+      const crlfPath = path.join(dir, 'crlf.md');
+      writeFileSync(crlfPath, 'FIRST-LINE\r\nsecond\n', 'utf8');
+      assert.strictEqual(firstLineUtf8('FIRST-LINE\r\nsecond\n'), 'FIRST-LINE');
+      assert.strictEqual(firstLineUtf8File(crlfPath), 'FIRST-LINE');
+      assert.strictEqual(firstLineUtf8('FIRST-LINE\r'), 'FIRST-LINE');
+      assert.strictEqual(inspectBrief(crlfPath).firstLine, 'FIRST-LINE\r');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

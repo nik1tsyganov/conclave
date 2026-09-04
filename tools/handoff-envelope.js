@@ -22,7 +22,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { inspectBrief } = require('./cli-pointer.js');
 const { assertHostMode, assertInJail } = require('./magi-bus-path.js');
-const { sha256Utf8File } = require('./utf8-hash.js');
+const { firstLineUtf8File, sha256Utf8File } = require('./utf8-hash.js');
 
 const SCHEMA_ID = 'handoff-envelope.v1';
 const SYSTEMS = Object.freeze(['magi', 'magi-cli']);
@@ -134,6 +134,7 @@ function inspectJailedBrief(briefPath) {
   }
   return {
     briefPath: info.briefPath,
+    firstLine: firstLineUtf8File(resolved),
     sha256Utf8: sha256Utf8File(resolved),
   };
 }

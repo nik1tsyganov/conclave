@@ -24,7 +24,7 @@ const {
   appendHandoff,
   recordHandoff,
 } = require('./handoff-envelope.js');
-const { sha256Utf8File } = require('./utf8-hash.js');
+const { firstLineUtf8File, sha256Utf8File } = require('./utf8-hash.js');
 const { inspectBrief } = require('./cli-pointer.js');
 
 const node = process.execPath;
@@ -84,6 +84,7 @@ describe('handoff-envelope', () => {
     };
     assert.deepStrictEqual(validateRow(dispatchRow, schema), { ok: true, error: null });
     assert.ok(readFileSync(SCHEMA_PATH, 'utf8').includes('no join key'));
+    assert.match(readFileSync(path.join(ROOT, '.gitignore'), 'utf8'), /^telemetry\/handoffs\.jsonl$/m);
   });
 
   it('builds and appends a handoff-envelope.v1 row', () => {
@@ -254,6 +255,25 @@ describe('handoff-envelope', () => {
     } finally {
       rmSync(bus, { recursive: true, force: true });
     }
+  });
+
+  it('uses Conclave firstLine split on the brief, not cli-pointer CR-keeping firstLine', () => {
+    withTempDir((dir) => {
+      const { briefPath } = seedBrief(dir, 'crlf.md', 'HANDOFF-CRLF\r\nbody\n');
+      assert.strictEqual(firstLineUtf8File(briefPath), 'HANDOFF-CRLF');
+      assert.strictEqual(inspectBrief(briefPath).firstLine, 'HANDOFF-CRLF\r');
+      const envelope = buildHandoff({
+        dispatchId: 'crlf-h',
+        system: 'magi',
+        seat: 'implementer',
+        status: 'accepted',
+        briefPath,
+        nextOwner: 'reviewer',
+        ts: '2026-09-04T09:02:45.000Z',
+      });
+      assert.strictEqual(envelope.briefSha256, sha256Utf8File(briefPath));
+      assert.strictEqual(Object.hasOwn(envelope, 'firstLineEcho'), false);
+    });
   });
 
   it('hashes invalid UTF-8 outputs as decoded text, not the raw buffer', () => {

@@ -116,6 +116,10 @@ describe('receipt-ack', () => {
     assert.match(src, /no Task capture/);
     assert.match(src, /explicit disk/);
     assert.doesNotMatch(src, /function captureTask/);
+    const host = readFileSync(path.join(ROOT, '.cursor/skills/magi/references/cursor-host.md'), 'utf8');
+    assert.match(host, /should `acknowledgeReceipt`/);
+    const arbiterRule = readFileSync(path.join(ROOT, '.cursor/rules/magi-arbiter.mdc'), 'utf8');
+    assert.doesNotMatch(arbiterRule, /acknowledgeReceipt/);
   });
 
   it('rejects a mismatched first-line echo, empty brief, and invented join keys', () => {
@@ -261,6 +265,23 @@ describe('receipt-ack', () => {
     } finally {
       if (existsSync(briefPath)) unlinkSync(briefPath);
     }
+  });
+
+  it('strips CR from firstLineEcho the way Conclave inspectBrief splits /\\r?\\n/', () => {
+    withTempDir((dir) => {
+      const briefPath = path.join(dir, 'crlf.md');
+      writeFileSync(briefPath, 'CRLF-FIRST\r\nsecond\n', 'utf8');
+      const pointer = inspectBrief(briefPath);
+      assert.strictEqual(pointer.firstLine, 'CRLF-FIRST\r');
+      const receipt = buildReceipt({
+        dispatchId: 'crlf-1',
+        seat: 'implementer',
+        briefPath,
+        firstLineEcho: pointer.firstLine,
+        ts: '2026-09-04T08:06:00.000Z',
+      });
+      assert.strictEqual(receipt.firstLineEcho, 'CRLF-FIRST');
+    });
   });
 
   it('hashes invalid UTF-8 as decoded text, not the raw pointer buffer', () => {

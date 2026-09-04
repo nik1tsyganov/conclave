@@ -26,7 +26,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { inspectBrief } = require('./cli-pointer.js');
 const { assertHostMode, assertInJail } = require('./magi-bus-path.js');
-const { sha256Utf8File } = require('./utf8-hash.js');
+const { firstLineUtf8, firstLineUtf8File, sha256Utf8File } = require('./utf8-hash.js');
 
 const SCHEMA_ID = 'receipt.v1';
 const REQUIRED = Object.freeze([
@@ -108,7 +108,7 @@ function inspectJailedBrief(briefPath) {
   }
   return {
     briefPath: info.briefPath,
-    firstLine: info.firstLine,
+    firstLine: firstLineUtf8File(resolved),
     sha256Utf8: sha256Utf8File(resolved),
   };
 }
@@ -123,9 +123,10 @@ function buildReceipt(input) {
   rejectJoinKeys(input);
 
   const info = inspectJailedBrief(input.briefPath);
-  const firstLineEcho =
-    input.firstLineEcho === undefined ? info.firstLine : input.firstLineEcho;
-  if (typeof firstLineEcho !== 'string' || firstLineEcho !== info.firstLine) {
+  const firstLineEcho = firstLineUtf8(
+    input.firstLineEcho === undefined ? info.firstLine : input.firstLineEcho,
+  );
+  if (firstLineEcho !== info.firstLine) {
     throw new ReceiptError('firstLineEcho does not match brief first line');
   }
 
