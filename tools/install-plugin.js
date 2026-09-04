@@ -178,6 +178,7 @@ function checkMagi() {
     'skills/magi/SKILL.md',
     'skills/magi/references/cursor-host.md',
     'skills/magi/references/brief-rules-block.md',
+    'skills/magi/references/run-local-skill-bundle.md',
     'rules/magi-arbiter.mdc',
     'rules/magi-activation.mdc',
     'rules/magi-orchestrator.mdc',

@@ -16,6 +16,19 @@ const path = require('node:path');
 
 const STANDING_PATH = 'C:\\src\\ai-ops-vault\\projects\\magi-cli-rules\\STANDING.md';
 const RULES_DIR = 'C:\\src\\ai-ops-vault\\projects\\magi-cli-rules';
+const VENDOR_MD = 'VENDOR.md';
+
+function hasAgyCardText(text) {
+  if (typeof text !== 'string') return false;
+  if (text.includes('agy.exe')) return true;
+  return /\bCasper\b/i.test(text) && /\bagy\b/i.test(text);
+}
+
+function hasCasperVia(text) {
+  if (typeof text !== 'string') return false;
+  if (text.includes('casper_via=agy')) return true;
+  return text.includes(VENDOR_MD) && hasAgyCardText(text);
+}
 
 const REQUIRED_MARKERS = Object.freeze([
   {
@@ -31,22 +44,10 @@ const REQUIRED_MARKERS = Object.freeze([
     anyOf: Object.freeze(['magi-dispatch']),
   },
   {
-    // Casper is agy.exe, not PATH gemini. Prefer casper_via=agy; plain agy also holds.
-    id: 'casper_via=agy|agy',
-    anyOf: Object.freeze(['casper_via=agy', 'agy']),
-  },
-  {
-    // Delivery / ACK / handoff names from this repo. Loose so briefs stay non-brittle.
-    id: 'pointer|cli-pointer',
-    anyOf: Object.freeze(['cli-pointer', 'pointer']),
-  },
-  {
-    id: 'receipt|receipt.v1',
-    anyOf: Object.freeze(['receipt.v1', 'receipt']),
-  },
-  {
-    id: 'envelope|handoff-envelope',
-    anyOf: Object.freeze(['handoff-envelope.v1', 'handoff-envelope', 'envelope']),
+    // Casper is agy.exe, not PATH gemini. Prefer casper_via=agy.
+    // Alternate: VENDOR.md plus Casper/agy card text (agy.exe or Casper+agy).
+    id: 'casper_via=agy|VENDOR.md+agy-card',
+    match: hasCasperVia,
   },
 ]);
 
@@ -55,8 +56,8 @@ function usage() {
     'Usage: node tools/cli-brief-rules-check.js --brief <file>',
     '',
     'Fails closed unless the brief contains the Magi CLI RULES markers:',
-    'magi-cli-rules or STANDING.md, magi-mode, magi-dispatch,',
-    'casper_via=agy or agy, plus pointer, receipt, and envelope.',
+    'magi-mode, magi-dispatch, STANDING.md or magi-cli-rules,',
+    'and casper_via=agy (or VENDOR.md plus Casper/agy card text).',
   ].join('\n');
 }
 
@@ -92,13 +93,20 @@ function parseArgs(argv) {
   return options;
 }
 
+function markerHolds(marker, text) {
+  if (typeof marker.match === 'function') {
+    return marker.match(text) === true;
+  }
+  return Array.isArray(marker.anyOf) && marker.anyOf.some((needle) => text.includes(needle));
+}
+
 function missingMarkers(text) {
   if (typeof text !== 'string') {
     return REQUIRED_MARKERS.map((marker) => marker.id);
   }
   const missing = [];
   for (const marker of REQUIRED_MARKERS) {
-    if (!marker.anyOf.some((needle) => text.includes(needle))) {
+    if (!markerHolds(marker, text)) {
       missing.push(marker.id);
     }
   }
@@ -156,9 +164,12 @@ module.exports = {
   REQUIRED_MARKERS,
   RULES_DIR,
   STANDING_PATH,
+  VENDOR_MD,
   checkBriefFile,
   checkBriefText,
   formatMissing,
+  hasAgyCardText,
+  hasCasperVia,
   main,
   missingMarkers,
   parseArgs,

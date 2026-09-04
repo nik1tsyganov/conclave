@@ -17,7 +17,7 @@ const {
 } = require('./cli-smoke.js');
 
 function rulesMarkers() {
-  return 'magi-cli-rules magi-mode magi-dispatch casper_via=agy pointer receipt envelope';
+  return 'magi-cli-rules magi-mode magi-dispatch casper_via=agy';
 }
 
 function uniqueBody() {
@@ -115,8 +115,7 @@ test('a brief without the RULES markers fails closed before any dry-run', async 
   assert.match(io.stderrText, /magi-cli-rules\|STANDING\.md/);
   assert.match(io.stderrText, /magi-mode/);
   assert.match(io.stderrText, /magi-dispatch/);
-  assert.match(io.stderrText, /casper_via=agy\|agy/);
-  assert.match(io.stderrText, /pointer\|cli-pointer/);
+  assert.match(io.stderrText, /casper_via=agy\|VENDOR\.md\+agy-card/);
 });
 
 test('a missing --brief flag exits 2 with ARGUMENT_ERROR', async () => {
@@ -160,11 +159,21 @@ test('an openai plan fails without pointer delivery or when it pipes the brief i
   );
 });
 
-test('a google -p value equal to the brief body fails; a pointer -p passes', () => {
+test('a google -p value equal to the brief body fails; a pointer -p with skills add-dir passes', () => {
   const body = uniqueBody();
   assert.throws(
     () => assertGooglePlan({ args: ['--model', 'gemini-3.1-pro-high', '-p', body] }, body),
     /-p value is the brief body/,
   );
-  assertGooglePlan({ args: ['-p', 'Read C:\\brief.md in full.'] }, body);
+  assertGooglePlan({
+    args: ['--add-dir', 'C:\\Users\\YESSIR\\.claude\\skills', '-p', 'Read C:\\brief.md in full.'],
+  }, body);
+});
+
+test('a google plan without --add-dir ...\\.claude\\skills fails closed', () => {
+  const body = uniqueBody();
+  assert.throws(
+    () => assertGooglePlan({ args: ['-p', 'Read C:\\brief.md in full.'] }, body),
+    /missing --add-dir/,
+  );
 });

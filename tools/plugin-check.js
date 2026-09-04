@@ -38,6 +38,7 @@ function check() {
     '.cursor/skills/magi/references/cursor-host.md',
     '.cursor/skills/magi/references/cursor-cli.md',
     '.cursor/skills/magi/references/brief-rules-block.md',
+    '.cursor/skills/magi/references/run-local-skill-bundle.md',
     '.cursor/skills/magi-cli/SKILL.md',
     '.cursor/skills/magi-cli/references/brief-rules-block.md',
     '.cursor/rules/magi-arbiter.mdc',
@@ -219,6 +220,7 @@ function check() {
     'Casper',
     'agy',
     'casper_via=agy',
+    'VENDOR.md',
     'cli-pointer',
     'receipt.v1',
     'handoff-envelope.v1',
@@ -226,6 +228,17 @@ function check() {
   ]) {
     if (!briefRulesMagi.includes(s)) {
       console.error(`brief-rules-block.md missing required string: ${s}`);
+      return 1;
+    }
+  }
+
+  const skillBundleDesign = fs.readFileSync(
+    path.join(ROOT, '.cursor/skills/magi/references/run-local-skill-bundle.md'),
+    'utf8',
+  );
+  for (const s of ['DESIGN', 'BackendEng', 'HANDOFF', 'not implemented', 'Magi#4', 'agy.exe']) {
+    if (!skillBundleDesign.includes(s)) {
+      console.error(`run-local-skill-bundle.md missing required string: ${s}`);
       return 1;
     }
   }
