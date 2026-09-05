@@ -10,14 +10,21 @@ const RULES_DIR = 'C:\\src\\ai-ops-vault\\projects\\magi-cli-rules';
 const VENDOR_MD = 'VENDOR.md';
 const RULES_INDEX = 'RULES/INDEX.md';
 
+// Backward-compatible marker set used by the existing smoke/tests. The new
+// production transaction adds STRICT_MARKERS + a staged-pack hash check.
 const REQUIRED_MARKERS = Object.freeze([
   { id: 'RULES/INDEX|magi-cli-rules|STANDING', anyOf: ['RULES/INDEX.md', 'RULES/INDEX', 'RULES\\INDEX.md', 'magi-cli-rules', 'STANDING.md', 'STANDING'] },
   { id: 'magi-mode', anyOf: ['magi-mode'] },
   { id: 'magi-dispatch', anyOf: ['magi-dispatch'] },
   { id: 'mix-mode', anyOf: ['mix-mode'] },
+  { id: 'casper_via=agy', anyOf: ['casper_via=agy'] },
   { id: 'WRITE AUDIT|R07', anyOf: ['WRITE AUDIT', 'R07'] },
   { id: 'engineering-orchestrator', anyOf: ['engineering-orchestrator'] },
   { id: 'testing', anyOf: ['testing'] },
+  { id: 'codex-bridge|claude-bridge|gemini-bridge', anyOf: ['codex-bridge', 'claude-bridge', 'gemini-bridge'] },
+]);
+
+const STRICT_MARKERS = Object.freeze([
   { id: 'hostMode: cursor-cli', anyOf: ['hostMode: cursor-cli', 'hostMode `cursor-cli`'] },
   { id: 'pointer-only', anyOf: ['pointer-only', 'pointer only', 'pointer delivery'] },
   { id: 'leaf seat', anyOf: ['leaf seat', 'no fan-out', 'MUST NOT sub-dispatch'] },
@@ -37,7 +44,6 @@ function usage() {
     'Exit 0 rules ok. Exit 1 missing/invalid rules. Exit 2 ARGUMENT_ERROR.',
   ].join('\n');
 }
-
 function argumentError(message) { const e = new Error(message); e.code = 'ARGUMENT_ERROR'; return e; }
 function rulesError(message) { const e = new Error(message); e.code = 'RULES_FAIL'; return e; }
 
@@ -61,25 +67,23 @@ function parseArgs(argv) {
 }
 
 function markerHolds(marker, text) { return marker.anyOf.some((needle) => text.includes(needle)); }
-
 function scopeIsReal(text) {
   const match = text.match(/SCOPE\s*:\s*([^\r\n]+)/i);
-  if (!match) return false;
-  return !/[<>]|paste engineering-orchestrator|TODO|TBD/i.test(match[1]);
+  return Boolean(match && !/[<>]|paste engineering-orchestrator|TODO|TBD/i.test(match[1]));
 }
 
 function missingMarkers(text, opts = {}) {
   if (typeof text !== 'string') return REQUIRED_MARKERS.map((m) => m.id);
   const missing = REQUIRED_MARKERS.filter((m) => !markerHolds(m, text)).map((m) => m.id);
-  if (!scopeIsReal(text)) missing.push('real SCOPE block');
   if (opts.role === 'implement' && !/\bimplement\b/i.test(text)) missing.push('implement');
-  if (opts.vendor) {
-    const bridge = BRIDGE_BY_VENDOR[opts.vendor];
-    if (!text.includes(bridge)) missing.push(bridge);
-    if (opts.vendor === 'google' && !text.includes('casper_via=agy')) missing.push('casper_via=agy');
-    if (opts.vendor === 'anthropic' && !/auth.*probe|headless.*probe|R16/i.test(text)) missing.push('Claude live auth + headless probe');
-  } else if (!Object.values(BRIDGE_BY_VENDOR).some((bridge) => text.includes(bridge))) {
-    missing.push('codex-bridge|claude-bridge|gemini-bridge');
+  if (opts.requireStructural) {
+    for (const marker of STRICT_MARKERS) if (!markerHolds(marker, text)) missing.push(marker.id);
+    if (!scopeIsReal(text)) missing.push('real SCOPE block');
+    if (opts.vendor) {
+      const bridge = BRIDGE_BY_VENDOR[opts.vendor];
+      if (!text.includes(bridge)) missing.push(bridge);
+      if (opts.vendor === 'anthropic' && !/auth.*probe|headless.*probe|R16/i.test(text)) missing.push('Claude live auth + headless probe');
+    }
   }
   return [...new Set(missing)];
 }
@@ -103,7 +107,7 @@ function checkBriefFile(briefPath, opts = {}) {
   return { ok: basic.ok && structuralMissing.length === 0, missing: [...basic.missing, ...structuralMissing], briefPath: resolved };
 }
 
-function formatMissing(missing) { return `brief missing RULES requirements: ${missing.join(', ')}`; }
+function formatMissing(missing) { return `brief missing RULES markers: ${missing.join(', ')}`; }
 
 function main(argv = process.argv.slice(2), io = process) {
   try {
@@ -122,4 +126,4 @@ function main(argv = process.argv.slice(2), io = process) {
 }
 
 if (require.main === module) process.exitCode = main();
-module.exports = { BRIDGE_BY_VENDOR, REQUIRED_MARKERS, RULES_DIR, RULES_INDEX, STANDING_PATH, VENDOR_MD, checkBriefFile, checkBriefText, formatMissing, main, missingMarkers, parseArgs, usage };
+module.exports = { BRIDGE_BY_VENDOR, REQUIRED_MARKERS, STRICT_MARKERS, RULES_DIR, RULES_INDEX, STANDING_PATH, VENDOR_MD, checkBriefFile, checkBriefText, formatMissing, main, missingMarkers, parseArgs, usage };
