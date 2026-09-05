@@ -9,7 +9,7 @@ const { parseClaude, verifyProof } = require('./cli-proof.js');
 const { runDispatch } = require('./dispatch-run.js');
 const { finalizeRun, inspectRun } = require('./run-finalize.js');
 const { hashFile, writeJson } = require('./dispatch-evidence.js');
-const { createSealedRun, fakeVendor, nativeCapture, temporary } = require('./test-fixtures.js');
+const { completeSyntheticDispatch, createSealedRun, fakeVendor, nativeCapture, temporary } = require('./test-fixtures.js');
 
 const RESPONSE = 'ACK fixture\nPOSITION: APPROVE\nDone.';
 const protocol = { responseProtocol: CLAUDE_RESPONSE_PROTOCOL };
@@ -155,7 +155,7 @@ test('production stores the protocol in launch and proof; native report survives
   const run = claudeRun(t);
   const response = `${RESPONSE}\r\nTrailing native whitespace\t \r\n`;
   const native = fakeVendor(() => {}, response);
-  const first = await runDispatch({ ...run.opts, dispatchId: 'd1' }, native);
+  const first = await completeSyntheticDispatch({ ...run.opts, dispatchId: 'd1' }, native);
   const folder = path.join(run.runDir, 'out/d1');
   for (const file of ['launch.json', 'proof.json']) assert.equal(JSON.parse(fs.readFileSync(path.join(folder, file), 'utf8')).responseProtocol, CLAUDE_RESPONSE_PROTOCOL);
   assert.equal(inspectRun(run.runDir).executions[0].response, response);
@@ -170,7 +170,7 @@ test('finalization and replay reject malformed payloads after artifact hashes ha
   for (const payload of [undefined, null, [], { response: null }, { response: RESPONSE, extra: true }]) {
     const run = claudeRun(t);
     const native = fakeVendor();
-    const result = await runDispatch({ ...run.opts, dispatchId: 'd1' }, native);
+    const result = await completeSyntheticDispatch({ ...run.opts, dispatchId: 'd1' }, native);
     rewriteArtifact(result, 'capture.txt', row => ({ ...row, structured_output: payload, result: RESPONSE }));
     const final = finalizeRun(run.runDir);
     assert.equal(final.executionStatus, 'FAIL');
@@ -185,7 +185,7 @@ test('finalization and replay compare the unmodified first line even when native
   for (const response of [RESPONSE.replace('ACK fixture', 'BAD fixture'), ` ${RESPONSE.slice(0, -1)}`]) {
     const run = claudeRun(t);
     const native = fakeVendor();
-    const result = await runDispatch({ ...run.opts, dispatchId: 'd1' }, native);
+    const result = await completeSyntheticDispatch({ ...run.opts, dispatchId: 'd1' }, native);
     rewriteArtifact(result, 'capture.txt', row => ({ ...row, structured_output: { response } }));
     const final = finalizeRun(run.runDir);
     assert.equal(final.outcomes[0].status, 'INVALID');
@@ -198,7 +198,7 @@ test('finalization and replay compare the unmodified first line even when native
 test('replay verifies native identity again instead of trusting committed proof fields', async t => {
   const run = claudeRun(t);
   const native = fakeVendor();
-  const result = await runDispatch({ ...run.opts, dispatchId: 'd1' }, native);
+  const result = await completeSyntheticDispatch({ ...run.opts, dispatchId: 'd1' }, native);
   rewriteArtifact(result, 'capture.txt', row => ({ ...row, modelUsage: { 'wrong-model': { inputTokens: 100, outputTokens: 23 } } }));
   assert.match(inspectRun(run.runDir).outcomes[0].error, /model mismatch/);
   await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1' }, native), /model mismatch/);
@@ -209,7 +209,7 @@ test('finalization and dispatch replay cannot downgrade committed protocol metad
   for (const file of ['launch.json', 'proof.json']) {
     const run = claudeRun(t);
     const native = fakeVendor();
-    const result = await runDispatch({ ...run.opts, dispatchId: 'd1' }, native);
+    const result = await completeSyntheticDispatch({ ...run.opts, dispatchId: 'd1' }, native);
     rewriteArtifact(result, file, row => ({ ...row, responseProtocol: 'legacy-text' }));
     const final = finalizeRun(run.runDir);
     assert.equal(final.outcomes[0].status, 'INVALID');

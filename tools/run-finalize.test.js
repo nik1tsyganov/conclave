@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { createSealedRun, fakeVendor } = require('./test-fixtures.js');
+const { completeSyntheticDispatch, createSealedRun, fakeVendor } = require('./test-fixtures.js');
 const { runDispatch } = require('./dispatch-run.js');
 const { finalizeRun, inspectRun, tallyUnit } = require('./run-finalize.js');
 
@@ -15,7 +15,7 @@ function panelRun(t, options = {}) {
   ], { magiConvened: true });
 }
 async function complete(run, reviewPosition = 'APPROVE') {
-  for (const row of run.dispatches) await runDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, `ACK fixture\nPOSITION: ${row.role === 'review' ? reviewPosition : 'APPROVE'}\nDone.`));
+  for (const row of run.dispatches) await completeSyntheticDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, `ACK fixture\nPOSITION: ${row.role === 'review' ? reviewPosition : 'APPROVE'}\nDone.`));
 }
 
 test('complete foreign verification and review approve once from native evidence', async (t) => {
@@ -37,7 +37,7 @@ test('execution success is distinct from a rejected review', async (t) => {
 
 test('a rejecting verifier prevents review and approval', async (t) => {
   const run = panelRun(t);
-  for (const row of run.dispatches.slice(0, 2)) await runDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, `ACK fixture\nPOSITION: ${row.role === 'verify' ? 'REJECT' : 'APPROVE'}\nDone.`));
+  for (const row of run.dispatches.slice(0, 2)) await completeSyntheticDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, `ACK fixture\nPOSITION: ${row.role === 'verify' ? 'REJECT' : 'APPROVE'}\nDone.`));
   await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd3' }, fakeVendor()), /verification did not approve/);
   const result = finalizeRun(run.runDir);
   assert.equal(result.executionStatus, 'FAIL'); assert.equal(result.approvalStatus, 'FAIL');
@@ -69,7 +69,7 @@ test('critical class requires independent planned vendors and two native votes',
 
 test('ballots cannot be supplied by the arbiter or inferred from prose', async (t) => {
   const run = panelRun(t);
-  for (const row of run.dispatches.slice(0, 2)) await runDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, 'ACK fixture\nThe arbiter says APPROVE.'));
+  for (const row of run.dispatches.slice(0, 2)) await completeSyntheticDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, 'ACK fixture\nThe arbiter says APPROVE.'));
   await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd3' }, fakeVendor()), /exactly one POSITION/);
   assert.equal(finalizeRun(run.runDir).approvalStatus, 'FAIL');
   assert.throws(() => tallyUnit(inspectRun(run.runDir), 'u1'), /exactly one POSITION/);

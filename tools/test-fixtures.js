@@ -87,7 +87,7 @@ function createSealedRun(t, entries = [{}], options = {}) {
   const sealed = require('./plan-seal.js').sealPlan({ plan: planSource, runDir, availability });
   const profiles = require('./seat-policy.js').loadProfiles();
   const skills = [...new Set(dispatches.flatMap((entry) => require('./seat-policy.js').buildSeatProfile(profiles, entry).skills))];
-  const opts = { plan: sealed.planPath, runDir, rulesRoot: ruleFixture(root), skillSourceRoot: skillFixture(root, skills), onTopic: true };
+  const opts = { plan: sealed.planPath, runDir, rulesRoot: ruleFixture(root), skillSourceRoot: skillFixture(root, skills) };
   return { root, cwd, runDir, opts, dispatches, available, availability, planSource, planObject, sealed };
 }
 
@@ -116,3 +116,16 @@ function fakeVendor(action = () => {}, response = 'ACK fixture\nPOSITION: APPROV
   return { buildLaunch, runLaunch, calls: () => calls };
 }
 Object.assign(module.exports, { createSealedRun, fakeVendor });
+
+// Test-only completion: inspect the known synthetic report before attesting it.
+// General run options intentionally carry no advance topicality assertion.
+async function completeSyntheticDispatch(opts, native) {
+  const { runDispatch } = require('./dispatch-run.js');
+  const result = await runDispatch(opts, native);
+  if (result.status !== 'AWAITING_ATTESTATION') return result;
+  const response = fs.readFileSync(result.responsePath, 'utf8');
+  require('node:assert/strict').equal(response, require('./vendor-native.js').finalResponse('anthropic', fs.readFileSync(result.capturePath, 'utf8'), { responseProtocol: require('./vendor-native.js').CLAUDE_RESPONSE_PROTOCOL }));
+  require('node:assert/strict').equal(result.captureSha256, hashFile(result.capturePath));
+  return runDispatch({ ...opts, onTopic: true, captureSha256: result.captureSha256 }, native);
+}
+module.exports.completeSyntheticDispatch = completeSyntheticDispatch;

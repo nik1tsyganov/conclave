@@ -62,7 +62,7 @@ function createReport({ runDir, outputDir, phase = 'finalize', errorFile, projec
       return { ...outcome, modelRequested: entry.model, effortRequested: entry.effort,
         modelObserved: execution?.proof.modelObserved ?? null,
         nativeId: execution?.proof.sessionId || execution?.proof.conversationId || null,
-        evidenceDir: execution?.state.evidenceDir ?? null,
+        evidenceDir: execution?.state.evidenceDir ?? outcome.evidenceDir ?? null,
         transactionPath: fs.existsSync(transactionPath) ? transactionPath : null };
     });
     for (const outcome of dispatches.filter(row => row.status !== 'PASS')) {
@@ -80,7 +80,7 @@ function createReport({ runDir, outputDir, phase = 'finalize', errorFile, projec
     status: assessment?.ok && !commandFailure ? 'PASS' : 'NEEDS_ATTENTION',
     executionStatus: assessment?.executionStatus ?? 'UNVERIFIED', approvalStatus: assessment?.approvalStatus ?? 'UNVERIFIED',
     dispatches, issues, commandFailure,
-    interpretation: 'Diagnostic snapshot, not activation evidence. NOT_RUN/RUNNING do not establish a defect or provider outage. Reproduce and classify each failure before fixing it.' };
+    interpretation: 'Diagnostic snapshot, not activation evidence. NOT_RUN/RUNNING/AWAITING_ATTESTATION do not establish a defect or provider outage. Reproduce and classify each failure before fixing it.' };
   const lines = ['# MAGI project run report', '', `Status: **${report.status}**`, '',
     `Recorded: ${report.recordedAt}`, `Phase: ${phase}`, `Run: ${root}`, `Plan: ${report.planId || 'unverified'}`,
     `Execution: ${report.executionStatus}; approval: ${report.approvalStatus}`, '', report.interpretation, '',

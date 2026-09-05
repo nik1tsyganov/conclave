@@ -141,20 +141,20 @@ function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
   return { ok: true, dispatches: plan.dispatches.length, implementUnits: implement.length };
 }
 
-function readValidatedPlan(file, expectedHash, matrix, availability = {}) {
+function readValidatedPlan(file, expectedHash, matrix, availability = {}, nowMs = Date.now()) {
   if (!file) throw argumentError('--plan is required');
   const planPath = fs.realpathSync(file);
   const bytes = fs.readFileSync(planPath);
   const planHash = sha256(bytes);
   if (expectedHash !== undefined && expectedHash !== planHash) throw policyError('plan hash changed since validation');
   const plan = JSON.parse(bytes.toString('utf8'));
-  const validation = validatePlan(plan, matrix, availability);
+  const validation = validatePlan(plan, matrix, availability, nowMs);
   return { plan, planPath, planHash, ...validation };
 }
 
-function bindDispatch(opts, matrix, availability) {
+function bindDispatch(opts, matrix, availability, nowMs) {
   if (!opts.planHash || !/^[a-f0-9]{64}$/.test(opts.planHash)) throw argumentError('--plan-hash from whole-plan validation is required');
-  const validated = readValidatedPlan(opts.plan, opts.planHash, matrix, availability);
+  const validated = readValidatedPlan(opts.plan, opts.planHash, matrix, availability, nowMs);
   const entry = validated.plan.dispatches.find((row) => row.dispatchId === opts.dispatchId);
   if (!entry) throw policyError(`dispatchId absent from validated plan: ${opts.dispatchId}`);
   for (const field of ['dispatchId', 'unitId', 'class', 'role', 'vendor', 'model', 'effort', 'authorVendor']) {

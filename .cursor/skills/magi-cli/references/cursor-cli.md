@@ -84,6 +84,26 @@ node tools/dispatch-run.js --plan C:/magi-runs/run-001/dispatch-plan.json --run-
 
 Repeat for the remaining dispatch IDs after their real dependencies complete. Route fields come from the sealed entry. Changed class, author, role, model, effort, scope, or brief fails before execution. A duplicate logical dispatch cannot append a second successful telemetry row. Preserve failed evidence; a corrected attempt needs a newly authorized plan/run.
 
+### Claude: inspect, then attest the returned capture
+
+The initial Claude launch uses the command above without `--on-topic` or `--capture-sha256`. After the child and deterministic checks finish, the command returns exit zero with this checkpoint shape:
+
+```json
+{"ok":false,"status":"AWAITING_ATTESTATION","planId":"...","planHash":"...","dispatchId":"...","capturePath":"...","responsePath":"...","captureSha256":"..."}
+```
+
+This is an expected inspection checkpoint. It is not execution PASS, approval, or a failed vendor call. Pending work cannot unlock verification, review, finalization, or activation. Read both returned files and judge whether the response addresses the bound brief. Topicality inspection does not replace the independent verification or review seats.
+
+Only after that inspection, run the same dispatch command with the returned capture hash:
+
+```powershell
+node tools/dispatch-run.js --plan C:/magi-runs/run-001/dispatch-plan.json --run-dir C:/magi-runs/run-001 --dispatch-id implement-1 --rules-root $env:MAGI_RULES_ROOT --on-topic --capture-sha256 <returned-sha256>
+```
+
+This completes the saved transaction without launching another child. It revalidates the capture, protected inputs, scope, workspace, and prerequisite evidence. A mismatched hash or changed evidence cannot qualify. Never supply topicality flags on a first launch: the response does not yet exist to inspect.
+
+Repeating the initial command while pending only returns its checkpoint. If the response is off-topic or uncertain, stop and report the pending state; do not attest it. An actual terminal FAIL remains failed and cannot be repaired by these flags. OpenAI and Google keep their one-step completion. Successful receipt replay remains idempotent.
+
 Launches read the sealed availability snapshot. An optional `--availability` argument must be a byte-identical copy. Refreshing expired probes requires a new complete plan and seal.
 
 The runtime derives capabilities from `seat-profiles.json`. It stages the vendor card (`seat-openai`, `seat-anthropic`, or `seat-google`), role skills, and class extras. The bundled lean source is the default. Full home orchestration and bridge skills are not seat capabilities.

@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { DEFAULT_MATRIX, loadAvailability, loadMatrix, readValidatedPlan, validatePlan } = require('./dispatch-matrix.js');
 const { DEFAULT_PROFILES } = require('./seat-policy.js');
-const { hashFile, writeJson } = require('./dispatch-evidence.js');
+const { ATTESTATION_PROTOCOL, hashFile, writeJson } = require('./dispatch-evidence.js');
 
 function sealPlan({ plan, runDir, availability }) {
   if (!plan || !runDir) throw new Error('--plan and --run-dir are required');
@@ -24,7 +24,7 @@ function sealPlan({ plan, runDir, availability }) {
   const availablePath = path.join(root, 'availability.json');
   if (fs.existsSync(availablePath)) throw new Error('run availability snapshot already exists');
   writeJson(availablePath, available);
-  const seal = { schemaVersion: 1, planId: validated.plan.planId, planHash: validated.planHash, matrixSha256: hashFile(DEFAULT_MATRIX), profilesSha256: hashFile(DEFAULT_PROFILES), availabilitySha256: hashFile(availablePath), sealedAt: new Date().toISOString() };
+  const seal = { schemaVersion: 1, planId: validated.plan.planId, planHash: validated.planHash, matrixSha256: hashFile(DEFAULT_MATRIX), profilesSha256: hashFile(DEFAULT_PROFILES), availabilitySha256: hashFile(availablePath), sealedAt: new Date().toISOString(), attestationProtocol: ATTESTATION_PROTOCOL };
   writeJson(sealPath, seal);
   return { ...seal, planPath, runDir: root };
 }

@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createSealedRun, fakeVendor } = require('./test-fixtures.js');
+const { completeSyntheticDispatch, createSealedRun, fakeVendor } = require('./test-fixtures.js');
 const { runDispatch } = require('./dispatch-run.js');
 const { createReport, main } = require('./project-run-report.js');
 
@@ -29,7 +29,7 @@ function panel(t) {
 
 test('report revalidates successful evidence without changing any run bytes', async t => {
   const run = panel(t);
-  for (const row of run.dispatches) await runDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, 'ACK fixture\nPOSITION: APPROVE'));
+  for (const row of run.dispatches) await completeSyntheticDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, 'ACK fixture\nPOSITION: APPROVE'));
   const before = fileBytes(run.runDir);
   const { report, outputDir } = createReport({ runDir: run.runDir, outputDir: output(t) });
   assert.equal(report.status, 'PASS', JSON.stringify(report.issues));
@@ -42,8 +42,8 @@ test('report revalidates successful evidence without changing any run bytes', as
 
 test('partial and rejected runs retain NOT_RUN and actual rejection', async t => {
   const run = panel(t);
-  await runDispatch({ ...run.opts, dispatchId: 'd1' }, fakeVendor());
-  await runDispatch({ ...run.opts, dispatchId: 'd2' }, fakeVendor(() => {}, 'ACK fixture\nPOSITION: REJECT'));
+  await completeSyntheticDispatch({ ...run.opts, dispatchId: 'd1' }, fakeVendor());
+  await completeSyntheticDispatch({ ...run.opts, dispatchId: 'd2' }, fakeVendor(() => {}, 'ACK fixture\nPOSITION: REJECT'));
   const { report } = createReport({ runDir: run.runDir, outputDir: output(t), phase: 'verify' });
   assert.equal(report.status, 'NEEDS_ATTENTION');
   assert.equal(report.dispatches[2].status, 'NOT_RUN');
@@ -63,7 +63,7 @@ test('Windows producer path aliases remain valid evidence during report export',
     }
   }
   assert.notEqual(fs.realpathSync(run.runDir), fs.realpathSync.native(run.runDir));
-  for (const row of run.dispatches) await runDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, 'ACK fixture\nPOSITION: APPROVE'));
+  for (const row of run.dispatches) await completeSyntheticDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, 'ACK fixture\nPOSITION: APPROVE'));
   const before = fileBytes(run.runDir);
   const { report } = createReport({ runDir: run.runDir, outputDir: output(t) });
   assert.equal(report.status, 'PASS', JSON.stringify(report.issues));
@@ -72,7 +72,7 @@ test('Windows producer path aliases remain valid evidence during report export',
 
 test('corrupt evidence cannot inherit a stale PASS summary', async t => {
   const run = panel(t);
-  for (const row of run.dispatches) await runDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, 'ACK fixture\nPOSITION: APPROVE'));
+  for (const row of run.dispatches) await completeSyntheticDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, 'ACK fixture\nPOSITION: APPROVE'));
   fs.writeFileSync(path.join(run.runDir, 'run-summary.json'), JSON.stringify({ ok: true }));
   fs.appendFileSync(path.join(run.runDir, 'out/d1/proof.json'), 'tampered');
   const { report } = createReport({ runDir: run.runDir, outputDir: output(t) });
@@ -152,7 +152,7 @@ test('a changed plan cannot redirect the reporter product boundary', t => {
 
 test('successful custom evidence directories and failed transactions have real report links', async t => {
   const run = panel(t);
-  for (const row of run.dispatches) await runDispatch({ ...run.opts, dispatchId: row.dispatchId,
+  for (const row of run.dispatches) await completeSyntheticDispatch({ ...run.opts, dispatchId: row.dispatchId,
     evidenceDir: path.join(run.runDir, 'custom-evidence', row.dispatchId) }, fakeVendor(() => {}, 'ACK fixture\nPOSITION: APPROVE'));
   const { report } = createReport({ runDir: run.runDir, outputDir: output(t) });
   assert.equal(report.status, 'PASS', JSON.stringify(report.issues));

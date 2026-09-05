@@ -47,6 +47,18 @@ node tools/dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-di
 
 Route fields come from the sealed entry. Any changed route, author, scope, or brief requires a new complete plan validation and seal. Graph overrides and naked route flags grant no authority.
 
+Claude completion has two steps. Its first launch has no topicality flags. After deterministic checks, it returns exit zero with `ok: false`, `status: AWAITING_ATTESTATION`, `capturePath`, `responsePath`, and `captureSha256`. This is an inspection checkpoint, not a failed vendor call or execution PASS. Do not start dependent seats yet.
+
+Read the returned response and raw capture. Check that the response addresses its bound brief. This is a topicality check, not a substitute for foreign correctness verification or review. If it is off-topic or uncertain, stop and export the pending report. Do not attest unseen output.
+
+After inspection, complete the same logical dispatch using the same command plus:
+
+```text
+--on-topic --capture-sha256 <exact returned capture SHA-256>
+```
+
+Completion revalidates saved evidence and the workspace without another native call. The hash binds the attestation to the response inspected. Repeating a pending launch without flags only reads its checkpoint. Premature attestation fails before launch; changed evidence or workspace cannot be accepted. OpenAI and Google remain one-step dispatches. A terminal FAIL still requires a new plan/run; do not retrofit a failed receipt.
+
 For each implementation unit, finish implementation, then every planned verifier with native APPROVE, then review. Stop when a check fails. Review cannot use verification from a changed workspace.
 
 The runtime stages the bundled lean vendor card plus role/class skills. The seat reads its generated `SEAT-CONTRACT.md`, staged skills, and hashed rules. Seats are leaves; they cannot delegate, change policy, or edit evidence and telemetry.
