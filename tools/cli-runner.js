@@ -2,16 +2,20 @@
 
 const fs = require('node:fs');
 const { spawn } = require('node:child_process');
+const { StringDecoder } = require('node:string_decoder');
 const { decide } = require('./cli-idle.js');
-const { sampleCpuMs } = require('./cli-process.js');
+const { sampleCpuMs, terminateProcessTree } = require('./cli-process.js');
+const { assertPlainPath } = require('./dispatch-evidence.js');
 
 function runLaunch(launch, options = {}) {
   return new Promise((resolve, reject) => {
+    if (options.signal?.aborted) { reject(Object.assign(new Error('dispatch cancelled before launch'), { code: 'CANCELLED' })); return; }
     const spawnFn = options.spawn || spawn;
     const child = spawnFn(launch.binary, launch.args, {
       cwd: launch.cwd,
       env: launch.env || process.env,
       shell: false,
+      windowsHide: true,
       stdio: launch.stdio || ['pipe', 'pipe', 'pipe'],
     });
     const pid = child.pid;
@@ -24,34 +28,45 @@ function runLaunch(launch, options = {}) {
     let lastCpuAtMs = startedAtMs;
     let lastCpuMs = null;
     let stdioBytes = 0;
+    let timer;
+    let killTimer;
+    let killReason = null;
+    const decoders = { stdout: new StringDecoder('utf8'), stderr: new StringDecoder('utf8') };
 
     function killRecordedPid() {
       if (!Number.isInteger(pid)) return;
-      try { (options.kill || process.kill.bind(process))(pid); } catch {}
+      try { (options.kill || terminateProcessTree)(pid); } catch {}
     }
     function finish(result) {
       if (settled) return;
       settled = true;
       clearInterval(timer);
+      clearTimeout(killTimer);
+      options.signal?.removeEventListener('abort', cancel);
+      stdout += decoders.stdout.end(); stderr += decoders.stderr.end();
       resolve({ ...result, pid, stdout, stderr });
     }
     function fail(error) {
       if (settled) return;
       settled = true;
       clearInterval(timer);
+      clearTimeout(killTimer);
+      options.signal?.removeEventListener('abort', cancel);
       reject(error);
     }
     function collect(which) {
       return (chunk) => {
-        const text = chunk.toString('utf8');
+        const text = decoders[which].write(Buffer.from(chunk));
         if (which === 'stdout') stdout += text; else stderr += text;
         stdioBytes += Buffer.byteLength(chunk);
         lastStdioAtMs = Date.now();
-        if (options[`${which}File`]) fs.appendFileSync(options[`${which}File`], chunk);
+        try { if (options[`${which}File`]) { assertPlainPath(options[`${which}File`]); fs.appendFileSync(options[`${which}File`], chunk); } }
+        catch (error) { killRecordedPid(); fail(error); }
       };
     }
     if (child.stdout) child.stdout.on('data', collect('stdout'));
     if (child.stderr) child.stderr.on('data', collect('stderr'));
+    if (child.stdin) child.stdin.once('error', (error) => { if (error.code !== 'EPIPE') { killRecordedPid(); fail(error); } });
     child.once('error', fail);
 
     const stdinMode = (launch.stdio || ['pipe'])[0];
@@ -64,7 +79,15 @@ function runLaunch(launch, options = {}) {
     }
 
     const pollMs = options.pollMs ?? 1000;
-    const timer = setInterval(() => {
+    function requestKill(reason) {
+      if (settled || killReason) return;
+      killReason = reason;
+      killRecordedPid();
+      killTimer = setTimeout(() => fail(Object.assign(new Error('child exit was not confirmed after termination'), { code: 'CHILD_EXIT_UNCONFIRMED' })), options.killGraceMs ?? 10000);
+    }
+    function cancel() { requestKill('cancelled'); }
+    options.signal?.addEventListener('abort', cancel, { once: true });
+    timer = setInterval(() => {
       const nowMs = Date.now();
       const cpuMs = (options.sampleCpuMs || sampleCpuMs)(pid);
       if (typeof cpuMs === 'number' && Number.isFinite(cpuMs)) {
@@ -84,14 +107,13 @@ function runLaunch(launch, options = {}) {
         idleCpuMs: options.idleCpuMs ?? 180000,
       });
       if (decision.action === 'kill') {
-        killRecordedPid();
-        finish({ ok: false, exitCode: 1, killed: true, killReason: decision.reason });
+        requestKill(decision.reason);
       }
     }, pollMs);
 
     child.once('close', (code) => {
       if (settled) return;
-      finish({ ok: code === 0, exitCode: code ?? 1, killed: false, killReason: null });
+      finish({ ok: code === 0 && !killReason, exitCode: code ?? 1, killed: Boolean(killReason), killReason, exitConfirmed: true });
     });
   });
 }

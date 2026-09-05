@@ -4,11 +4,12 @@
 /**
  * Verify the MAGI plugin layout from the repo root.
  *
- * Exit 0 iff all required paths exist and the required strings are present.
+ * Static packaging and documentation checks. This cannot authorize a dispatch.
  */
 
 const fs = require('fs');
 const path = require('path');
+const { checkBriefText } = require('./cli-brief-rules-check.js');
 const {
   SOURCE_SURFACE,
   INSTALLED_MAGI_SURFACE,
@@ -26,6 +27,20 @@ function containsForbidden(text, needles) {
     }
   }
   return null;
+}
+
+function checkBriefTemplate(text) {
+  // Templates intentionally contain a SCOPE placeholder. Only this static
+  // document check fills it; dispatch preflight must reject unfilled scopes.
+  const body = text.replace(/^SCOPE: <[^>\r\n]+>\.?$/m, 'SCOPE: static template validation.');
+  const missing = new Set();
+  for (const vendor of ['openai', 'anthropic', 'google']) {
+    for (const role of ['implement', 'review', 'verify', 'plan', 'research']) {
+      const result = checkBriefText(body, { role, vendor, requireStructural: true });
+      for (const item of result.missing) missing.add(item);
+    }
+  }
+  return { ok: missing.size === 0, missing: [...missing] };
 }
 
 function check() {
@@ -109,7 +124,7 @@ function check() {
   ];
 
   for (const rel of required) {
-    if (!fs.existsSync(path.join(ROOT, rel))) {
+    if (!fs.existsSync(path.join(ROOT, rel)) || !fs.statSync(path.join(ROOT, rel)).isFile()) {
       console.error(`MISSING: ${rel}`);
       return 1;
     }
@@ -210,26 +225,10 @@ function check() {
     console.error('brief-rules-block.md copies diverge: magi/references != tools/templates');
     return 1;
   }
-  for (const s of [
-    'STANDING RULES',
-    'magi-mode',
-    'magi-dispatch',
-    'mix-mode',
-    'casper_via=agy',
-    'Vendor:',
-    'RULES/INDEX.md',
-    'WRITE AUDIT',
-    'R07',
-    'receipt ACK',
-    'handoff envelope',
-    'magi-cli-rules',
-    'STANDING',
-    'cli-brief-rules-check.js',
-  ]) {
-    if (!briefRulesMagi.includes(s)) {
-      console.error(`brief-rules-block.md missing required string: ${s}`);
-      return 1;
-    }
+  const templateCheck = checkBriefTemplate(briefRulesMagi);
+  if (!templateCheck.ok) {
+    console.error(`brief-rules-block.md violates leaf-seat template contract: ${templateCheck.missing.join(', ')}`);
+    return 1;
   }
 
   const skillBundleDesign = fs.readFileSync(
@@ -245,7 +244,12 @@ function check() {
 
 
   for (const ref of [cursorCli, magiCliRef]) {
-    for (const s of ['codex.exe', 'agy.exe', 'cursor-cli', '.local\\bin\\claude.exe', 'fable', 'xhigh', 'telemetry-append.js', 'cli-brief-rules-check.js', 'extraDirs', 'magi-cli-rules', 'RULES/INDEX.md', 'casper_via=agy', 'src/index.js', 'loadApi', 'PR_BODY.md']) {
+    for (const s of [
+      'cursor-cli', 'dispatch-run.js', '--plan', '--run-dir', '--dispatch-id',
+      'dispatch-matrix', 'seat-profiles', 'SEAT-CONTRACT.md', 'skills-manifest.json',
+      'rules-manifest.json', 'cli-brief-rules-check.js', 'cli-proof',
+      'MAGI_RULES_ROOT', 'RULES/INDEX.md', 'casper_via=agy',
+    ]) {
       if (!ref.includes(s)) {
         console.error(`cursor-cli.md missing required string: ${s}`);
         return 1;
@@ -391,4 +395,4 @@ if (require.main === module) {
   process.exit(check());
 }
 
-module.exports = { check, containsForbidden };
+module.exports = { check, containsForbidden, checkBriefTemplate };

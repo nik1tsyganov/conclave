@@ -4,6 +4,8 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { canonicalPlainPath, pathsOverlap, resolveRuntimePaths } = require('./runtime-paths.js');
+const { regularFiles } = require('./cli-skill-stage.js');
 const {
   INSTALLED_MAGI_SURFACE,
   INSTALLED_MAGI_CLI_SURFACE,
@@ -24,16 +26,78 @@ const CLI_RUNTIME_TOOLS = Object.freeze([
   'activation-check.js', 'hog-check.js', 'host-resolver.js', 'position-tally.js',
   'cli-adapters.js', 'cli-brief-rules-check.js', 'cli-idle.js', 'cli-pointer.js',
   'cli-process.js', 'cli-proof.js', 'cli-rules-stage.js', 'cli-runner.js', 'cli-skill-stage.js',
-  'dispatch-matrix.js', 'dispatch-run.js', 'dispatch-schema.js', 'magi-cli-preflight.js',
-  'model-availability.js', 'seat-policy.js', 'telemetry-append.js', 'vendor-binaries.js',
+  'dispatch-evidence.js', 'dispatch-matrix.js', 'dispatch-run.js', 'dispatch-schema.js', 'magi-cli-preflight.js',
+  'model-availability.js', 'model-probe.js', 'plan-seal.js', 'probe-evidence.js', 'vendor-native.js',
+  'run-finalize.js', 'panel-tally.js', 'plugin-surface.js',
+  'runtime-paths.js', 'seat-policy.js', 'telemetry-append.js', 'vendor-binaries.js',
   'dispatch-log.pass.jsonl', 'dispatch-log.fail.jsonl',
 ]);
 
 function bail(msg) { console.error(`CANNOT RUN: ${msg}`); process.exit(2); }
-function copyDir(src, dest) { if (!fs.existsSync(src)) bail(`missing ${src}`); fs.cpSync(src, dest, { recursive: true }); }
-function copyFile(src, dest) { if (!fs.existsSync(src)) bail(`missing ${src}`); fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.copyFileSync(src, dest); }
-function ensureClean(dest) { if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true }); fs.mkdirSync(dest, { recursive: true }); }
-function writeManifest(dest, manifest) { fs.mkdirSync(path.join(dest, '.cursor-plugin'), { recursive: true }); fs.writeFileSync(path.join(dest, '.cursor-plugin', 'plugin.json'), `${JSON.stringify(manifest, null, 2)}\n`); }
+function copyDir(src, dest) { if (!fs.existsSync(src)) throw new Error(`missing ${src}`); fs.cpSync(src, dest, { recursive: true }); }
+function copyFile(src, dest) { if (!fs.existsSync(src)) throw new Error(`missing ${src}`); fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.copyFileSync(src, dest); }
+function writeManifest(dest, manifest) { fs.mkdirSync(path.join(dest, '.cursor-plugin'), { recursive: true }); fs.writeFileSync(path.join(dest, '.cursor-plugin', 'plugin.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8'); }
+
+function prepareInstall(sourceRoot, destination, manifest, sources, validateFiles = () => {}) {
+  const source = canonicalPlainPath(sourceRoot);
+  const target = canonicalPlainPath(destination);
+  if (pathsOverlap(source, target)) throw new Error('installer source and destination overlap; refusing to replace either tree');
+  const files = new Map();
+  const directories = new Set();
+  function directory(relative) {
+    const segments = relative.split('/');
+    for (let i = 1; i <= segments.length; i += 1) directories.add(segments.slice(0, i).join('/'));
+  }
+  for (const [from, to] of sources) {
+    const sourcePath = canonicalPlainPath(path.join(source, from));
+    const stat = fs.lstatSync(sourcePath);
+    if (stat.isDirectory()) {
+      directory(to);
+      const subdirectories = [];
+      for (const file of regularFiles(sourcePath, sourcePath, [], subdirectories)) {
+        files.set(`${to}/${path.relative(sourcePath, file).replaceAll('\\', '/')}`, fs.readFileSync(file));
+      }
+      for (const dir of subdirectories) directory(`${to}/${path.relative(sourcePath, dir).replaceAll('\\', '/')}`);
+    } else if (stat.isFile()) {
+      directory(path.posix.dirname(to));
+      files.set(to, fs.readFileSync(sourcePath));
+    } else throw new Error(`unsupported installer source: ${sourcePath}`);
+  }
+  directory('.cursor-plugin');
+  files.set('.cursor-plugin/plugin.json', Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, 'utf8'));
+  validateFiles(files);
+  if (fs.existsSync(target)) {
+    if (!fs.lstatSync(target).isDirectory()) throw new Error(`installer destination is not a directory: ${target}`);
+    const existingDirectories = [];
+    const existingFiles = regularFiles(target, target, [], existingDirectories);
+    if (existingFiles.length || existingDirectories.length) {
+      const installed = readInstalledManifest(target);
+      const surface = manifest.name === 'magi-cursor-cli' ? INSTALLED_MAGI_CLI_SURFACE : INSTALLED_MAGI_SURFACE;
+      if (!installed.ok || installed.manifest.name !== manifest.name || installed.manifest.repository !== manifest.repository ||
+          !checkManifestSurface(installed.manifest, surface).ok) {
+        throw new Error(`refusing to replace unrelated directory: ${target}`);
+      }
+      for (const file of existingFiles) {
+        const relative = path.relative(target, file).replaceAll('\\', '/');
+        if (!files.has(relative)) throw new Error(`refusing to remove unrelated destination file: ${relative}`);
+      }
+      for (const dir of existingDirectories) {
+        const relative = path.relative(target, dir).replaceAll('\\', '/');
+        if (!directories.has(relative)) throw new Error(`refusing to remove unrelated destination directory: ${relative}`);
+      }
+    }
+  }
+  return { target, files, directories };
+}
+
+function writeInstall(prepared) {
+  // Every source byte and destination entry was checked before the first write.
+  fs.rmSync(prepared.target, { recursive: true, force: true });
+  fs.mkdirSync(prepared.target, { recursive: true });
+  for (const dir of prepared.directories) fs.mkdirSync(path.join(prepared.target, ...dir.split('/')), { recursive: true });
+  for (const [relative, body] of prepared.files) fs.writeFileSync(path.join(prepared.target, ...relative.split('/')), body);
+  return prepared.target;
+}
 
 function magiCursorManifest() {
   return applySurfaceFields({
@@ -61,25 +125,35 @@ function readInstalledManifest(dest) {
 }
 
 function installMagiCursor() {
-  ensureClean(MAGI_DEST);
-  writeManifest(MAGI_DEST, magiCursorManifest());
-  copyDir(path.join(ROOT, '.cursor', 'skills'), path.join(MAGI_DEST, 'skills'));
-  copyDir(path.join(ROOT, '.cursor', 'rules'), path.join(MAGI_DEST, 'rules'));
-  copyDir(path.join(ROOT, 'agents'), path.join(MAGI_DEST, 'agents'));
-  copyDir(path.join(ROOT, 'tools'), path.join(MAGI_DEST, 'tools'));
-  fs.mkdirSync(path.join(MAGI_DEST, 'commands'), { recursive: true });
-  copyFile(path.join(ROOT, 'commands', 'magi.md'), path.join(MAGI_DEST, 'commands', 'magi.md'));
-  copyFile(path.join(ROOT, 'commands', 'magi-cli.md'), path.join(MAGI_DEST, 'commands', 'magi-cli.md'));
+  return writeInstall(prepareInstall(ROOT, MAGI_DEST, magiCursorManifest(), [
+    ['.cursor/skills', 'skills'], ['.cursor/rules', 'rules'], ['agents', 'agents'],
+    ['tools', 'tools'], ['seat-skills', 'seat-skills'],
+    ['commands/magi.md', 'commands/magi.md'], ['commands/magi-cli.md', 'commands/magi-cli.md'],
+  ]));
 }
 
-function installMagiCursorCli() {
-  ensureClean(MAGI_CLI_DEST);
-  writeManifest(MAGI_CLI_DEST, magiCliManifest());
-  copyDir(path.join(ROOT, '.cursor', 'skills', 'magi-cli'), path.join(MAGI_CLI_DEST, 'skills', 'magi-cli'));
-  copyDir(path.join(ROOT, '.cursor', 'rules'), path.join(MAGI_CLI_DEST, 'rules'));
-  copyFile(path.join(ROOT, 'commands', 'magi-cli.md'), path.join(MAGI_CLI_DEST, 'commands', 'magi-cli.md'));
-  for (const tool of CLI_RUNTIME_TOOLS) copyFile(path.join(ROOT, 'tools', tool), path.join(MAGI_CLI_DEST, 'tools', tool));
-  if (fs.existsSync(path.join(ROOT, 'tools', 'templates'))) copyDir(path.join(ROOT, 'tools', 'templates'), path.join(MAGI_CLI_DEST, 'tools', 'templates'));
+function validateCliFiles(files) {
+  for (const required of ['skills/magi-cli/SKILL.md', 'skills/magi-cli/references/cursor-cli.md',
+    'skills/magi-cli/references/dispatch-matrix.json', 'skills/magi-cli/references/seat-profiles.json',
+    'rules/magi-arbiter.mdc']) {
+    if (!files.has(required)) throw new Error(`installer source missing required file: ${required}`);
+  }
+  const profiles = JSON.parse(files.get('skills/magi-cli/references/seat-profiles.json').toString('utf8'));
+  const skills = new Set(['baseSkills', 'roleSkills', 'classSkills'].flatMap(key => Object.values(profiles[key] || {}).flat()));
+  for (const skill of skills) {
+    if (typeof skill !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(skill) || !files.has(`seat-skills/${skill}/SKILL.md`)) {
+      throw new Error(`installer source missing bundled seat skill: ${skill}`);
+    }
+  }
+}
+
+function installMagiCursorCli({ destination = MAGI_CLI_DEST, sourceRoot = ROOT } = {}) {
+  const prepared = prepareInstall(sourceRoot, destination, magiCliManifest(), [
+    ['.cursor/skills/magi-cli', 'skills/magi-cli'], ['.cursor/rules', 'rules'],
+    ['commands/magi-cli.md', 'commands/magi-cli.md'], ['tools/templates', 'tools/templates'],
+    ['seat-skills', 'seat-skills'], ...CLI_RUNTIME_TOOLS.map(tool => [`tools/${tool}`, `tools/${tool}`]),
+  ], validateCliFiles);
+  return writeInstall(prepared);
 }
 
 function installUserGlobals() {
@@ -104,7 +178,9 @@ function checkMagi() {
   if (missing.length) throw new Error(`magi missing: ${missing.join(', ')}`);
   checkSurface(MAGI_DEST, INSTALLED_MAGI_SURFACE, 'magi');
 }
-function checkMagiCli() {
+function checkMagiCli(destination = MAGI_CLI_DEST) {
+  const paths = resolveRuntimePaths({ root: canonicalPlainPath(destination) });
+  const files = new Set(regularFiles(paths.root));
   const required = [
     'skills/magi-cli/SKILL.md',
     'skills/magi-cli/references/cursor-cli.md',
@@ -112,15 +188,39 @@ function checkMagiCli() {
     'skills/magi-cli/references/seat-profiles.json',
     'rules/magi-arbiter.mdc',
     'commands/magi-cli.md',
-    ...CLI_RUNTIME_TOOLS.filter((name) => name.endsWith('.js')).map((name) => `tools/${name}`),
+    ...CLI_RUNTIME_TOOLS.map((name) => `tools/${name}`),
   ];
-  const missing = required.filter((rel) => !fs.existsSync(path.join(MAGI_CLI_DEST, rel)));
+  const missing = required.filter((rel) => !files.has(path.join(paths.root, rel)));
   if (missing.length) throw new Error(`magi-cursor-cli missing: ${missing.join(', ')}`);
-  if (fs.existsSync(path.join(MAGI_CLI_DEST, 'agents'))) throw new Error('magi-cursor-cli must not have an agents/ directory');
-  checkSurface(MAGI_CLI_DEST, INSTALLED_MAGI_CLI_SURFACE, 'magi-cursor-cli');
+  for (const directory of [paths.templatesDir, paths.seatSkillsRoot]) {
+    if (!fs.existsSync(directory) || !fs.lstatSync(directory).isDirectory()) throw new Error(`magi-cursor-cli missing directory: ${directory}`);
+  }
+  if (fs.existsSync(path.join(paths.root, 'agents'))) throw new Error('magi-cursor-cli must not have an agents/ directory');
+  checkSurface(paths.root, INSTALLED_MAGI_CLI_SURFACE, 'magi-cursor-cli');
+  const profiles = JSON.parse(fs.readFileSync(paths.seatProfilesPath, 'utf8'));
+  const skills = new Set(['baseSkills', 'roleSkills', 'classSkills'].flatMap(key => Object.values(profiles[key] || {}).flat()));
+  for (const skill of skills) {
+    if (typeof skill !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(skill) || !files.has(path.join(paths.seatSkillsRoot, skill, 'SKILL.md'))) {
+      throw new Error(`magi-cursor-cli bundled seat skill missing or invalid: ${skill}`);
+    }
+  }
 }
 
-function main() {
+function main(argv = process.argv.slice(2)) {
+  let destination;
+  let checkOnly = false;
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === '--destination' && destination === undefined && argv[i + 1] && !argv[i + 1].startsWith('--')) destination = argv[++i];
+    else if (argv[i] === '--check' && !checkOnly) checkOnly = true;
+    else throw new Error(`unknown, duplicate or incomplete installer option: ${argv[i]}`);
+  }
+  if (destination !== undefined) {
+    if (!checkOnly) installMagiCursorCli({ destination });
+    checkMagiCli(destination);
+    console.log(`MAGI Cursor CLI ${checkOnly ? 'checked' : 'installed and checked'} at ${path.resolve(destination)}`);
+    return;
+  }
+  if (checkOnly) throw new Error('--check requires --destination; no global installation was attempted');
   fs.mkdirSync(PLUGINS_DIR, { recursive: true });
   installMagiCursor();
   installMagiCursorCli();
@@ -130,7 +230,7 @@ function main() {
   console.log(`MAGI Cursor installed at ${MAGI_DEST}`);
   console.log(`MAGI Cursor CLI installed at ${MAGI_CLI_DEST}`);
   console.log('MAGI CLI runtime is installed-relative; C:\\src\\magi is no longer required merely to launch seats.');
-  console.log('The standing-rules pack still requires ai-ops-vault (default C:\\src\\ai-ops-vault or MAGI_RULES_ROOT).');
+  console.log('Set MAGI_RULES_ROOT to the external standing-rules pack.');
   console.log('Reload Cursor and enable both plugins.');
 }
 
@@ -138,4 +238,15 @@ if (require.main === module) {
   try { main(); process.exit(0); }
   catch (error) { bail(error instanceof Error ? error.message : String(error)); }
 }
-module.exports = { CLI_RUNTIME_TOOLS, magiCursorManifest, magiCliManifest, writeManifest, readInstalledManifest, checkMagi, checkMagiCli };
+module.exports = {
+  ROOT,
+  CLI_RUNTIME_TOOLS,
+  magiCursorManifest,
+  magiCliManifest,
+  writeManifest,
+  readInstalledManifest,
+  checkMagi,
+  checkMagiCli,
+  installMagiCursorCli,
+  main,
+};

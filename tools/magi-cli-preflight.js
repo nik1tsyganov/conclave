@@ -5,7 +5,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { resolveVendorBinary } = require('./vendor-binaries.js');
-const { DEFAULT_RULES_ROOT, FINGERPRINT } = require('./cli-rules-stage.js');
+const { FINGERPRINT_V2, listRuleFiles } = require('./cli-rules-stage.js');
+const { FORBIDDEN_ARBITER_SKILLS, regularFiles } = require('./cli-skill-stage.js');
+const { canonicalPlainPath, resolveRulesRoot, resolveRuntimePaths } = require('./runtime-paths.js');
 const { loadProfiles } = require('./seat-policy.js');
 
 function unique(values) { return [...new Set(values)]; }
@@ -20,48 +22,84 @@ function requiredSeatSkills(profiles) {
 
 function check(options = {}) {
   const home = options.home || os.homedir();
-  const rulesRoot = options.rulesRoot || process.env.MAGI_RULES_ROOT || DEFAULT_RULES_ROOT;
-  const profiles = loadProfiles(options.seatProfiles);
   const findings = [];
+  const record = (name, action) => {
+    try { findings.push({ check: name, ok: true, ...action() }); }
+    catch (error) { findings.push({ check: name, ok: false, error: error.message }); }
+  };
+  let paths;
+  let profiles;
+  record('runtime:contracts', () => {
+    paths = resolveRuntimePaths({ root: options.runtimeRoot });
+    profiles = loadProfiles(options.seatProfiles || paths.seatProfilesPath);
+    return { value: paths.root };
+  });
 
   for (const vendor of ['openai', 'google', 'anthropic']) {
-    try { findings.push({ check: `binary:${vendor}`, ok: true, value: resolveVendorBinary(vendor, { home, env: options.env }) }); }
-    catch (error) { findings.push({ check: `binary:${vendor}`, ok: false, error: error.message }); }
+    record(`binary:${vendor}`, () => ({ value: resolveVendorBinary(vendor, { home, env: options.env }) }));
   }
 
-  const arbiterSkills = unique(profiles.arbiterSkills || []);
-  const seatSkills = requiredSeatSkills(profiles);
-  for (const skill of arbiterSkills) {
-    const file = path.join(home, '.claude', 'skills', skill, 'SKILL.md');
-    findings.push({ check: `arbiter-skill:${skill}`, ok: fs.existsSync(file), value: file });
-  }
+  const arbiterSkills = unique(profiles?.arbiterSkills || []);
+  const seatSkills = profiles ? requiredSeatSkills(profiles) : [];
+  findings.push({ check: 'skills:allow-list', ok: seatSkills.length > 0 });
   for (const skill of seatSkills) {
-    const file = path.join(home, '.claude', 'skills', skill, 'SKILL.md');
-    findings.push({ check: `seat-skill:${skill}`, ok: fs.existsSync(file), value: file });
+    record(`seat-skill:${skill}`, () => {
+      if (typeof skill !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(skill)) throw new Error('invalid seat skill name');
+      const root = path.join(paths.seatSkillsRoot, skill);
+      const file = path.join(root, 'SKILL.md');
+      if (!regularFiles(root).includes(file)) throw new Error(`bundled seat skill missing regular SKILL.md: ${file}`);
+      return { value: file };
+    });
   }
 
-  const overlap = seatSkills.filter((skill) => arbiterSkills.includes(skill) && profiles.forbiddenSeatSkills?.includes(skill));
+  const forbidden = unique([...FORBIDDEN_ARBITER_SKILLS, ...(profiles?.forbiddenSeatSkills || [])]);
+  const overlap = seatSkills.filter((skill) => forbidden.includes(skill));
   findings.push({ check: 'skills:arbiter-seat-separation', ok: overlap.length === 0, observed: overlap });
 
-  const standing = path.join(rulesRoot, 'STANDING.md');
-  let fingerprint = null;
-  try { fingerprint = fs.readFileSync(standing, 'utf8').split(/\r?\n/, 1)[0]; } catch {}
-  findings.push({ check: 'rules:fingerprint', ok: fingerprint === FINGERPRINT, value: standing, observed: fingerprint });
-  const rulesDir = path.join(rulesRoot, 'RULES');
-  let ruleCount = 0;
-  try { ruleCount = fs.readdirSync(rulesDir).filter((name) => /^R\d{2}-.*\.md$/.test(name)).length; } catch {}
-  findings.push({ check: 'rules:R01-R21', ok: ruleCount >= 21, value: rulesDir, observed: ruleCount });
+  let rulesRoot;
+  record('rules:root', () => {
+    rulesRoot = canonicalPlainPath(resolveRulesRoot({ rulesRoot: options.rulesRoot, env: options.env }));
+    const files = regularFiles(rulesRoot);
+    for (const relative of ['STANDING.md', 'VENDOR.md', 'RULES/INDEX.md']) {
+      if (!files.includes(path.join(rulesRoot, ...relative.split('/')))) throw new Error(`external rules pack missing ${relative}; set MAGI_RULES_ROOT or pass rulesRoot`);
+    }
+    return { value: rulesRoot };
+  });
+  if (rulesRoot) {
+    record('rules:fingerprint', () => {
+      const standing = path.join(rulesRoot, 'STANDING.md');
+      const fingerprint = fs.readFileSync(standing, 'utf8').split(/\r?\n/, 1)[0];
+      if (fingerprint !== FINGERPRINT_V2) throw new Error('STANDING.md must have the trusted MAGI-CLI-STANDING v2 first line');
+      return { value: standing, observed: fingerprint };
+    });
+    record('rules:R01-R22', () => {
+      const rulesDir = path.join(rulesRoot, 'RULES');
+      const names = listRuleFiles(rulesDir);
+      if (!names.some(name => name.startsWith('R22-'))) throw new Error('rules pack missing R22');
+      for (const name of names) {
+        if (!fs.lstatSync(path.join(rulesDir, name)).isFile()) throw new Error(`rule must be a regular file: ${name}`);
+      }
+      return { value: rulesDir, observed: names.map(name => name.slice(0, 3)) };
+    });
+  }
 
   return { ok: findings.every((f) => f.ok), arbiterSkills, seatSkills, findings };
 }
 
 function main(argv = process.argv.slice(2), io = process) {
-  const rootIndex = argv.indexOf('--rules-root');
-  const profileIndex = argv.indexOf('--seat-profiles');
-  const result = check({
-    rulesRoot: rootIndex === -1 ? undefined : argv[rootIndex + 1],
-    seatProfiles: profileIndex === -1 ? undefined : argv[profileIndex + 1],
-  });
+  let result;
+  try {
+    const options = {};
+    const flags = { '--rules-root': 'rulesRoot', '--seat-profiles': 'seatProfiles' };
+    for (let i = 0; i < argv.length; i += 1) {
+      const key = flags[argv[i]];
+      if (!key || options[key] || !argv[i + 1] || argv[i + 1].startsWith('--')) throw new Error(`unknown, duplicate or incomplete preflight option: ${argv[i]}`);
+      options[key] = argv[++i];
+    }
+    result = check(options);
+  } catch (error) {
+    result = { ok: false, findings: [{ check: 'preflight', ok: false, error: error.message }] };
+  }
   io.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   return result.ok ? 0 : 2;
 }

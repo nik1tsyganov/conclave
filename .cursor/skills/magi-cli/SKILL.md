@@ -1,113 +1,72 @@
 ---
 name: magi-cli
-description: Code-enforced MAGI Cursor CLI mode. Grok 4.6 is the non-voting arbiter; OpenAI, Anthropic and Google seats execute through vendor CLIs. Not CONCLAVE.
+description: Plan-bound MAGI Cursor CLI mode. Grok 4.6 is the non-voting arbiter; OpenAI, Anthropic and Google seats use native CLIs. Not CONCLAVE.
 ---
 
 # MAGI Cursor CLI
 
-## Identity and boundary
+## Identity and authority
 
-Run `magi-whoami --mode cursor-cli --slug <picker slug>` before activation. Stop unless LEGAL.
+Run `magi-whoami --mode cursor-cli --slug <picker slug>`. Stop unless the declared route is LEGAL. This declaration check does not attest the actual host model.
 
-Grok 4.6 is the arbiter. It may classify, build the graph/dispatch plan, compose briefs, invoke the deterministic runtime, record lead telemetry and mechanically tally. It is **never a seat**: no substantive implementation, planning, research, review, verification, repair or vote.
+Grok 4.6 coordinates the run. It classifies work, writes briefs and complete plans, invokes the deterministic runtime, and requests finalization and tallying. It never performs substantive implementation, repair, planning, research, review, verification, or voting as a seat.
 
-## Arbiter reading only
+Read `references/cursor-cli.md` for the complete run procedure, `references/dispatch-matrix.json` for route legality, `references/seat-profiles.json` for capabilities, and `references/brief-rules-block.md` for brief instructions.
 
-The arbiter reads these orchestration surfaces; they are not automatically granted to seats:
+The arbiter retains orchestration, routing, bridge, distribution, assessment, and retrospective work. Leaf seats receive the selected vendor card and role/class skills. Do not load the arbiter's full skill stack into a seat.
 
-1. `engineering-orchestrator`
-2. `graph-engineering`
-3. `context-engineering`
-4. `magi-mode`
-5. `magi-dispatch`
-6. `mix-mode`
-7. `dispatch-efficiency`
-8. this skill's `references/cursor-cli.md`, `references/dispatch-matrix.json`, `references/seat-profiles.json`, `references/brief-rules-block.md`
-9. the vendor bridge needed for the launch (`codex-bridge`, `gemini-bridge`, or `claude-bridge`)
-10. `task-retrospective` only at task close when retrospective work is actually required
+## Runtime procedure
 
-Do not preload loop/harness/evaluation/testing/implementation skills into the arbiter just because a future seat may use them. `seat-profiles.json` selects and `cli-skill-stage.js` stages those capabilities for the seat that needs them.
+1. Set `MAGI_RULES_ROOT` to the external STANDING v2 / R01–R22 pack. Run `tools/magi-cli-preflight.js`.
+2. Use `claude auth status` for the Claude login check. Run `model-probe.js --vendor --model --effort --evidence-dir` for every selected exact pair.
+3. Import each captured `probe.json` with `model-availability.js --file <availability.json> --probe <probe.json>`. Evidence expires after 60 minutes from its original completion time. Re-imports do not renew it.
+4. Finalize the briefs, then write the complete plan with unique dispatch IDs, immutable brief hashes, absolute worktrees, relative scopes, author provenance, and any escalation reason.
+5. Run `plan-seal.js --plan <draft.json> --run-dir <new-run-dir> --availability <availability.json>`.
+6. Launch each selected entry with `dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-dir> --dispatch-id <id> --availability <availability.json> --rules-root <external-v2-pack>`.
+7. Run `run-finalize.js --run-dir <run-dir>` and `panel-tally.js --run-dir <run-dir> --unit-id <unit>`.
 
-## Front door
+Unknown or unproven models are unavailable. Every native model/effort pair is probe-gated. Requested/observed mismatch fails. The matrix defines legal routes, not a promise of access.
 
-1. Run `tools/magi-cli-preflight.js`.
-2. Classify each unit into a matrix class and semantic role: `implement`, `review`, `verify`, `plan`, or `research`.
-3. Write `dispatch-plan.json` with explicit vendor/model/effort for every seat.
-4. Run `tools/dispatch-matrix.js --plan <plan> [--availability <availability.json>]`.
-5. Stop on non-zero. Do not route around the validator.
-6. Launch each seat only through `tools/dispatch-run.js`.
-7. Use structured receipts/proof/telemetry for activation and tally; never hand-wave a failed gate.
+Changed route, class, author, scope, or brief requires a newly validated complete plan and seal. A graph override or ad-hoc launch flag cannot alter a sealed dispatch.
 
-## Routing policy
+## Seat roles and permissions
 
-`references/dispatch-matrix.json` is the machine-readable legal route set.
+| Role | Product permission | Core work |
+|---|---|---|
+| implement | Writes only within declared scope | Implementation and testing |
+| review | Read-only | Review and minimalism |
+| verify | Read-only | Testing and evaluation |
+| plan | Read-only | Planning and context |
+| research | Read-only | Research and context |
 
-- OpenAI: Luna → Terra → Sol → Astra. Astra is probe-gated; some lanes are escalation-only and require an explicit reason.
-- Anthropic: Sonnet for balanced work, Opus for judgment/review/planning, Fable for long-running agentic work.
-- Google: Gemini Pro for deep/context work; Flash lanes remain probe-gated until exact agy slugs are observed.
-- Probe-gated availability must be fresh (runtime default: 60 minutes) and exact. Requested/observed mismatch is unavailable, never a silent substitution.
+Profiles add `seat-openai`, `seat-anthropic`, or `seat-google` plus applicable class skills. The bundled `seat-skills/` source is the default. Staging creates `skills-manifest.json`; rule staging creates `rules-manifest.json`. Structural preflight checks real files and hashes against the generated `SEAT-CONTRACT.md`.
 
-The matrix, not Grok preference, decides which vendor/model/effort combinations are legal.
+Every seat is a leaf and cannot delegate. Seats must not edit policy, evidence, receipts, or telemetry. They acknowledge the bound BRIEF first line in the native final response. The STANDING v2 fingerprint is separate.
 
-## Seat policy
+OpenAI read-only roles use `read-only`; agy uses `--sandbox`. Claude non-implementation roles use the schema 5 `read-only-tools` profile: `--safe-mode --permission-mode dontAsk --tools Read,Glob,Grep --allowedTools Read,Glob,Grep`. They inspect authorized files and existing test evidence, but cannot execute shell commands. Provide the needed test reports in their inputs. Claude plan mode requires a separate approval turn and cannot reliably complete unattended leaf verification.
 
-`references/seat-profiles.json` is the machine-readable seat capability authority.
+Claude implementation retains `--permission-mode bypassPermissions` with `--safe-mode`. Safe mode disables global customization and hooks while preserving subscription authentication and role permissions. Do not substitute `--bare`, which disables OAuth. The leaf reads authorized context from staged files. Product scope auditing rejects unauthorized writes; it does not sandbox vendor home directories or provide universal hostile-process isolation.
 
-- `implement`: scoped product writes; implementation + testing skills.
-- `review`: read-only; review/minimalism skills.
-- `verify`: read-only; testing/evaluation skills.
-- `plan`: read-only; context/planning support only.
-- `research`: read-only; context/research support only.
-- Class-specific extras are additive, e.g. loop/harness for agentic-long-run and auth-security for security-sensitive.
-- Routing, bridge, orchestration, distribution, assessment and retrospective skills are arbiter-only.
-- Every seat is a leaf. It must not sub-dispatch or delegate to another model/agent.
+## Review, escalation, and distribution
 
-`dispatch-run.js` writes `SEAT-CONTRACT.md`, stages only the allow-listed skills, hashes that pack, and points the vendor process at the contract.
+Review/verify entries require correct `authorVendor` provenance and another vendor. Ordinary implementation approval needs foreign verification and review, with every review returning native APPROVE.
 
-## Permissions
+Critical `requiresPanel` classes need `magiConvened: true` and two distinct foreign review/verify vendors on the same unit and worktree. Critical approval requires at least two eligible native APPROVE positions after author recusal.
 
-- OpenAI: implement=`workspace-write`; all non-implement roles=`read-only`.
-- Anthropic: implement=`bypassPermissions`; all non-implement roles=`plan`.
-- Google/agy: implement=`--dangerously-skip-permissions`; all non-implement roles=`--sandbox`.
+Astra requires `escalation: true` and a reason with at least 16 characters and three distinct words. Greater capability never increases write scope.
 
-A vendor may not review or verify a unit it authored.
+Convened implementation uses `min(3, implementation unit count)` distinct vendors. The 60% cap starts at two units. Planning, research, and review-only panels do not manufacture implementation rows. SLICES defines work and dependencies, not vendor authority.
 
-## Distribution
+## Proof and completion
 
-The implementation distribution floor is applied to **implementation units only** and only when at least two implementation units exist.
+`cli-proof.js` requires native session/usage and observed identity. OpenAI includes sandbox and observed effort. Google requires a successful agy envelope and its exact per-conversation model slug with fused effort. Claude requires structured native success, session, numeric usage, canonical observed model, and session-bound observed effort.
 
-When MAGI is convened and implementation work exists, use `min(3, implementUnitCount)` distinct implementation vendors. A one-unit implementation task is therefore legal; a two-unit task spreads across two vendors; three or more independent units use all three vendors when routes are legal.
+Requested-only identity cannot qualify a production dispatch. Missing, conflicting, or changed proof fails. Google uses `casper_via=agy` and the exact staged skill-root grant. No Gemini PAYG fallback is permitted.
 
-Review-only, planning, research and verification panels do not manufacture fake implementation rows to satisfy the floor.
+Google probes and dispatches pin `--log-file` to `native-cli.log` in a unique evidence directory for that call. Default second-resolution home logs can collide under parallel execution. The collector uses the pinned native log when building the proof log, `vendor.log`.
 
-Project slices define units/dependencies/write scope, not vendor assignment. Vendor/model/effort comes from the matrix and live availability.
+The runtime commits a transaction only after plan binding, acknowledgment, proof, scope audit, receipts, and idempotent telemetry agree. Failed work remains recorded. Execution PASS is distinct from approval.
 
-## Proof
+Review responses end with exactly one `POSITION: APPROVE`, `POSITION: REJECT`, or `POSITION: ABSTAIN` line. `panel-tally.js` extracts votes from verified native responses. Grok never writes ballots or votes. No model can waive deterministic failure.
 
-`cli-proof.js` defines what counts:
-
-- Codex: session ID + tokens + sandbox + observed model.
-- agy: conversation ID + usage + response + exact observed model from the run log.
-- Claude: healthy non-empty topical capture + requested model/effort. The current text-mode path does **not** claim that requested Claude identity was independently observed; proof labels that evidence `requested-only`.
-
-Do not upgrade requested-only identity into observed identity in telemetry, evidence, docs or battery results.
-
-## Rules, telemetry and receipts
-
-Every seat brief uses `references/brief-rules-block.md` with a concrete SCOPE. `dispatch-run.js` stages/hashes the vault R01–R21 pack and the seat skill pack before launch.
-
-A successful transaction produces launch metadata, seat profile/contract, staged-skill manifest, rules manifest, capture/log, proof, telemetry, receipt ACK and handoff envelope. Proof + telemetry + receipt are one completion transaction.
-
-## Claude live gate
-
-Re-run Claude auth and headless probes in the dispatching session. Degradation is based on current evidence, not old documentation. A documented Claude failure may activate the explicit degraded path; do not infer it from stale state.
-
-## Google live gate
-
-Use agy only; no Gemini API PAYG fallback. Pass the staged per-dispatch skill root with `--add-dir`. The full global skill tree is not the MAGI seat capability boundary.
-
-## Verification
-
-After implementation dispatches, run `activation-check` on the live implement log. Tally panel POSITION with `position-tally.js`; never hand-count. Deterministic failures cannot be waived by Grok or a seat.
-
-Use `npm run check` for the repository release gate and `npm run check:cross-repo` when MAGI, magi-kit and ai-ops-vault are all present locally.
+`cli-launch.js` and standalone `cli-smoke.js` are transport diagnostics, not production activation paths. Use `npm run check` and the explicit-root `cross-repo-check.js` for offline validation. Native acceptance remains a separate target-machine check.

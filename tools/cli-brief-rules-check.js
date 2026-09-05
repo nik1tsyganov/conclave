@@ -3,7 +3,10 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { isDeepStrictEqual } = require('node:util');
 const { verifyStagedRules } = require('./cli-rules-stage.js');
+const { verifySeatSkills } = require('./cli-skill-stage.js');
+const { loadProfiles, validateSeat } = require('./seat-policy.js');
 const { ROLES } = require('./dispatch-schema.js');
 
 const STANDING_PATH = 'C:\\src\\ai-ops-vault\\projects\\magi-cli-rules\\STANDING.md';
@@ -72,7 +75,7 @@ function missingMarkers(text, opts = {}) {
   if (opts.requireStructural) {
     for (const marker of STRICT_MARKERS) if (!markerHolds(marker, text)) missing.push(marker.id);
     if (!scopeIsReal(text)) missing.push('real SCOPE block');
-    if (opts.vendor === 'google' && !/casper_via=agy|agy/i.test(text)) missing.push('casper_via=agy');
+    if (opts.vendor === 'google' && !/\bcasper_via=agy\b/.test(text)) missing.push('casper_via=agy');
     if (opts.vendor === 'anthropic' && !/R16|auth.*probe|headless.*probe/i.test(text)) missing.push('Claude R16 probe status');
   }
   return [...new Set(missing)];
@@ -83,6 +86,46 @@ function checkBriefText(text, opts = {}) {
   return { ok: missing.length === 0, missing };
 }
 
+function readRegularFile(file) {
+  if (!fs.lstatSync(file).isFile()) throw new Error(`not a regular file: ${file}`);
+  return fs.readFileSync(file, 'utf8');
+}
+
+function verifyStagedSeat(briefPath, opts = {}) {
+  const briefDir = path.dirname(path.resolve(briefPath));
+  const seatContractPath = path.resolve(opts.seatContractPath || path.join(briefDir, 'SEAT-CONTRACT.md'));
+  const profilePath = path.join(path.dirname(seatContractPath), 'seat-profile.json');
+  const onDiskProfile = JSON.parse(readRegularFile(profilePath));
+  const profile = opts.seatProfile || onDiskProfile;
+  if (!isDeepStrictEqual(onDiskProfile, profile)) throw new Error('generated seat profile differs from the expected profile');
+  for (const field of ['role', 'vendor']) {
+    if (opts[field] && profile[field] !== opts[field]) throw new Error(`seat ${field} does not match the requested ${field}`);
+  }
+  if (!Array.isArray(profile.skills)) throw new Error('seat profile has no skill allow-list');
+  const validated = validateSeat(loadProfiles(), profile);
+  if (profile.permissionProfile !== validated.permissionProfile) throw new Error('seat permission profile does not match role policy');
+  if (!isDeepStrictEqual(profile.proofFields, validated.proofFields)) throw new Error('seat proof fields do not match vendor policy');
+
+  const skillRoot = path.resolve(opts.skillRoot || path.join(path.dirname(seatContractPath), 'skills'));
+  const contract = readRegularFile(seatContractPath);
+  for (const [label, value] of Object.entries({
+    Vendor: profile.vendor, Role: profile.role, Class: profile.class, 'Permission profile': profile.permissionProfile,
+    'Skill manifest': path.join(skillRoot, 'skills-manifest.json'),
+  })) {
+    const fields = contract.split(/\r?\n/).filter((line) => line.startsWith(`${label}:`));
+    if (fields.length !== 1 || fields[0].slice(label.length + 1).trim() !== value) {
+      throw new Error(`seat contract ${label} does not match the generated profile`);
+    }
+  }
+  const skillSection = contract.match(/^Allowed staged skills:\r?\n((?:- [^\r\n]+(?:\r?\n|$))*)/m);
+  const pointers = skillSection ? skillSection[1].trimEnd().split(/\r?\n/).sort() : [];
+  const expectedPointers = validated.skills.map((skill) => `- ${skill}: ${path.join(skillRoot, skill, 'SKILL.md')}`).sort();
+  if (!isDeepStrictEqual(pointers, expectedPointers)) throw new Error('seat contract skill pointers do not match the staged allow-list');
+  const manifest = opts.expectedSkillsManifest || JSON.parse(readRegularFile(path.join(skillRoot, 'skills-manifest.json')));
+  verifySeatSkills({ destinationRoot: skillRoot, skills: validated.skills, manifest });
+  return { seatProfile: validated, skillRoot, seatContractPath };
+}
+
 function checkBriefFile(briefPath, opts = {}) {
   const resolved = path.resolve(briefPath);
   let body;
@@ -91,8 +134,14 @@ function checkBriefFile(briefPath, opts = {}) {
   const basic = checkBriefText(body, opts);
   const structuralMissing = [];
   if (opts.requireStructural) {
-    try { verifyStagedRules(resolved); }
+    try { verifyStagedRules(resolved, opts.expectedRulesManifest); }
     catch (error) { structuralMissing.push(`staged rules: ${error.message}`); }
+    try {
+      const staged = verifyStagedSeat(resolved, opts);
+      const roleCheck = checkBriefText(body, { ...opts, role: staged.seatProfile.role, vendor: staged.seatProfile.vendor });
+      for (const item of roleCheck.missing) if (!basic.missing.includes(item)) structuralMissing.push(item);
+    }
+    catch (error) { structuralMissing.push(`staged seat: ${error.message}`); }
   }
   return { ok: basic.ok && structuralMissing.length === 0, missing: [...basic.missing, ...structuralMissing], briefPath: resolved };
 }
@@ -116,4 +165,4 @@ function main(argv = process.argv.slice(2), io = process) {
 }
 
 if (require.main === module) process.exitCode = main();
-module.exports = { REQUIRED_MARKERS, STRICT_MARKERS, RULES_DIR, RULES_INDEX, STANDING_PATH, VENDOR_MD, checkBriefFile, checkBriefText, formatMissing, main, missingMarkers, parseArgs, usage };
+module.exports = { REQUIRED_MARKERS, STRICT_MARKERS, RULES_DIR, RULES_INDEX, STANDING_PATH, VENDOR_MD, checkBriefFile, checkBriefText, formatMissing, main, missingMarkers, parseArgs, usage, verifyStagedSeat };

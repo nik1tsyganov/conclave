@@ -1,84 +1,58 @@
 ---
 name: magi-cli
-description: Start or continue a code-enforced MAGI Cursor CLI run (hostMode `cursor-cli`). Not CONCLAVE and not `/magi` Task mode.
+description: Start or continue a plan-bound MAGI Cursor CLI run. Not CONCLAVE and not Cursor Task mode.
 ---
 
 # /magi-cli
 
-- If this chat is CONCLAVE, stop and open a separate MAGI chat.
-- Run `magi-whoami --mode cursor-cli --slug <picker slug>`. Stop unless LEGAL.
-- The arbiter is xAI Grok 4.6. Grok classifies, writes plans/briefs, launches seats, records lead telemetry and mechanically tallies. It MUST NOT act as an implement, plan, research, review or verify seat; repair product work; or vote.
-- Run installed `tools/magi-cli-preflight.js` before planning. Exit 2 is fail-closed.
-- Read the MAGI CLI skill plus `references/cursor-cli.md`, `references/dispatch-matrix.json`, `references/seat-profiles.json`, and `references/brief-rules-block.md`.
+If the chat is CONCLAVE, open a separate MAGI chat. Run `magi-whoami --mode cursor-cli --slug <picker slug>`. Stop unless the declared route is LEGAL.
 
-## 1. Write and validate the dispatch plan
+Read the MAGI CLI skill and its co-located `references/cursor-cli.md`, `dispatch-matrix.json`, `seat-profiles.json`, and `brief-rules-block.md`. The run guide contains the complete command arguments and plan-field contract.
 
-Before any vendor process starts, write `dispatch-plan.json`:
+Grok 4.6 is the non-voting arbiter. It classifies, composes briefs and complete plans, dispatches vendor seats, and requests deterministic completion checks. It must not act as a substantive implementation, repair, plan, research, review, verification, or voting seat.
 
-```json
-{
-  "hostMode": "cursor-cli",
-  "arbiter": { "vendor": "xai", "model": "grok-4.6", "effort": "high" },
-  "magiConvened": true,
-  "dispatches": [
-    { "unitId": "api-1", "class": "standard-feature", "role": "implement", "vendor": "openai", "model": "gpt-5.6-terra", "effort": "medium" },
-    { "unitId": "architecture", "class": "architecture-planning", "role": "plan", "vendor": "anthropic", "model": "opus", "effort": "high" }
-  ]
-}
-```
+## Prepare
 
-Run:
+1. Set `MAGI_RULES_ROOT` to the external STANDING v2 / R01–R22 pack.
+2. Run installed `tools/magi-cli-preflight.js`.
+3. Check Claude with `claude auth status`. Probe every intended exact model/effort using `model-probe.js --vendor --model --effort --evidence-dir`.
+4. Import each native `probe.json` with `model-availability.js --file <availability.json> --probe <probe.json>`.
+5. Write the final UTF-8 briefs with concrete scopes and a unique first-line acknowledgment. Hash their exact bytes.
+
+Unknown or unproven model/effort pairs are unavailable. Availability replays hashed native evidence and uses the original probe timestamp. Its default expiry is 60 minutes. Re-importing evidence cannot renew it.
+
+## Seal the complete plan
+
+The plan binds `planId`, `hostMode: cursor-cli`, the xAI/Grok arbiter, and every dispatch entry. Each entry includes `dispatchId`, `unitId`, `class`, `role`, `vendor`, `model`, `effort`, absolute `cwd` and `brief`, `briefSha256`, and relative `writeScope`.
+
+Non-implementation roles use an empty write scope and remain read-only. Review/verify entries require a different, correct `authorVendor`. Astra requires `escalation: true` and a substantive reason with at least 16 characters and three distinct words.
+
+Claude non-implementation roles use the schema 5 `read-only-tools` profile: `--safe-mode --permission-mode dontAsk --tools Read,Glob,Grep --allowedTools Read,Glob,Grep`. They can inspect files and existing test evidence, but cannot execute shell commands. Supply the needed evidence in the brief. Plan mode requires a separate approval turn and is not the unattended verification path.
+
+Claude implementation uses `--safe-mode --permission-mode bypassPermissions`. Safe mode excludes global customization and hooks while preserving subscription authentication and role permissions. Do not use `--bare`; it disables OAuth. Product audits do not isolate vendor home directories.
+
+Critical classes require `magiConvened: true` and two distinct foreign review/verify vendors on the same unit and worktree. Implementation vendor count scales as `min(3, implementation units)`; the 60% cap starts at two units. Do not invent implementation rows for read-only panels.
+
+Run `plan-seal.js --plan <draft.json> --run-dir <new-run-dir> --availability <availability.json>`. Stop on failure.
+
+## Dispatch and conclude
+
+Launch each selected entry with:
 
 ```text
-tools/dispatch-matrix.js --plan <dispatch-plan.json> [--availability <availability.json>]
+node tools/dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-dir> --dispatch-id <id> --availability <availability.json> --rules-root <external-v2-pack>
 ```
 
-Non-zero means STOP. Grok may choose only routes admitted by the matrix.
+Route fields come from the sealed entry. Any changed route, author, scope, or brief requires a new complete plan validation and seal. Graph overrides and naked route flags grant no authority.
 
-`high` is the normal arbiter effort. Use `xhigh` only for genuinely contested/high-risk decomposition or routing.
+The runtime stages the bundled lean vendor card plus role/class skills. The seat reads its generated `SEAT-CONTRACT.md`, staged skills, and hashed rules. Seats are leaves; they cannot delegate, change policy, or edit evidence and telemetry.
 
-## 2. Seat roles are semantic and permission-scoped
+Native observed model/effort evidence, brief acknowledgment, scope audit, receipts, and idempotent telemetry must agree. Claude requested-only identity cannot qualify. Google uses agy, `casper_via=agy`, and the exact staged skill-root grant. No Gemini PAYG fallback is allowed.
 
-Legal roles are `implement`, `review`, `verify`, `plan`, and `research`.
+Every Google probe and dispatch pins `--log-file` to `native-cli.log` in its unique evidence directory. Use that per-run source for proof collection; default second-resolution home logs can collide during parallel calls.
 
-- `implement` may write only within its assigned worktree/SCOPE.
-- `review`, `verify`, `plan`, and `research` are read-only product roles.
-- Review/verify cannot be assigned to the vendor that authored the unit.
-- Plan/research work is not mislabeled as implementation merely to satisfy distribution rules.
+Run `run-finalize.js --run-dir <run-dir>`. Execution PASS is separate from approval. Ordinary implementation approval requires foreign verification and review, with every review returning native APPROVE. Critical approval requires at least two native APPROVE votes after author recusal.
 
-The seat capability set is generated from `seat-profiles.json`. Routing, bridge, orchestration, distribution and retrospective skills are arbiter-only. The seat receives only its role/class allow-list through a staged, hashed skill pack.
+Run `panel-tally.js --run-dir <run-dir> --unit-id <unit>` for receipt-bound panel votes. Each eligible review response must end with exactly one `POSITION: APPROVE`, `POSITION: REJECT`, or `POSITION: ABSTAIN` line. Never handwrite ballots or waive deterministic failure.
 
-## 3. Launch only through the transaction runner
-
-Every seat launches through `tools/dispatch-run.js` with explicit class, role, vendor, model, effort, brief, worktree, dispatch/unit IDs and evidence directory.
-
-Do not call vendor binaries directly for a MAGI seat. `dispatch-run.js` rechecks the matrix, builds the seat contract, stages the minimal skill pack, stages/hashes R01–R21, validates the brief, applies role permissions, captures proof, writes telemetry, and creates receipt/handoff artifacts.
-
-## 4. Model policy
-
-- **OpenAI:** Luna = throughput; Terra = balanced; Sol = frontier; GPT-6 Astra = frontier-plus. Astra is probe-required. On lanes marked `escalationOnly`, the dispatch must include an explicit escalation reason.
-- **Anthropic:** Sonnet = balanced; Opus = judgment/review; Fable = long-horizon agentic work. Current Claude text-mode proof confirms the requested alias/effort plus a healthy topical response; it does **not** pretend the vendor-native model identity was observed.
-- **Google:** Gemini 3.1 Pro high is the proven deep lane. Gemini 3.8 Flash routes are probe-required until exact agy slugs are observed.
-
-Probe-required availability must be fresh; the runtime defaults to a 60-minute maximum proof age. Record probes with `tools/model-availability.js`. Requested/observed mismatch makes the requested route unavailable.
-
-## 5. Distribution and panels
-
-The ≤60% implementation floor applies when there are at least two implementation units. A single implementation unit is not mathematically rejected by the floor.
-
-When MAGI is convened and implementation work exists, implementation units must be spread across `min(3, numberOfImplementationUnits)` distinct vendors. Thus:
-
-- 1 implement unit → one implementation vendor is legal;
-- 2 independent implement units → two vendors;
-- 3+ independent implement units → all three vendors where the plan is convened and routes are legal.
-
-A review-only or research/plan panel does not need fake implementation rows. Convening a seat still requires giving that seat real work in the role for which it was convened.
-
-## 6. Standing requirements
-
-- Every seat brief contains the required RULES block with concrete SCOPE, role, vendor, host mode, seat-contract/skill-manifest pointers, proof and communication requirements.
-- Google/agy receives the staged per-dispatch skill root, not the full global skill tree as its MAGI capability boundary.
-- Claude requires live auth + headless probe before dispatch; degradation is based on current evidence, not stale docs.
-- Implement seats produce WRITE AUDIT when required.
-- Run `activation-check` on the live implement log and `position-tally` for panel POSITION.
-- Deterministic failures cannot be waived by Grok or any seat.
+The scope audit does not sandbox vendor home directories. Standalone transport smoke results cannot activate production work.

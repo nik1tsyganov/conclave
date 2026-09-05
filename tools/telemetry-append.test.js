@@ -65,6 +65,8 @@ describe('telemetry-append', () => {
       const expectedLog = path.join(dir, 'telemetry', 'dispatches.jsonl');
       mkdirSync(toolsDir);
       copyFileSync(helper, copiedHelper);
+      copyFileSync(path.join(__dirname, 'dispatch-schema.js'), path.join(toolsDir, 'dispatch-schema.js'));
+      copyFileSync(path.join(__dirname, 'dispatch-evidence.js'), path.join(toolsDir, 'dispatch-evidence.js'));
 
       const r = spawnSync(
         process.execPath,
@@ -175,7 +177,7 @@ describe('telemetry-append', () => {
     });
   });
 
-  it('writes rows accepted by the activation gate', () => {
+  it('keeps legacy accounting readable without treating it as activation proof', () => {
     withTempDir((dir) => {
       const log = path.join(dir, 'dispatches.jsonl');
       for (const vendor of ['openai', 'google', 'anthropic']) {
@@ -184,8 +186,8 @@ describe('telemetry-append', () => {
       }
 
       const activation = runActivation(log);
-      assert.strictEqual(activation.status, 0, activation.stderr);
-      assert.strictEqual(activation.stdout.trim(), 'FLOOR HOLDS');
+      assert.strictEqual(activation.status, 1, activation.stderr);
+      assert.match(activation.stderr, /committed dispatch transaction/);
     });
   });
 });

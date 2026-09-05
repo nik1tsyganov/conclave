@@ -2,14 +2,26 @@
 description: MAGI activation rules
 alwaysApply: true
 ---
-If this chat is CONCLAVE, ignore this file.
+This file applies to MAGI runs. Ignore it in CONCLAVE and unrelated chats.
 
-Otherwise:
-- Three-vendor implement split before first write.
-- 60% floor.
-- Idle Casper = FAILED.
-- WRITE AUDIT required.
-- `activation-check` required (calls `hog-check`).
-- Canonical command for any repo: `node C:\src\magi\tools\activation-check.js <log path>`.
-- Log path: product-repo runs write `C:\src\magi\projects\<slug>\magi-dispatch-log.jsonl`, never a log inside the product repo; MAGI-kit work uses `C:\src\magi\magi-dispatch-log.jsonl`. See `C:\src\magi\projects\README.md`.
-- Project slices/graphs define units, dependencies, and write scope, not vendors: follow mix-mode `distributionFloor.projectSlicePolicy` at dispatch (class table + live floor), ignore project `SLICES.md` implement/verify columns, and accept only `vendorOverride` on that run's `graph.json`.
+## Cursor CLI activation
+
+For `hostMode: cursor-cli` or `/magi-cli`, use this branch and the [MAGI CLI skill](../skills/magi-cli/SKILL.md). Native-mode instructions below do not apply to this branch.
+
+- Validate and seal the complete plan before the first vendor process. Launch only its selected entries through `dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-dir> --dispatch-id <id> --availability <availability.json> --rules-root <external-v2-pack>`.
+- For `magiConvened: true` with implementation units, require at least `min(3, implementation unit count)` distinct implementation vendors.
+- For every plan with at least two implementation units, no vendor may hold more than 60% of those units. The matrix's `distributionFloor` and `distributionFloorMinimumImplementUnits` define this share cap and threshold. The cap does not apply to one implementation unit.
+- Planning, research, and review-only plans must not manufacture implementation rows. Only planned roles and the applicable approval rules determine completion.
+- Preserve author independence and all class requirements. A critical `requiresPanel` implementation needs a convened plan and two distinct foreign review/verify vendors on the same unit and worktree.
+- Require native invocation proof, the bound brief acknowledgment, WRITE AUDIT, scope checks, receipts, and runtime-owned telemetry. A seat cannot create or repair its own completion evidence.
+- Finalize with `node <runtime-root>/tools/run-finalize.js --run-dir <run-dir>`. Activate with `node <runtime-root>/tools/activation-check.js --run-dir <run-dir>`.
+- For a unit's panel decision, use `node <runtime-root>/tools/panel-tally.js --run-dir <run-dir> --unit-id <unit>`. It reads verified native responses containing exactly one `POSITION: APPROVE`, `POSITION: REJECT`, or `POSITION: ABSTAIN` line and applies author recusal. Do not write ballots or count votes by hand.
+- Follow the finalizer's result. It reports execution and approval separately; execution PASS alone does not establish approval. No arbiter or seat can waive a deterministic failure.
+
+`<runtime-root>` means the resolved MAGI source checkout or installed runtime directory. Completion uses that sealed run's committed evidence and runtime projections, not manually assembled implementation logs. Standalone smoke and transport diagnostics cannot activate a production run.
+
+## Native MAGI only
+
+For an explicitly selected non-CLI MAGI mode, delegate activation policy to its existing [native MAGI skill](../skills/magi/SKILL.md) and the native host's `magi-mode` skill. Read only their guidance for that native mode. This delegation does not import their CLI examples, distribution rules, or graph overrides into `cursor-cli`.
+
+If a native workflow switches to `cursor-cli`, apply the CLI branch above and validate a complete CLI plan before launch.

@@ -1,72 +1,50 @@
 #!/usr/bin/env node
 'use strict';
-
 const fs = require('node:fs');
 const path = require('node:path');
-
-const VENDORS = new Set(['openai', 'anthropic', 'google']);
-
-function argError(message) { const e = new Error(message); e.code = 'ARGUMENT_ERROR'; return e; }
-
-function parseArgs(argv) {
-  const out = {};
-  for (let i = 0; i < argv.length; i += 1) {
-    const flag = argv[i];
-    if (flag === '--help' || flag === '-h') { out.help = true; continue; }
-    if (!['--file', '--vendor', '--model', '--observed-model', '--proof-id', '--note'].includes(flag)) throw argError(`unknown option: ${flag}`);
-    const value = argv[++i];
-    if (!value || value.startsWith('--')) throw argError(`${flag} requires a value`);
-    out[flag.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = value;
-  }
-  return out;
-}
+const { loadMatrix } = require('./dispatch-matrix.js');
+const { hashFile, writeJson } = require('./dispatch-evidence.js');
+const { verifyProbe } = require('./probe-evidence.js');
 
 function load(file) {
-  try { return JSON.parse(fs.readFileSync(path.resolve(file), 'utf8')); }
-  catch (error) {
-    if (error.code === 'ENOENT') return { schemaVersion: 1, vendors: {} };
-    throw argError(`cannot read availability file: ${error.message}`);
-  }
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+  catch (error) { if (error.code === 'ENOENT') return { schemaVersion: 2, vendors: {} }; throw error; }
 }
-
 function record(options) {
-  for (const key of ['file', 'vendor', 'model', 'observedModel', 'proofId']) if (!options[key]) throw argError(`--${key.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`)} is required`);
-  if (!VENDORS.has(options.vendor)) throw argError('invalid --vendor');
+  if (!options.file || !options.probe) throw new Error('--file and --probe are required; handwritten observations are not evidence');
+  const file = fs.realpathSync(options.probe);
+  const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const matrix = loadMatrix();
+  const spec = matrix.vendors?.[raw.vendor]?.models?.[raw.requestedModel];
+  if (!spec?.efforts.includes(raw.effort)) throw new Error('probe model/effort is outside catalog');
+  const verified = verifyProbe(file, { vendor: raw.vendor, model: raw.requestedModel, effort: raw.effort, observedModel: spec.canonical || raw.requestedModel });
+  const entry = { available: true, vendor: verified.vendor, requestedModel: verified.requestedModel, observedModel: verified.observedModel, effort: verified.effort, observedAt: verified.completedAt, evidence: { path: file, sha256: hashFile(file) }, note: options.note || null };
   const data = load(options.file);
-  data.schemaVersion = 1;
-  data.updatedAt = new Date().toISOString();
+  data.schemaVersion = 2;
   data.vendors ||= {};
-  data.vendors[options.vendor] ||= { models: {} };
-  data.vendors[options.vendor].models ||= {};
-  data.vendors[options.vendor].models[options.model] = {
-    available: options.observedModel === options.model,
-    observedModel: options.observedModel,
-    proofId: options.proofId,
-    observedAt: data.updatedAt,
-    note: options.note || null,
-  };
-  fs.mkdirSync(path.dirname(path.resolve(options.file)), { recursive: true });
-  fs.writeFileSync(path.resolve(options.file), `${JSON.stringify(data, null, 2)}\n`, 'utf8');
-  return data.vendors[options.vendor].models[options.model];
+  const vendor = data.vendors[raw.vendor] ||= { models: {} };
+  vendor.models ||= {};
+  const model = vendor.models[raw.requestedModel] ||= { efforts: {} };
+  model.efforts ||= {};
+  model.efforts[raw.effort] = entry;
+  writeJson(path.resolve(options.file), data);
+  return entry;
 }
-
-function usage() {
-  return 'Usage: node tools/model-availability.js --file <availability.json> --vendor <vendor> --model <requested> --observed-model <actual> --proof-id <proof> [--note <text>]';
+function parseArgs(argv) {
+  const opts = {};
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--help') { opts.help = true; continue; }
+    if (!['--file', '--probe', '--note'].includes(argv[i]) || !argv[i + 1]) throw new Error(`invalid option: ${argv[i]}`);
+    opts[argv[i].slice(2)] = argv[++i];
+  }
+  return opts;
 }
-
 function main(argv = process.argv.slice(2), io = process) {
   try {
     const opts = parseArgs(argv);
-    if (opts.help) { io.stdout.write(`${usage()}\n`); return 0; }
-    const result = record(opts);
-    io.stdout.write(`${JSON.stringify(result)}\n`);
-    return result.available ? 0 : 1;
-  } catch (error) {
-    const code = error.code || 'AVAILABILITY_FAIL';
-    io.stderr.write(`${code}: ${error.message}\n`);
-    return code === 'ARGUMENT_ERROR' ? 2 : 1;
-  }
+    if (opts.help) { io.stdout.write('Usage: model-availability --file <availability.json> --probe <model-probe result.json> [--note <text>]\n'); return 0; }
+    io.stdout.write(`${JSON.stringify(record(opts))}\n`); return 0;
+  } catch (error) { io.stderr.write(`AVAILABILITY_FAIL: ${error.message}\n`); return 1; }
 }
-
 if (require.main === module) process.exitCode = main();
 module.exports = { load, main, parseArgs, record };

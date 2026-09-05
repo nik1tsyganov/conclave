@@ -1,1 +1,138 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="MAGI is a code-enforced tri-vendor AI engineering system with Grok as a non-voting arbiter."><title>MAGI — Multi-Agent General Intelligence</title><link rel="stylesheet" href="styles.css"></head><body><header class="nav"><div class="wrap"><div class="brand">M.A.G.I.</div><nav class="navlinks"><a href="#system">System</a><a href="#matrix">Matrix</a><a href="#enforcement">Enforcement</a><a href="#principles">Principles</a><a href="https://github.com/nik1tsyganov/magi">GitHub</a></nav></div></header><main><section class="hero"><div class="wrap"><div class="eyebrow">MULTI-VENDOR · CODE-ENFORCED · FAIL-CLOSED</div><h1>MAGI<span>MULTI-AGENT GENERAL INTELLIGENCE</span></h1><p>Three independent AI vendors build, challenge, plan, research, and verify work under a fourth-vendor arbiter that cannot become a substantive seat. The model proposes. Code decides what is legal.</p><div class="actions"><a class="btn primary" href="#system">See the system</a><a class="btn" href="https://github.com/nik1tsyganov/magi">Open repository</a></div><div class="hero-art"><img src="magi-core.svg" alt="MAGI tri-core system with Grok arbiter and OpenAI, Anthropic, and Google seats"></div></div></section><section id="system"><div class="wrap"><div class="kicker">The panel</div><h2>Different vendors. Different failure modes.</h2><p class="lead">MAGI is not one model pretending to be a committee. Melchior, Balthasar, and Casper are vendor-separated seats. Grok sits above them only as classifier, dispatcher, evidence recorder, and mechanical arbiter.</p><div class="grid3"><article class="card blue"><h3>Melchior / OpenAI</h3><p>Technical depth, implementation, debugging, and adversarial review. The OpenAI ladder scales from Luna through Terra and Sol to Astra for extreme or explicitly escalated work.</p></article><article class="card amber"><h3>Balthasar / Anthropic</h3><p>Judgment, conservative review, planning, safety, and long-running agentic implementation. Sonnet, Fable, and Opus are selected by role rather than treated as one linear ladder.</p></article><article class="card green"><h3>Casper / Google</h3><p>Context, breadth, synthesis, and an intentionally decorrelated third perspective. agy results must carry exact observed-model proof so silent downgrade cannot masquerade as the requested seat.</p></article></div></div></section><section id="matrix"><div class="wrap"><div class="kicker">Routing</div><h2>The dispatch matrix is executable policy.</h2><p class="lead">Grok classifies the unit and proposes a route. The validator allows only role, model, effort, vendor, escalation, and availability combinations admitted by the machine-readable matrix.</p><table class="matrix"><thead><tr><th>Task class</th><th>Primary route</th><th>Alternates / escalation</th></tr></thead><tbody><tr><td>Architecture / planning</td><td>Claude Opus · high</td><td>GPT-5.6 Sol · Gemini Pro · Astra* only on explicit escalation</td></tr><tr><td>Standard feature</td><td>GPT-5.6 Terra · medium</td><td>Claude Sonnet · Gemini Flash*</td></tr><tr><td>Bulk / mechanical</td><td>GPT-5.6 Luna · medium</td><td>Gemini Flash* · Claude Sonnet</td></tr><tr><td>Difficult debugging</td><td>Claude Fable · xhigh</td><td>GPT-5.6 Sol · Gemini Pro · Astra* escalation</td></tr><tr><td>Long-running agentic work</td><td>Claude Fable · xhigh</td><td>GPT-6 Astra* · Gemini Flash* · GPT-5.6 Sol</td></tr><tr><td>Long-context analysis / research</td><td>Gemini Pro</td><td>GPT-6 Astra* · Claude Fable · GPT-5.6 Sol</td></tr><tr><td>Security-sensitive implementation</td><td>Claude Opus · xhigh</td><td>GPT-5.6 Sol · Gemini Pro · Astra* escalation</td></tr><tr><td>Adversarial review</td><td>GPT-5.6 Sol · high</td><td>Claude Opus · Gemini Pro · Astra* escalation</td></tr><tr><td>Extreme end-to-end implementation</td><td>GPT-6 Astra* · high</td><td>Claude Fable · Gemini Pro</td></tr></tbody></table><p class="lead" style="font-size:14px;margin-top:14px">* Probe-required. Exact availability proof must be fresh; the runtime default maximum age is 60 minutes. Escalation-only routes also require a recorded reason.</p></div></section><section id="enforcement"><div class="wrap"><div class="kicker">Control plane</div><h2>Rules become gates, not suggestions.</h2><p class="lead">MAGI CLI validates the whole plan before spend, then re-validates every seat at the actual launch boundary. A deterministic failure cannot be waived by Grok or by a seat.</p><div class="diagram"><img src="architecture.svg" alt="MAGI code enforcement architecture"></div><div class="codeflow"><div class="step"><b>1. Classify</b><small>Grok labels the unit and proposes a semantic role and legal route.</small></div><div class="step"><b>2. Validate plan</b><small>Distribution, model, effort, probe, escalation, and review rules.</small></div><div class="step"><b>3. Bind seat</b><small>Permissions, minimal staged skills, leaf-seat contract.</small></div><div class="step"><b>4. Execute</b><small>Vendor CLI runs with role-scoped permissions.</small></div><div class="step"><b>5. Prove</b><small>IDs, usage, capture, model identity evidence, and hashes.</small></div><div class="step"><b>6. Tally</b><small>Structured receipts drive activation and panel result.</small></div></div></div></section><section id="principles"><div class="wrap"><div class="kicker">Standing design</div><h2>What MAGI refuses to trust.</h2><div class="principles"><div class="principle"><div class="num">01</div><div><strong>No self-grading</strong><span>A vendor cannot review or verify the artifact it authored.</span></div></div><div class="principle"><div class="num">02</div><div><strong>No arbiter seat</strong><span>Grok classifies and dispatches but never supplies the substantive seat result or vote.</span></div></div><div class="principle"><div class="num">03</div><div><strong>No invented identity evidence</strong><span>Observed model identity is recorded only when the vendor path exposes it. Claude's current text-mode path is explicitly labeled requested-only.</span></div></div><div class="principle"><div class="num">04</div><div><strong>No hidden skill sprawl</strong><span>Seats receive a staged allow-listed skill pack matched to role and task class. Bridges and orchestration remain arbiter-only.</span></div></div><div class="principle"><div class="num">05</div><div><strong>No fake distribution math</strong><span>The 60% implementation floor starts at two implement units; plan, research, and review panels never fabricate implementation rows.</span></div></div><div class="principle"><div class="num">06</div><div><strong>No prose-only compliance</strong><span>Rules packs, seat profiles, skill manifests, receipts, telemetry, and matrix versions are hashed or schema-checked.</span></div></div></div></div></section></main><footer class="footer"><div class="wrap"><div><strong>M.A.G.I.</strong><br>Multi-Agent General Intelligence</div><div>Original system artwork and diagrams for this project. Retro-futurist anime command-system visual language; not an official Evangelion asset.</div></div></footer></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="MAGI coordinates AI engineering across three vendors through sealed plans, native evidence, and independent review.">
+  <title>MAGI — Multi-Agent General Intelligence</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="nav">
+    <div class="wrap">
+      <div class="brand">M.A.G.I. <span class="jp" lang="ja" aria-hidden="true">合議システム</span></div>
+      <nav class="navlinks" aria-label="Main navigation">
+        <a href="#system">System</a>
+        <a href="#matrix">Matrix</a>
+        <a href="#enforcement">Enforcement</a>
+        <a href="#principles">Principles</a>
+        <a href="https://github.com/nik1tsyganov/magi">GitHub</a>
+      </nav>
+    </div>
+  </header>
+  <main id="main" tabindex="-1">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="wrap">
+        <div class="hero-copy">
+          <div class="eyebrow">MULTI-VENDOR · CODE-ENFORCED · FAIL-CLOSED</div>
+          <h1 id="hero-title">MAGI<span>MULTI-AGENT GENERAL INTELLIGENCE</span></h1>
+          <p>Three AI vendors build, challenge, plan, research, and verify. A fourth-vendor arbiter routes the work. Sealed plans and native evidence hold the system to its rules.</p>
+          <div class="actions">
+            <a class="btn primary" href="#system">See the system</a>
+            <a class="btn" href="https://github.com/nik1tsyganov/magi">Open repository</a>
+          </div>
+        </div>
+        <figure class="hero-art">
+          <img src="magi-site-hero.jpg" width="1280" height="853" alt="MAGI concept artwork: three glowing vendor cores overlook a shared command room, with the five-stage workflow below." fetchpriority="high" decoding="async">
+          <figcaption><span>Three vendor seats. One non-voting arbiter.</span><a href="magi-site-hero.jpg">Full artwork</a><a href="magi-core.svg">System diagram</a></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="system" aria-labelledby="system-title">
+      <div class="wrap">
+        <div class="kicker">The panel <span class="jp" lang="ja" aria-hidden="true">三者合議</span></div>
+        <h2 id="system-title">Different vendors.<br>Different failure modes.</h2>
+        <p class="lead">Melchior, Balthasar, and Casper are vendor-separated seats. Grok classifies work, dispatches seats, and collects evidence. It supplies no substantive seat result or vote.</p>
+        <div class="grid3">
+          <article class="card blue">
+            <div class="seat-label">MELCHIOR / OPENAI</div>
+            <h3>Technical depth.</h3>
+            <p>Implementation, debugging, and adversarial review. The OpenAI ladder runs from Luna through Terra and Sol to Astra. Every Astra route needs a recorded escalation reason.</p>
+          </article>
+          <article class="card amber">
+            <div class="seat-label">BALTHASAR / ANTHROPIC</div>
+            <h3>Judgment in context.</h3>
+            <p>Review, planning, safety, and long-running agentic implementation. Sonnet, Fable, and Opus are selected by role. Production proof requires native observed model and effort.</p>
+          </article>
+          <article class="card green">
+            <div class="seat-label">CASPER / GOOGLE</div>
+            <h3>A wider field of view.</h3>
+            <p>Context, breadth, and synthesis from a third vendor. agy must prove its exact observed model slug, including the fused effort. A silent substitution fails the dispatch.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="matrix" aria-labelledby="matrix-title">
+      <div class="wrap">
+        <div class="kicker">Routing <span class="jp" lang="ja" aria-hidden="true">経路選択</span></div>
+        <h2 id="matrix-title">The dispatch matrix<br>is executable policy.</h2>
+        <p class="lead">Grok proposes a route. The validator checks the complete plan: task class, role, vendor, model, effort, scope, author provenance, escalation, and fresh availability evidence.</p>
+        <p class="scroll-hint" id="matrix-scroll-hint">On narrow screens, scroll the table sideways. Keyboard users can focus it and use the arrow keys.</p>
+        <div class="table-scroll" role="region" aria-labelledby="matrix-caption" aria-describedby="matrix-scroll-hint" tabindex="0">
+          <table class="matrix">
+            <caption id="matrix-caption">Selected catalog routes · availability must be proved locally</caption>
+            <thead><tr><th scope="col">Task class</th><th scope="col">Primary route</th><th scope="col">Alternates / escalation</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Architecture / planning</th><td>Claude Opus · high</td><td>GPT-5.6 Sol · Gemini Pro · Astra escalation</td></tr>
+              <tr><th scope="row">Standard feature</th><td>GPT-5.6 Terra · medium</td><td>Claude Sonnet · Gemini Flash</td></tr>
+              <tr><th scope="row">Bulk / mechanical</th><td>GPT-5.6 Luna · medium</td><td>Gemini Flash · Claude Sonnet</td></tr>
+              <tr><th scope="row">Difficult debugging</th><td>Claude Fable · xhigh</td><td>GPT-5.6 Sol · Gemini Pro · Astra escalation</td></tr>
+              <tr><th scope="row">Long-running agentic work</th><td>Claude Fable · xhigh</td><td>Astra escalation · Gemini Flash · GPT-5.6 Sol</td></tr>
+              <tr><th scope="row">Long-context analysis / research</th><td>Gemini Pro · fused-high</td><td>Astra escalation · Claude Fable · GPT-5.6 Sol</td></tr>
+              <tr><th scope="row">Security-sensitive implementation</th><td>Claude Opus · xhigh</td><td>GPT-5.6 Sol · Gemini Pro · Astra escalation</td></tr>
+              <tr><th scope="row">Adversarial review</th><td>GPT-5.6 Sol · high</td><td>Claude Opus · Gemini Pro · Astra escalation</td></tr>
+              <tr><th scope="row">Extreme end-to-end implementation</th><td>GPT-6 Astra · high · escalation</td><td>Claude Fable · Gemini Pro</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="matrix-note">Every exact model/effort pair needs native probe evidence. It expires 60 minutes after the original probe completes; re-importing it does not renew it. Unproven pairs remain unavailable. Astra always requires an escalation flag and a recorded reason.</p>
+      </div>
+    </section>
+
+    <section id="enforcement" aria-labelledby="enforcement-title">
+      <div class="wrap">
+        <div class="kicker">Control plane <span class="jp" lang="ja" aria-hidden="true">制御系統</span></div>
+        <h2 id="enforcement-title">From a legal route<br>to accountable work.</h2>
+        <p class="lead">The runtime seals the whole plan before a production dispatch. Each launch consumes a bound entry. Changed routes, scopes, briefs, or author claims fail validation.</p>
+        <figure class="diagram">
+          <img src="architecture.svg" width="1400" height="760" alt="Grok proposes a plan. Dispatch, seat, and rules policy constrain vendor execution. Native proof and telemetry feed the approval tally." loading="lazy" decoding="async">
+          <figcaption><span>Policy, capabilities, execution, evidence.</span><a href="architecture.svg">Full diagram</a></figcaption>
+        </figure>
+        <ol class="codeflow" aria-label="MAGI lifecycle">
+          <li class="step"><b><span>01</span> Dispatch</b><p>Seal the complete plan against fresh model/effort probes, concrete scopes, and author provenance.</p></li>
+          <li class="step"><b><span>02</span> Execute</b><p>Leaf seats receive hashed rules and lean skills. Role permissions bound the work; post-run write audits reject out-of-scope changes.</p></li>
+          <li class="step"><b><span>03</span> Deliberate</b><p>Foreign reviewers challenge the work. Each captured response carries one APPROVE, ABSTAIN, or REJECT position.</p></li>
+          <li class="step"><b><span>04</span> Verify</b><p>Check native identity, usage, acknowledgments, artifact hashes, write audits, and committed outcomes.</p></li>
+          <li class="step"><b><span>05</span> Activate</b><p>Finalize execution and approval separately. Native POSITION tallies decide critical approval after author recusal.</p></li>
+        </ol>
+        <p class="boundary-note">Execution PASS alone does not approve work. Ordinary approval requires foreign verification and an approving review. Critical approval needs two eligible APPROVE votes. Approval records a decision; it does not deploy or merge work by itself.</p>
+      </div>
+    </section>
+
+    <section id="principles" aria-labelledby="principles-title">
+      <div class="wrap">
+        <div class="kicker">Standing design <span class="jp" lang="ja" aria-hidden="true">運用原則</span></div>
+        <h2 id="principles-title">What MAGI refuses to trust.</h2>
+        <div class="principles">
+          <div class="principle"><div class="num" aria-hidden="true">01</div><div><strong>No self-grading</strong><span>A vendor cannot review or verify the artifact it authored.</span></div></div>
+          <div class="principle"><div class="num" aria-hidden="true">02</div><div><strong>No arbiter seat</strong><span>Grok classifies and dispatches but never supplies the substantive seat result or vote.</span></div></div>
+          <div class="principle"><div class="num" aria-hidden="true">03</div><div><strong>No invented identity evidence</strong><span>Codex and Claude must prove native observed model and effort. agy must prove its exact fused slug. Requested settings alone cannot qualify.</span></div></div>
+          <div class="principle"><div class="num" aria-hidden="true">04</div><div><strong>No hidden skill sprawl</strong><span>Seats receive hashed, allow-listed skills and rules. Every non-implementation role is read-only. Bridges and orchestration remain arbiter-only.</span></div></div>
+          <div class="principle"><div class="num" aria-hidden="true">05</div><div><strong>No fake distribution math</strong><span>The 60% implementation share cap starts at two units. Planning, research, and review do not inflate the implementation count.</span></div></div>
+          <div class="principle"><div class="num" aria-hidden="true">06</div><div><strong>No prose-only compliance</strong><span>Real files, manifest hashes, native proof, receipts, and idempotent telemetry must agree with the sealed plan.</span></div></div>
+        </div>
+        <p class="boundary-note">Project writes are audited after execution. These checks do not isolate vendor home directories or control arbitrary shell calls.</p>
+      </div>
+    </section>
+  </main>
+  <footer class="footer">
+    <div class="wrap">
+      <div><strong>M.A.G.I.</strong><br>Multi-Agent General Intelligence</div>
+      <div>Project artwork and system diagrams. Independent fan project inspired by Evangelion; no official affiliation or endorsement.</div>
+    </div>
+  </footer>
+</body>
+</html>

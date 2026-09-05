@@ -55,13 +55,24 @@ function base(opts) {
   };
 }
 
+function subscriptionEnv(source = process.env) {
+  const env = { ...source };
+  for (const key of ['OPENAI_API_KEY', 'AZURE_OPENAI_API_KEY', 'OPENAI_BASE_URL', 'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENAI_USE_VERTEXAI', 'GOOGLE_APPLICATION_CREDENTIALS', 'CLAUDECODE']) delete env[key];
+  return env;
+}
+
+function seatContextText(ctx) {
+  const finalHeader = JSON.stringify(ctx.brief.firstLine.replace(/\r$/, ''));
+  return `Read ${ctx.seatContractPath} in full before doing any task work. Use only the MAGI-authorized staged skills listed there. The user delegated the task and report format to this bound brief and contract. Native permissions still apply. Your FINAL response must start with the brief's exact first line: ${finalHeader} (JSON-encoded; output the decoded string without quotes). Do not put a status sentence, introduction, Markdown decoration or confirmation request before that line. Then follow the brief's response format.`;
+}
+
 function seatPointerText(ctx) {
-  return `${pointerText(ctx.brief).trim()} Read ${ctx.seatContractPath} in full before doing any task work. Use only the MAGI-authorized staged skills listed there.`;
+  return `${pointerText(ctx.brief).trim()} ${seatContextText(ctx)}`;
 }
 
 function seatPointerFile(ctx) {
   const file = writePointerFile(ctx.brief.briefPath);
-  fs.appendFileSync(file, `Read ${ctx.seatContractPath} in full before doing any task work. Use only the MAGI-authorized staged skills listed there.\n`, 'utf8');
+  fs.appendFileSync(file, `${seatContextText(ctx)}\n`, 'utf8');
   return file;
 }
 
@@ -77,16 +88,17 @@ function openaiLaunch(opts) {
       '-c', 'memories.use_memories=false', '-c', 'memories.generate_memories=false',
       '-C', ctx.cwd, '-o', opts.capturePath, '-',
     ],
-    cwd: ctx.cwd, stdinFile: pointerFile, stdio: ['pipe', 'pipe', 'pipe'],
+    cwd: ctx.cwd, env: subscriptionEnv(opts.env), stdinFile: pointerFile, stdio: ['pipe', 'pipe', 'pipe'],
     pointerFile, requestedSandbox: roleSandbox(ctx.role), skillRoot: ctx.skillRoot, seatContractPath: ctx.seatContractPath,
   };
 }
 
 function googleLaunch(opts) {
   const ctx = base({ ...opts, vendor: 'google' });
-  const env = { ...(opts.env || process.env), AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
+  const env = { ...subscriptionEnv(opts.env), AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
   for (const key of ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENAI_USE_VERTEXAI', 'GOOGLE_APPLICATION_CREDENTIALS', 'CLAUDECODE']) delete env[key];
-  const args = ['--model', ctx.model, '--output-format', 'json', '--print-timeout', '20m'];
+  const nativeLogPath = path.join(path.dirname(opts.capturePath || ctx.seatContractPath), 'native-cli.log');
+  const args = ['--model', ctx.model, '--output-format', 'json', '--print-timeout', '20m', '--log-file', nativeLogPath];
   if (ctx.role === 'implement') args.push('--dangerously-skip-permissions'); else args.push('--sandbox');
   const addDirs = [ctx.cwd, path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath)];
   if (opts.rulesRoot) addDirs.push(opts.rulesRoot);
@@ -95,27 +107,34 @@ function googleLaunch(opts) {
   return {
     vendor: 'google', role: ctx.role, model: ctx.model, effort: null,
     binary: resolveVendorBinary('google', { env: opts.env, home: opts.home, mustExist: opts.mustExistBinary !== false }),
-    args, env, cwd: ctx.cwd, stdio: ['ignore', 'pipe', 'pipe'], skillRoot: ctx.skillRoot, seatContractPath: ctx.seatContractPath,
+    args, env, cwd: ctx.cwd, stdio: ['ignore', 'pipe', 'pipe'], nativeLogPath, skillRoot: ctx.skillRoot, seatContractPath: ctx.seatContractPath,
   };
 }
 
 function anthropicLaunch(opts) {
   const ctx = base({ ...opts, vendor: 'anthropic' });
+  if (ctx.role !== 'implement' && ((opts.reviewPermissionMode && opts.reviewPermissionMode !== 'dontAsk') || (process.env.MAGI_CLAUDE_REVIEW_PERMISSION_MODE && process.env.MAGI_CLAUDE_REVIEW_PERMISSION_MODE !== 'dontAsk'))) throw new Error('read-only Claude roles require dontAsk with read-only tools');
   const pointerFile = seatPointerFile(ctx);
   const permissionMode = ctx.role === 'implement'
     ? 'bypassPermissions'
-    : (opts.reviewPermissionMode || process.env.MAGI_CLAUDE_REVIEW_PERMISSION_MODE || 'plan');
-  const args = ['-p', '--model', ctx.model, '--effort', ctx.effort, '--permission-mode', permissionMode, '--add-dir', ctx.cwd];
+    : 'dontAsk';
+  // Keep authenticated native tools and permissions, but exclude global hooks,
+  // plugins and instruction discovery. Leaf context is read from staged files.
+  const args = ['-p', '--safe-mode', '--model', ctx.model, '--effort', ctx.effort, '--permission-mode', permissionMode, '--add-dir', ctx.cwd];
+  // Native final-response instructions must survive tool-result narration.
+  // Append to the native system prompt; never replace its permission controls.
+  args.push('--append-system-prompt', seatContextText(ctx));
+  if (ctx.role !== 'implement') args.push('--tools', 'Read,Glob,Grep', '--allowedTools', 'Read,Glob,Grep');
   const addDirs = [path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath)];
   if (opts.rulesRoot) addDirs.push(opts.rulesRoot);
   for (const dir of [...new Set(addDirs)]) {
     if (path.win32.resolve(dir).toLowerCase() !== ctx.cwd.toLowerCase()) args.push('--add-dir', dir);
   }
-  args.push('--output-format', 'text');
+  args.push('--output-format', 'stream-json', '--verbose');
   return {
     vendor: 'anthropic', role: ctx.role, model: ctx.model, effort: ctx.effort,
     binary: resolveVendorBinary('anthropic', { env: opts.env, home: opts.home, mustExist: opts.mustExistBinary !== false }),
-    args, cwd: ctx.cwd, stdinFile: pointerFile, stdio: ['pipe', 'pipe', 'pipe'], permissionMode,
+    args, cwd: ctx.cwd, env: subscriptionEnv(opts.env), stdinFile: pointerFile, stdio: ['pipe', 'pipe', 'pipe'], permissionMode,
     skillRoot: ctx.skillRoot, seatContractPath: ctx.seatContractPath,
   };
 }
@@ -127,4 +146,4 @@ function buildLaunch(opts) {
   throw new Error(`unsupported vendor: ${opts.vendor}`);
 }
 
-module.exports = { DEFAULTS, READ_ONLY_ROLES, allowedWorkspace, anthropicLaunch, buildLaunch, googleLaunch, openaiLaunch, roleSandbox, seatPointerFile, seatPointerText };
+module.exports = { DEFAULTS, READ_ONLY_ROLES, allowedWorkspace, anthropicLaunch, buildLaunch, googleLaunch, openaiLaunch, roleSandbox, seatPointerFile, seatPointerText, subscriptionEnv };

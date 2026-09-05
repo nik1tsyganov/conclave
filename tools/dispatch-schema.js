@@ -17,7 +17,7 @@ function positiveNumberOrNull(value, field) {
 
 function validateDispatchRow(row, options = {}) {
   if (!row || typeof row !== 'object' || Array.isArray(row)) fail('row must be a JSON object');
-  if (!VENDORS.includes(row.vendor)) fail(`invalid vendor: ${row.vendor}`);
+  if (!VENDORS.includes(row.vendor)) fail('invalid vendor');
   if (!ROLES.includes(row.role)) fail(`invalid role: ${row.role}`);
   if (row.hostMode !== undefined && !HOST_MODES.includes(row.hostMode)) fail(`invalid hostMode: ${row.hostMode}`);
   if (row.routedBy !== undefined && row.routedBy !== 'arbiter') fail('invalid routedBy');
@@ -27,6 +27,13 @@ function validateDispatchRow(row, options = {}) {
   if (options.requireDispatchId && (typeof row.dispatchId !== 'string' || row.dispatchId.length === 0)) fail('dispatchId required');
   if (options.requireUnitId && (typeof row.unitId !== 'string' || row.unitId.length === 0)) fail('unitId required');
   if (options.requireProof && (typeof row.proofId !== 'string' || row.proofId.length === 0)) fail('proofId required');
+  if (options.requireHostMode && !HOST_MODES.includes(row.hostMode)) fail('invalid hostMode');
+  if (row.schemaVersion === 2) {
+    for (const field of ['dispatchId', 'unitId', 'class', 'planId', 'modelRequested', 'modelObserved', 'transactionPath']) if (typeof row[field] !== 'string' || !row[field]) fail(`${field} required`);
+    for (const field of ['proofId', 'planHash']) if (!/^[a-f0-9]{64}$/.test(row[field] || '')) fail(`invalid ${field}`);
+    if (row.status !== 'PASS') fail('success dispatch row must have status PASS');
+    if (typeof row.escalation !== 'boolean') fail('escalation must be boolean');
+  }
   positiveNumberOrNull(row.vendorSideTokens, 'vendorSideTokens');
   positiveNumberOrNull(row.totalTokens, 'totalTokens');
   if (row.date !== undefined) {

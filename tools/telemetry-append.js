@@ -4,6 +4,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { validateDispatchRow } = require('./dispatch-schema.js');
+const { appendUniqueRow, verifyCommittedRow } = require('./dispatch-evidence.js');
 
 function fail(reason, status = 1) {
   console.error(String(reason).replace(/[\r\n]+/g, ' '));
@@ -38,18 +39,20 @@ try { row = JSON.parse(rowText); }
 catch (error) { fail(`invalid JSON: ${error.message}`); }
 try {
   validateDispatchRow(row, {
+    requireHostMode: true,
     requireCursorCli: row.hostMode === 'cursor-cli',
     requireArbiter: row.hostMode === 'cursor-cli',
     requireDispatchId: row.schemaVersion === 1,
     requireUnitId: row.schemaVersion === 1,
     requireProof: row.schemaVersion === 1,
   });
+  if (row.schemaVersion === 2) verifyCommittedRow(row);
 } catch (error) {
   fail(error.message);
 }
 try {
   fs.mkdirSync(path.dirname(logPath), { recursive: true });
-  fs.appendFileSync(logPath, `${JSON.stringify(row)}\n`, 'utf8');
+  appendUniqueRow(logPath, row);
 } catch (error) {
   fail(`cannot write log: ${error.message}`, 2);
 }

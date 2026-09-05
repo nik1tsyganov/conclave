@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "updated": "2026-09-05",
   "principles": {
     "leafSeat": true,
@@ -26,9 +26,9 @@
     "claude-bridge"
   ],
   "baseSkills": {
-    "openai": [],
-    "anthropic": [],
-    "google": []
+    "openai": ["seat-openai"],
+    "anthropic": ["seat-anthropic"],
+    "google": ["seat-google"]
   },
   "roleSkills": {
     "implement": ["implement", "testing"],
@@ -67,13 +67,13 @@
     "openai": {
       "roles": ["implement", "review", "verify", "plan", "research"],
       "writePermission": { "implement": "workspace-write", "review": "read-only", "verify": "read-only", "plan": "read-only", "research": "read-only" },
-      "proof": ["sessionId", "vendorSideTokens", "sandbox", "modelObserved"]
+      "proof": ["sessionId", "vendorSideTokens", "sandbox", "modelObserved", "effortObserved"]
     },
     "anthropic": {
       "roles": ["implement", "review", "verify", "plan", "research"],
-      "writePermission": { "implement": "bypassPermissions", "review": "plan", "verify": "plan", "plan": "plan", "research": "plan" },
-      "proof": ["modelRequested", "effortRequested", "identityEvidence", "onTopic", "responseBytes"],
-      "proofCaveat": "Current Claude text-mode path proves the requested alias/effort and a healthy topical response, not vendor-native observed model identity. Do not label requested-only evidence as observed identity."
+      "writePermission": { "implement": "bypassPermissions", "review": "read-only-tools", "verify": "read-only-tools", "plan": "read-only-tools", "research": "read-only-tools" },
+      "proof": ["sessionId", "vendorSideTokens", "modelRequested", "effortRequested", "modelObserved", "effortObserved", "identityEvidence", "onTopic", "responseBytes"],
+      "proofPolicy": "Production requires structured native success, session and usage, canonical observed model, and session-bound native observed effort. Missing or mismatched observation fails; requested identity cannot replace it."
     },
     "google": {
       "roles": ["implement", "review", "verify", "plan", "research"],

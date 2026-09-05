@@ -2,29 +2,45 @@
 description: MAGI Cursor arbiter rules. Always on in every Cursor workspace; ignore in CONCLAVE chats.
 alwaysApply: true
 ---
-If this chat is CONCLAVE (`/conclave`, `camerlengo-8`), ignore this file.
+This file applies to MAGI runs. Ignore it in CONCLAVE (`/conclave`, `camerlengo-8`) and unrelated chats.
 
-Otherwise, this is the MAGI Cursor arbiter for `/magi` and `/magi-cli`. `magi-whoami` is required (mode `cursor` or `cursor-cli`). For hostMode `cursor`, use the native Task model table in `.cursor/skills/magi/references/cursor-host.md`. For operational status, see `live-check.mdc` (check live, never write "until X" as current status).
+Declare the mode with `magi-whoami` (`cursor` or `cursor-cli`). This checks the declared route, not the actual host model. For operational status, use a current check as described in [live-check.mdc](live-check.mdc).
 
 ## Arbiter boundary
 
 - The Cursor arbiter is xAI Grok only. It is not a MAGI seat.
-- The arbiter classifies, writes the dispatch plan and briefs, launches seats, records lead telemetry, and runs the mechanical tally.
+- The arbiter classifies, prepares plans and briefs, launches seats, and requests the mode's evidence and deterministic completion checks.
 - The arbiter MUST NOT implement, review, verify, repair, or vote on product artifacts. If it does, activation fails.
 - Deterministic checks outrank the arbiter and every seat. The arbiter cannot waive a failing code/schema/proof/rules check.
 
-## `/magi-cli` dispatch matrix — mandatory
+## Cursor CLI only
 
-For hostMode `cursor-cli`, `.cursor/skills/magi-cli/references/dispatch-matrix.json` is the machine-readable routing authority for vendor/model/effort by role and task class.
+For `hostMode: cursor-cli` or `/magi-cli`, use the [MAGI CLI skill](../skills/magi-cli/SKILL.md) and its [run procedure](../skills/magi-cli/references/cursor-cli.md). Its dispatch matrix selects legal vendor/model/effort combinations by role and class. Grok 4.6 is the non-voting arbiter; substantive planning and research also belong to vendor seats.
 
-Before the first vendor process starts:
+Before the first production dispatch:
 
-1. Classify every unit into a matrix class.
-2. Write `dispatch-plan.json` with `hostMode:"cursor-cli"`, `arbiter:{vendor:"xai",model:"grok-4.6",effort:"high"|"xhigh"}`, `magiConvened`, and every planned seat row `{unitId,class,role,vendor,model,effort,authorVendor?}`.
-3. Run `node <MAGI CLI plugin>/tools/dispatch-matrix.js --plan <dispatch-plan.json> [--availability <availability.json>]`.
-4. Exit 1/2 means STOP. Do not hand-edit around the checker; change the plan or establish live availability.
-5. Launch every seat through `dispatch-run.js`, not directly through a vendor binary. `dispatch-run.js` re-checks the matrix at the launch boundary, stages/validates standing rules, captures proof, and writes telemetry/receipt artifacts.
+1. Classify every unit. Set `MAGI_RULES_ROOT` to the external STANDING v2 / R01-R22 pack and run the CLI preflight.
+2. Probe every selected exact vendor/model/effort pair with `model-probe.js --vendor <vendor> --model <model> --effort <effort> --evidence-dir <new-probe-dir>`. Import each captured `probe.json` with `model-availability.js --file <availability.json> --probe <probe.json>`.
+3. Require actual native observed identity and hashed evidence for every route. Unknown, mismatched, or unproven pairs are unavailable. Evidence expires 60 minutes after its original completion; importing it again does not renew it.
+4. Finalize the briefs and their SHA256 hashes. Prepare the whole plan with `planId`, `hostMode: "cursor-cli"`, `arbiter: {vendor: "xai", model: "grok-4.6", effort: "high"}`, `magiConvened`, and all `dispatches`. The matrix also permits arbiter effort `xhigh`.
+5. Each dispatch binds `dispatchId`, `unitId`, `class`, `role`, `vendor`, `model`, `effort`, absolute `cwd`, absolute `brief`, `briefSha256`, and relative `writeScope`. Review/verify entries require correct foreign `authorVendor`. Read-only roles have `writeScope: []`. Carry escalation authorization in the plan; Astra always requires `escalation: true` and a reason of at least 16 characters and three distinct words.
+6. Seal the complete plan with `node <runtime-root>/tools/plan-seal.js --plan <draft.json> --run-dir <new-run-dir> --availability <availability.json>`. A policy failure stops the launch.
+7. Launch each entry through `node <runtime-root>/tools/dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-dir> --dispatch-id <id> --rules-root <external-v2-pack>`. The runtime binds the selected entry, staged skill/rule hashes, native proof, scope audit, receipts, and idempotent telemetry.
 
-Grok may choose only among routes admitted by the matrix. A model marked `probe-required` is unavailable until an availability record proves that exact observed model slug. An owner `vendorOverride` may alter vendor choice only when the run graph records it and a future explicit override field is accepted by the policy checker; until then, an override that is not in the matrix is fail-closed.
+Launch uses the availability evidence pinned by the seal. Omit `--availability` on `dispatch-run`; that optional argument accepts only a byte-identical copy for relocation. A refreshed availability snapshot requires a new complete plan and seal.
 
-Project slices/graphs define units, dependencies, and write scope, not vendors: follow the matrix + live distribution floor at dispatch, ignore project `SLICES.md` implement/verify vendor columns, and accept only run-local graph overrides that the deterministic checker supports.
+Only the arbiter owns orchestration, routing, bridge, distribution, assessment, and retrospective skills. Leaves receive their selected vendor card and role/class skills. They cannot delegate or edit policy, receipts, evidence, or telemetry. Non-implementation roles stay read-only under their native profile.
+
+Convened implementation requires at least `min(3, implementation unit count)` distinct implementation vendors. Every plan with at least two implementation units has the matrix's 60% maximum vendor share. Plans without implementation do not manufacture implementation rows. Preserve all class, author-independence, and critical-panel requirements.
+
+Project slices and graphs define units, dependencies, and write scope. A SLICES vendor column or `graph.json` `vendorOverride` grants no CLI route authority. Changing a route, class, author, brief, or scope requires a revised complete plan, all policy checks, and a new seal.
+
+Finalize with `run-finalize.js --run-dir <run-dir>` and activate with `activation-check.js --run-dir <run-dir>`. Use `panel-tally.js --run-dir <run-dir> --unit-id <unit>` for verified native POSITION votes and author recusal. Execution and approval are separate results. The arbiter cannot fabricate votes or telemetry, hand-count passage, or waive failure.
+
+Resolve `<runtime-root>` from the MAGI source checkout or installed runtime directory. Standalone smoke and transport diagnostics cannot activate production work.
+
+## Native Cursor only
+
+For an explicitly selected `hostMode: cursor` run, follow the [native MAGI skill](../skills/magi/SKILL.md) and [native Task model table](../skills/magi/references/cursor-host.md). Their native routing, distribution, and tally policy is scoped to that mode and cannot override the CLI branch above.
+
+If a native host check switches a dispatch to `cursor-cli`, use the CLI skill and validate a complete sealed CLI plan before launch.

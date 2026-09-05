@@ -13,7 +13,7 @@ function fixture(t) {
   const seatContractPath = path.join(dir, 'SEAT-CONTRACT.md');
   const skillRoot = path.join(dir, 'skills');
   fs.mkdirSync(skillRoot, { recursive: true });
-  fs.writeFileSync(briefPath, 'test brief', 'utf8');
+  fs.writeFileSync(briefPath, 'ACK test brief\nTask details remain in this file.\n', 'utf8');
   fs.writeFileSync(seatContractPath, 'seat contract', 'utf8');
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   return { dir, briefPath, seatContractPath, skillRoot };
@@ -58,8 +58,26 @@ test('Claude non-implement roles do not inherit implement bypassPermissions', (t
     briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
     cwd: 'C:\\src\\product-a', model: 'fable', effort: 'xhigh', env: fakeBins, mustExistBinary: false,
   };
-  for (const role of ['review', 'verify', 'plan', 'research']) assert.strictEqual(anthropicLaunch({ ...common, role }).permissionMode, 'plan');
-  assert.strictEqual(anthropicLaunch({ ...common, role: 'implement' }).permissionMode, 'bypassPermissions');
+  for (const role of ['implement', 'review', 'verify', 'plan', 'research']) {
+    const launch = anthropicLaunch({ ...common, role });
+    assert.strictEqual(launch.permissionMode, role === 'implement' ? 'bypassPermissions' : 'dontAsk');
+    assert.ok(launch.args.includes('--safe-mode'), 'global hooks and skills must not override a leaf contract');
+    assert.ok(!launch.args.includes('--bare'), 'bare mode disables subscription OAuth');
+    assert.ok(!launch.args.includes('--system-prompt'), 'native system controls must remain in place');
+    const finalContract = launch.args[launch.args.indexOf('--append-system-prompt') + 1];
+    assert.ok(finalContract.includes(JSON.stringify('ACK test brief')));
+    assert.ok(finalContract.includes("Your FINAL response must start with the brief's exact first line"));
+    assert.ok(finalContract.includes('Native permissions still apply'));
+    assert.ok(!finalContract.includes(fs.readFileSync(f.briefPath, 'utf8')), 'the brief body remains on disk');
+    assert.ok(fs.readFileSync(launch.stdinFile, 'utf8').includes(JSON.stringify('ACK test brief')), 'the user pointer binds the literal header too');
+    assert.ok(!launch.env.ANTHROPIC_API_KEY);
+    if (role !== 'implement') {
+      assert.strictEqual(launch.args[launch.args.indexOf('--tools') + 1], 'Read,Glob,Grep');
+      assert.strictEqual(launch.args[launch.args.indexOf('--allowedTools') + 1], 'Read,Glob,Grep');
+      assert.ok(!launch.args.includes('plan'), 'plan mode requires a separate approval turn');
+      for (const forbidden of ['bypassPermissions', 'manual', 'auto', 'acceptEdits', 'plan']) assert.throws(() => anthropicLaunch({ ...common, role, reviewPermissionMode: forbidden }), /read-only Claude roles require/);
+    }
+  }
 });
 
 test('Google and Claude launchers mount only staged seat skill root, not full global skill tree', (t) => {
@@ -73,6 +91,8 @@ test('Google and Claude launchers mount only staged seat skill root, not full gl
     cwd: 'C:\\src\\product-a', model: 'fable', effort: 'xhigh', role: 'review', env: fakeBins, mustExistBinary: false,
   });
   assert.ok(google.args.includes(path.resolve(f.skillRoot)));
+  assert.strictEqual(google.args[google.args.indexOf('--log-file') + 1], path.join(f.dir, 'native-cli.log'));
+  assert.strictEqual(google.nativeLogPath, path.join(f.dir, 'native-cli.log'));
   assert.ok(claude.args.includes(path.resolve(f.skillRoot)));
   assert.ok(!google.args.includes('C:\\Users\\test\\.claude\\skills'));
 });

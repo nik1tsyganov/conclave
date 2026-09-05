@@ -6,26 +6,33 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildLaunch } = require('./cli-adapters.js');
 const { runLaunch } = require('./cli-runner.js');
-const { stageRules, verifyStagedRules } = require('./cli-rules-stage.js');
+const { FINGERPRINT_V2, stageRules, verifyStagedRules } = require('./cli-rules-stage.js');
 const { checkBriefFile } = require('./cli-brief-rules-check.js');
 const { verifyProof } = require('./cli-proof.js');
 const { validateDispatchRow, ROLES } = require('./dispatch-schema.js');
-const { loadMatrix, loadAvailability, routeAllowed } = require('./dispatch-matrix.js');
+const { DEFAULT_MATRIX, bindDispatch, loadMatrix, loadAvailability } = require('./dispatch-matrix.js');
 const { loadProfiles, buildSeatProfile } = require('./seat-policy.js');
-const { stageSeatSkills } = require('./cli-skill-stage.js');
+const { stageSeatSkills, verifySeatSkills } = require('./cli-skill-stage.js');
+const { DEFAULT_PROFILES } = require('./seat-policy.js');
+const { appendUniqueRow, assertPlainPath, compareWorkspace, hashFile, inside, reserveTransaction, snapshotWorkspace, transactionKey, verifyCommittedRow, writeJson: atomicJson } = require('./dispatch-evidence.js');
+const { finalResponse, nativeLog } = require('./vendor-native.js');
+const { readSealedRun } = require('./plan-seal.js');
 
 function argError(message) { const e = new Error(message); e.code = 'ARGUMENT_ERROR'; return e; }
 function policyError(message) { const e = new Error(message); e.code = 'POLICY_FAIL'; return e; }
 function hashText(text) { return crypto.createHash('sha256').update(text).digest('hex'); }
 function appendJsonl(file, row) { fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true }); fs.appendFileSync(path.resolve(file), `${JSON.stringify(row)}\n`, 'utf8'); }
-function writeJson(file, value) { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`, 'utf8'); }
+function writeJson(file, value) { atomicJson(file, value); }
+function runtimeManifest() {
+  return fs.readdirSync(__dirname).filter((name) => name.endsWith('.js') && !name.endsWith('.test.js')).sort().map((name) => ({ path: name, sha256: hashFile(path.join(__dirname, name)) }));
+}
 
 function parseArgs(argv) {
   const out = { onTopic: false };
   const values = new Set([
     '--vendor', '--role', '--class', '--brief', '--cwd', '--model', '--effort', '--dispatch-id', '--unit-id',
     '--evidence-dir', '--telemetry-log', '--activation-log', '--rules-root', '--review-permission-mode',
-    '--matrix', '--availability', '--author-vendor', '--seat-profiles', '--skill-source-root',
+    '--matrix', '--availability', '--author-vendor', '--seat-profiles', '--skill-source-root', '--plan', '--plan-hash', '--run-dir', '--max-wall-ms',
   ]);
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
@@ -41,10 +48,9 @@ function parseArgs(argv) {
 
 function usage() {
   return [
-    'Usage: node tools/dispatch-run.js --vendor <openai|google|anthropic> --role <implement|review|verify|plan|research>',
-    '  --class <routing-class> --brief <BRIEF.md> --cwd <worktree> --model <slug> --effort <level>',
-    '  --dispatch-id <id> --unit-id <id> --evidence-dir <dir> [--availability <json>]',
-    '  [--author-vendor <vendor>] [--rules-root <dir>] [--seat-profiles <json>] [--skill-source-root <dir>] [--on-topic]',
+    'Usage: node tools/dispatch-run.js --plan <run-dir/dispatch-plan.json> --dispatch-id <id>',
+    '  [--run-dir <dir>] [--availability <json>] [--max-wall-ms <milliseconds>]',
+    '  [--rules-root <dir>] [--skill-source-root <dir>] [--on-topic]',
     '',
     'Runs one fail-closed MAGI CLI seat transaction. Matrix, seat policy, staged skills, rules, proof, and telemetry are enforced in code.',
   ].join('\n');
@@ -73,11 +79,14 @@ function seatContractText(opts, seatProfile, skillStage) {
     `Class: ${opts.class}`,
     `Model: ${opts.model}`,
     `Effort: ${opts.effort}`,
+    `Plan: ${opts.planId} (${opts.planHash})`,
+    `Escalation: ${opts.escalation === true}; reason: ${opts.escalationReason || 'none'}`,
     `Permission profile: ${seatProfile.permissionProfile}`,
     '',
     'This is a leaf seat. Do not dispatch, delegate, spawn, or ask another model/agent to perform work.',
     'This seat is not the arbiter. Do not change routing, model choice, panel membership, or deterministic gate outcomes.',
-    opts.role === 'implement' ? 'Writes are limited to BRIEF.md scope in the assigned worktree.' : 'Read-only role: do not modify product files.',
+    opts.role === 'implement' ? `Writes are limited to these relative paths in the assigned worktree: ${opts.writeScope.join(', ')}.` : 'Read-only role: do not modify product files.',
+    'Do not stage or commit changes. Do not modify any evidence, rules, contracts, or skill files.',
     '',
     'Allowed staged skills:',
     ...seatProfile.skills.map((skill) => `- ${skill}: ${path.join(skillStage.root, skill, 'SKILL.md')}`),
@@ -88,18 +97,62 @@ function seatContractText(opts, seatProfile, skillStage) {
   ].join('\n');
 }
 
-async function runDispatch(opts) {
+async function runDispatch(opts, dependencies = {}) {
+  if (!opts.plan || !opts.dispatchId) throw argError('--plan and --dispatch-id are required');
+  const planPath = fs.realpathSync(opts.plan);
+  const runDir = path.dirname(planPath);
+  if (opts.runDir && fs.realpathSync(opts.runDir) !== runDir) throw policyError('--run-dir does not contain the sealed plan');
+  const sealed = readSealedRun(runDir);
+  const { seal } = sealed;
+  if (planPath !== sealed.planPath) throw policyError('dispatch plan must be the sealed run plan');
+  const planEntry = sealed.plan.dispatches.find((row) => row.dispatchId === opts.dispatchId);
+  if (!planEntry) throw policyError('dispatchId absent from sealed plan');
+  opts = { ...planEntry, planHash: seal.planHash, evidenceDir: path.join(runDir, 'out', opts.dispatchId), ...opts };
   required(opts);
-  const brief = path.resolve(opts.brief);
+  const originalBrief = path.resolve(opts.brief);
   const evidenceDir = path.resolve(opts.evidenceDir);
+  const cwd = fs.realpathSync(opts.cwd);
+  if (!inside(evidenceDir, runDir)) throw policyError('evidence directory must be inside its sealed run directory');
+  if (inside(evidenceDir, cwd)) throw policyError('evidence directory must be outside the product worktree');
+  // Overrides may relocate an identical contract; they cannot weaken runtime policy.
+  for (const [supplied, canonical] of [[opts.matrix, DEFAULT_MATRIX], [opts.seatProfiles, DEFAULT_PROFILES]]) {
+    if (supplied && hashFile(supplied) !== hashFile(canonical)) throw policyError('runtime policy override differs from installed contract');
+  }
+  if (opts.availability && hashFile(opts.availability) !== seal.availabilitySha256) {
+    throw policyError('availability override differs from sealed evidence');
+  }
+  const matrix = loadMatrix();
+  const availability = loadAvailability(sealed.availablePath);
+  const binding = bindDispatch(opts, matrix, availability);
+  if (inside(binding.planPath, cwd)) throw policyError('dispatch plan must be outside the product worktree');
+  opts = { ...opts, ...binding.entry, cwd, planHash: binding.planHash, planId: binding.plan.planId };
+  const telemetryLog = path.resolve(opts.telemetryLog || path.join(runDir, 'telemetry', 'dispatches.jsonl'));
+  const activationLog = path.resolve(opts.activationLog || path.join(runDir, 'magi-dispatch-log.jsonl'));
+  if ([telemetryLog, activationLog].some((file) => !inside(file, runDir) || inside(file, cwd))) throw policyError('dispatch logs must be inside the run directory and outside the product worktree');
+  for (const file of [telemetryLog, activationLog, evidenceDir]) assertPlainPath(file);
+  if (['review', 'verify'].includes(opts.role)) {
+    const author = binding.plan.dispatches.find((row) => row.unitId === opts.unitId && row.role === 'implement');
+    if (author) {
+      const authorFile = path.join(runDir, '.magi-dispatches', `${transactionKey(author)}.json`);
+      if (!fs.existsSync(authorFile)) throw policyError('implementation must finish before its review or verification');
+      const state = JSON.parse(fs.readFileSync(authorFile, 'utf8'));
+      verifyCommittedRow(state.telemetry || {});
+    }
+  }
+  const transaction = reserveTransaction(binding, evidenceDir);
+  if (transaction.replayed) return { ok: true, replayed: true, proofId: transaction.state.telemetry.proofId, receipt: transaction.state.receipt, telemetry: transaction.state.telemetry };
+  let scopeAudit = null;
+  let before = null;
+  let evidenceCreated = false;
+  try {
+  if (fs.existsSync(evidenceDir) && fs.readdirSync(evidenceDir).length) throw policyError('evidence directory must be new or empty');
   fs.mkdirSync(evidenceDir, { recursive: true });
-
-  const matrix = loadMatrix(opts.matrix);
-  const availability = loadAvailability(opts.availability);
-  const routePolicy = routeAllowed(matrix, { class: opts.class, role: opts.role, vendor: opts.vendor, model: opts.model, effort: opts.effort }, availability);
-  if (!routePolicy.ok) throw policyError(routePolicy.reason);
-
-  const seatProfiles = loadProfiles(opts.seatProfiles);
+  evidenceCreated = true;
+  if (inside(fs.realpathSync(evidenceDir), cwd)) throw policyError('evidence directory resolves inside the product worktree');
+  const brief = path.join(evidenceDir, 'brief', 'BRIEF.md');
+  fs.mkdirSync(path.dirname(brief), { recursive: true });
+  fs.copyFileSync(originalBrief, brief);
+  const seatProfiles = loadProfiles();
   const seatProfile = buildSeatProfile(seatProfiles, { vendor: opts.vendor, role: opts.role, class: opts.class, arbiter: false, subdispatch: false });
   const skillStage = stageSeatSkills({
     skills: seatProfile.skills,
@@ -111,8 +164,9 @@ async function runDispatch(opts) {
   fs.writeFileSync(seatContractPath, seatContractText(opts, seatProfile, skillStage), 'utf8');
 
   const staged = stageRules({ briefPath: brief, rulesRoot: opts.rulesRoot });
+  if (staged.manifest.fingerprint !== FINGERPRINT_V2) throw policyError('production dispatch requires the external STANDING v2 / R01-R22 pack');
   verifyStagedRules(brief);
-  const briefCheck = checkBriefFile(brief, { role: opts.role, vendor: opts.vendor, requireStructural: true });
+  const briefCheck = checkBriefFile(brief, { role: opts.role, vendor: opts.vendor, requireStructural: true, seatProfile, skillRoot: skillStage.root, seatContractPath, expectedRulesManifest: staged.manifest, expectedSkillsManifest: skillStage.manifest });
   if (!briefCheck.ok) {
     const error = new Error(`brief gate failed: ${briefCheck.missing.join(', ')}`);
     error.code = 'RULES_FAIL';
@@ -125,32 +179,75 @@ async function runDispatch(opts) {
   const pidFile = path.join(evidenceDir, 'child.pid');
   for (const file of [capturePath, stdoutPath, stderrPath]) fs.rmSync(file, { force: true });
 
-  const launch = buildLaunch({
+  const launch = (dependencies.buildLaunch || buildLaunch)({
     vendor: opts.vendor, role: opts.role, briefPath: brief, cwd: opts.cwd, model: opts.model,
     effort: opts.vendor === 'google' ? undefined : opts.effort,
-    capturePath, rulesRoot: staged.rulesRoot, skillRoot: skillStage.root, seatContractPath,
+    capturePath, skillRoot: skillStage.root, seatContractPath,
     reviewPermissionMode: opts.reviewPermissionMode,
   });
+  if (launch.nativeLogPath) {
+    if (!inside(launch.nativeLogPath, evidenceDir)) throw new Error('native log must stay inside dispatch evidence');
+    assertPlainPath(launch.nativeLogPath);
+    fs.rmSync(launch.nativeLogPath, { force: true });
+  }
+  const runtimeFiles = runtimeManifest();
+  const runtimeSha256 = hashText(JSON.stringify(runtimeFiles));
+  atomicJson(path.join(evidenceDir, 'runtime-manifest.json'), runtimeFiles);
   writeJson(path.join(evidenceDir, 'launch.json'), {
     class: opts.class, vendor: launch.vendor, role: launch.role, model: opts.model, effort: opts.effort,
-    binary: launch.binary, args: launch.args, cwd: launch.cwd,
+    planId: opts.planId, planHash: opts.planHash, planEntry: binding.entry, escalation: opts.escalation === true, escalationReason: opts.escalationReason || null,
+    binary: launch.binary, args: launch.args, cwd: launch.cwd, nativeLogPath: launch.nativeLogPath,
     matrixVersion: matrix.schemaVersion, seatProfileVersion: seatProfiles.schemaVersion,
-    seatContractPath, skillManifestPath: skillStage.manifestPath,
+    seatContractPath, skillManifestPath: skillStage.manifestPath, runtimeSha256,
   });
 
-  const result = await runLaunch(launch, { pidFile, stdoutFile: stdoutPath, stderrFile: stderrPath });
-  if (!result.ok) {
-    const error = new Error(`vendor child failed exit=${result.exitCode}${result.killReason ? ` reason=${result.killReason}` : ''}`);
-    error.code = 'LAUNCH_FAIL';
-    throw error;
-  }
-
+  const protectedPaths = [binding.planPath, sealed.sealPath, sealed.availablePath, originalBrief, DEFAULT_MATRIX, DEFAULT_PROFILES, brief, seatContractPath, staged.manifestPath, skillStage.manifestPath, path.join(evidenceDir, 'seat-profile.json'),
+    ...Object.entries(skillStage.manifest.skills).flatMap(([skill, files]) => files.map((file) => path.join(skillStage.root, skill, file.path))),
+    ...staged.manifest.files.map((item) => path.join(path.dirname(brief), item.path))];
+  const protectedHashes = protectedPaths.map((file) => ({ path: file, sha256: hashFile(file) }));
+  atomicJson(path.join(evidenceDir, 'plan-binding.json'), { planId: opts.planId, planHash: opts.planHash, entry: binding.entry });
+  before = snapshotWorkspace(cwd);
+  atomicJson(path.join(evidenceDir, 'workspace-before.json'), before);
+  const rulesBefore = snapshotWorkspace(staged.rulesRoot);
+  atomicJson(path.join(evidenceDir, 'rules-source-before.json'), rulesBefore);
+  const skillSources = () => Object.fromEntries(seatProfile.skills.map((skill) => [skill, snapshotWorkspace(path.join(skillStage.manifest.sourceRoot, skill))]));
+  const skillsBefore = skillSources();
+  atomicJson(path.join(evidenceDir, 'skills-source-before.json'), skillsBefore);
+  const maxWallMs = opts.maxWallMs === undefined ? 2700000 : Number(opts.maxWallMs);
+  if (!Number.isFinite(maxWallMs) || maxWallMs < 1 || maxWallMs > 2700000) throw argError('--max-wall-ms must be between 1 and 2700000');
+  const result = await (dependencies.runLaunch || runLaunch)(launch, { pidFile, stdoutFile: stdoutPath, stderrFile: stderrPath, maxWallMs, signal: dependencies.signal });
+  for (const file of [telemetryLog, activationLog, capturePath, path.join(evidenceDir, 'vendor.log'), transaction.file, path.join(runDir, '.magi-sessions'), ...(launch.nativeLogPath ? [launch.nativeLogPath] : [])]) assertPlainPath(file);
+  const after = snapshotWorkspace(cwd);
+  atomicJson(path.join(evidenceDir, 'workspace-after.json'), after);
+  scopeAudit = compareWorkspace(before, after, opts.writeScope);
+  atomicJson(path.join(evidenceDir, 'scope-audit.json'), scopeAudit);
+  const rulesAfter = snapshotWorkspace(staged.rulesRoot);
+  atomicJson(path.join(evidenceDir, 'rules-source-after.json'), rulesAfter);
+  const rulesAudit = compareWorkspace(rulesBefore, rulesAfter, []);
+  atomicJson(path.join(evidenceDir, 'rules-source-audit.json'), rulesAudit);
+  const skillsAfter = skillSources();
+  atomicJson(path.join(evidenceDir, 'skills-source-after.json'), skillsAfter);
+  const skillsAudit = Object.fromEntries(seatProfile.skills.map((skill) => [skill, compareWorkspace(skillsBefore[skill], skillsAfter[skill], [])]));
+  atomicJson(path.join(evidenceDir, 'skills-source-audit.json'), skillsAudit);
   if (opts.vendor !== 'openai') fs.writeFileSync(capturePath, result.stdout, 'utf8');
-  else if (!fs.existsSync(capturePath)) fs.writeFileSync(capturePath, result.stdout, 'utf8');
-  const combinedLog = `${result.stderr}\n${result.stdout}`;
+  let combinedLog = opts.vendor === 'openai' ? result.stderr : `${result.stderr}\n${result.stdout}`;
+  if (result.ok && fs.existsSync(capturePath) && !dependencies.runLaunch) combinedLog = nativeLog(opts.vendor, fs.readFileSync(capturePath, 'utf8'), combinedLog, { cwd, nativeLogPath: launch.nativeLogPath });
   fs.writeFileSync(path.join(evidenceDir, 'vendor.log'), combinedLog, 'utf8');
-
-  const proof = verifyProof({ vendor: opts.vendor, capture: capturePath, log: path.join(evidenceDir, 'vendor.log'), expectedModel: opts.model, expectedEffort: opts.effort, onTopic: opts.onTopic });
+  if (!result.ok) throw Object.assign(new Error(`vendor child failed exit=${result.exitCode}${result.killReason ? ` reason=${result.killReason}` : ''}`), { code: 'LAUNCH_FAIL' });
+  if (!scopeAudit.ok) throw Object.assign(new Error('vendor changed files outside its authorized scope or changed git state'), { code: 'SCOPE_FAIL' });
+  if (!rulesAudit.ok || hashText(JSON.stringify(runtimeManifest())) !== runtimeSha256) throw policyError('external rules source or runtime code changed during dispatch');
+  if (Object.values(skillsAudit).some((audit) => !audit.ok)) throw policyError('external skill source changed during dispatch');
+  if (opts.role === 'implement' && scopeAudit.changedFiles.length === 0) throw Object.assign(new Error('implementation produced no covered file change'), { code: 'SCOPE_FAIL' });
+  for (const file of protectedHashes) if (hashFile(file.path) !== file.sha256) throw policyError(`protected input changed during dispatch: ${file.path}`);
+  verifyStagedRules(brief, staged.manifest);
+  verifySeatSkills({ destinationRoot: skillStage.root, skills: seatProfile.skills, manifest: skillStage.manifest });
+  if (!fs.existsSync(capturePath) || !fs.readFileSync(capturePath, 'utf8').trim()) throw Object.assign(new Error('vendor capture missing or empty'), { code: 'PROOF_FAIL' });
+  const modelSpec = matrix.vendors[opts.vendor].models[opts.model];
+  const proof = verifyProof({ vendor: opts.vendor, capture: capturePath, log: path.join(evidenceDir, 'vendor.log'), expectedModel: opts.model, expectedObservedModel: modelSpec.canonical || opts.model, expectedEffort: opts.effort, expectedSandbox: launch.requestedSandbox, onTopic: opts.onTopic });
+  const response = finalResponse(opts.vendor, fs.readFileSync(capturePath, 'utf8'));
+  const firstLine = fs.readFileSync(brief, 'utf8').split(/\r?\n/, 1)[0];
+  if (response.split(/\r?\n/, 1)[0] !== firstLine) throw Object.assign(new Error('final response does not acknowledge the bound brief first line'), { code: 'PROOF_FAIL' });
+  Object.assign(proof, { planId: opts.planId, planHash: opts.planHash, escalation: opts.escalation === true, escalationReason: opts.escalationReason || null });
   for (const field of seatProfile.proofFields) {
     if (proof[field] === undefined || proof[field] === null) {
       const error = new Error(`seat proof missing required field: ${field}`);
@@ -159,24 +256,30 @@ async function runDispatch(opts) {
     }
   }
   const proofId = hashText(JSON.stringify(proof));
+  const sessionKey = `${opts.vendor}-${hashText(proof.sessionId || proof.conversationId || '')}`;
+  const sessionDir = path.join(runDir, '.magi-sessions');
+  fs.mkdirSync(sessionDir, { recursive: true });
+  try { fs.writeFileSync(path.join(sessionDir, `${sessionKey}.json`), JSON.stringify({ dispatchId: opts.dispatchId, proofId }), { flag: 'wx' }); }
+  catch (error) { if (error.code === 'EEXIST') throw policyError('native session already belongs to another dispatch'); throw error; }
   writeJson(path.join(evidenceDir, 'proof.json'), { proofId, class: opts.class, ...proof });
 
   const now = new Date();
   const telemetry = validateDispatchRow({
-    schemaVersion: 1, date: now.toISOString().slice(0, 10), dispatchId: opts.dispatchId, unitId: opts.unitId,
+    schemaVersion: 2, status: 'PASS', date: now.toISOString().slice(0, 10), dispatchId: opts.dispatchId, unitId: opts.unitId,
     class: opts.class, vendor: opts.vendor, role: opts.role, hostMode: 'cursor-cli', routedBy: 'arbiter', capturedBy: 'lead',
-    model: opts.model, effort: opts.effort, proofId, vendorSideTokens: proof.vendorSideTokens ?? null,
+    model: opts.model, modelRequested: opts.model, modelObserved: proof.modelObserved, effort: opts.effort, proofId, vendorSideTokens: proof.vendorSideTokens ?? null,
+    authorVendor: opts.authorVendor || null, planId: opts.planId, planHash: opts.planHash, escalation: opts.escalation === true, escalationReason: opts.escalationReason || null,
+    transactionPath: transaction.file,
     note: `evidence=${evidenceDir};matrix=v${matrix.schemaVersion};seat-profile=v${seatProfiles.schemaVersion}`,
   }, { requireCursorCli: true, requireArbiter: true, requireDispatchId: true, requireUnitId: true, requireProof: true });
 
-  const telemetryLog = opts.telemetryLog || path.resolve(__dirname, '..', 'telemetry', 'dispatches.jsonl');
-  appendJsonl(telemetryLog, telemetry);
-  if (opts.role === 'implement') appendJsonl(opts.activationLog || path.resolve(__dirname, '..', 'magi-dispatch-log.jsonl'), telemetry);
-
   const receipt = {
-    schemaVersion: 1, dispatchId: opts.dispatchId, unitId: opts.unitId, class: opts.class, vendor: opts.vendor, role: opts.role,
+    schemaVersion: 2, status: 'PASS', dispatchId: opts.dispatchId, unitId: opts.unitId, class: opts.class, vendor: opts.vendor, role: opts.role,
     model: opts.model, effort: opts.effort, proofId, matrixVersion: matrix.schemaVersion, seatProfileVersion: seatProfiles.schemaVersion,
     seatSkills: seatProfile.skills, permissionProfile: seatProfile.permissionProfile,
+    planId: opts.planId, planHash: opts.planHash, planEntry: binding.entry, transactionPath: transaction.file,
+    modelRequested: opts.model, modelObserved: proof.modelObserved, escalation: opts.escalation === true, escalationReason: opts.escalationReason || null,
+    changedFiles: scopeAudit.changedFiles, scopeCoverage: scopeAudit.coverage, runtimeSha256,
     briefSha256: crypto.createHash('sha256').update(fs.readFileSync(brief)).digest('hex'),
     captureSha256: crypto.createHash('sha256').update(fs.readFileSync(capturePath)).digest('hex'),
     seatContractSha256: crypto.createHash('sha256').update(fs.readFileSync(seatContractPath)).digest('hex'),
@@ -185,7 +288,28 @@ async function runDispatch(opts) {
   };
   writeJson(path.join(evidenceDir, 'receipt-ack.json'), receipt);
   writeJson(path.join(evidenceDir, 'handoff-envelope.json'), { ...receipt, telemetryLog, status: 'PASS' });
+  const artifacts = ['capture.txt', 'vendor.log', 'proof.json', 'receipt-ack.json', 'handoff-envelope.json', 'scope-audit.json', 'plan-binding.json', 'launch.json', 'workspace-before.json', 'workspace-after.json', 'runtime-manifest.json', 'rules-source-before.json', 'rules-source-after.json', 'rules-source-audit.json', 'skills-source-before.json', 'skills-source-after.json', 'skills-source-audit.json']
+    .map((file) => ({ path: path.join(evidenceDir, file), sha256: hashFile(path.join(evidenceDir, file)) }));
+  artifacts.push(...protectedHashes);
+  if (launch.nativeLogPath && fs.existsSync(launch.nativeLogPath)) artifacts.push({ path: launch.nativeLogPath, sha256: hashFile(launch.nativeLogPath) });
+  const logs = [...new Set([telemetryLog, activationLog])];
+  for (const log of logs) appendUniqueRow(log, telemetry);
+  // This commit marker is written last. Consumers reject incomplete projections.
+  atomicJson(transaction.file, { ...transaction.state, status: 'PASS', receipt, telemetry, artifacts, logs, completedAt: now.toISOString() });
   return { ok: true, proofId, receipt, telemetry };
+  } catch (error) {
+    if (before && !scopeAudit) {
+      try { scopeAudit = compareWorkspace(before, snapshotWorkspace(cwd), opts.writeScope); } catch (auditError) { scopeAudit = { ok: false, error: auditError.message }; }
+    }
+    const failure = { ...transaction.state, status: 'FAIL', code: error.code || 'DISPATCH_FAIL', error: error.message, scopeAudit, completedAt: new Date().toISOString() };
+    atomicJson(transaction.file, failure);
+    // Failed records never qualify for activation or successful usage accounting.
+    if (evidenceCreated) {
+      atomicJson(path.join(evidenceDir, 'receipt-ack.json'), failure);
+      atomicJson(path.join(evidenceDir, 'handoff-envelope.json'), failure);
+    }
+    throw error;
+  }
 }
 
 async function main(argv = process.argv.slice(2), io = process) {

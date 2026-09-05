@@ -4,7 +4,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const DEFAULT_PROFILES = path.resolve(__dirname, '..', '.cursor', 'skills', 'magi-cli', 'references', 'seat-profiles.json');
+const DEFAULT_PROFILES = require('./runtime-paths.js').resolveRuntimePaths().seatProfilesPath;
 
 function policyError(message) {
   const error = new Error(message);

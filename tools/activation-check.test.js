@@ -32,27 +32,27 @@ describe('activation-check', () => {
     assert.strictEqual(r.stderr.trim(), 'FIXTURE LOG — NOT AN ACTIVATION');
   });
 
-  it('forwards a passing hog-check result for a non-fixture live log', () => {
+  it('rejects handwritten balanced rows as uncommitted evidence', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'activation-check-'));
     const liveLog = path.join(dir, 'live.jsonl');
     writeFileSync(liveLog, '{"vendor":"google","role":"implement"}\n{"vendor":"anthropic","role":"implement"}\n{"vendor":"openai","role":"implement"}\n');
     try {
       const r = run(liveLog);
-      assert.strictEqual(r.status, 0);
-      assert.strictEqual(r.stdout.trim(), 'FLOOR HOLDS');
+      assert.strictEqual(r.status, 1);
+      assert.match(r.stderr, /committed dispatch transaction/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it('forwards a failing hog-check result for a non-fixture live log', () => {
+  it('rejects handwritten imbalanced rows before accounting', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'activation-check-'));
     const liveLog = path.join(dir, 'live.jsonl');
     writeFileSync(liveLog, '{"vendor":"anthropic","role":"implement"}\n{"vendor":"anthropic","role":"implement"}\n{"vendor":"anthropic","role":"implement"}\n{"vendor":"openai","role":"implement"}\n');
     try {
       const r = run(liveLog);
       assert.strictEqual(r.status, 1);
-      assert.match(r.stderr, /FLOOR TRIPPED anthropic/);
+      assert.match(r.stderr, /committed dispatch transaction/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

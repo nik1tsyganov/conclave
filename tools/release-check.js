@@ -23,6 +23,14 @@ const REQUIRED = [
   'tools/cross-repo-check.js',
   'tools/dispatch-matrix.js',
   'tools/dispatch-run.js',
+  'tools/dispatch-evidence.js',
+  'tools/plan-seal.js',
+  'tools/model-probe.js',
+  'tools/probe-evidence.js',
+  'tools/vendor-native.js',
+  'tools/run-finalize.js',
+  'tools/panel-tally.js',
+  'tools/runtime-paths.js',
   'tools/dispatch-schema.js',
   'tools/magi-cli-preflight.js',
   'tools/model-availability.js',
@@ -60,7 +68,7 @@ function main(io = process) {
     profiles.principles?.proofMustDistinguishRequestedFromObserved !== true ||
     !profiles.roleSkills?.plan ||
     !profiles.roleSkills?.research ||
-    profiles.vendors?.anthropic?.proof?.includes('modelObserved')
+    !['sessionId', 'vendorSideTokens', 'modelObserved', 'effortObserved'].every((field) => profiles.vendors?.anthropic?.proof?.includes(field))
   ) {
     io.stderr.write('RELEASE_CHECK_FAIL seat profiles are stale or not fail-closed\n');
     return 1;
