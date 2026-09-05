@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const { allowedWorkspace, anthropicLaunch, googleLaunch, openaiLaunch } = require('./cli-adapters.js');
+const { CLAUDE_RESPONSE_PROTOCOL, CLAUDE_RESPONSE_SCHEMA, validateClaudeResponseLaunch } = require('./vendor-native.js');
 
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-adapter-'));
@@ -60,6 +61,13 @@ test('Claude non-implement roles do not inherit implement bypassPermissions', (t
   };
   for (const role of ['implement', 'review', 'verify', 'plan', 'research']) {
     const launch = anthropicLaunch({ ...common, role });
+    assert.strictEqual(launch.responseProtocol, CLAUDE_RESPONSE_PROTOCOL);
+    validateClaudeResponseLaunch(launch);
+    assert.deepStrictEqual(JSON.parse(launch.args[launch.args.indexOf('--json-schema') + 1]), CLAUDE_RESPONSE_SCHEMA);
+    assert.deepStrictEqual(CLAUDE_RESPONSE_SCHEMA.required, ['response']);
+    assert.strictEqual(CLAUDE_RESPONSE_SCHEMA.additionalProperties, false);
+    assert.strictEqual(CLAUDE_RESPONSE_SCHEMA.properties.response.type, 'string');
+    assert.ok(!JSON.stringify(CLAUDE_RESPONSE_SCHEMA).includes('minLength'));
     assert.strictEqual(launch.permissionMode, role === 'implement' ? 'bypassPermissions' : 'dontAsk');
     assert.ok(launch.args.includes('--safe-mode'), 'global hooks and skills must not override a leaf contract');
     assert.ok(!launch.args.includes('--bare'), 'bare mode disables subscription OAuth');

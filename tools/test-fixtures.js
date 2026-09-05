@@ -93,13 +93,21 @@ function createSealedRun(t, entries = [{}], options = {}) {
 
 function fakeVendor(action = () => {}, response = 'ACK fixture\nPOSITION: APPROVE\nDone.') {
   let calls = 0;
-  const buildLaunch = (opts) => ({ ...opts, vendor: opts.vendor, role: opts.role, binary: process.execPath, args: [], requestedSandbox: opts.role === 'implement' ? 'workspace-write' : 'read-only' });
+  const buildLaunch = (opts) => ({ ...opts, vendor: opts.vendor, role: opts.role, binary: process.execPath,
+    args: opts.vendor === 'anthropic' ? ['--json-schema', JSON.stringify(require('./vendor-native.js').CLAUDE_RESPONSE_SCHEMA)] : [],
+    requestedSandbox: opts.role === 'implement' ? 'workspace-write' : 'read-only' });
   const runLaunch = async (launch) => {
     calls++;
     if (launch.role === 'implement') fs.writeFileSync(path.join(launch.cwd, 'result.txt'), 'implemented');
     await action(launch);
     const model = launch.vendor === 'anthropic' ? require('./dispatch-matrix.js').loadMatrix().vendors.anthropic.models[launch.model].canonical : launch.model;
     const native = nativeCapture(launch.vendor, model, launch.vendor === 'google' ? 'fused-high' : launch.effort, response, launch.requestedSandbox);
+    if (launch.vendor === 'anthropic') {
+      const terminal = JSON.parse(native.capture);
+      terminal.structured_output = { response };
+      terminal.result = JSON.stringify(terminal.structured_output);
+      native.capture = JSON.stringify(terminal);
+    }
     const id = require('node:crypto').randomUUID();
     native.capture = native.capture.replaceAll(SESSION, id); native.log = native.log.replaceAll(SESSION, id);
     if (launch.vendor === 'openai') fs.writeFileSync(launch.capturePath, native.capture);

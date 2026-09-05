@@ -4,12 +4,67 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const GOOGLE_IDENTITY_LINE = /Print mode: starting.*model=|Print mode: conversation=|Created conversation /;
+const CLAUDE_RESPONSE_PROTOCOL = 'claude-structured-response-v1';
+const CLAUDE_RESPONSE_SCHEMA = Object.freeze({
+  type: 'object',
+  properties: Object.freeze({ response: Object.freeze({ type: 'string', description: 'The final report, starting with the exact first line of the bound brief.' }) }),
+  required: Object.freeze(['response']),
+  additionalProperties: false,
+});
+
+function responseError(message) { return Object.assign(new Error(message), { code: 'PROOF_FAIL' }); }
+function requireClaudeResponseProtocol(protocol) {
+  if (protocol !== CLAUDE_RESPONSE_PROTOCOL) throw responseError('Claude structured response protocol is missing or unsupported');
+}
+function validateClaudeResponseLaunch(launch) {
+  requireClaudeResponseProtocol(launch.responseProtocol);
+  const args = launch.args || [];
+  const schemaFlags = args.filter(arg => arg === '--json-schema' || String(arg).startsWith('--json-schema='));
+  if (launch.vendor !== 'anthropic' || schemaFlags.length !== 1 || schemaFlags[0] !== '--json-schema' ||
+      args[args.indexOf('--json-schema') + 1] !== JSON.stringify(CLAUDE_RESPONSE_SCHEMA)) {
+    throw responseError('Claude launch does not bind the required structured response schema');
+  }
+}
+
+function validateClaudeStructuredResponse(records) {
+  if (!Array.isArray(records) || !records.length || records.some(row => !row || typeof row !== 'object' || Array.isArray(row))) {
+    throw responseError('Claude structured response has malformed native records');
+  }
+  if (records.some(row => row.is_error || row.subtype === 'error' || row.status === 'error' || row.error)) {
+    throw responseError('Claude capture contains error result/status');
+  }
+  const terminals = records.filter(row => row.type === 'result');
+  if (terminals.length !== 1) throw responseError('Claude structured response requires exactly one terminal result');
+  const terminal = terminals[0];
+  if (terminal.subtype !== 'success' || records.at(-1) !== terminal) throw responseError('Claude structured response requires a successful final terminal result');
+  if (typeof terminal.session_id !== 'string' || !terminal.session_id.trim()) throw responseError('Claude structured response is missing terminal session identity');
+  const nativeRows = records.filter(row => row.type === 'result' || row.type === 'assistant' || (row.type === 'system' && row.subtype === 'init'));
+  if (nativeRows.some(row => Object.hasOwn(row, 'session_id') && row.session_id !== terminal.session_id)) throw responseError('Claude proof has inconsistent sessions');
+  const payload = terminal.structured_output;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload) ||
+      Object.keys(payload).length !== 1 || !Object.hasOwn(payload, 'response') ||
+      typeof payload.response !== 'string' || !payload.response.trim()) {
+    throw responseError('Claude structured_output must contain only a nonempty response string');
+  }
+  return payload.response;
+}
+
+function strictJsonRecords(capture) {
+  try { return [JSON.parse(capture)]; } catch {}
+  try { return String(capture).split(/\r?\n/).filter(line => line.trim()).map(line => JSON.parse(line)); }
+  catch { throw responseError('Claude capture is malformed structured data'); }
+}
 
 function jsonRecords(text) {
   try { return [JSON.parse(text)]; } catch {}
   return String(text).split(/\r?\n/).flatMap((line) => { try { return [JSON.parse(line)]; } catch { return []; } });
 }
-function finalResponse(vendor, capture) {
+function finalResponse(vendor, capture, options = {}) {
+  if (options.responseProtocol !== undefined) {
+    requireClaudeResponseProtocol(options.responseProtocol);
+    if (vendor !== 'anthropic') throw responseError('Claude structured response protocol cannot apply to another vendor');
+    return validateClaudeStructuredResponse(strictJsonRecords(capture));
+  }
   if (vendor === 'openai') return String(capture).trim();
   const records = jsonRecords(capture);
   if (vendor === 'google') return typeof records[0]?.response === 'string' ? records[0].response.trim() : '';
@@ -51,4 +106,4 @@ function nativeLog(vendor, capture, baseLog, { home = os.homedir(), cwd, nativeL
   }
   throw new Error('matching Claude native session evidence missing');
 }
-module.exports = { finalResponse, jsonRecords, nativeLog };
+module.exports = { CLAUDE_RESPONSE_PROTOCOL, CLAUDE_RESPONSE_SCHEMA, finalResponse, jsonRecords, nativeLog, requireClaudeResponseProtocol, validateClaudeResponseLaunch, validateClaudeStructuredResponse };

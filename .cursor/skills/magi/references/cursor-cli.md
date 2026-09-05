@@ -94,6 +94,8 @@ Claude non-implementation seats use the schema 5 `read-only-tools` profile. The 
 
 Claude implementation uses `--safe-mode --permission-mode bypassPermissions` with its declared scope and post-run audit. Native safe mode disables global customization and hooks while preserving subscription authentication and role permissions. Do not use `--bare`; it disables OAuth. Safe mode is not vendor-home isolation.
 
+Production Claude dispatches request a native `--json-schema` envelope. Put the complete final report in the schema's `response` string, exposed by the CLI as terminal `structured_output.response`. The runtime uses that string unchanged and checks its exact bound-BRIEF first line. It does not strip a prefix, generate an acknowledgment, or fall back to the text `result` field. Missing or malformed structured output fails. Native success, session, model, effort, usage, and scope checks still apply. Standalone `model-probe.js` keeps its challenge-response format; other vendor output formats are unchanged.
+
 Google probes and dispatches supply `--log-file <evidence-dir>/native-cli.log`. Each call has a unique evidence directory. Default second-resolution home-log names can collide during parallel calls, so proof collection uses the pinned native file when building `vendor.log`.
 
 ## Read the committed evidence

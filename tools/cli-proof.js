@@ -3,6 +3,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { CLAUDE_RESPONSE_PROTOCOL, requireClaudeResponseProtocol, validateClaudeStructuredResponse } = require('./vendor-native.js');
 
 const AUTH_NEEDLES = ['not logged in', 'please run /login', 'auth required', 'authentication required'];
 
@@ -179,6 +180,7 @@ function parseGoogle(captureText, logText, expectedModel) {
 
 function parseClaude(captureText, expectedModel, expectedEffort, onTopic, options = {}) {
   if (options.identityPolicy) throw proofError('Claude identity policy overrides are not supported');
+  if (options.responseProtocol !== undefined) requireClaudeResponseProtocol(options.responseProtocol);
   const capture = String(captureText || '');
   if (!capture.trim()) throw proofError('Claude capture is empty');
   if (!expectedModel) throw proofError('Claude expected model is required');
@@ -204,12 +206,14 @@ function parseClaude(captureText, expectedModel, expectedEffort, onTopic, option
   }
 
   if (isStructured) {
+    const structuredResponse = options.responseProtocol === CLAUDE_RESPONSE_PROTOCOL
+      ? validateClaudeStructuredResponse(parsedEvents) : null;
     let observedModels = new Set();
     const usageModels = new Set();
     let sessionIds = new Set();
     let usage = null;
     let vendorSideTokens = null;
-    let hasActualResultText = false;
+    let hasActualResultText = structuredResponse !== null;
     let hasSuccessfulTerminalResult = false;
 
     for (const ev of parsedEvents) {
@@ -312,6 +316,7 @@ function parseClaude(captureText, expectedModel, expectedEffort, onTopic, option
       usage,
       vendorSideTokens,
       onTopic: true,
+      ...(structuredResponse !== null ? { responseProtocol: CLAUDE_RESPONSE_PROTOCOL } : {}),
       responseBytes: Buffer.byteLength(capture, 'utf8'),
     };
   }
@@ -328,6 +333,7 @@ function verifyProof(options) {
   const log = read(options.log, '--log');
 
   if (options.identityPolicy) throw proofError('identity policy overrides are not supported');
+  if (options.responseProtocol !== undefined && options.vendor !== 'anthropic') throw proofError('Claude structured response protocol cannot apply to another vendor');
 
   if (options.vendor === 'openai') return parseCodex(log, options.expectedModel, options);
   if (options.vendor === 'google') return parseGoogle(capture, log, options.expectedModel);
@@ -343,7 +349,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === '--on-topic') { out.onTopic = true; continue; }
-    if (['--vendor', '--capture', '--log', '--expected-model', '--expected-effort', '--expected-sandbox', '--expected-observed-model'].includes(flag)) {
+    if (['--vendor', '--capture', '--log', '--expected-model', '--expected-effort', '--expected-sandbox', '--expected-observed-model', '--response-protocol'].includes(flag)) {
       const value = argv[++i];
       if (!value || value.startsWith('--')) throw argumentError(`${flag} requires a value`);
       out[flag.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = value;
@@ -356,7 +362,7 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  return 'Usage: node tools/cli-proof.js --vendor <openai|google|anthropic> --capture <file> --log <file> --expected-model <slug> [--expected-effort <level>] [--on-topic] [--expected-sandbox <sandbox>] [--expected-observed-model <slug>]';
+  return 'Usage: node tools/cli-proof.js --vendor <openai|google|anthropic> --capture <file> --log <file> --expected-model <slug> [--expected-effort <level>] [--on-topic] [--expected-sandbox <sandbox>] [--expected-observed-model <slug>] [--response-protocol <protocol>]';
 }
 
 function main(argv = process.argv.slice(2), io = process) {

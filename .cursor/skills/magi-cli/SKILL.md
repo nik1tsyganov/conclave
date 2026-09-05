@@ -61,6 +61,8 @@ Convened implementation uses `min(3, implementation unit count)` distinct vendor
 
 `cli-proof.js` requires native session/usage and observed identity. OpenAI includes sandbox and observed effort. Google requires a successful agy envelope and its exact per-conversation model slug with fused effort. Claude requires structured native success, session, numeric usage, canonical observed model, and session-bound observed effort.
 
+Production Claude dispatches use native `--json-schema`. The complete final report is the native terminal `structured_output.response` string. The runtime checks that unmodified string against the bound BRIEF first line; the text `result` field is not a fallback. Missing or malformed structured output fails. Native identity, status, and scope requirements still apply. Standalone `model-probe.js` challenge output and other vendor formats are unchanged.
+
 Requested-only identity cannot qualify a production dispatch. Missing, conflicting, or changed proof fails. Google uses `casper_via=agy` and the exact staged skill-root grant. No Gemini PAYG fallback is permitted.
 
 Google probes and dispatches pin `--log-file` to `native-cli.log` in a unique evidence directory for that call. Default second-resolution home logs can collide under parallel execution. The collector uses the pinned native log when building the proof log, `vendor.log`.

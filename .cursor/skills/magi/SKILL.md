@@ -36,6 +36,8 @@ CLI seats are leaves. They cannot delegate, load Cursor plugins, or edit policy,
 
 Briefs follow their bound task and generated seat contract. The native final response acknowledges the BRIEF first line. Do not impose benchmark-specific exports or PR files on unrelated work. Runtime-owned proof, acknowledgment, WRITE AUDIT, scope, receipts, and telemetry must agree before completion.
 
+Production Claude CLI dispatches use native `--json-schema`; their complete final report is `structured_output.response`. The runtime checks that unmodified string's exact BRIEF first line, with no text `result` fallback. Native identity, status, and scope rules remain. Standalone model probes and other vendor output formats are unchanged. See the linked CLI procedure for the full report contract.
+
 ## Native Cursor workflow only
 
 Everything below applies only to an explicitly selected `hostMode: cursor` run. It retains the existing native Task workflow. Its skill stack, distribution, graph overrides, logs, and tally commands cannot override the CLI branch above.

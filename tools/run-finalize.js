@@ -6,7 +6,7 @@ const path = require('node:path');
 const { readSealedRun } = require('./plan-seal.js');
 const { assertPlainPath, compareWorkspace, hash, hashFile, inside, snapshotWorkspace, transactionKey, verifyCommittedRow, writeJson } = require('./dispatch-evidence.js');
 const { verifyProof } = require('./cli-proof.js');
-const { finalResponse } = require('./vendor-native.js');
+const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, validateClaudeResponseLaunch } = require('./vendor-native.js');
 const { tally } = require('./position-tally.js');
 
 function readJson(file) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
@@ -22,6 +22,8 @@ function verifyExecution(run, entry, state) {
     if (!state.artifacts.some((item) => item.path === artifact(name) && item.sha256 === hashFile(artifact(name)))) throw new Error(`missing committed artifact: ${name}`);
   }
   const launch = readJson(artifact('launch.json'));
+  const responseProtocol = entry.vendor === 'anthropic' ? CLAUDE_RESPONSE_PROTOCOL : undefined;
+  if (responseProtocol) validateClaudeResponseLaunch(launch);
   const runtimeSha256 = hash(JSON.stringify(readJson(artifact('runtime-manifest.json'))));
   if (launch.runtimeSha256 !== runtimeSha256 || state.receipt.runtimeSha256 !== runtimeSha256) throw new Error('runtime identity mismatch');
   same(launch.planEntry, entry, 'launch');
@@ -31,7 +33,7 @@ function verifyExecution(run, entry, state) {
   const { telemetryLog, ...receiptEnvelope } = envelope;
   same(receiptEnvelope, state.receipt, 'handoff');
   const spec = run.matrix.vendors[entry.vendor].models[entry.model];
-  const proof = verifyProof({ vendor: entry.vendor, capture: artifact('capture.txt'), log: artifact('vendor.log'), expectedModel: entry.model, expectedObservedModel: spec.canonical || entry.model, expectedEffort: entry.effort, expectedSandbox: entry.vendor === 'openai' ? (entry.role === 'implement' ? 'workspace-write' : 'read-only') : undefined, onTopic: true });
+  const proof = verifyProof({ vendor: entry.vendor, capture: artifact('capture.txt'), log: artifact('vendor.log'), expectedModel: entry.model, expectedObservedModel: spec.canonical || entry.model, expectedEffort: entry.effort, expectedSandbox: entry.vendor === 'openai' ? (entry.role === 'implement' ? 'workspace-write' : 'read-only') : undefined, onTopic: true, responseProtocol });
   Object.assign(proof, { planId: run.plan.planId, planHash: run.seal.planHash, escalation: entry.escalation === true, escalationReason: entry.escalationReason || null });
   const proofId = hash(JSON.stringify(proof));
   same(readJson(artifact('proof.json')), { proofId, class: entry.class, ...proof }, 'native proof');
@@ -57,7 +59,7 @@ function verifyExecution(run, entry, state) {
   const skillsAudit = Object.fromEntries(Object.keys(skillsBefore).map((skill) => [skill, compareWorkspace(skillsBefore[skill], skillsAfter[skill], [])]));
   same(readJson(artifact('skills-source-audit.json')), skillsAudit, 'skills source audit');
   if (Object.values(skillsAudit).some((audit) => !audit.ok)) throw new Error('skill source changed during execution');
-  const response = finalResponse(entry.vendor, fs.readFileSync(artifact('capture.txt'), 'utf8'));
+  const response = finalResponse(entry.vendor, fs.readFileSync(artifact('capture.txt'), 'utf8'), { responseProtocol });
   if (response.split(/\r?\n/, 1)[0] !== fs.readFileSync(entry.brief, 'utf8').split(/\r?\n/, 1)[0]) throw new Error('native response has wrong brief acknowledgement');
   return { entry, state, proof, response, after };
 }

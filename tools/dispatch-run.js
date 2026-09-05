@@ -15,8 +15,9 @@ const { loadProfiles, buildSeatProfile } = require('./seat-policy.js');
 const { stageSeatSkills, verifySeatSkills } = require('./cli-skill-stage.js');
 const { DEFAULT_PROFILES } = require('./seat-policy.js');
 const { appendUniqueRow, assertPlainPath, compareWorkspace, hashFile, inside, reserveTransaction, snapshotWorkspace, transactionKey, verifyCommittedRow, writeJson: atomicJson } = require('./dispatch-evidence.js');
-const { finalResponse, nativeLog } = require('./vendor-native.js');
+const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, nativeLog, validateClaudeResponseLaunch } = require('./vendor-native.js');
 const { readSealedRun } = require('./plan-seal.js');
+const { verifyExecution } = require('./run-finalize.js');
 
 function argError(message) { const e = new Error(message); e.code = 'ARGUMENT_ERROR'; return e; }
 function policyError(message) { const e = new Error(message); e.code = 'POLICY_FAIL'; return e; }
@@ -140,7 +141,11 @@ async function runDispatch(opts, dependencies = {}) {
     }
   }
   const transaction = reserveTransaction(binding, evidenceDir);
-  if (transaction.replayed) return { ok: true, replayed: true, proofId: transaction.state.telemetry.proofId, receipt: transaction.state.receipt, telemetry: transaction.state.telemetry };
+  const responseProtocol = opts.vendor === 'anthropic' ? CLAUDE_RESPONSE_PROTOCOL : undefined;
+  if (transaction.replayed) {
+    verifyExecution(sealed, binding.entry, transaction.state);
+    return { ok: true, replayed: true, proofId: transaction.state.telemetry.proofId, receipt: transaction.state.receipt, telemetry: transaction.state.telemetry };
+  }
   let scopeAudit = null;
   let before = null;
   let evidenceCreated = false;
@@ -184,7 +189,9 @@ async function runDispatch(opts, dependencies = {}) {
     effort: opts.vendor === 'google' ? undefined : opts.effort,
     capturePath, skillRoot: skillStage.root, seatContractPath,
     reviewPermissionMode: opts.reviewPermissionMode,
+    responseProtocol,
   });
+  if (responseProtocol) validateClaudeResponseLaunch(launch);
   if (launch.nativeLogPath) {
     if (!inside(launch.nativeLogPath, evidenceDir)) throw new Error('native log must stay inside dispatch evidence');
     assertPlainPath(launch.nativeLogPath);
@@ -193,15 +200,17 @@ async function runDispatch(opts, dependencies = {}) {
   const runtimeFiles = runtimeManifest();
   const runtimeSha256 = hashText(JSON.stringify(runtimeFiles));
   atomicJson(path.join(evidenceDir, 'runtime-manifest.json'), runtimeFiles);
-  writeJson(path.join(evidenceDir, 'launch.json'), {
+  const launchPath = path.join(evidenceDir, 'launch.json');
+  writeJson(launchPath, {
     class: opts.class, vendor: launch.vendor, role: launch.role, model: opts.model, effort: opts.effort,
     planId: opts.planId, planHash: opts.planHash, planEntry: binding.entry, escalation: opts.escalation === true, escalationReason: opts.escalationReason || null,
     binary: launch.binary, args: launch.args, cwd: launch.cwd, nativeLogPath: launch.nativeLogPath,
+    responseProtocol,
     matrixVersion: matrix.schemaVersion, seatProfileVersion: seatProfiles.schemaVersion,
     seatContractPath, skillManifestPath: skillStage.manifestPath, runtimeSha256,
   });
 
-  const protectedPaths = [binding.planPath, sealed.sealPath, sealed.availablePath, originalBrief, DEFAULT_MATRIX, DEFAULT_PROFILES, brief, seatContractPath, staged.manifestPath, skillStage.manifestPath, path.join(evidenceDir, 'seat-profile.json'),
+  const protectedPaths = [binding.planPath, sealed.sealPath, sealed.availablePath, originalBrief, DEFAULT_MATRIX, DEFAULT_PROFILES, brief, seatContractPath, staged.manifestPath, skillStage.manifestPath, path.join(evidenceDir, 'seat-profile.json'), launchPath,
     ...Object.entries(skillStage.manifest.skills).flatMap(([skill, files]) => files.map((file) => path.join(skillStage.root, skill, file.path))),
     ...staged.manifest.files.map((item) => path.join(path.dirname(brief), item.path))];
   const protectedHashes = protectedPaths.map((file) => ({ path: file, sha256: hashFile(file) }));
@@ -243,8 +252,8 @@ async function runDispatch(opts, dependencies = {}) {
   verifySeatSkills({ destinationRoot: skillStage.root, skills: seatProfile.skills, manifest: skillStage.manifest });
   if (!fs.existsSync(capturePath) || !fs.readFileSync(capturePath, 'utf8').trim()) throw Object.assign(new Error('vendor capture missing or empty'), { code: 'PROOF_FAIL' });
   const modelSpec = matrix.vendors[opts.vendor].models[opts.model];
-  const proof = verifyProof({ vendor: opts.vendor, capture: capturePath, log: path.join(evidenceDir, 'vendor.log'), expectedModel: opts.model, expectedObservedModel: modelSpec.canonical || opts.model, expectedEffort: opts.effort, expectedSandbox: launch.requestedSandbox, onTopic: opts.onTopic });
-  const response = finalResponse(opts.vendor, fs.readFileSync(capturePath, 'utf8'));
+  const proof = verifyProof({ vendor: opts.vendor, capture: capturePath, log: path.join(evidenceDir, 'vendor.log'), expectedModel: opts.model, expectedObservedModel: modelSpec.canonical || opts.model, expectedEffort: opts.effort, expectedSandbox: launch.requestedSandbox, onTopic: opts.onTopic, responseProtocol });
+  const response = finalResponse(opts.vendor, fs.readFileSync(capturePath, 'utf8'), { responseProtocol });
   const firstLine = fs.readFileSync(brief, 'utf8').split(/\r?\n/, 1)[0];
   if (response.split(/\r?\n/, 1)[0] !== firstLine) throw Object.assign(new Error('final response does not acknowledge the bound brief first line'), { code: 'PROOF_FAIL' });
   Object.assign(proof, { planId: opts.planId, planHash: opts.planHash, escalation: opts.escalation === true, escalationReason: opts.escalationReason || null });
@@ -290,7 +299,7 @@ async function runDispatch(opts, dependencies = {}) {
   writeJson(path.join(evidenceDir, 'handoff-envelope.json'), { ...receipt, telemetryLog, status: 'PASS' });
   const artifacts = ['capture.txt', 'vendor.log', 'proof.json', 'receipt-ack.json', 'handoff-envelope.json', 'scope-audit.json', 'plan-binding.json', 'launch.json', 'workspace-before.json', 'workspace-after.json', 'runtime-manifest.json', 'rules-source-before.json', 'rules-source-after.json', 'rules-source-audit.json', 'skills-source-before.json', 'skills-source-after.json', 'skills-source-audit.json']
     .map((file) => ({ path: path.join(evidenceDir, file), sha256: hashFile(path.join(evidenceDir, file)) }));
-  artifacts.push(...protectedHashes);
+  artifacts.push(...protectedHashes.filter(file => !artifacts.some(item => item.path === file.path)));
   if (launch.nativeLogPath && fs.existsSync(launch.nativeLogPath)) artifacts.push({ path: launch.nativeLogPath, sha256: hashFile(launch.nativeLogPath) });
   const logs = [...new Set([telemetryLog, activationLog])];
   for (const log of logs) appendUniqueRow(log, telemetry);

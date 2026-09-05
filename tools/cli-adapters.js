@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { inspectBrief, pointerText } = require('./cli-pointer.js');
 const { resolveVendorBinary } = require('./vendor-binaries.js');
+const { CLAUDE_RESPONSE_PROTOCOL, CLAUDE_RESPONSE_SCHEMA } = require('./vendor-native.js');
 
 const DEFAULTS = Object.freeze({
   openai: { model: 'gpt-5.6-sol', effort: 'high' },
@@ -132,9 +133,9 @@ function anthropicLaunch(opts) {
   for (const dir of [...new Set(addDirs)]) {
     if (path.win32.resolve(dir).toLowerCase() !== ctx.cwd.toLowerCase()) args.push('--add-dir', dir);
   }
-  args.push('--output-format', 'stream-json', '--verbose');
+  args.push('--output-format', 'stream-json', '--verbose', '--json-schema', JSON.stringify(CLAUDE_RESPONSE_SCHEMA));
   return {
-    vendor: 'anthropic', role: ctx.role, model: ctx.model, effort: ctx.effort,
+    vendor: 'anthropic', role: ctx.role, model: ctx.model, effort: ctx.effort, responseProtocol: CLAUDE_RESPONSE_PROTOCOL,
     binary: resolveVendorBinary('anthropic', { env: opts.env, home: opts.home, mustExist: opts.mustExistBinary !== false }),
     args, cwd: ctx.cwd, env: subscriptionEnv(opts.env), stdinFile: pointerFile, stdio: ['pipe', 'pipe', 'pipe'], permissionMode,
     skillRoot: ctx.skillRoot, seatContractPath: ctx.seatContractPath,
