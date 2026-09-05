@@ -1,11 +1,11 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "updated": "2026-09-05",
   "principles": {
     "leafSeat": true,
     "subdispatchForbidden": true,
     "arbiterOnlyOrchestration": true,
-    "reviewVerifyReadOnly": true,
+    "nonImplementationRolesReadOnly": true,
     "implementWriteScopedToWorktree": true,
     "skillsAreAllowListed": true,
     "classExtrasAreAdditive": true,
@@ -32,19 +32,22 @@
   "roleSkills": {
     "implement": ["implement", "testing"],
     "review": ["code-minimalism"],
-    "verify": ["testing", "evaluation-engineering"]
+    "verify": ["testing", "evaluation-engineering"],
+    "plan": ["context-engineering"],
+    "research": ["context-engineering"]
   },
   "classSkills": {
-    "architecture-planning": ["context-engineering"],
+    "architecture-planning": [],
     "standard-feature": [],
     "bulk-mechanical": ["code-minimalism"],
     "debug-mystery": ["context-engineering"],
-    "long-context-analysis": ["context-engineering"],
+    "long-context-analysis": [],
     "agentic-long-run": ["loop-engineering", "harness-engineering"],
     "security-sensitive": ["auth-security"],
     "review-adversarial": [],
     "test-verification": [],
-    "research-synthesis": ["context-engineering"]
+    "research-synthesis": [],
+    "extreme-end-to-end": ["loop-engineering", "harness-engineering"]
   },
   "forbiddenSeatSkills": [
     "engineering-orchestrator",
@@ -61,18 +64,18 @@
   ],
   "vendors": {
     "openai": {
-      "roles": ["implement", "review", "verify"],
-      "writePermission": { "implement": "workspace-write", "review": "read-only", "verify": "read-only" },
+      "roles": ["implement", "review", "verify", "plan", "research"],
+      "writePermission": { "implement": "workspace-write", "review": "read-only", "verify": "read-only", "plan": "read-only", "research": "read-only" },
       "proof": ["sessionId", "vendorSideTokens", "sandbox", "modelObserved"]
     },
     "anthropic": {
-      "roles": ["implement", "review", "verify"],
-      "writePermission": { "implement": "bypassPermissions", "review": "plan", "verify": "plan" },
+      "roles": ["implement", "review", "verify", "plan", "research"],
+      "writePermission": { "implement": "bypassPermissions", "review": "plan", "verify": "plan", "plan": "plan", "research": "plan" },
       "proof": ["modelObserved", "effortObserved", "onTopic", "responseBytes"]
     },
     "google": {
-      "roles": ["implement", "review", "verify"],
-      "writePermission": { "implement": "dangerously-skip-permissions", "review": "sandbox", "verify": "sandbox" },
+      "roles": ["implement", "review", "verify", "plan", "research"],
+      "writePermission": { "implement": "dangerously-skip-permissions", "review": "sandbox", "verify": "sandbox", "plan": "sandbox", "research": "sandbox" },
       "proof": ["conversationId", "usage", "modelObserved", "responseBytes"]
     }
   }
