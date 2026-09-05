@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 5,
+  "updated": "2026-09-05",
+  "principles": {
+    "leafSeat": true,
+    "subdispatchForbidden": true,
+    "arbiterOnlyOrchestration": true,
+    "nonImplementationRolesReadOnly": true,
+    "implementWriteScopedToWorktree": true,
+    "skillsAreAllowListed": true,
+    "classExtrasAreAdditive": true,
+    "bridgesAreArbiterOnly": true,
+    "proofMustDistinguishRequestedFromObserved": true
+  },
+  "arbiterSkills": [
+    "engineering-orchestrator",
+    "graph-engineering",
+    "context-engineering",
+    "magi-mode",
+    "magi-dispatch",
+    "mix-mode",
+    "dispatch-efficiency",
+    "task-retrospective",
+    "codex-bridge",
+    "gemini-bridge",
+    "claude-bridge"
+  ],
+  "baseSkills": {
+    "openai": ["seat-openai"],
+    "anthropic": ["seat-anthropic"],
+    "google": ["seat-google"]
+  },
+  "roleSkills": {
+    "implement": ["implement", "testing"],
+    "review": ["code-minimalism"],
+    "verify": ["testing", "evaluation-engineering"],
+    "plan": ["context-engineering"],
+    "research": ["context-engineering"]
+  },
+  "classSkills": {
+    "architecture-planning": [],
+    "standard-feature": [],
+    "bulk-mechanical": ["code-minimalism"],
+    "debug-mystery": ["context-engineering"],
+    "long-context-analysis": [],
+    "agentic-long-run": ["loop-engineering", "harness-engineering"],
+    "security-sensitive": ["auth-security"],
+    "review-adversarial": [],
+    "test-verification": [],
+    "research-synthesis": [],
+    "extreme-end-to-end": ["loop-engineering", "harness-engineering"]
+  },
+  "forbiddenSeatSkills": [
+    "engineering-orchestrator",
+    "graph-engineering",
+    "magi-mode",
+    "magi-dispatch",
+    "mix-mode",
+    "dispatch-efficiency",
+    "dispatch-assessment",
+    "task-retrospective",
+    "codex-bridge",
+    "gemini-bridge",
+    "claude-bridge"
+  ],
+  "vendors": {
+    "openai": {
+      "roles": ["implement", "review", "verify", "plan", "research"],
+      "writePermission": { "implement": "workspace-write", "review": "read-only", "verify": "read-only", "plan": "read-only", "research": "read-only" },
+      "proof": ["sessionId", "vendorSideTokens", "sandbox", "modelObserved", "effortObserved"]
+    },
+    "anthropic": {
+      "roles": ["implement", "review", "verify", "plan", "research"],
+      "writePermission": { "implement": "bypassPermissions", "review": "read-only-tools", "verify": "read-only-tools", "plan": "read-only-tools", "research": "read-only-tools" },
+      "proof": ["sessionId", "vendorSideTokens", "modelRequested", "effortRequested", "modelObserved", "effortObserved", "identityEvidence", "onTopic", "responseBytes"],
+      "proofPolicy": "Production requires structured native success, session and usage, canonical observed model, and session-bound native observed effort. Missing or mismatched observation fails; requested identity cannot replace it."
+    },
+    "google": {
+      "roles": ["implement", "review", "verify", "plan", "research"],
+      "writePermission": { "implement": "dangerously-skip-permissions", "review": "sandbox", "verify": "sandbox", "plan": "sandbox", "research": "sandbox" },
+      "proof": ["conversationId", "usage", "modelObserved", "responseBytes"]
+    }
+  }
+}

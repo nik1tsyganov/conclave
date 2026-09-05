@@ -32,7 +32,7 @@ function withBusRoot(busRoot, fn) {
 describe('magi-bus-path', () => {
   it('default MAGI_BUS_ROOT matches cli-claude.js', () => {
     assert.strictEqual(DEFAULT_MAGI_BUS_ROOT, CLAUDE_BUS_ROOT);
-    assert.strictEqual(DEFAULT_MAGI_BUS_ROOT, 'C:\\Users\\YESSIR\\AppData\\Local\\Temp\\magi-bus');
+    assert.strictEqual(DEFAULT_MAGI_BUS_ROOT, path.join(tmpdir(), 'magi-bus'));
     assert.strictEqual(getRepoRoot(), ROOT);
     assert.deepStrictEqual(HOST_MODES, ['cursor', 'cursor-cli']);
   });

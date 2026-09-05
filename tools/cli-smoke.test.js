@@ -7,31 +7,46 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const { assertGooglePlan, assertNoBodyLeak, assertOpenaiPlan, googlePlanHasSkillsAddDir, main } = require('./cli-smoke.js');
+const { buildSeatProfile, loadProfiles } = require('./seat-policy.js');
+const { stageSeatSkills } = require('./cli-skill-stage.js');
 
+const ROOT = path.resolve(__dirname, '..');
 const smokePath = path.join(__dirname, 'cli-smoke.js');
-const {
-  assertGooglePlan,
-  assertNoBodyLeak,
-  assertOpenaiPlan,
-  main,
-} = require('./cli-smoke.js');
-
-function rulesMarkers() {
-  return 'RULES/INDEX.md magi-mode magi-dispatch mix-mode casper_via=agy WRITE AUDIT';
-}
 
 function uniqueBody() {
-  return `${rulesMarkers()}\nUNIQUE-SMOKE-${crypto.randomUUID()}-`.padEnd(200, 'b');
+  return `RULES/INDEX.md SEAT-CONTRACT.md skills/skills-manifest.json WRITE AUDIT\nUNIQUE-SMOKE-${crypto.randomUUID()}-`.padEnd(200, 'b');
 }
 
 function makeBrief(t, body) {
-  const parent = path.join(os.tmpdir(), 'magi-bus');
-  fs.mkdirSync(parent, { recursive: true });
-  const directory = fs.mkdtempSync(path.join(parent, 'magi-smoke-'));
-  const briefPath = path.join(directory, 'brief.md');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-smoke-'));
+  const briefPath = path.join(directory, 'BRIEF.md');
   fs.writeFileSync(briefPath, body, 'utf8');
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   return briefPath;
+}
+
+function stagedBrief(t) {
+  const briefPath = makeBrief(t, uniqueBody());
+  const root = path.dirname(briefPath);
+  const profile = buildSeatProfile(loadProfiles(), { vendor: 'openai', role: 'review', class: 'review-adversarial' });
+  const sourceRoot = path.join(root, 'source');
+  for (const skill of profile.skills) {
+    fs.mkdirSync(path.join(sourceRoot, skill), { recursive: true });
+    fs.writeFileSync(path.join(sourceRoot, skill, 'SKILL.md'), `# ${skill}\nRead-only diagnostic fixture.\n`, 'utf8');
+  }
+  const staged = stageSeatSkills({ skills: profile.skills, sourceRoot, destinationRoot: path.join(root, 'skills') });
+  fs.writeFileSync(path.join(root, 'seat-profile.json'), JSON.stringify(profile), 'utf8');
+  const seatContractPath = path.join(root, 'SEAT-CONTRACT.md');
+  fs.writeFileSync(seatContractPath, [
+    '# MAGI CLI seat contract', 'Vendor: openai', 'Role: review', 'Class: review-adversarial',
+    `Permission profile: ${profile.permissionProfile}`,
+    'Read-only leaf seat.',
+    'Allowed staged skills:',
+    ...profile.skills.map((skill) => `- ${skill}: ${path.join(staged.root, skill, 'SKILL.md')}`),
+    '', `Skill manifest: ${staged.manifestPath}`,
+  ].join('\n'), 'utf8');
+  return { briefPath, root, profile, staged, seatContractPath };
 }
 
 function capture() {
@@ -41,100 +56,95 @@ function capture() {
   return io;
 }
 
-test('smoke passes the current launchers on a 200-char body without spawning a vendor', async (t) => {
-  const body = uniqueBody();
-  assert.strictEqual(body.length, 200);
-  const briefPath = makeBrief(t, body);
-  const io = capture();
-  let spawned = false;
-
-  const code = await main(
-    ['--brief', briefPath, '--cwd', 'C:\\src\\magi'],
-    io,
-    { spawnFn() { spawned = true; throw new Error('vendor process spawned'); } },
-  );
-
-  assert.strictEqual(code, 0, io.stderrText);
-  assert.strictEqual(spawned, false, 'dry-run smoke spawned a vendor process');
-  assert.deepStrictEqual(JSON.parse(io.stdoutText), {
-    ok: true,
-    vendors: ['openai', 'google', 'anthropic'],
+test('offline smoke checks current adapters with every child-process API forbidden', (t) => {
+  const fixture = stagedBrief(t);
+  assert.strictEqual(fs.readFileSync(fixture.briefPath, 'utf8').length, 200);
+  const noSpawn = path.join(fixture.root, 'no-spawn.cjs');
+  fs.writeFileSync(noSpawn, [
+    "const cp = require('node:child_process');",
+    "for (const name of ['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork']) {",
+    "  cp[name] = () => { throw new Error('unexpected child-process API: ' + name); };",
+    '}',
+  ].join('\n'), 'utf8');
+  const result = spawnSync(process.execPath, ['--require', noSpawn, smokePath, '--brief', fixture.briefPath, '--cwd', fixture.root], {
+    encoding: 'utf8', env: { ...process.env, MAGI_ALLOWED_WORKSPACE_ROOTS: fixture.root }, windowsHide: true,
   });
-});
-
-test('the CLI entry prints one JSON report and exits 0', (t) => {
-  const briefPath = makeBrief(t, uniqueBody());
-  const result = spawnSync(process.execPath, [
-    smokePath,
-    '--brief', briefPath,
-    '--cwd', 'C:\\src\\magi',
-  ], { encoding: 'utf8' });
-
   assert.strictEqual(result.status, 0, result.stderr);
   const report = JSON.parse(result.stdout);
-  assert.strictEqual(report.ok, true);
   assert.deepStrictEqual(report.vendors, ['openai', 'google', 'anthropic']);
+  assert.strictEqual(report.ok, true);
+  assert.strictEqual(report.dryRun, true);
+  assert.strictEqual(report.diagnostic, 'pointer-delivery-only');
+  assert.strictEqual(report.activationEligible, false);
 });
 
-test('an empty brief exits 2: cli-launch already refuses it', async (t) => {
-  const briefPath = makeBrief(t, '');
-  const io = capture();
-
-  const code = await main(['--brief', briefPath, '--cwd', 'C:\\src\\magi'], io);
-
-  assert.strictEqual(code, 2, io.stderrText);
-  assert.match(io.stderrText, /^ARGUMENT_ERROR:/);
+test('the CLI accepts an explicit staged contract outside the brief directory', (t) => {
+  const fixture = stagedBrief(t);
+  const nested = path.join(fixture.root, 'brief');
+  fs.mkdirSync(nested);
+  const briefPath = path.join(nested, 'BRIEF.md');
+  fs.copyFileSync(fixture.briefPath, briefPath);
+  const result = spawnSync(process.execPath, [
+    smokePath, '--brief', briefPath, '--cwd', fixture.root,
+    '--skill-root', fixture.staged.root, '--seat-contract', fixture.seatContractPath,
+  ], { encoding: 'utf8', env: { ...process.env, MAGI_ALLOWED_WORKSPACE_ROOTS: fixture.root }, windowsHide: true });
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(JSON.parse(result.stdout).activationEligible, false);
 });
 
-test('a missing brief exits 2 with ARGUMENT_ERROR', async () => {
-  const io = capture();
-
-  const code = await main([
-    '--brief', path.join(os.tmpdir(), 'magi-smoke-missing-brief.md'),
-    '--cwd', 'C:\\src\\magi',
-  ], io);
-
-  assert.strictEqual(code, 2, io.stderrText);
-  assert.match(io.stderrText, /^ARGUMENT_ERROR:/);
+test('offline smoke still rejects a workspace outside its explicit grant', (t) => {
+  const fixture = stagedBrief(t);
+  const allowedRoot = path.join(fixture.root, 'allowed');
+  const result = spawnSync(process.execPath, [smokePath, '--brief', fixture.briefPath, '--cwd', fixture.root], {
+    encoding: 'utf8', windowsHide: true,
+    env: { ...process.env, MAGI_DEV_ROOT: allowedRoot, MAGI_ALLOWED_WORKSPACE_ROOTS: allowedRoot },
+  });
+  assert.strictEqual(result.status, 1, result.stdout);
+  assert.match(result.stderr, /WORKSPACE_FORBIDDEN/);
+  assert.strictEqual(fs.existsSync(`${fixture.briefPath}.pointer.md`), false);
 });
 
-test('a brief without the RULES markers fails closed before any dry-run', async (t) => {
-  const briefPath = makeBrief(t, `UNIQUE-SMOKE-${crypto.randomUUID()}-`.padEnd(200, 'b'));
-  const io = capture();
-  let spawned = false;
-
-  const code = await main(
-    ['--brief', briefPath, '--cwd', 'C:\\src\\magi'],
-    io,
-    { spawnFn() { spawned = true; throw new Error('vendor process spawned'); } },
-  );
-
-  assert.strictEqual(code, 1, io.stderrText);
-  assert.strictEqual(spawned, false, 'missing RULES must not reach a vendor spawn');
-  assert.match(io.stderrText, /brief missing RULES markers/);
-  assert.match(io.stderrText, /RULES\/INDEX\|magi-cli-rules\|STANDING/);
-  assert.match(io.stderrText, /magi-mode/);
-  assert.match(io.stderrText, /magi-dispatch/);
-  assert.match(io.stderrText, /mix-mode/);
-  assert.match(io.stderrText, /casper_via=agy/);
-  assert.match(io.stderrText, /WRITE AUDIT\|R07/);
+test('empty, missing, and omitted briefs are argument errors', async (t) => {
+  for (const args of [
+    ['--brief', makeBrief(t, ''), '--cwd', ROOT],
+    ['--brief', path.join(os.tmpdir(), 'magi-smoke-no-such-brief.md'), '--cwd', ROOT],
+    ['--cwd', ROOT],
+  ]) {
+    const io = capture();
+    assert.strictEqual(await main(args, io), 2, io.stderrText);
+    assert.match(io.stderrText, /^ARGUMENT_ERROR:/);
+  }
 });
 
-test('a missing --brief flag exits 2 with ARGUMENT_ERROR', async () => {
+test('missing basic markers fail before launch planning', async (t) => {
   const io = capture();
+  const briefPath = makeBrief(t, 'unbound task');
+  const code = await main(['--brief', briefPath, '--cwd', ROOT], io);
+  assert.strictEqual(code, 1);
+  assert.strictEqual(fs.existsSync(`${briefPath}.pointer.md`), false);
+  for (const marker of ['RULES/INDEX|magi-cli-rules|STANDING', 'SEAT-CONTRACT', 'skills-manifest', 'WRITE AUDIT|R07']) {
+    assert.ok(io.stderrText.includes(marker));
+  }
+});
 
-  const code = await main(['--cwd', 'C:\\src\\magi'], io);
+test('marker words alone cannot supply the staged skill root or contract', async (t) => {
+  const io = capture();
+  const result = await main(['--brief', makeBrief(t, uniqueBody()), '--cwd', ROOT], io);
+  assert.strictEqual(result, 1);
+  assert.match(io.stderrText, /seat-profile|staged seat|contract/);
+});
 
-  assert.strictEqual(code, 2, io.stderrText);
-  assert.match(io.stderrText, /^ARGUMENT_ERROR:/);
+test('a modified staged skill fails the diagnostic', async (t) => {
+  const fixture = stagedBrief(t);
+  fs.appendFileSync(path.join(fixture.staged.root, fixture.profile.skills[0], 'SKILL.md'), 'changed\n', 'utf8');
+  const io = capture();
+  assert.strictEqual(await main(['--brief', fixture.briefPath, '--cwd', ROOT], io), 1);
+  assert.match(io.stderrText, /hash|mismatch|bytes/);
 });
 
 test('a plan argument carrying the brief body is a leak', () => {
   const body = uniqueBody();
-  assert.throws(
-    () => assertNoBodyLeak('google', { args: ['-p', body] }, body),
-    /leaks the brief body into an argument/,
-  );
+  assert.throws(() => assertNoBodyLeak('google', { args: ['-p', body] }, body), /leaks the brief body into an argument/);
 });
 
 test('stdin-file contents carrying the brief body are a leak', (t) => {
@@ -142,40 +152,29 @@ test('stdin-file contents carrying the brief body are a leak', (t) => {
   const briefPath = makeBrief(t, body);
   const stdinFile = `${briefPath}.stdin.md`;
   fs.writeFileSync(stdinFile, `prefix ${body} suffix`, 'utf8');
-
-  assert.throws(
-    () => assertNoBodyLeak('openai', { args: [], stdinFile }, body),
-    /leaks the brief body/,
-  );
+  assert.throws(() => assertNoBodyLeak('openai', { args: [], stdinFile }, body), /leaks the brief body/);
 });
 
-test('an openai plan fails without pointer delivery or when it pipes the brief itself', () => {
-  const briefPath = 'C:\\src\\magi\\brief.md';
-  assert.throws(
-    () => assertOpenaiPlan({ delivery: 'inline', stdinFile: 'C:\\x.pointer.md' }, briefPath),
-    /expected "pointer"/,
-  );
-  assert.throws(
-    () => assertOpenaiPlan({ delivery: 'pointer', stdinFile: briefPath }, briefPath),
-    /brief path itself/,
-  );
+test('OpenAI rejects inline delivery and piping the brief itself', () => {
+  const briefPath = path.join(ROOT, 'example-brief.md');
+  assert.throws(() => assertOpenaiPlan({ delivery: 'inline', stdinFile: 'other.md' }, briefPath), /expected "pointer"/);
+  assert.throws(() => assertOpenaiPlan({ delivery: 'pointer', stdinFile: briefPath }, briefPath), /brief path itself/);
 });
 
-test('a google -p value equal to the brief body fails; a pointer -p with skills add-dir passes', () => {
+test('Google rejects a body prompt and accepts the exact staged skill directory', () => {
   const body = uniqueBody();
-  assert.throws(
-    () => assertGooglePlan({ args: ['--model', 'gemini-3.1-pro-high', '-p', body] }, body),
-    /-p value is the brief body/,
-  );
-  assertGooglePlan({
-    args: ['--add-dir', 'C:\\Users\\YESSIR\\.claude\\skills', '-p', 'Read C:\\brief.md in full.'],
-  }, body);
+  const skillRoot = path.join(ROOT, 'example-run', 'skills');
+  assert.throws(() => assertGooglePlan({ args: ['-p', body] }, body, skillRoot), /-p value is the brief body/);
+  assertGooglePlan({ args: ['--add-dir', skillRoot, '-p', 'Read the bound BRIEF.md in full.'] }, body, skillRoot);
+  assert.strictEqual(googlePlanHasSkillsAddDir(['--add-dir', skillRoot], skillRoot), true);
 });
 
-test('a google plan without --add-dir ...\\.claude\\skills fails closed', () => {
+test('Google rejects absent, broader home, and similarly named skill grants', () => {
   const body = uniqueBody();
-  assert.throws(
-    () => assertGooglePlan({ args: ['-p', 'Read C:\\brief.md in full.'] }, body),
-    /missing --add-dir/,
-  );
+  const skillRoot = path.join(ROOT, 'example-run', 'skills');
+  for (const addDir of [null, path.join(os.homedir(), '.claude', 'skills'), `${skillRoot}-other`, path.dirname(skillRoot)]) {
+    const args = [...(addDir ? ['--add-dir', addDir] : []), '-p', 'Read the bound BRIEF.md in full.'];
+    assert.throws(() => assertGooglePlan({ args }, body, skillRoot), /missing --add-dir/);
+  }
+  assert.strictEqual(googlePlanHasSkillsAddDir(['--add-dir', skillRoot]), false);
 });

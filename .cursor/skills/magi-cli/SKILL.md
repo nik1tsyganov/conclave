@@ -1,93 +1,74 @@
 ---
 name: magi-cli
-description: MAGI Cursor CLI mode. Use when the user says magi-cli or /magi-cli. Grok arbiter dispatches via vendor CLIs; never Cursor Task to elector slugs. Not CONCLAVE.
+description: Plan-bound MAGI Cursor CLI mode. Grok 4.6 is the non-voting arbiter; OpenAI, Anthropic and Google seats use native CLIs. Not CONCLAVE.
 ---
 
-# MAGI in Cursor CLI mode (`/magi-cli`)
+# MAGI Cursor CLI
 
-## Required reading (LIVE files — read from these paths, do not copy)
+## Identity and authority
 
-Read these files in order:
+Run `magi-whoami --mode cursor-cli --slug <picker slug>`. Stop unless the declared route is LEGAL. This declaration check does not attest the actual host model.
 
-1. `C:\Users\YESSIR\.claude\skills\engineering-orchestrator\SKILL.md`
-2. `C:\Users\YESSIR\.claude\skills\graph-engineering\SKILL.md`
-3. `C:\Users\YESSIR\.claude\skills\loop-engineering\SKILL.md`
-4. `C:\Users\YESSIR\.claude\skills\harness-engineering\SKILL.md`
-5. `C:\Users\YESSIR\.claude\skills\evaluation-engineering\SKILL.md`
-6. `C:\Users\YESSIR\.claude\skills\context-engineering\SKILL.md`
-7. `C:\Users\YESSIR\.claude\skills\magi-mode\SKILL.md`
-8. `C:\Users\YESSIR\.claude\skills\magi-dispatch\SKILL.md`
-9. `C:\Users\YESSIR\.claude\skills\mix-mode\SKILL.md`
-10. `C:\Users\YESSIR\.claude\skills\dispatch-efficiency\SKILL.md`
-11. `C:\Users\YESSIR\.claude\skills\task-retrospective\SKILL.md`
-12. `references/cursor-cli.md`
-13. `references/brief-rules-block.md` (mandatory RULES block on every Magi CLI seat brief)
-14. `C:\Users\YESSIR\.claude\skills\codex-bridge\SKILL.md` when dispatching Codex
-15. `C:\Users\YESSIR\.claude\skills\gemini-bridge\SKILL.md` when dispatching Gemini
-16. `C:\Users\YESSIR\.claude\skills\claude-bridge\SKILL.md` when dispatching Claude (`C:\Users\YESSIR\.local\bin\claude.exe -p --model fable --effort xhigh`; run the live auth and headless probes first)
+Grok 4.6 coordinates the run. It classifies work, writes briefs and complete plans, invokes the deterministic runtime, and requests finalization and tallying. It never performs substantive implementation, repair, planning, research, review, verification, or voting as a seat.
 
-## MAGI is not CONCLAVE
+Read `references/cursor-cli.md` for the complete run procedure, `references/dispatch-matrix.json` for route legality, `references/seat-profiles.json` for capabilities, and `references/brief-rules-block.md` for brief instructions.
 
-- Do not run `session-whoami.js` from CONCLAVE.
-- Do not dispatch `camerlengo-8`.
-- Run `magi-whoami` before activation.
+The arbiter retains orchestration, routing, bridge, distribution, assessment, and retrospective work. Leaf seats receive the selected vendor card and role/class skills. Do not load the arbiter's full skill stack into a seat.
 
-## Cursor hostMode (`cursor-cli`)
+## Runtime procedure
 
-- Grok classifies, briefs, dispatches, lead-writes telemetry, tallies.
-- All seat dispatches go through vendor CLIs (`codex.exe`, `agy.exe`, `claude.exe`), never Cursor Task to claude/gpt/gemini slugs.
-- Claude is reachable via **`C:\Users\YESSIR\.local\bin\claude.exe -p --model fable --effort xhigh`** (owner 2026-09-02). Live 2026-09-02: `claude auth status` reported `loggedIn: true`, `authMethod: claude.ai`, and `subscriptionType: max`; `claude -p --model haiku` returned `ready`. Re-run both probes in the session that will dispatch. If a later probe returns login/auth language, an empty capture, or off-topic text, record `degraded=true`, include the probe text, and only then treat Codex+Gemini as a duo.
-- **`extra` is not a Claude Code effort name.** Live `claude.exe --help` (2026-09-02) lists `low, medium, high, xhigh, max`, so the rung below `max` is `xhigh`. Do not default this mode to `max`: effort is a behavioral signal, not a published price multiplier, and community 3–5x cost claims are UNVERIFIED.
-- The overlay lives in `magi-seats.json` → `hostModes.modes.cursor-cli`. The global `seats.balthasar-2` still reads model `opus`, effort `high`.
-- A `/magi` session may land in this mode mid-task when `node C:\src\magi\tools\host-resolver.js` reports Cursor Task usage tripped; from that point, `references/cursor-cli.md` governs the rest of the run.
-- Any implement/review/vote by the arbiter is FAILED activation.
+1. Set `MAGI_RULES_ROOT` to the external STANDING v2 / R01–R22 pack. Run `tools/magi-cli-preflight.js`.
+2. Use `claude auth status` for the Claude login check. Run `model-probe.js --vendor --model --effort --evidence-dir` for every selected exact pair.
+3. Import each captured `probe.json` with `model-availability.js --file <availability.json> --probe <probe.json>`. Evidence expires after 60 minutes from its original completion time. Re-imports do not renew it.
+4. Finalize the briefs, then write the complete plan with unique dispatch IDs, immutable brief hashes, absolute worktrees, relative scopes, author provenance, and any escalation reason.
+5. Run `plan-seal.js --plan <draft.json> --run-dir <new-run-dir> --availability <availability.json>`.
+6. Launch each selected entry with `dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-dir> --dispatch-id <id> --availability <availability.json> --rules-root <external-v2-pack>`.
+7. Run `run-finalize.js --run-dir <run-dir>` and `panel-tally.js --run-dir <run-dir> --unit-id <unit>`.
 
-## Three-vendor implement split (degraded when Claude is unavailable)
+Unknown or unproven models are unavailable. Every native model/effort pair is probe-gated. Requested/observed mismatch fails. The matrix defines legal routes, not a promise of access.
 
-Before the first write, split implement across the reachable vendors:
+Changed route, class, author, scope, or brief requires a newly validated complete plan and seal. A graph override or ad-hoc launch flag cannot alter a sealed dispatch.
 
-- Intake/cluster A → Codex CLI via `codex.exe`
-- Intake/cluster B → Gemini CLI via `agy.exe`
-- Intake/cluster C → Claude CLI at `C:\Users\YESSIR\.local\bin\claude.exe -p --model fable --effort xhigh`; run the live probes before dispatch.
+## Seat roles and permissions
 
-Permute if needed; Casper must not be idle.
+| Role | Product permission | Core work |
+|---|---|---|
+| implement | Writes only within declared scope | Implementation and testing |
+| review | Read-only | Review and minimalism |
+| verify | Read-only | Testing and evaluation |
+| plan | Read-only | Planning and context |
+| research | Read-only | Research and context |
 
-While capacity-state `distributionBreaker` is tripped, do not give Claude the majority of implement units.
+Profiles add `seat-openai`, `seat-anthropic`, or `seat-google` plus applicable class skills. The bundled `seat-skills/` source is the default. Staging creates `skills-manifest.json`; rule staging creates `rules-manifest.json`. Structural preflight checks real files and hashes against the generated `SEAT-CONTRACT.md`.
 
-Enforce the 60% floor per vendor.
+Every seat is a leaf and cannot delegate. Seats must not edit policy, evidence, receipts, or telemetry. They acknowledge the bound BRIEF first line in the native final response. The STANDING v2 fingerprint is separate.
 
-Project slice lists do NOT assign vendors. Ignore any `implement`/`verify` vendor column in a project `SLICES.md` or plan doc: vendors come from the MAGI class table plus the live floor at dispatch, and a project plan never beats the class table. The only valid owner override is `vendorOverride` on that run's `graph.json` node, recorded there — not in a doc. Canonical policy: `mix-mode` → `distributionFloor.projectSlicePolicy`. Pointer only; do not restate or fork it here.
+OpenAI read-only roles use `read-only`; agy uses `--sandbox`. Claude non-implementation roles use the schema 5 `read-only-tools` profile: `--safe-mode --permission-mode dontAsk --tools Read,Glob,Grep --allowedTools Read,Glob,Grep`. They inspect authorized files and existing test evidence, but cannot execute shell commands. Provide the needed test reports in their inputs. Claude plan mode requires a separate approval turn and cannot reliably complete unattended leaf verification.
 
-Each implementer must paste WRITE AUDIT (`git diff --stat` + `git status --porcelain`).
+Claude implementation retains `--permission-mode bypassPermissions` with `--safe-mode`. Safe mode disables global customization and hooks while preserving subscription authentication and role permissions. Do not substitute `--bare`, which disables OAuth. The leaf reads authorized context from staged files. Product scope auditing rejects unauthorized writes; it does not sandbox vendor home directories or provide universal hostile-process isolation.
 
-After implement rows, write `magi-dispatch-log.jsonl` `{vendor, role:"implement"}` (gitignored) and run `node C:\src\magi\tools\activation-check.js <log path>`. Exit 1 = FAILED activation. Do not use `dispatch-log.pass.jsonl` as a live log.
+## Review, escalation, and distribution
 
-Log path: product-repo runs write `C:\src\magi\projects\<slug>\magi-dispatch-log.jsonl`, never a log inside the product repo; MAGI-kit work uses `C:\src\magi\magi-dispatch-log.jsonl`. See `C:\src\magi\projects\README.md`.
+Review/verify entries require correct `authorVendor` provenance and another vendor. Ordinary implementation approval needs foreign verification and review, with every review returning native APPROVE.
 
-## Illegal returns
+Critical `requiresPanel` classes need `magiConvened: true` and two distinct foreign review/verify vendors on the same unit and worktree. Critical approval requires at least two eligible native APPROVE positions after author recusal.
 
-- Do not run `magi-battery.js` or `mix-run.js` under plain node.
-- Parse check only: `node C:\Users\YESSIR\.claude\workflows\checks\magi-workflow-cli.mjs`
+Astra requires `escalation: true` and a reason with at least 16 characters and three distinct words. Greater capability never increases write scope.
 
-## Packs (efficiency, not routers)
+Convened implementation uses `min(3, implementation unit count)` distinct vendors. The 60% cap starts at two units. Planning, research, and review-only panels do not manufacture implementation rows. SLICES defines work and dependencies, not vendor authority.
 
-Cursor Task seats may use these local Cursor plugin packs as efficiency skills; they do not replace MAGI dispatch:
+## Proof and completion
 
-- Team Kit: `check-compiler-errors`, `deslop`, `verify-this`, `control-cli`, `control-ui`, `ci-watcher`, `fix-ci`, `loop-on-ci`
-- Superpowers: `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `receiving-code-review`
+`cli-proof.js` requires native session/usage and observed identity. OpenAI includes sandbox and observed effort. Google requires a successful agy envelope and its exact per-conversation model slug with fused effort. Claude requires structured native success, session, numeric usage, canonical observed model, and session-bound observed effort.
 
-CLI seats (`cursor-cli`) cannot load Cursor plugins; they run the equivalent project checks directly (typecheck, tests, WRITE AUDIT). The arbiter may use Team Kit in its own Cursor chat after a merge.
+Production Claude dispatches use native `--json-schema`. The complete final report is the native terminal `structured_output.response` string. The runtime checks that unmodified string against the bound BRIEF first line; the text `result` field is not a fallback. Missing or malformed structured output fails. Native identity, status, and scope requirements still apply. Standalone `model-probe.js` challenge output and other vendor formats are unchanged.
 
-Do not use as routers: `using-superpowers`, `dispatching-parallel-agents`, `executing-plans`, `subagent-driven-development`, `brainstorming`, `review-and-ship`, `new-branch-and-pr`, `agents-memory-updater`. Continual Learning remains owner-invoked `/continual-learning` only.
+Requested-only identity cannot qualify a production dispatch. Missing, conflicting, or changed proof fails. Google uses `casper_via=agy` and the exact staged skill-root grant. No Gemini PAYG fallback is permitted.
 
-See `~\.cursor\rules\cursor-packs.mdc`.
+Google probes and dispatches pin `--log-file` to `native-cli.log` in a unique evidence directory for that call. Default second-resolution home logs can collide under parallel execution. The collector uses the pinned native log when building the proof log, `vendor.log`.
 
-## POSITION tally
+The runtime commits a transaction only after plan binding, acknowledgment, proof, scope audit, receipts, and idempotent telemetry agree. Failed work remains recorded. Execution PASS is distinct from approval.
 
-Tally panel POSITION with `node C:\src\magi\tools\position-tally.js`. Do not hand-count. Passage is `>=2 APPROVE` among eligible electors; `ABSTAIN` never toward passage; counted eligible ballots below 2 is `NOT_PANEL` (`degraded=true`, `quorumFloor`); else `DEADLOCK`. After a documented Claude fail path, pass `--degraded`. Idle Casper is not that path.
+Review responses end with exactly one `POSITION: APPROVE`, `POSITION: REJECT`, or `POSITION: ABSTAIN` line. `panel-tally.js` extracts votes from verified native responses. Grok never writes ballots or votes. No model can waive deterministic failure.
 
-## Other
-
-- Put the SCOPE block from `engineering-orchestrator` in every seat brief.
-- Every Magi CLI seat brief MUST paste the STANDING RULES block from `references/brief-rules-block.md` (fill SCOPE / Vendor / Bridges at dispatch). Fail closed with `node C:\src\magi\tools\cli-brief-rules-check.js --brief <file>` (`cli-smoke.js` runs the same check).
-- Every Magi CLI **implement** seat brief MUST include the `src/index.js` re-export, `PR_BODY.md`, and full fixture `BRIEF.md` MUST lines (paste `tools/templates/implement-brief-export-must.md` or equivalent). Do not abbreviate to `Implement src/X.js + PR_BODY.md`. Accept `loadApi` requires `typeof api.<fn> === 'function'`; do not leave starter `module.exports = {}`.
+`cli-launch.js` and standalone `cli-smoke.js` are transport diagnostics, not production activation paths. Use `npm run check` and the explicit-root `cross-repo-check.js` for offline validation. Native acceptance remains a separate target-machine check.
