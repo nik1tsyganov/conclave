@@ -9,7 +9,7 @@ const { runLaunch } = require('./cli-runner.js');
 const { stageRules, verifyStagedRules } = require('./cli-rules-stage.js');
 const { checkBriefFile } = require('./cli-brief-rules-check.js');
 const { verifyProof } = require('./cli-proof.js');
-const { validateDispatchRow } = require('./dispatch-schema.js');
+const { validateDispatchRow, ROLES } = require('./dispatch-schema.js');
 const { loadMatrix, loadAvailability, routeAllowed } = require('./dispatch-matrix.js');
 const { loadProfiles, buildSeatProfile } = require('./seat-policy.js');
 const { stageSeatSkills } = require('./cli-skill-stage.js');
@@ -41,7 +41,7 @@ function parseArgs(argv) {
 
 function usage() {
   return [
-    'Usage: node tools/dispatch-run.js --vendor <openai|google|anthropic> --role <implement|review|verify>',
+    'Usage: node tools/dispatch-run.js --vendor <openai|google|anthropic> --role <implement|review|verify|plan|research>',
     '  --class <routing-class> --brief <BRIEF.md> --cwd <worktree> --model <slug> --effort <level>',
     '  --dispatch-id <id> --unit-id <id> --evidence-dir <dir> [--availability <json>]',
     '  [--author-vendor <vendor>] [--rules-root <dir>] [--seat-profiles <json>] [--skill-source-root <dir>] [--on-topic]',
@@ -55,7 +55,7 @@ function required(opts) {
     if (!opts[key]) throw argError(`--${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)} is required`);
   }
   if (!['openai', 'google', 'anthropic'].includes(opts.vendor)) throw argError('invalid --vendor');
-  if (!['implement', 'review', 'verify'].includes(opts.role)) throw argError('invalid --role');
+  if (!ROLES.includes(opts.role)) throw argError('invalid --role');
   if (opts.authorVendor && !['openai', 'google', 'anthropic'].includes(opts.authorVendor)) throw argError('invalid --author-vendor');
   if (opts.authorVendor === opts.vendor && (opts.role === 'review' || opts.role === 'verify')) {
     throw policyError(`same-vendor ${opts.role} forbidden: ${opts.vendor} authored ${opts.unitId}`);
@@ -77,7 +77,7 @@ function seatContractText(opts, seatProfile, skillStage) {
     '',
     'This is a leaf seat. Do not dispatch, delegate, spawn, or ask another model/agent to perform work.',
     'This seat is not the arbiter. Do not change routing, model choice, panel membership, or deterministic gate outcomes.',
-    opts.role === 'implement' ? 'Writes are limited to BRIEF.md scope in the assigned worktree.' : 'Read-only judgment role: do not modify product files.',
+    opts.role === 'implement' ? 'Writes are limited to BRIEF.md scope in the assigned worktree.' : 'Read-only role: do not modify product files.',
     '',
     'Allowed staged skills:',
     ...seatProfile.skills.map((skill) => `- ${skill}: ${path.join(skillStage.root, skill, 'SKILL.md')}`),
