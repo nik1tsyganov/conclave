@@ -65,11 +65,11 @@ test('Claude non-implement roles do not inherit implement bypassPermissions', (t
     assert.ok(!launch.args.includes('--bare'), 'bare mode disables subscription OAuth');
     assert.ok(!launch.args.includes('--system-prompt'), 'native system controls must remain in place');
     const finalContract = launch.args[launch.args.indexOf('--append-system-prompt') + 1];
-    assert.ok(finalContract.includes(JSON.stringify('ACK test brief')));
+    assert.ok(!finalContract.includes('ACK test brief'), 'acknowledgment content stays in the bound brief');
     assert.ok(finalContract.includes("Your FINAL response must start with the brief's exact first line"));
     assert.ok(finalContract.includes('Native permissions still apply'));
     assert.ok(!finalContract.includes(fs.readFileSync(f.briefPath, 'utf8')), 'the brief body remains on disk');
-    assert.ok(fs.readFileSync(launch.stdinFile, 'utf8').includes(JSON.stringify('ACK test brief')), 'the user pointer binds the literal header too');
+    assert.ok(!fs.readFileSync(launch.stdinFile, 'utf8').includes('ACK test brief'), 'the pointer carries no brief content');
     assert.ok(!launch.env.ANTHROPIC_API_KEY);
     if (role !== 'implement') {
       assert.strictEqual(launch.args[launch.args.indexOf('--tools') + 1], 'Read,Glob,Grep');
@@ -77,6 +77,28 @@ test('Claude non-implement roles do not inherit implement bypassPermissions', (t
       assert.ok(!launch.args.includes('plan'), 'plan mode requires a separate approval turn');
       for (const forbidden of ['bypassPermissions', 'manual', 'auto', 'acceptEdits', 'plan']) assert.throws(() => anthropicLaunch({ ...common, role, reviewPermissionMode: forbidden }), /read-only Claude roles require/);
     }
+  }
+});
+
+test('every adapter keeps even a single-line brief body out of launch arguments and pointers', (t) => {
+  const f = fixture(t);
+  const body = 'PRIVATE_BRIEF_CONTENT_727e4df5';
+  fs.writeFileSync(f.briefPath, body);
+  for (const build of [openaiLaunch, googleLaunch, anthropicLaunch]) {
+    const launch = build({ ...f, cwd: 'C:\\src\\product-a', model: 'fixture', effort: 'high', role: 'implement',
+      capturePath: path.join(f.dir, 'capture.txt'), env: fakeBins, mustExistBinary: false });
+    assert.ok(!launch.args.some(arg => String(arg).includes(body)));
+    if (launch.stdinFile) assert.ok(!fs.readFileSync(launch.stdinFile, 'utf8').includes(body));
+  }
+});
+
+test('oversized seat pointers fail before a pointer file is written', (t) => {
+  const f = fixture(t);
+  for (const build of [openaiLaunch, googleLaunch, anthropicLaunch]) {
+    assert.throws(() => build({ ...f, seatContractPath: 'C:\\src\\' + 'x'.repeat(2100), cwd: 'C:\\src\\product-a',
+      model: 'fixture', effort: 'high', role: 'implement', capturePath: path.join(f.dir, 'capture.txt'),
+      env: fakeBins, mustExistBinary: false }), /2000-character delivery limit/);
+    assert.ok(!fs.existsSync(f.briefPath + '.pointer.md'));
   }
 });
 

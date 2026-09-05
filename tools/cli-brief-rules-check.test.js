@@ -176,6 +176,15 @@ test('standalone structural checks read adjacent profile and hashed skills', (t)
   assert.strictEqual(result.ok, true, result.missing.join('; '));
 });
 
+test('standalone skill pointers use the canonical filesystem spelling', (t) => {
+  const fixture = stagedBrief(t);
+  // Windows permits case and 8.3 aliases. Staging records the long, canonical
+  // spelling, which remains authoritative when callers use another alias.
+  const briefPath = process.platform === 'win32' ? fixture.briefPath.toUpperCase() : fixture.briefPath;
+  const result = checkBriefFile(briefPath, { requireStructural: true });
+  assert.strictEqual(result.ok, true, result.missing.join('; '));
+});
+
 test('standalone structural checks apply the role from the generated profile', (t) => {
   const fixture = stagedBrief(t, { role: 'review' });
   fs.writeFileSync(fixture.briefPath, legalBrief(), 'utf8');

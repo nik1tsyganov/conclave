@@ -8,6 +8,7 @@ const { verifyStagedRules } = require('./cli-rules-stage.js');
 const { verifySeatSkills } = require('./cli-skill-stage.js');
 const { loadProfiles, validateSeat } = require('./seat-policy.js');
 const { ROLES } = require('./dispatch-schema.js');
+const { canonicalPlainPath } = require('./runtime-paths.js');
 
 const STANDING_PATH = 'C:\\src\\ai-ops-vault\\projects\\magi-cli-rules\\STANDING.md';
 const RULES_DIR = 'C:\\src\\ai-ops-vault\\projects\\magi-cli-rules';
@@ -106,7 +107,9 @@ function verifyStagedSeat(briefPath, opts = {}) {
   if (profile.permissionProfile !== validated.permissionProfile) throw new Error('seat permission profile does not match role policy');
   if (!isDeepStrictEqual(profile.proofFields, validated.proofFields)) throw new Error('seat proof fields do not match vendor policy');
 
-  const skillRoot = path.resolve(opts.skillRoot || path.join(path.dirname(seatContractPath), 'skills'));
+  // Staging writes canonical pointers, including the long name of Windows
+  // 8.3 paths. Compare against that same root without accepting junctions.
+  const skillRoot = canonicalPlainPath(opts.skillRoot || path.join(path.dirname(seatContractPath), 'skills'));
   const contract = readRegularFile(seatContractPath);
   for (const [label, value] of Object.entries({
     Vendor: profile.vendor, Role: profile.role, Class: profile.class, 'Permission profile': profile.permissionProfile,

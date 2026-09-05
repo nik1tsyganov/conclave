@@ -11,9 +11,9 @@
 // argv. buildLaunch writes `<brief>.pointer.md` beside the brief
 // (tools/cli-pointer.js) and pipes only that short path+bytes+hash pointer;
 // the model Reads the brief file itself through a second --add-dir naming the
-// brief's parent, which must sit under C:\src\magi or the magi-bus temp root.
-// The bypass is pre-authorized for MAGI implement writes under C:\src\magi
-// ONLY, so buildLaunch still refuses an --add-dir cwd outside that root.
+// brief's parent, which must sit under an authorized workspace or the magi-bus
+// temp root. Fixtures grant only their own workspace through the same explicit
+// MAGI_ALLOWED_WORKSPACE_ROOTS setting as the transport adapters.
 //
 // Capture health: the 2026-09-02 kill at 31 minutes of 0-byte capture was a
 // FALSE HANG - `claude -p` buffers stdout until exit, so a healthy fable/xhigh
@@ -21,8 +21,7 @@
 // corrected law: 0 bytes on a RUNNING child is OK at any elapsed time; 0 bytes
 // AFTER exit (including an idle-watch kill at the 20-minute limit) is
 // EMPTY_CAPTURE / FAIL, and files landing never rescues it.
-// No test spends a -p model call; the only spawn is `claude.exe --help`,
-// skipped when the binary is absent.
+// Binary discovery is file-only. No test invokes a vendor CLI.
 
 const test = require('node:test');
 const { after } = require('node:test');
@@ -31,7 +30,6 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { spawnSync } = require('node:child_process');
 
 const {
   CLAUDE_BIN,
@@ -42,7 +40,7 @@ const {
   MAGI_ROOT,
   MAGI_BUS_ROOT,
   AUTH_NEEDLES,
-  buildLaunch,
+  buildLaunch: buildClaudeLaunch,
   assessCapture,
   assessIdleCapture,
   parseProof,
@@ -54,7 +52,7 @@ const cleanupDirs = [];
 
 function makeTempDir(zoneRoot) {
   fs.mkdirSync(zoneRoot, { recursive: true });
-  const dir = fs.mkdtempSync(path.join(zoneRoot, 'cli-claude-test-'));
+  const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(zoneRoot, 'cli-claude-test-')));
   cleanupDirs.push(dir);
   return dir;
 }
@@ -76,22 +74,29 @@ function makeFiveThousandCharBody() {
 }
 
 const busTempDir = makeTempDir(MAGI_BUS_ROOT);
-const repoTempDir = makeTempDir(path.join(MAGI_ROOT, 'tools'));
+const fixtureRoot = makeTempDir(os.tmpdir());
+const repoTempDir = makeTempDir(path.join(fixtureRoot, 'tools'));
 const sharedBrief = makeBrief(busTempDir, 'shared brief body for option tests\n', 'shared.md');
 
+function buildLaunch(options = {}) {
+  return buildClaudeLaunch({ cwd: fixtureRoot, env: { MAGI_ALLOWED_WORKSPACE_ROOTS: fixtureRoot }, ...options });
+}
+
 after(() => {
-  for (const dir of cleanupDirs) {
+  for (const dir of cleanupDirs.reverse()) {
+    const relative = path.relative(fs.realpathSync.native(os.tmpdir()), dir);
+    assert.ok(relative && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
 test('constants: binary path, cursor-cli overlay defaults, idle limit, magi + bus roots', () => {
-  assert.strictEqual(CLAUDE_BIN, 'C:\\Users\\YESSIR\\.local\\bin\\claude.exe');
+  assert.strictEqual(CLAUDE_BIN, path.join(os.homedir(), '.local', 'bin', 'claude.exe'));
   assert.strictEqual(DEFAULT_MODEL, 'fable');
   assert.strictEqual(DEFAULT_EFFORT, 'xhigh');
   assert.strictEqual(IDLE_LIMIT_MS, 20 * 60 * 1000);
   assert.strictEqual(MAGI_ROOT, 'C:\\src\\magi');
-  assert.strictEqual(MAGI_BUS_ROOT, 'C:\\Users\\YESSIR\\AppData\\Local\\Temp\\magi-bus');
+  assert.strictEqual(MAGI_BUS_ROOT, path.join(os.tmpdir(), 'magi-bus'));
   assert.deepStrictEqual(CLAUDE_EFFORTS, ['low', 'medium', 'high', 'xhigh', 'max']);
   assert.ok(AUTH_NEEDLES.length >= 3);
 });
@@ -105,7 +110,7 @@ test('buildLaunch: default args are the measured write dispatch, pointer (not bo
     '--model', 'fable',
     '--effort', 'xhigh',
     '--permission-mode', 'bypassPermissions',
-    '--add-dir', 'C:\\src\\magi',
+    '--add-dir', fixtureRoot,
     '--add-dir', busTempDir,
     '--output-format', 'text',
   ]);
@@ -125,7 +130,7 @@ test('buildLaunch: stdinFile content is the exact cli-pointer contract line', ()
       'Follow it. Repeat its first line verbatim before anything else.\n'
   );
   // The pointer is SHORT and closes: it never carries the body.
-  assert.ok(pointer.length < 300, `pointer must stay short, got ${pointer.length} chars`);
+  assert.ok(pointer.length < briefPath.length + 200, 'pointer overhead must stay short regardless of the runner path');
   assert.ok(!pointer.includes(BODY_NEEDLE), 'pointer must not contain the brief body');
 });
 
@@ -144,7 +149,7 @@ test('buildLaunch: first --add-dir is the magi root, second is the brief parent'
   const launch = buildLaunch({ briefPath });
   const first = launch.args.indexOf('--add-dir');
   assert.notStrictEqual(first, -1);
-  assert.strictEqual(launch.args[first + 1], MAGI_ROOT);
+  assert.strictEqual(launch.args[first + 1], fixtureRoot);
   const second = launch.args.indexOf('--add-dir', first + 2);
   assert.notStrictEqual(second, -1);
   assert.strictEqual(launch.args[second + 1], busTempDir);
@@ -154,7 +159,7 @@ test('buildLaunch: a brief under the repo also gets its parent as a second --add
   const briefPath = makeBrief(repoTempDir, 'repo-zone brief body\n');
   const launch = buildLaunch({ briefPath });
   const first = launch.args.indexOf('--add-dir');
-  assert.strictEqual(launch.args[first + 1], MAGI_ROOT);
+  assert.strictEqual(launch.args[first + 1], fixtureRoot);
   const second = launch.args.indexOf('--add-dir', first + 2);
   assert.strictEqual(launch.args[second + 1], repoTempDir);
 });
@@ -169,13 +174,15 @@ test('buildLaunch: brief parent equal to the cwd --add-dir is not duplicated', (
 
 test('buildLaunch: brief parents outside repo and magi-bus are refused', () => {
   for (const briefPath of [
-    'C:\\Users\\YESSIR\\Desktop\\brief.md',
+    'C:\\Users\\runner\\Desktop\\brief.md',
     'C:\\Users\\brief.md',
     'C:\\brief.md',
     path.join(os.tmpdir(), 'brief.md'), // plain temp, not the bus
-    `${MAGI_BUS_ROOT}-evil\\brief.md`, // prefix trap on the bus root
+    path.join(`${MAGI_BUS_ROOT}-evil`, 'brief.md'), // prefix trap on the bus root
     'C:\\src\\magistrate\\brief.md', // prefix trap on the repo root
-    `${MAGI_BUS_ROOT}\\..\\brief.md`, // traversal back out of the bus
+    path.join(MAGI_BUS_ROOT, '..', 'brief.md'), // traversal back out of the bus
+    path.join(`${fixtureRoot}-evil`, 'brief.md'), // prefix trap on the explicit root
+    path.join(fixtureRoot, '..', 'brief.md'), // traversal out of the explicit root
   ]) {
     assert.throws(
       () => buildLaunch({ briefPath }),
@@ -196,10 +203,10 @@ test('buildLaunch: a refused launch writes no pointer file', () => {
 });
 
 test('buildLaunch: --add-dir carries opts.cwd, resolved, when given', () => {
-  const launch = buildLaunch({ briefPath: sharedBrief, cwd: 'C:\\src\\magi\\out' });
+  const launch = buildLaunch({ briefPath: sharedBrief, cwd: path.join(fixtureRoot, 'out') });
   const i = launch.args.indexOf('--add-dir');
   assert.notStrictEqual(i, -1);
-  assert.strictEqual(launch.args[i + 1], 'C:\\src\\magi\\out');
+  assert.strictEqual(launch.args[i + 1], path.join(fixtureRoot, 'out'));
 });
 
 test('buildLaunch: --add-dir cwd outside C:\\src\\magi is refused - bypass is scoped', () => {
@@ -208,21 +215,58 @@ test('buildLaunch: --add-dir cwd outside C:\\src\\magi is refused - bypass is sc
     'C:\\src\\magi\\..\\signal-sim',
     'C:\\src\\magistrate', // prefix trap: starts with the root's characters
     'C:\\',
-    'C:\\Users\\YESSIR',
+    'C:\\Users\\runner',
   ]) {
     assert.throws(
-      () => buildLaunch({ briefPath: sharedBrief, cwd }),
+      () => buildClaudeLaunch({ briefPath: sharedBrief, cwd, env: {} }),
       /pre-authorized under C:\\src\\magi only/,
       `cwd ${cwd} must be refused`
     );
   }
 });
 
-test('buildLaunch: --add-dir accepts the root case-insensitively and after traversal back in', () => {
-  for (const cwd of ['c:\\SRC\\magi', 'C:\\src\\magi\\', 'C:\\src\\magi\\out\\..']) {
+test('buildLaunch: --add-dir accepts native root spellings and traversal back in', () => {
+  const spellings = [fixtureRoot, `${fixtureRoot}${path.sep}`, path.join(fixtureRoot, 'out', '..')];
+  if (process.platform === 'win32') spellings.push(fixtureRoot.toUpperCase());
+  for (const cwd of spellings) {
     const launch = buildLaunch({ briefPath: sharedBrief, cwd });
     assert.ok(launch.args.includes('--add-dir'), `cwd ${cwd} must be dispatchable`);
   }
+});
+
+test('buildLaunch: an explicit workspace grant cannot authorize its siblings or parents', () => {
+  for (const cwd of [os.tmpdir(), `${fixtureRoot}-evil`, path.join(fixtureRoot, '..', 'other')]) {
+    assert.throws(() => buildLaunch({ briefPath: sharedBrief, cwd }), /pre-authorized/);
+  }
+  assert.throws(() => buildClaudeLaunch({ briefPath: sharedBrief, cwd: fixtureRoot, env: {} }), /pre-authorized/);
+});
+
+test('buildLaunch: native pointer paths preserve filesystem case and POSIX separators', () => {
+  const root = makeTempDir(os.tmpdir());
+  const briefPath = makeBrief(root, 'case and separator fixture\n');
+  const options = { cwd: root, briefPath, env: { MAGI_ALLOWED_WORKSPACE_ROOTS: root } };
+  const launch = buildClaudeLaunch(options);
+  assert.strictEqual(launch.stdinFile, `${briefPath}.pointer.md`);
+  assert.ok(fs.readFileSync(launch.stdinFile, 'utf8').includes(`Read ${briefPath} in full.`));
+  if (process.platform === 'win32') {
+    const upperCaseLaunch = buildClaudeLaunch({ ...options, cwd: root.toUpperCase() });
+    assert.strictEqual(upperCaseLaunch.args[upperCaseLaunch.args.indexOf('--add-dir') + 1], root);
+  } else {
+    assert.ok(launch.stdinFile.startsWith('/'));
+    assert.ok(!launch.stdinFile.includes('\\'));
+    assert.throws(() => buildClaudeLaunch({ ...options, cwd: root.toUpperCase() }), /pre-authorized/);
+    assert.throws(() => buildClaudeLaunch({ ...options, briefPath: 'C:\\src\\magi\\brief.md' }), /outside the pointer zones/);
+  }
+});
+
+test('buildLaunch: a junction cannot turn a granted path into a broader pointer or write grant', () => {
+  const target = makeTempDir(os.tmpdir());
+  const link = path.join(fixtureRoot, 'escape-link');
+  fs.symlinkSync(target, link, 'junction');
+  const briefPath = makeBrief(target, 'outside through link\n');
+  assert.throws(() => buildLaunch({ briefPath: path.join(link, 'brief.md') }), /symlink|junction/);
+  assert.throws(() => buildLaunch({ briefPath: sharedBrief, cwd: link }), /symlink|junction/);
+  assert.strictEqual(fs.existsSync(`${briefPath}.pointer.md`), false);
 });
 
 test('buildLaunch: permission mode is the measured --permission-mode, never the dangerous flag', () => {
@@ -408,22 +452,16 @@ test('parseProof: requires the dispatched model and a real effort level', () => 
   );
 });
 
-test(
-  'live: claude.exe --help answers with the flags the recipe uses',
-  { skip: fs.existsSync('C:\\Users\\YESSIR\\.local\\bin\\claude.exe') ? false : 'claude.exe not present' },
-  () => {
-    const r = spawnSync(CLAUDE_BIN, ['--help'], {
-      encoding: 'utf8',
-      timeout: 60000,
-      windowsHide: true,
-    });
-    assert.strictEqual(r.status, 0);
-    assert.ok(r.stdout.length > 0, '--help stdout must not be empty');
-    assert.match(r.stdout, /--model/);
-    assert.match(r.stdout, /--effort/);
-    assert.match(r.stdout, /--permission-mode/);
-    assert.match(r.stdout, /--add-dir/);
-    assert.match(r.stdout, /--output-format/);
-    assert.strictEqual(assessCapture(r.stdout).verdict, 'PASS');
-  }
-);
+test('buildLaunch: binary discovery is file-only and preserves explicit, environment, and config precedence', () => {
+  const binary = makeBrief(repoTempDir, 'fixture only; never execute', 'claude-fixture.exe');
+  const missing = path.join(repoTempDir, 'missing.exe');
+  const env = { MAGI_ALLOWED_WORKSPACE_ROOTS: fixtureRoot, MAGI_CLAUDE_BIN: binary };
+  assert.strictEqual(buildLaunch({ briefPath: sharedBrief, env, mustExistBinary: true }).binary, binary);
+  assert.strictEqual(buildLaunch({ briefPath: sharedBrief, binary, env: { ...env, MAGI_CLAUDE_BIN: missing }, mustExistBinary: true }).binary, binary);
+  assert.strictEqual(buildLaunch({ briefPath: sharedBrief, env, config: { vendors: { anthropic: { binary: missing } } } }).binary, binary);
+  assert.strictEqual(buildLaunch({ briefPath: sharedBrief, config: { vendors: { anthropic: { binary } } }, mustExistBinary: true }).binary, binary);
+  assert.strictEqual(buildLaunch({ briefPath: sharedBrief, home: fixtureRoot }).binary, path.join(fixtureRoot, '.local', 'bin', 'claude.exe'));
+  const briefPath = makeBrief(busTempDir, 'missing binary leaves no pointer\n', 'missing-binary.md');
+  assert.throws(() => buildLaunch({ briefPath, binary: missing, mustExistBinary: true }), /does not exist/);
+  assert.strictEqual(fs.existsSync(`${briefPath}.pointer.md`), false);
+});

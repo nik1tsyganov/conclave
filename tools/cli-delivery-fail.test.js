@@ -38,7 +38,7 @@ test('OpenAI launch plans keep the brief body out of arguments and pointer files
 
   const launch = buildCodexLaunch({
     brief: briefPath,
-    cwd: 'C:\\src\\magi',
+    cwd: directory,
     capture: path.join(directory, 'capture.txt'),
   });
 
@@ -70,9 +70,9 @@ for (const vendor of ['google', 'anthropic']) {
       launcherPath,
       '--vendor', vendor,
       '--brief', briefPath,
-      '--cwd', 'C:\\src\\magi',
+      '--cwd', directory,
       '--dry-run',
-    ], { encoding: 'utf8' });
+    ], { encoding: 'utf8', env: { ...process.env, MAGI_ALLOWED_WORKSPACE_ROOTS: directory }, windowsHide: true });
 
     assert.strictEqual(result.status, 0, result.stderr);
     const launch = JSON.parse(result.stdout);
@@ -99,7 +99,7 @@ test('a missing brief returns ARGUMENT_ERROR before any vendor module or process
       [
         '--vendor', vendor,
         '--brief', missing,
-        '--cwd', 'C:\\src\\magi',
+        '--cwd', os.tmpdir(),
         '--capture', path.join(os.tmpdir(), 'unused-capture.txt'),
       ],
       {
@@ -132,7 +132,7 @@ test('an empty brief returns ARGUMENT_ERROR before any vendor module or process 
       [
         '--vendor', vendor,
         '--brief', briefPath,
-        '--cwd', 'C:\\src\\magi',
+        '--cwd', directory,
         '--capture', path.join(directory, 'unused-capture.txt'),
       ],
       {
@@ -161,7 +161,7 @@ test('OpenAI pointer preparation rejects an empty brief', (t) => {
   assert.throws(
     () => buildCodexLaunch({
       brief: briefPath,
-      cwd: 'C:\\src\\magi',
+      cwd: directory,
       capture: path.join(directory, 'capture.txt'),
     }),
     (error) => error.code === 'ARGUMENT_ERROR' && /empty/.test(error.message),

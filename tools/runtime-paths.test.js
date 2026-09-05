@@ -24,14 +24,15 @@ function writeReferences(referencesDir) {
 
 test('default root resolves the real source checkout', () => {
   const resolved = resolveRuntimePaths();
-  assert.strictEqual(resolved.root, DEFAULT_ROOT);
+  const canonicalRoot = fs.realpathSync.native(DEFAULT_ROOT);
+  assert.strictEqual(resolved.root, canonicalRoot);
   assert.strictEqual(resolved.layout, 'source');
-  assert.strictEqual(resolved.matrixPath, path.join(DEFAULT_ROOT, '.cursor', 'skills', 'magi-cli', 'references', 'dispatch-matrix.json'));
-  assert.strictEqual(resolved.seatProfilesPath, path.join(DEFAULT_ROOT, '.cursor', 'skills', 'magi-cli', 'references', 'seat-profiles.json'));
+  assert.strictEqual(resolved.matrixPath, path.join(canonicalRoot, '.cursor', 'skills', 'magi-cli', 'references', 'dispatch-matrix.json'));
+  assert.strictEqual(resolved.seatProfilesPath, path.join(canonicalRoot, '.cursor', 'skills', 'magi-cli', 'references', 'seat-profiles.json'));
   assert.ok(fs.existsSync(resolved.matrixPath));
   assert.ok(fs.existsSync(resolved.seatProfilesPath));
-  assert.strictEqual(resolved.toolsDir, path.join(DEFAULT_ROOT, 'tools'));
-  assert.strictEqual(resolved.seatSkillsRoot, path.join(DEFAULT_ROOT, 'seat-skills'));
+  assert.strictEqual(resolved.toolsDir, path.join(canonicalRoot, 'tools'));
+  assert.strictEqual(resolved.seatSkillsRoot, path.join(canonicalRoot, 'seat-skills'));
 });
 
 test('detects an installed layout (skills/magi-cli/references, no .cursor)', () => {
@@ -39,11 +40,13 @@ test('detects an installed layout (skills/magi-cli/references, no .cursor)', () 
   fs.mkdirSync(path.join(root, 'tools'), { recursive: true });
   writeReferences(path.join(root, 'skills', 'magi-cli', 'references'));
   const resolved = resolveRuntimePaths({ root });
+  const canonicalRoot = fs.realpathSync.native(root);
+  assert.strictEqual(resolved.root, canonicalRoot);
   assert.strictEqual(resolved.layout, 'installed');
-  assert.strictEqual(resolved.matrixPath, path.join(root, 'skills', 'magi-cli', 'references', 'dispatch-matrix.json'));
-  assert.strictEqual(resolved.seatProfilesPath, path.join(root, 'skills', 'magi-cli', 'references', 'seat-profiles.json'));
-  assert.strictEqual(resolved.templatesDir, path.join(root, 'tools', 'templates'));
-  assert.strictEqual(resolved.seatSkillsRoot, path.join(root, 'seat-skills'));
+  assert.strictEqual(resolved.matrixPath, path.join(canonicalRoot, 'skills', 'magi-cli', 'references', 'dispatch-matrix.json'));
+  assert.strictEqual(resolved.seatProfilesPath, path.join(canonicalRoot, 'skills', 'magi-cli', 'references', 'seat-profiles.json'));
+  assert.strictEqual(resolved.templatesDir, path.join(canonicalRoot, 'tools', 'templates'));
+  assert.strictEqual(resolved.seatSkillsRoot, path.join(canonicalRoot, 'seat-skills'));
 });
 
 test('canonical paths preserve missing suffixes and detect actual containment', () => {

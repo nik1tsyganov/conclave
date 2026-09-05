@@ -66,7 +66,9 @@ test('offline smoke checks current adapters with every child-process API forbidd
     "  cp[name] = () => { throw new Error('unexpected child-process API: ' + name); };",
     '}',
   ].join('\n'), 'utf8');
-  const result = spawnSync(process.execPath, ['--require', noSpawn, smokePath, '--brief', fixture.briefPath, '--cwd', ROOT], { encoding: 'utf8' });
+  const result = spawnSync(process.execPath, ['--require', noSpawn, smokePath, '--brief', fixture.briefPath, '--cwd', fixture.root], {
+    encoding: 'utf8', env: { ...process.env, MAGI_ALLOWED_WORKSPACE_ROOTS: fixture.root }, windowsHide: true,
+  });
   assert.strictEqual(result.status, 0, result.stderr);
   const report = JSON.parse(result.stdout);
   assert.deepStrictEqual(report.vendors, ['openai', 'google', 'anthropic']);
@@ -83,11 +85,23 @@ test('the CLI accepts an explicit staged contract outside the brief directory', 
   const briefPath = path.join(nested, 'BRIEF.md');
   fs.copyFileSync(fixture.briefPath, briefPath);
   const result = spawnSync(process.execPath, [
-    smokePath, '--brief', briefPath, '--cwd', ROOT,
+    smokePath, '--brief', briefPath, '--cwd', fixture.root,
     '--skill-root', fixture.staged.root, '--seat-contract', fixture.seatContractPath,
-  ], { encoding: 'utf8' });
+  ], { encoding: 'utf8', env: { ...process.env, MAGI_ALLOWED_WORKSPACE_ROOTS: fixture.root }, windowsHide: true });
   assert.strictEqual(result.status, 0, result.stderr);
   assert.strictEqual(JSON.parse(result.stdout).activationEligible, false);
+});
+
+test('offline smoke still rejects a workspace outside its explicit grant', (t) => {
+  const fixture = stagedBrief(t);
+  const allowedRoot = path.join(fixture.root, 'allowed');
+  const result = spawnSync(process.execPath, [smokePath, '--brief', fixture.briefPath, '--cwd', fixture.root], {
+    encoding: 'utf8', windowsHide: true,
+    env: { ...process.env, MAGI_DEV_ROOT: allowedRoot, MAGI_ALLOWED_WORKSPACE_ROOTS: allowedRoot },
+  });
+  assert.strictEqual(result.status, 1, result.stdout);
+  assert.match(result.stderr, /WORKSPACE_FORBIDDEN/);
+  assert.strictEqual(fs.existsSync(`${fixture.briefPath}.pointer.md`), false);
 });
 
 test('empty, missing, and omitted briefs are argument errors', async (t) => {

@@ -1,10 +1,11 @@
 'use strict';
 
 /**
- * MAGI Claude CLI capture-health recipe (cursor-cli host mode).
+ * Historical MAGI Claude CLI capture-health diagnostic.
  *
- * Executable form of .cursor/skills/magi/references/cursor-cli.md. The
- * 2026-09-02 incident this file first encoded - a fable/xhigh implement
+ * Production launches use a sealed plan through dispatch-run.js. This legacy
+ * recipe cannot establish production proof or activation. The 2026-09-02
+ * incident this file first encoded - a fable/xhigh implement
  * dispatch killed at 31 minutes of 0-byte capture - was a FALSE HANG:
  * `claude -p` buffers stdout until exit, so a healthy long implement shows
  * 0 capture bytes the whole time it runs. Empty capture is a verdict about
@@ -25,24 +26,27 @@
  * `<brief>.pointer.md` beside the brief (tools/cli-pointer.js) and pipes only
  * that short path+bytes+hash pointer; the model Reads the brief file itself.
  * A second --add-dir names the brief's parent directory, which must sit under
- * C:\src\magi or under the lead-written MAGI bus temp root - a brief parented
+ * an authorized workspace or the lead-written MAGI bus temp root - a brief parented
  * anywhere else is refused (never --add-dir C:\Users or a drive root).
  * Never --continue / --resume. The bypass grant is scoped: the cwd --add-dir
- * must stay under C:\src\magi.
+ * must stay under C:\src\magi or an explicit MAGI_ALLOWED_WORKSPACE_ROOTS entry.
  */
 
 const path = require('node:path');
+const os = require('node:os');
 const { containsForbidden } = require('./plugin-check.js');
 const { writePointerFile } = require('./cli-pointer.js');
+const { canonicalPlainPath } = require('./runtime-paths.js');
+const { resolveVendorBinary } = require('./vendor-binaries.js');
 
-const CLAUDE_BIN = 'C:\\Users\\YESSIR\\.local\\bin\\claude.exe';
+const CLAUDE_BIN = path.join(os.homedir(), '.local', 'bin', 'claude.exe');
 const DEFAULT_MODEL = 'fable';
-// The only root --permission-mode bypassPermissions is pre-authorized for
-// (owner grant, 2026-09-02): MAGI implement writes under C:\src\magi.
+// Historical default write grant. Other roots require the existing explicit
+// MAGI_ALLOWED_WORKSPACE_ROOTS setting; cwd alone never grants access.
 const MAGI_ROOT = 'C:\\src\\magi';
 // Where lead-written MAGI bus briefs live. A brief's parent directory must be
-// under MAGI_ROOT or under this bus root for the pointer launch to add-dir it.
-const MAGI_BUS_ROOT = 'C:\\Users\\YESSIR\\AppData\\Local\\Temp\\magi-bus';
+// under an authorized workspace or this bus root for the pointer launch to add-dir it.
+const MAGI_BUS_ROOT = path.join(os.tmpdir(), 'magi-bus');
 // Claude Code effort levels per `claude.exe --help` (verified live 2026-09-02).
 // The owner's "Extra" is not one of them - the rung below max is xhigh - and
 // the cursor-cli overlay pins xhigh: max is NOT the default here.
@@ -61,42 +65,39 @@ function assertEffort(effort) {
   }
 }
 
-function resolveAddDir(cwd) {
+function nativePath(value) {
+  // Never reinterpret an absolute Windows path as a relative POSIX filename.
+  if (process.platform !== 'win32' && /^(?:[a-z]:|\\\\)/i.test(value)) return null;
+  return canonicalPlainPath(value);
+}
+
+function isUnderRoot(candidate, root) {
+  if (!candidate || !root) return false;
+  const relative = path.relative(root, candidate);
+  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+function resolveAddDir(cwd, roots) {
   if (typeof cwd !== 'string' || cwd.length === 0) {
     throw new Error('cwd must be a non-empty path: --add-dir names the write scope explicitly');
   }
-  // Resolve before checking so traversal ("..") cannot smuggle the add-dir
-  // outside the pre-authorized root; emit the resolved form so the string
-  // checked and the string dispatched are the same one. Windows paths compare
-  // case-insensitively.
-  const resolved = path.win32.resolve(cwd);
-  const lower = resolved.toLowerCase();
-  const root = MAGI_ROOT.toLowerCase();
-  if (lower !== root && !lower.startsWith(root + '\\')) {
+  // Canonicalization resolves short-name aliases and refuses symlink escapes.
+  const resolved = nativePath(cwd);
+  if (!roots.some(root => isUnderRoot(resolved, root))) {
     throw new Error(
-      `--permission-mode bypassPermissions is pre-authorized under ${MAGI_ROOT} only; ` +
-        `refusing --add-dir ${resolved}`
+      `--permission-mode bypassPermissions is pre-authorized under ${roots.join(', ') || MAGI_ROOT} only; ` +
+        `refusing --add-dir ${resolved || cwd}`
     );
   }
   return resolved;
 }
 
-function isUnderRoot(lowerPath, root) {
-  const lowerRoot = root.toLowerCase();
-  return lowerPath === lowerRoot || lowerPath.startsWith(lowerRoot + '\\');
-}
-
-function resolveBriefDir(briefPath) {
-  // Resolve before checking so traversal ("..") cannot smuggle the parent
-  // outside the two pointer zones; prefix checks use root + '\\' so
-  // C:\src\magistrate or magi-bus-evil never match. Windows paths compare
-  // case-insensitively.
-  const resolved = path.win32.resolve(briefPath);
-  const dir = path.win32.dirname(resolved);
-  const lower = dir.toLowerCase();
-  if (!isUnderRoot(lower, MAGI_ROOT) && !isUnderRoot(lower, MAGI_BUS_ROOT)) {
+function resolveBriefDir(briefPath, roots) {
+  const resolved = nativePath(briefPath);
+  const dir = resolved && path.dirname(resolved);
+  if (!roots.some(root => isUnderRoot(dir, root))) {
     throw new Error(
-      `brief parent ${dir} is outside the pointer zones (${MAGI_ROOT}, ${MAGI_BUS_ROOT}); ` +
+      `brief parent ${dir || briefPath} is outside the pointer zones (${roots.join(', ')}); ` +
         'refusing to --add-dir it'
     );
   }
@@ -127,8 +128,15 @@ function buildLaunch(opts = {}) {
   // --add-dir C:\src\magi --output-format text. Cheap validation and both
   // zone checks run BEFORE any disk write, so a refused launch leaves no
   // pointer file behind.
-  const addDir = resolveAddDir(cwd);
-  const { resolved: resolvedBrief, dir: briefDir } = resolveBriefDir(briefPath);
+  const env = opts.env || process.env;
+  const roots = [MAGI_ROOT, ...(env.MAGI_ALLOWED_WORKSPACE_ROOTS || '').split(';').filter(Boolean)]
+    .map(nativePath).filter(Boolean);
+  const addDir = resolveAddDir(cwd, roots);
+  const { resolved: resolvedBrief, dir: briefDir } = resolveBriefDir(briefPath, [...roots, nativePath(MAGI_BUS_ROOT)]);
+  const binary = resolveVendorBinary('anthropic', {
+    binary: opts.binary, env, home: opts.home, config: opts.config, configFile: opts.configFile,
+    mustExist: opts.mustExistBinary === true,
+  });
   // Only the pointer rides stdin: path + bytes + hash, one short line that
   // closes. The model reaches the brief body through --add-dir and Reads it.
   const pointerPath = writePointerFile(resolvedBrief);
@@ -139,12 +147,12 @@ function buildLaunch(opts = {}) {
     '--permission-mode', 'bypassPermissions',
     '--add-dir', addDir,
   ];
-  if (briefDir.toLowerCase() !== addDir.toLowerCase()) {
+  if (path.relative(briefDir, addDir) !== '') {
     args.push('--add-dir', briefDir);
   }
   args.push('--output-format', 'text');
   return {
-    binary: CLAUDE_BIN,
+    binary,
     args,
     stdinFile: pointerPath,
     stdio: ['pipe', 'pipe', 'pipe'],

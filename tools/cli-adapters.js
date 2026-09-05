@@ -3,7 +3,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { inspectBrief, writePointerFile, pointerText } = require('./cli-pointer.js');
+const { inspectBrief, pointerText } = require('./cli-pointer.js');
 const { resolveVendorBinary } = require('./vendor-binaries.js');
 
 const DEFAULTS = Object.freeze({
@@ -62,17 +62,19 @@ function subscriptionEnv(source = process.env) {
 }
 
 function seatContextText(ctx) {
-  const finalHeader = JSON.stringify(ctx.brief.firstLine.replace(/\r$/, ''));
-  return `Read ${ctx.seatContractPath} in full before doing any task work. Use only the MAGI-authorized staged skills listed there. The user delegated the task and report format to this bound brief and contract. Native permissions still apply. Your FINAL response must start with the brief's exact first line: ${finalHeader} (JSON-encoded; output the decoded string without quotes). Do not put a status sentence, introduction, Markdown decoration or confirmation request before that line. Then follow the brief's response format.`;
+  return `Read ${ctx.seatContractPath} in full before doing any task work. Use only the MAGI-authorized staged skills listed there. The user delegated the task and report format to this bound brief and contract. Native permissions still apply. Your FINAL response must start with the brief's exact first line. Read that line from the bound brief. Do not put a status sentence, introduction, Markdown decoration or confirmation request before that line. Then follow the brief's response format.`;
 }
 
 function seatPointerText(ctx) {
-  return `${pointerText(ctx.brief).trim()} ${seatContextText(ctx)}`;
+  const text = `${pointerText(ctx.brief).trim()} ${seatContextText(ctx)}`;
+  if (text.length + 1 > 2000) throw Object.assign(new Error('seat pointer exceeds the 2000-character delivery limit'), { code: 'POINTER_FAIL' });
+  return text;
 }
 
 function seatPointerFile(ctx) {
-  const file = writePointerFile(ctx.brief.briefPath);
-  fs.appendFileSync(file, `${seatContextText(ctx)}\n`, 'utf8');
+  const text = seatPointerText(ctx);
+  const file = path.resolve(ctx.brief.briefPath + '.pointer.md');
+  fs.writeFileSync(file, `${text}\n`, 'utf8');
   return file;
 }
 

@@ -66,7 +66,8 @@ test('preflight uses bundled skills and v2 rules with file-only binary discovery
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.deepEqual(result.arbiterSkills, ['magi-mode']);
   assert.equal(result.findings.some(row => row.check.startsWith('arbiter-skill:')), false);
-  assert.ok(result.findings.filter(row => row.check.startsWith('seat-skill:')).every(row => row.value.startsWith(f.runtimeRoot)));
+  const canonicalRuntimeRoot = fs.realpathSync.native(f.runtimeRoot);
+  assert.ok(result.findings.filter(row => row.check.startsWith('seat-skill:')).every(row => row.value.startsWith(canonicalRuntimeRoot + path.sep)));
   assert.deepEqual(result.findings.find(row => row.check === 'rules:R01-R22').observed, Array.from({ length: 22 }, (_, n) => `R${String(n + 1).padStart(2, '0')}`));
   assert.deepEqual(snapshot(f.root), before);
 });
