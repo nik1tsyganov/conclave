@@ -77,8 +77,9 @@ function parseClaude(captureText, expectedModel, expectedEffort, onTopic) {
   if (onTopic !== true) throw proofError('Claude topicality must be explicitly attested with --on-topic after arbiter inspection');
   return {
     vendor: 'anthropic',
-    modelObserved: expectedModel,
-    effortObserved: expectedEffort,
+    modelRequested: expectedModel,
+    effortRequested: expectedEffort,
+    identityEvidence: 'requested-only',
     onTopic: true,
     responseBytes: Buffer.byteLength(capture, 'utf8'),
     vendorSideTokens: null,
