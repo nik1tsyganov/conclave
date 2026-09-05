@@ -53,12 +53,14 @@ function main(io = process) {
   }
   const profiles = loadProfiles();
   if (
-    profiles.schemaVersion < 3 ||
+    profiles.schemaVersion < 4 ||
     profiles.principles?.leafSeat !== true ||
     profiles.principles?.skillsAreAllowListed !== true ||
     profiles.principles?.bridgesAreArbiterOnly !== true ||
+    profiles.principles?.proofMustDistinguishRequestedFromObserved !== true ||
     !profiles.roleSkills?.plan ||
-    !profiles.roleSkills?.research
+    !profiles.roleSkills?.research ||
+    profiles.vendors?.anthropic?.proof?.includes('modelObserved')
   ) {
     io.stderr.write('RELEASE_CHECK_FAIL seat profiles are stale or not fail-closed\n');
     return 1;
