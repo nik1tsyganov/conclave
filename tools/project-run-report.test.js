@@ -50,6 +50,26 @@ test('partial and rejected runs retain NOT_RUN and actual rejection', async t =>
   assert.ok(report.issues.some(row => row.kind === 'approval'));
 });
 
+test('Windows producer path aliases remain valid evidence during report export', { skip: process.platform !== 'win32' }, async t => {
+  const previous = { TEMP: process.env.TEMP, TMP: process.env.TMP };
+  const alias = os.tmpdir().toLowerCase();
+  let run;
+  try {
+    process.env.TEMP = alias; process.env.TMP = alias;
+    run = panel(t);
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+  }
+  assert.notEqual(fs.realpathSync(run.runDir), fs.realpathSync.native(run.runDir));
+  for (const row of run.dispatches) await runDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, 'ACK fixture\nPOSITION: APPROVE'));
+  const before = fileBytes(run.runDir);
+  const { report } = createReport({ runDir: run.runDir, outputDir: output(t) });
+  assert.equal(report.status, 'PASS', JSON.stringify(report.issues));
+  assert.deepEqual(fileBytes(run.runDir), before);
+});
+
 test('corrupt evidence cannot inherit a stale PASS summary', async t => {
   const run = panel(t);
   for (const row of run.dispatches) await runDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, 'ACK fixture\nPOSITION: APPROVE'));

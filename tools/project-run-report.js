@@ -13,11 +13,14 @@ const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 
 function createReport({ runDir, outputDir, phase = 'finalize', errorFile, projectRoot }) {
   if (!runDir || !outputDir || !PHASES.includes(phase)) throw new Error('runDir, a new outputDir, and a valid phase are required');
-  const root = canonicalPlainPath(runDir);
+  const protectedRun = canonicalPlainPath(runDir);
+  // Native canonicalization is for containment. Evidence paths retain the
+  // producer's realpath spelling (Windows case and 8.3 aliases can differ).
+  const root = fs.realpathSync(runDir);
   const destination = canonicalPlainPath(outputDir);
   if (!fs.statSync(root).isDirectory()) throw new Error('runDir must be an existing attempt/run directory');
   if (fs.existsSync(destination)) throw new Error('outputDir already exists; preserve the report and choose a new directory');
-  const protectedRoots = [root, canonicalPlainPath(DEFAULT_ROOT), canonicalPlainPath(process.cwd())];
+  const protectedRoots = [protectedRun, canonicalPlainPath(DEFAULT_ROOT), canonicalPlainPath(process.cwd())];
   if (projectRoot) {
     const product = canonicalPlainPath(projectRoot);
     if (!fs.statSync(product).isDirectory()) throw new Error('projectRoot must be an existing directory');
