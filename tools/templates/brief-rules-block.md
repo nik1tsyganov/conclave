@@ -1,18 +1,19 @@
-# Magi CLI brief RULES block (required)
+# MAGI CLI brief RULES block (required)
 
-Paste into every Magi CLI seat brief. `dispatch-run.js` stages the vault rules pack beside the brief and verifies its fingerprint/hashes before any vendor process starts.
+Paste into every MAGI CLI seat brief. `dispatch-run.js` stages the versioned rules pack and the seat's allow-listed skill pack before launch. Arbiter-only routing/bridge/orchestration skills are **not** seat skills.
 
 ```text
-STANDING RULES (Magi CLI): Read STANDING.md and RULES/INDEX.md, then R01–R21. Delivery: pointer-only.
-Skills: magi-mode, magi-dispatch, mix-mode, engineering-orchestrator, testing, <implement when role=implement>, <codex-bridge|claude-bridge|gemini-bridge for this vendor>.
-SCOPE: <replace with concrete engineering-orchestrator Pre-dispatch SCOPE; no placeholder>.
-Vendor: <codex|claude|agy> — casper_via=agy for google. hostMode: cursor-cli. not CONCLAVE.
-MUST: WRITE AUDIT; no C:\src\vault writes; no Gemini PAYG; leaf seat (no fan-out); SLICES≠vendors (R11).
-LIVE: R09 live-check; Claude requires R16 auth + headless probe before dispatch.
+STANDING RULES (MAGI CLI): Read staged STANDING.md and RULES/INDEX.md, then R01–R21. Delivery: pointer-only.
+SEAT: Read SEAT-CONTRACT.md and skills/skills-manifest.json before task work. Use only the staged skills listed by that contract.
+SCOPE: <replace with the concrete assigned work/read scope; no placeholder>.
+ROLE: <implement|review|verify>. Review/verify are read-only and must not modify product files.
+Vendor: <codex|claude|agy> — casper_via=agy for Google. hostMode: cursor-cli. not CONCLAVE.
+MUST: WRITE AUDIT when role=implement; no C:\src\vault writes; no Gemini PAYG; leaf seat (no fan-out); SLICES≠vendors (R11).
+LIVE: R09 live-check. Claude dispatch requires R16 auth + headless probe status established by the arbiter before launch.
 COMMS: receipt ACK + handoff envelope + output hashes. TELEMETRY: R17 exactly one arbiter row after dispatch.
-PROOF: R18 vendor-native proof via cli-proof. Floor: ≤60% per vendor; activation-check on dispatch-log.
+PROOF: R18 vendor-native proof via cli-proof. Deterministic failures cannot be waived.
 ```
 
-Production preflight is structural, not substring-only: the staged `rules-manifest.json` must verify, the SCOPE must be concrete, the correct vendor bridge must be named, and the vendor-specific requirements must hold. Use `node tools/dispatch-run.js ...`; direct `cli-launch.js` is a diagnostic/legacy surface.
+Production preflight is structural: the staged rules manifest must verify, SCOPE must be concrete, role permissions must match the seat contract, and vendor-specific requirements must hold. `dispatch-run.js` is the seat front door; direct vendor CLI calls are diagnostic only.
 
-SoT: ai-ops-vault `projects/magi-cli-rules/` (STANDING + RULES/R01–R21).
+SoT: `ai-ops-vault/projects/magi-cli-rules/` plus the generated `SEAT-CONTRACT.md` / `skills-manifest.json` for that dispatch.
