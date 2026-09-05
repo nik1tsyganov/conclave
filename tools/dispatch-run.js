@@ -11,6 +11,7 @@ const { checkBriefFile } = require('./cli-brief-rules-check.js');
 const { verifyProof } = require('./cli-proof.js');
 const { validateDispatchRow } = require('./dispatch-schema.js');
 const { loadMatrix, loadAvailability, routeAllowed } = require('./dispatch-matrix.js');
+const { loadProfiles, buildSeatProfile } = require('./seat-policy.js');
 
 function argError(message) { const e = new Error(message); e.code = 'ARGUMENT_ERROR'; return e; }
 function policyError(message) { const e = new Error(message); e.code = 'POLICY_FAIL'; return e; }
@@ -20,7 +21,7 @@ function parseArgs(argv) {
   const values = new Set([
     '--vendor', '--role', '--class', '--brief', '--cwd', '--model', '--effort', '--dispatch-id', '--unit-id',
     '--evidence-dir', '--telemetry-log', '--activation-log', '--rules-root', '--review-permission-mode',
-    '--matrix', '--availability', '--author-vendor',
+    '--matrix', '--availability', '--author-vendor', '--seat-profiles',
   ]);
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
@@ -39,9 +40,9 @@ function usage() {
     'Usage: node tools/dispatch-run.js --vendor <openai|google|anthropic> --role <implement|review|verify>',
     '  --class <routing-class> --brief <BRIEF.md> --cwd <worktree> --model <slug> --effort <level>',
     '  --dispatch-id <id> --unit-id <id> --evidence-dir <dir> [--availability <json>]',
-    '  [--author-vendor <vendor>] [--rules-root <dir>] [--on-topic]',
+    '  [--author-vendor <vendor>] [--rules-root <dir>] [--seat-profiles <json>] [--on-topic]',
     '',
-    'Runs one fail-closed MAGI CLI seat transaction. The dispatch matrix is enforced again at the launch boundary.',
+    'Runs one fail-closed MAGI CLI seat transaction. Matrix and seat capability policy are rechecked at launch.',
   ].join('\n');
 }
 
@@ -71,8 +72,18 @@ async function runDispatch(opts) {
   const effort = opts.effort;
   const matrix = loadMatrix(opts.matrix);
   const availability = loadAvailability(opts.availability);
-  const policy = routeAllowed(matrix, { class: opts.class, role: opts.role, vendor: opts.vendor, model, effort }, availability);
-  if (!policy.ok) throw policyError(policy.reason);
+  const routePolicy = routeAllowed(matrix, { class: opts.class, role: opts.role, vendor: opts.vendor, model, effort }, availability);
+  if (!routePolicy.ok) throw policyError(routePolicy.reason);
+
+  const seatProfiles = loadProfiles(opts.seatProfiles);
+  const seatProfile = buildSeatProfile(seatProfiles, {
+    vendor: opts.vendor,
+    role: opts.role,
+    class: opts.class,
+    arbiter: false,
+    subdispatch: false,
+  });
+  writeJson(path.join(evidenceDir, 'seat-profile.json'), seatProfile);
 
   const staged = stageRules({ briefPath: brief, rulesRoot: opts.rulesRoot });
   verifyStagedRules(brief);
@@ -96,7 +107,8 @@ async function runDispatch(opts) {
   });
   writeJson(path.join(evidenceDir, 'launch.json'), {
     class: opts.class, vendor: launch.vendor, role: launch.role, model, effort,
-    binary: launch.binary, args: launch.args, cwd: launch.cwd, matrixVersion: matrix.schemaVersion,
+    binary: launch.binary, args: launch.args, cwd: launch.cwd,
+    matrixVersion: matrix.schemaVersion, seatProfile,
   });
 
   const result = await runLaunch(launch, { pidFile, stdoutFile: stdoutPath, stderrFile: stderrPath });
@@ -115,6 +127,13 @@ async function runDispatch(opts) {
     vendor: opts.vendor, capture: capturePath, log: path.join(evidenceDir, 'vendor.log'),
     expectedModel: model, expectedEffort: effort, onTopic: opts.onTopic,
   });
+  for (const field of seatProfile.proofFields) {
+    if (proof[field] === undefined || proof[field] === null) {
+      const error = new Error(`seat proof missing required field: ${field}`);
+      error.code = 'PROOF_FAIL';
+      throw error;
+    }
+  }
   const proofId = hashText(JSON.stringify(proof));
   writeJson(path.join(evidenceDir, 'proof.json'), { proofId, class: opts.class, ...proof });
 
@@ -123,7 +142,7 @@ async function runDispatch(opts) {
     schemaVersion: 1, date: now.toISOString().slice(0, 10), dispatchId: opts.dispatchId, unitId: opts.unitId,
     class: opts.class, vendor: opts.vendor, role: opts.role, hostMode: 'cursor-cli', routedBy: 'arbiter', capturedBy: 'lead',
     model, effort, proofId, vendorSideTokens: proof.vendorSideTokens ?? null,
-    note: `evidence=${evidenceDir};matrix=v${matrix.schemaVersion}`,
+    note: `evidence=${evidenceDir};matrix=v${matrix.schemaVersion};seat-profile=v${seatProfiles.schemaVersion}`,
   }, { requireCursorCli: true, requireArbiter: true, requireDispatchId: true, requireUnitId: true, requireProof: true });
 
   const telemetryLog = opts.telemetryLog || path.resolve(__dirname, '..', 'telemetry', 'dispatches.jsonl');
@@ -132,7 +151,8 @@ async function runDispatch(opts) {
 
   const receipt = {
     schemaVersion: 1, dispatchId: opts.dispatchId, unitId: opts.unitId, class: opts.class, vendor: opts.vendor, role: opts.role,
-    model, effort, proofId, matrixVersion: matrix.schemaVersion,
+    model, effort, proofId, matrixVersion: matrix.schemaVersion, seatProfileVersion: seatProfiles.schemaVersion,
+    seatSkills: seatProfile.skills, permissionProfile: seatProfile.permissionProfile,
     briefSha256: crypto.createHash('sha256').update(fs.readFileSync(brief)).digest('hex'),
     captureSha256: crypto.createHash('sha256').update(fs.readFileSync(capturePath)).digest('hex'),
     rulesManifest: staged.manifestPath, completedAt: now.toISOString(),
