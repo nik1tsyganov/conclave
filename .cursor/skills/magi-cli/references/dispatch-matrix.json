@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "updated": "2026-09-05",
   "principles": {
     "arbiterVendor": "xai",
@@ -13,7 +13,7 @@
     "arbiterNeverVotes": true,
     "deterministicRulesOutrankModels": true,
     "distributionFloor": 0.6,
-    "requireThreeImplementVendorsWhenMagiConvened": true,
+    "distributionFloorMinimumImplementUnits": 2,
     "requireCrossVendorReview": true,
     "requireObservedModelProof": true,
     "unknownAvailabilityIsUnavailable": true,
@@ -27,7 +27,7 @@
         "gpt-5.6-sol": { "efforts": ["none", "low", "medium", "high", "xhigh", "max"], "tier": "frontier" },
         "gpt-6-astra": { "efforts": ["low", "medium", "high", "xhigh", "max"], "tier": "frontier-plus", "availability": "probe-required" }
       },
-      "note": "Astra is an escalation tier, not the standing default. It is illegal until the local Codex path proves the exact gpt-6-astra model is reachable and observed."
+      "note": "Astra is an escalation tier, not the standing default. It is illegal until the local Codex path proves exact gpt-6-astra reachability and, where marked escalationOnly, the route carries an explicit escalation reason."
     },
     "anthropic": {
       "models": {
@@ -35,7 +35,7 @@
         "opus": { "canonical": "claude-opus-5", "efforts": ["low", "medium", "high", "xhigh", "max"], "tier": "judgment" },
         "fable": { "canonical": "claude-fable-5-1", "efforts": ["low", "medium", "high", "xhigh", "max"], "tier": "agentic-frontier" }
       },
-      "note": "Fable is role-specialized for ambitious long-horizon agentic work; Opus remains the conservative judgment/review lane. The Claude CLI alias fable is permitted only when live proof confirms the active Fable family before a measured run."
+      "note": "Fable is role-specialized for ambitious long-horizon agentic work; Opus remains the conservative judgment/review lane."
     },
     "google": {
       "models": {
@@ -49,7 +49,7 @@
   },
   "classes": {
     "architecture-planning": {
-      "implement": [
+      "plan": [
         { "vendor": "anthropic", "model": "opus", "effort": "high", "priority": 1 },
         { "vendor": "openai", "model": "gpt-5.6-sol", "effort": "high", "priority": 2 },
         { "vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 3 },
@@ -88,7 +88,7 @@
       ]
     },
     "long-context-analysis": {
-      "implement": [
+      "research": [
         { "vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 1 },
         { "vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 2, "requiresProbe": true },
         { "vendor": "anthropic", "model": "fable", "effort": "high", "priority": 3 },
@@ -129,7 +129,7 @@
       ]
     },
     "research-synthesis": {
-      "implement": [
+      "research": [
         { "vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 1 },
         { "vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 2, "requiresProbe": true },
         { "vendor": "anthropic", "model": "fable", "effort": "high", "priority": 3 },
