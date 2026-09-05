@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "updated": "2026-09-05",
   "principles": {
     "leafSeat": true,
@@ -8,35 +8,56 @@
     "reviewVerifyReadOnly": true,
     "implementWriteScopedToWorktree": true,
     "skillsAreAllowListed": true,
-    "classExtrasAreAdditive": true
+    "classExtrasAreAdditive": true,
+    "bridgesAreArbiterOnly": true
   },
+  "arbiterSkills": [
+    "engineering-orchestrator",
+    "graph-engineering",
+    "context-engineering",
+    "magi-mode",
+    "magi-dispatch",
+    "mix-mode",
+    "dispatch-efficiency",
+    "task-retrospective",
+    "codex-bridge",
+    "gemini-bridge",
+    "claude-bridge"
+  ],
   "baseSkills": {
-    "openai": ["magi-mode", "magi-dispatch", "mix-mode", "testing", "codex-bridge"],
-    "anthropic": ["magi-mode", "magi-dispatch", "mix-mode", "testing", "claude-bridge"],
-    "google": ["magi-mode", "magi-dispatch", "mix-mode", "testing", "gemini-bridge"]
+    "openai": [],
+    "anthropic": [],
+    "google": []
   },
   "roleSkills": {
-    "implement": ["implement"],
+    "implement": ["implement", "testing"],
     "review": ["code-minimalism"],
-    "verify": []
+    "verify": ["testing", "evaluation-engineering"]
   },
   "classSkills": {
-    "architecture-planning": ["graph-engineering", "context-engineering"],
+    "architecture-planning": ["context-engineering"],
     "standard-feature": [],
     "bulk-mechanical": ["code-minimalism"],
     "debug-mystery": ["context-engineering"],
     "long-context-analysis": ["context-engineering"],
     "agentic-long-run": ["loop-engineering", "harness-engineering"],
     "security-sensitive": ["auth-security"],
-    "review-adversarial": ["code-minimalism"],
-    "test-verification": ["evaluation-engineering"],
+    "review-adversarial": [],
+    "test-verification": [],
     "research-synthesis": ["context-engineering"]
   },
   "forbiddenSeatSkills": [
     "engineering-orchestrator",
+    "graph-engineering",
+    "magi-mode",
+    "magi-dispatch",
+    "mix-mode",
     "dispatch-efficiency",
     "dispatch-assessment",
-    "task-retrospective"
+    "task-retrospective",
+    "codex-bridge",
+    "gemini-bridge",
+    "claude-bridge"
   ],
   "vendors": {
     "openai": {
