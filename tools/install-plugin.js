@@ -25,7 +25,8 @@ const CLI_RUNTIME_TOOLS = Object.freeze([
   'cli-adapters.js', 'cli-brief-rules-check.js', 'cli-idle.js', 'cli-pointer.js',
   'cli-process.js', 'cli-proof.js', 'cli-rules-stage.js', 'cli-runner.js',
   'dispatch-matrix.js', 'dispatch-run.js', 'dispatch-schema.js', 'magi-cli-preflight.js',
-  'telemetry-append.js', 'vendor-binaries.js', 'dispatch-log.pass.jsonl', 'dispatch-log.fail.jsonl',
+  'model-availability.js', 'telemetry-append.js', 'vendor-binaries.js',
+  'dispatch-log.pass.jsonl', 'dispatch-log.fail.jsonl',
 ]);
 
 function bail(msg) { console.error(`CANNOT RUN: ${msg}`); process.exit(2); }
@@ -46,7 +47,7 @@ function magiCursorManifest() {
 function magiCliManifest() {
   return applySurfaceFields({
     name: 'magi-cursor-cli', displayName: 'MAGI Cursor CLI',
-    description: 'Grok arbiter + vendor CLIs with fail-closed rules/proof/telemetry. Not CONCLAVE.',
+    description: 'Grok arbiter + vendor CLIs with fail-closed matrix/rules/proof/telemetry. Not CONCLAVE.',
     version: '0.1.0', author: { name: 'Nikita Tsyganov' }, repository: 'https://github.com/nik1tsyganov/magi.git',
     license: 'MIT', keywords: ['magi', 'magi-cli', 'multi-vendor', 'cursor', 'cli'],
   }, INSTALLED_MAGI_CLI_SURFACE);
