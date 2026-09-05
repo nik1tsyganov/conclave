@@ -1,118 +1,190 @@
-# MAGI Cursor Plugin
+# MAGI
 
-Original MAGI tri-seat panel (Claude + Codex + Gemini) as a local Cursor plugin.
+MAGI is a **code-enforced, tri-vendor AI engineering system**. OpenAI, Anthropic, and Google occupy the three working seats. xAI/Grok 4.6 is the non-voting arbiter: it classifies work, proposes routes, writes briefs, launches seats, records lead telemetry, and performs mechanical tallying. It does **not** implement, review, verify, repair, or vote.
 
-- **MAGI is not CONCLAVE.** CONCLAVE is a separate plugin with its own host rules. The owner picks CONCLAVE when Cursor model usage remains; `/magi` or `/magi-cli` when running MAGI.
-- The Cursor arbiter is an xAI/Grok slug. Use a model picker that shows `cursor-grok-4.6-high-fast` (or another Grok arbiter slug).
-- The Grok arbiter routes, briefs, and tallies; it does **not** implement, review, verify, or vote.
-- Claude Code still uses the same MAGI policy: run `magi-whoami --mode claude-code` there. This plugin is the Cursor surface.
-- `/magi` = MAGI Cursor (hostMode `cursor`): Grok arbiter dispatches native
-  Cursor Task seats through `implementer`, `reviewer`, and `verifier`, always
-  with the frontier model override for that vendor:
-  `claude-opus-5-thinking-high`, `gpt-5.6-sol-medium`, or `gemini-3.1-pro`.
-  It does not use the `codex-*` or `gemini-*` CLI wrappers.
-- `/magi-cli` = MAGI Cursor CLI (hostMode `cursor-cli`): Grok arbiter dispatches via vendor CLIs (`codex.exe`, `agy.exe`, `claude.exe`) when Cursor Task usage is exhausted. Never Cursor Task to elector slugs in this mode. Magi CLI dispatches Claude through `C:\Users\YESSIR\.local\bin\claude.exe -p --model fable --effort xhigh`. Live 2026-09-02: `claude auth status` reported `loggedIn: true` (`claude.ai`, Max), and the headless Haiku probe returned `ready`. Re-run both checks in the dispatching session.
-- Codex-led MAGI can reach Claude at that command. If a later probe returns login/auth language, an empty capture, or off-topic text, record `degraded=true` with the probe text; only then is Codex+Gemini a duo. Claude-hosted MAGI is the full tri-seat.
-- **MAGI plugin rules are `alwaysApply: true` in every Cursor workspace.** Four rules (`magi-arbiter`, `magi-activation`, `magi-orchestrator`, and `live-check`) ship with the plugin and are copied to `~/.cursor/rules/` by the installer, matching CONCLAVE's always-on `commit-and-push` user rule. The three named MAGI rules ignore CONCLAVE chats via the first-line discriminator; `live-check` applies everywhere. Do not glob MAGI rules to magi-only trees.
+> The model proposes. Deterministic policy decides what is legal.
 
-## Installation
+A standalone visual explainer lives in [`site/`](site/). Open [`site/index.html`](site/index.html) directly in a browser.
 
-```bash
+## System
+
+| Seat | Vendor | Primary strengths | Model strategy |
+|---|---|---|---|
+| **Melchior** | OpenAI | technical rigor, implementation, debugging, adversarial review | Luna → Terra → Sol → Astra by task difficulty |
+| **Balthasar** | Anthropic | judgment, conservative review, safety, long-running agentic implementation | Sonnet / Fable / Opus selected by role |
+| **Casper** | Google | context, breadth, synthesis, decorrelated third perspective | Flash → Pro; exact agy-observed slug required |
+| **Arbiter** | xAI | classification, routing, brief composition, mechanical orchestration | Grok 4.6 high; xhigh only for contested/high-risk routing |
+
+MAGI is **not CONCLAVE**. CONCLAVE is a separate system with separate host rules.
+
+## Two host modes
+
+- `/magi` — Cursor Task mode.
+- `/magi-cli` — vendor-CLI mode using Codex CLI, agy, and Claude Code. This mode is the focus of the fail-closed runtime in `tools/`.
+
+## Code-enforced control plane
+
+`/magi-cli` no longer relies on the arbiter remembering a prose routing table.
+
+```text
+Grok classifies
+    ↓
+dispatch-plan.json
+    ↓
+dispatch-matrix.js          class/vendor/model/effort/probe/distribution policy
+    ↓
+seat-policy.js              role/permissions/skill allow-list/leaf-seat policy
+    ↓
+cli-skill-stage.js          minimal per-seat staged skill pack + hashes
+    ↓
+cli-rules-stage.js          versioned standing rules + hashes
+    ↓
+dispatch-run.js             rechecks policy at the actual launch boundary
+    ↓
+vendor CLI
+    ↓
+cli-proof.js                observed model + vendor-native proof
+    ↓
+telemetry + receipt + activation + mechanical tally
+```
+
+A deterministic failure cannot be waived by Grok or by a seat.
+
+### Routing authority
+
+`.cursor/skills/magi-cli/references/dispatch-matrix.json` is the machine-readable source for legal vendor/model/effort combinations by task class and role. `tools/dispatch-matrix.js` validates a whole plan before any vendor spend, and `tools/dispatch-run.js` validates the individual route again immediately before launch.
+
+Current high-level policy:
+
+| Class | Preferred route |
+|---|---|
+| Architecture / extreme planning | GPT-6 Astra high/xhigh, then Opus / Gemini Pro |
+| Standard feature | GPT-5.6 Terra medium |
+| Bulk / mechanical | GPT-5.6 Luna medium |
+| Difficult debugging | GPT-5.6 Sol high |
+| Long-running agentic implementation | Claude Fable xhigh |
+| Long-context analysis / research synthesis | Gemini Pro |
+| Security-sensitive | Opus xhigh, Astra xhigh, Gemini Pro panel |
+| Adversarial review | Sol/Astra high, Opus high, Gemini Pro |
+
+Probe-required models are **unavailable until the actual CLI proves the exact requested slug**. Silent vendor substitution is a failed route, not a successful fallback.
+
+### Seat capability authority
+
+`.cursor/skills/magi-cli/references/seat-profiles.json` defines what each vendor seat may do:
+
+- legal roles;
+- permission profile per role;
+- required proof fields;
+- base skills;
+- role-specific skills;
+- class-specific skills;
+- forbidden arbiter/orchestration skills;
+- leaf-seat / no-subdispatch invariant.
+
+`tools/cli-skill-stage.js` copies only that seat's allow-listed skills into the dispatch evidence directory and writes a hashed manifest. `dispatch-run.js` writes `SEAT-CONTRACT.md`, points the vendor process at that contract, and includes the contract + skill-manifest hashes in the receipt.
+
+Review and verify seats are read-only. A vendor cannot review or verify work authored by the same vendor.
+
+## Install
+
+```powershell
 node C:\src\magi\tools\install-plugin.js
 ```
 
-Then in Cursor: **Developer: Reload Window**, open **Customize**, and enable both **MAGI Cursor** and **MAGI Cursor CLI**.
+The installer creates both local Cursor plugins and now copies the MAGI CLI runtime into the installed CLI plugin, including the matrix, seat-policy, proof, rules, binary-resolution, and skill-staging tools. The launcher no longer requires `C:\src\magi` merely to execute installed runtime code.
 
-## Starting a MAGI session
+The standing rules pack is still external and versioned under `ai-ops-vault`; set `MAGI_RULES_ROOT` when it is not at the default location.
 
-1. Open a **new** Cursor chat that is **not** `/conclave` and not the session that created this plugin.
-2. Make sure the chat is on a Grok arbiter slug (e.g., `cursor-grok-4.6-high-fast`).
-3. Type `/magi` for Cursor Task mode, or `/magi-cli` for vendor-CLI mode.
-4. Verify the host slug:
-   ```bash
-   # For /magi:
-   node C:\Users\YESSIR\.claude\skills\magi-mode\references\magi-whoami.js --mode cursor --slug cursor-grok-4.6-high-fast
-   # For /magi-cli:
-   node C:\Users\YESSIR\.claude\skills\magi-mode\references\magi-whoami.js --mode cursor-cli --slug cursor-grok-4.6-high-fast
-   ```
-   The command must report `LEGAL`. If it does not, stop.
-5. In `/magi`, the arbiter dispatches Task `implementer` three times, once with
-   each frontier model above, and permutes vendors across implement units.
-   Review and verification use Task `reviewer` and `verifier` with the same
-   required model overrides. In `/magi-cli`, the arbiter uses vendor CLIs.
+Then reload Cursor and enable **MAGI Cursor** and **MAGI Cursor CLI**.
 
-## Launch
+## `/magi-cli` front door
 
-Run `node tools/cli-launch.js --help` for the vendor-CLI launch options.
-The idle watch — when a silent vendor child is a hang and when it is not — lives in `tools/cli-launch.js` and `tools/cli-idle.js`.
+1. Use a Grok 4.6 Cursor host and run the MAGI identity check.
+2. Run `tools/magi-cli-preflight.js`.
+3. Classify units and write `dispatch-plan.json`.
+4. Validate it:
 
-Every Magi CLI seat brief MUST include the RULES block from
-`.cursor/skills/magi/references/brief-rules-block.md`. Check with
-`node tools/cli-brief-rules-check.js --brief <file>`. `tools/cli-smoke.js`
-fails closed when those markers are missing. When
-`C:\src\ai-ops-vault\projects\magi-cli-rules` is on the host, the arbiter
-SHOULD pass it as Gemini/`agy` `extraDirs`. Do not pass that vault (or
-`C:\Users`) as Claude `--add-dir`.
-
-## After implement dispatches
-
-Each implementer pastes a WRITE AUDIT (`git diff --stat` + `git status --porcelain`).
-
-For product work, the lead writes each JSONL row per implement unit
-`{vendor, role:"implement"}` to `projects/<slug>/magi-dispatch-log.jsonl`.
-MAGI-kit work uses this repository's root `magi-dispatch-log.jsonl`. Both paths
-are gitignored; do not commit secrets.
-
-Then run the activation check:
-
-```bash
-# Product work:
-node C:\src\magi\tools\activation-check.js projects/<slug>/magi-dispatch-log.jsonl
-
-# MAGI-kit work:
-node C:\src\magi\tools\activation-check.js C:\src\magi\magi-dispatch-log.jsonl
+```powershell
+node tools\dispatch-matrix.js --plan dispatch-plan.json --availability availability.json
 ```
 
-`activation-check.js` rejects the checked-in fixtures, then calls `hog-check.js` to enforce the 60% vendor floor. Exit 0 means `FLOOR HOLDS`; exit 1 means `FAILED activation`.
+5. Launch every seat only through `dispatch-run.js`:
 
-## POSITION tally
-
-The arbiter tallies POSITION mechanically. Do not hand-count.
-
-```bash
-node C:\src\magi\tools\position-tally.js --ballots '[{"elector":"anthropic","position":"APPROVE"},{"elector":"openai","position":"APPROVE"},{"elector":"google","position":"ABSTAIN"}]'
+```powershell
+node tools\dispatch-run.js `
+  --vendor openai `
+  --role implement `
+  --class standard-feature `
+  --brief C:\path\BRIEF.md `
+  --cwd C:\src\product `
+  --model gpt-5.6-terra `
+  --effort medium `
+  --dispatch-id run-001 `
+  --unit-id api-001 `
+  --evidence-dir C:\path\evidence\api-001
 ```
 
-`--file` accepts a JSON array, a `{ "ballots": [...] }` object, or JSONL. `--degraded` is the cursor-cli Claude fail path (Codex+Gemini duo). `--author-vendor <vendor>` recuses that elector (protocol 6). `--json` prints the full result.
+The transaction fails before vendor spend if the route, seat profile, required skills, or standing rules are invalid.
 
-Rules encoded here (same passage arithmetic MAGI and CONCLAVE share for later AI-ops reuse):
+## Evidence contract
 
-- Eligible electors are `anthropic`, `openai`, and `google`. The Grok arbiter never votes.
-- Passage is `>=2 APPROVE` among eligible electors.
-- `ABSTAIN` never counts toward passage.
-- When fewer than 2 eligible electors cast a counted POSITION, the verdict is `NOT_PANEL` with `degraded=true` and `reason=quorumFloor` (shared CONCLAVE quorum floor). Destructive gates stay fail closed. This is not `DEADLOCK`.
-- Once quorum is met and APPROVE stays below 2, the verdict is `DEADLOCK`. There is no panel `REJECTED` verdict.
-- `implementer` / `reviewer` / `verifier` (also telemetry `implement` / `review` / `verify`) are gate roles. They may ride a ballot for audit. They do not create a vote and they do not change eligibility.
-- Degraded duo marks Claude (`anthropic`) ineligible only. Idle Casper is `FAILED activation`, not a duo — the tool refuses `--degraded-vendor google`.
+A successful seat produces structured evidence including:
 
-Intentional MAGI-vs-CONCLAVE differences: elector names are the three MAGI vendors, not CONCLAVE cardinal seats; the Claude-fail duo input (`--degraded`) is MAGI cursor-cli only; this repo does not run `session-whoami.js` or `camerlengo-8`. Passage arithmetic and the `NOT_PANEL` / `degraded` / `quorumFloor` result shape are shared on purpose.
+```text
+launch.json
+seat-profile.json
+SEAT-CONTRACT.md
+skills/skills-manifest.json
+RULES/rules-manifest.json
+capture.txt
+vendor.log
+proof.json
+receipt-ack.json
+handoff-envelope.json
+```
 
-## Agent discovery
+Vendor-native proof is mandatory:
 
-- Claude Code reaches the MAGI seats via wrapper agents already installed in `C:\Users\YESSIR\.claude\agents\` (same stems as the plugin agents).
-- Cursor Task uses the MAGI Cursor plugin `agents/` directory when the plugin is enabled (copied to `C:\Users\YESSIR\.cursor\plugins\local\magi\agents`). Keep both copies. Do not delete the plugin agents.
-- `/magi-cli` uses vendor CLIs (`C:\Users\YESSIR\tools\bin\codex.exe`, `C:\Users\YESSIR\tools\bin\agy.exe`) and does not use the wrapper agents.
+- **OpenAI/Codex:** session ID, token usage, sandbox, observed model.
+- **Google/agy:** conversation ID, usage, response, exact observed model slug.
+- **Anthropic/Claude:** non-empty topical capture, requested model/effort evidence contract.
 
-## Product work tracking
+## Distribution and review independence
 
-Product repositories do not carry MAGI policy or run records. Project-specific
-slice graphs, floor notes, and dispatch logs live under [`projects/`](projects/).
+When MAGI is convened, real implementation work must reach all three available vendors. A seat convened and then starved is failed activation. The implementation distribution floor prevents one vendor from silently receiving more than 60% of eligible independent units when qualified alternatives exist.
 
-## magi-probe playbooks
+No vendor reviews or verifies its own authored unit. Position votes are tallied mechanically with `tools/position-tally.js`; Grok never votes.
 
-- [RUN-IN-CURSOR.md](C:\src\magi-probe\RUN-IN-CURSOR.md)
-- [RUN-IN-CLAUDE.md](C:\src\magi-probe\RUN-IN-CLAUDE.md)
+## Rules
+
+The standing MAGI CLI rules live in `ai-ops-vault/projects/magi-cli-rules/`. `cli-rules-stage.js` copies the versioned pack beside a dispatch and records hashes. `cli-brief-rules-check.js` verifies the staged pack, concrete scope, correct vendor bridge, and vendor-specific requirements.
+
+Markdown documents explain policy. **Executable invariants live in code and machine-readable contracts.**
+
+## Verification
+
+```powershell
+npm test
+npm run check
+```
+
+`npm run check` is the aggregate release gate for unit tests plus MAGI CLI contract checks.
+
+## Website
+
+The one-shot explanatory site is intentionally dependency-free:
+
+```text
+site/
+  index.html
+  styles.css
+  magi-core.svg
+  architecture.svg
+```
+
+The art is original project artwork using a retro-futurist anime command-system visual language; it is not an official Evangelion asset.
 
 ## Repository
 
-- https://github.com/nik1tsyganov/magi
+https://github.com/nik1tsyganov/magi
