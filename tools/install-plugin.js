@@ -1,23 +1,9 @@
 #!/usr/bin/env node
 'use strict';
 
-/**
- * Install MAGI as local Cursor plugins.
- *
- * Installs TWO plugins:
- *   ~/.cursor/plugins/local/magi            — MAGI Cursor (hostMode `cursor`, native Task models)
- *   ~/.cursor/plugins/local/magi-cursor-cli — MAGI Cursor CLI (hostMode `cursor-cli`, vendor CLIs)
- *
- *   node tools/install-plugin.js
- *
- * Then: Developer: Reload Window, and enable both MAGI Cursor and MAGI Cursor CLI under Customize.
- *
- * Exit 0 = installed. Exit 1 = dest missing a required file. Exit 2 = could not run.
- */
-
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const {
   INSTALLED_MAGI_SURFACE,
   INSTALLED_MAGI_CLI_SURFACE,
@@ -34,87 +20,52 @@ const USER_SKILL_MAGI_CLI = path.join(os.homedir(), '.cursor', 'skills', 'magi-c
 const USER_RULES_DIR = path.join(os.homedir(), '.cursor', 'rules');
 const CLAUDE_CMD_DIR = path.join(os.homedir(), '.claude', 'commands');
 
-function bail(msg) {
-  console.error(`CANNOT RUN: ${msg}`);
-  process.exit(2);
-}
+const CLI_RUNTIME_TOOLS = Object.freeze([
+  'activation-check.js', 'hog-check.js', 'host-resolver.js', 'position-tally.js',
+  'cli-adapters.js', 'cli-brief-rules-check.js', 'cli-idle.js', 'cli-pointer.js',
+  'cli-process.js', 'cli-proof.js', 'cli-rules-stage.js', 'cli-runner.js',
+  'dispatch-run.js', 'dispatch-schema.js', 'telemetry-append.js', 'vendor-binaries.js',
+  'dispatch-log.pass.jsonl', 'dispatch-log.fail.jsonl',
+]);
 
-function copyDir(src, dest) {
-  if (!fs.existsSync(src)) bail(`missing ${src}`);
-  fs.cpSync(src, dest, { recursive: true });
-}
-
-function copyFile(src, dest) {
-  if (!fs.existsSync(src)) bail(`missing ${src}`);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.copyFileSync(src, dest);
-}
-
-function ensureClean(dest) {
-  if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true });
-  fs.mkdirSync(dest, { recursive: true });
-}
-
-function writeManifest(dest, manifest) {
-  fs.mkdirSync(path.join(dest, '.cursor-plugin'), { recursive: true });
-  fs.writeFileSync(path.join(dest, '.cursor-plugin', 'plugin.json'), JSON.stringify(manifest, null, 2) + '\n');
-}
+function bail(msg) { console.error(`CANNOT RUN: ${msg}`); process.exit(2); }
+function copyDir(src, dest) { if (!fs.existsSync(src)) bail(`missing ${src}`); fs.cpSync(src, dest, { recursive: true }); }
+function copyFile(src, dest) { if (!fs.existsSync(src)) bail(`missing ${src}`); fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.copyFileSync(src, dest); }
+function ensureClean(dest) { if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true }); fs.mkdirSync(dest, { recursive: true }); }
+function writeManifest(dest, manifest) { fs.mkdirSync(path.join(dest, '.cursor-plugin'), { recursive: true }); fs.writeFileSync(path.join(dest, '.cursor-plugin', 'plugin.json'), `${JSON.stringify(manifest, null, 2)}\n`); }
 
 function magiCursorManifest() {
-  return applySurfaceFields(
-    {
-      name: 'magi',
-      displayName: 'MAGI Cursor',
-      description:
-        'Original MAGI tri-seat (Claude + Codex + Gemini). Cursor Grok arbiter routes; it does not implement. Not CONCLAVE.',
-      version: '0.1.0',
-      author: { name: 'Nikita Tsyganov' },
-      repository: 'https://github.com/nik1tsyganov/magi.git',
-      license: 'MIT',
-      keywords: ['magi', 'multi-vendor', 'cursor', 'dispatch'],
-    },
-    INSTALLED_MAGI_SURFACE,
-  );
+  return applySurfaceFields({
+    name: 'magi', displayName: 'MAGI Cursor',
+    description: 'Original MAGI tri-seat (Claude + Codex + Gemini). Cursor Grok arbiter routes; it does not implement. Not CONCLAVE.',
+    version: '0.1.0', author: { name: 'Nikita Tsyganov' }, repository: 'https://github.com/nik1tsyganov/magi.git',
+    license: 'MIT', keywords: ['magi', 'multi-vendor', 'cursor', 'dispatch'],
+  }, INSTALLED_MAGI_SURFACE);
 }
 
 function magiCliManifest() {
-  return applySurfaceFields(
-    {
-      name: 'magi-cursor-cli',
-      displayName: 'MAGI Cursor CLI',
-      description:
-        'Grok arbiter + vendor CLIs (codex.exe, agy.exe) when Cursor Task usage is exhausted. Not CONCLAVE.',
-      version: '0.1.0',
-      author: { name: 'Nikita Tsyganov' },
-      repository: 'https://github.com/nik1tsyganov/magi.git',
-      license: 'MIT',
-      keywords: ['magi', 'magi-cli', 'multi-vendor', 'cursor', 'cli'],
-    },
-    INSTALLED_MAGI_CLI_SURFACE,
-  );
+  return applySurfaceFields({
+    name: 'magi-cursor-cli', displayName: 'MAGI Cursor CLI',
+    description: 'Grok arbiter + vendor CLIs with fail-closed rules/proof/telemetry. Not CONCLAVE.',
+    version: '0.1.0', author: { name: 'Nikita Tsyganov' }, repository: 'https://github.com/nik1tsyganov/magi.git',
+    license: 'MIT', keywords: ['magi', 'magi-cli', 'multi-vendor', 'cursor', 'cli'],
+  }, INSTALLED_MAGI_CLI_SURFACE);
 }
 
 function readInstalledManifest(dest) {
-  const rel = '.cursor-plugin/plugin.json';
-  const full = path.join(dest, rel);
-  if (!fs.existsSync(full)) return { ok: false, error: `missing ${rel}` };
-  try {
-    return { ok: true, manifest: JSON.parse(fs.readFileSync(full, 'utf8')), error: null };
-  } catch (error) {
-    return { ok: false, error: `invalid ${rel}: ${error.message}` };
-  }
+  const full = path.join(dest, '.cursor-plugin', 'plugin.json');
+  if (!fs.existsSync(full)) return { ok: false, error: 'missing .cursor-plugin/plugin.json' };
+  try { return { ok: true, manifest: JSON.parse(fs.readFileSync(full, 'utf8')), error: null }; }
+  catch (error) { return { ok: false, error: `invalid .cursor-plugin/plugin.json: ${error.message}` }; }
 }
 
 function installMagiCursor() {
   ensureClean(MAGI_DEST);
-
   writeManifest(MAGI_DEST, magiCursorManifest());
-
   copyDir(path.join(ROOT, '.cursor', 'skills'), path.join(MAGI_DEST, 'skills'));
   copyDir(path.join(ROOT, '.cursor', 'rules'), path.join(MAGI_DEST, 'rules'));
   copyDir(path.join(ROOT, 'agents'), path.join(MAGI_DEST, 'agents'));
   copyDir(path.join(ROOT, 'tools'), path.join(MAGI_DEST, 'tools'));
-
   fs.mkdirSync(path.join(MAGI_DEST, 'commands'), { recursive: true });
   copyFile(path.join(ROOT, 'commands', 'magi.md'), path.join(MAGI_DEST, 'commands', 'magi.md'));
   copyFile(path.join(ROOT, 'commands', 'magi-cli.md'), path.join(MAGI_DEST, 'commands', 'magi-cli.md'));
@@ -122,177 +73,68 @@ function installMagiCursor() {
 
 function installMagiCursorCli() {
   ensureClean(MAGI_CLI_DEST);
-
   writeManifest(MAGI_CLI_DEST, magiCliManifest());
-
   copyDir(path.join(ROOT, '.cursor', 'skills', 'magi-cli'), path.join(MAGI_CLI_DEST, 'skills', 'magi-cli'));
   copyDir(path.join(ROOT, '.cursor', 'rules'), path.join(MAGI_CLI_DEST, 'rules'));
   copyFile(path.join(ROOT, 'commands', 'magi-cli.md'), path.join(MAGI_CLI_DEST, 'commands', 'magi-cli.md'));
-
-  fs.mkdirSync(path.join(MAGI_CLI_DEST, 'tools'), { recursive: true });
-  for (const tool of [
-    'hog-check.js',
-    'hog-check.test.js',
-    'activation-check.js',
-    'activation-check.test.js',
-    'dispatch-log.pass.jsonl',
-    'dispatch-log.fail.jsonl',
-    'host-resolver.js',
-    'host-resolver.test.js',
-    'position-tally.js',
-    'position-tally.test.js',
-  ]) {
-    copyFile(path.join(ROOT, 'tools', tool), path.join(MAGI_CLI_DEST, 'tools', tool));
-  }
+  for (const tool of CLI_RUNTIME_TOOLS) copyFile(path.join(ROOT, 'tools', tool), path.join(MAGI_CLI_DEST, 'tools', tool));
+  if (fs.existsSync(path.join(ROOT, 'tools', 'templates'))) copyDir(path.join(ROOT, 'tools', 'templates'), path.join(MAGI_CLI_DEST, 'tools', 'templates'));
 }
 
 function installUserGlobals() {
   fs.mkdirSync(USER_RULES_DIR, { recursive: true });
-  for (const ruleFile of ['magi-arbiter.mdc', 'magi-activation.mdc', 'magi-orchestrator.mdc', 'live-check.mdc']) {
-    const src = path.join(ROOT, '.cursor', 'rules', ruleFile);
-    const dst = path.join(USER_RULES_DIR, ruleFile);
-    copyFile(src, dst);
-    if (!fs.existsSync(dst)) {
-      console.error(`INSTALL INCOMPLETE — user rule missing: ${dst}`);
-      process.exit(1);
-    }
+  for (const rule of ['magi-arbiter.mdc', 'magi-activation.mdc', 'magi-orchestrator.mdc', 'live-check.mdc']) {
+    copyFile(path.join(ROOT, '.cursor', 'rules', rule), path.join(USER_RULES_DIR, rule));
   }
-  console.log(`MAGI user rules installed at ${USER_RULES_DIR}`);
-
   copyFile(path.join(ROOT, 'claude-commands', 'magi.md'), path.join(CLAUDE_CMD_DIR, 'magi.md'));
-  if (!fs.existsSync(path.join(CLAUDE_CMD_DIR, 'magi.md'))) {
-    console.error('INSTALL INCOMPLETE — claude command missing');
-    process.exit(1);
-  }
-
   if (fs.existsSync(USER_SKILL_MAGI)) fs.rmSync(USER_SKILL_MAGI, { recursive: true, force: true });
   copyDir(path.join(ROOT, '.cursor', 'skills', 'magi'), USER_SKILL_MAGI);
-
   if (fs.existsSync(USER_SKILL_MAGI_CLI)) fs.rmSync(USER_SKILL_MAGI_CLI, { recursive: true, force: true });
   copyDir(path.join(ROOT, '.cursor', 'skills', 'magi-cli'), USER_SKILL_MAGI_CLI);
 }
 
+function checkSurface(dest, expected, label) {
+  const written = readInstalledManifest(dest);
+  if (!written.ok) throw new Error(`${label} ${written.error}`);
+  const surface = checkManifestSurface(written.manifest, expected);
+  if (!surface.ok) throw new Error(`${label} ${surface.error}`);
+}
+
 function checkMagi() {
-  const required = [
-    '.cursor-plugin/plugin.json',
-    'skills/magi/SKILL.md',
-    'skills/magi/references/cursor-host.md',
-    'skills/magi/references/brief-rules-block.md',
-    'skills/magi/references/run-local-skill-bundle.md',
-    'rules/magi-arbiter.mdc',
-    'rules/magi-activation.mdc',
-    'rules/magi-orchestrator.mdc',
-    'rules/live-check.mdc',
-    'commands/magi.md',
-    'commands/magi-cli.md',
-    'tools/hog-check.js',
-    'tools/activation-check.js',
-    'agents/implementer.md',
-    'agents/verifier.md',
-    'agents/reviewer.md',
-    'agents/codex-implementer.md',
-    'agents/codex-verifier.md',
-    'agents/codex-reviewer.md',
-    'agents/gemini-implementer.md',
-    'agents/gemini-verifier.md',
-    'agents/gemini-reviewer.md',
-  ];
+  const required = ['skills/magi/SKILL.md', 'rules/magi-arbiter.mdc', 'commands/magi.md', 'agents/implementer.md'];
   const missing = required.filter((rel) => !fs.existsSync(path.join(MAGI_DEST, rel)));
-  if (missing.length) {
-    console.error('INSTALL INCOMPLETE — magi missing:');
-    for (const m of missing) console.error(`  ${m}`);
-    process.exit(1);
-  }
-  const written = readInstalledManifest(MAGI_DEST);
-  if (!written.ok) {
-    console.error(`INSTALL INCOMPLETE — magi ${written.error}`);
-    process.exit(1);
-  }
-  const surface = checkManifestSurface(written.manifest, INSTALLED_MAGI_SURFACE);
-  if (!surface.ok) {
-    console.error(`INSTALL INCOMPLETE — magi ${surface.error}`);
-    process.exit(1);
-  }
+  if (missing.length) throw new Error(`magi missing: ${missing.join(', ')}`);
+  checkSurface(MAGI_DEST, INSTALLED_MAGI_SURFACE, 'magi');
 }
 
 function checkMagiCli() {
   const required = [
-    '.cursor-plugin/plugin.json',
-    'skills/magi-cli/SKILL.md',
-    'skills/magi-cli/references/cursor-cli.md',
-    'skills/magi-cli/references/brief-rules-block.md',
-    'rules/magi-arbiter.mdc',
-    'rules/magi-activation.mdc',
-    'rules/magi-orchestrator.mdc',
-    'rules/live-check.mdc',
-    'commands/magi-cli.md',
-    'tools/hog-check.js',
-    'tools/activation-check.js',
-    'tools/position-tally.js',
+    'skills/magi-cli/SKILL.md', 'skills/magi-cli/references/cursor-cli.md', 'rules/magi-arbiter.mdc', 'commands/magi-cli.md',
+    ...CLI_RUNTIME_TOOLS.filter((name) => name.endsWith('.js')).map((name) => `tools/${name}`),
   ];
   const missing = required.filter((rel) => !fs.existsSync(path.join(MAGI_CLI_DEST, rel)));
-  if (missing.length) {
-    console.error('INSTALL INCOMPLETE — magi-cursor-cli missing:');
-    for (const m of missing) console.error(`  ${m}`);
-    process.exit(1);
-  }
-  if (fs.existsSync(path.join(MAGI_CLI_DEST, 'agents'))) {
-    console.error('INSTALL INCOMPLETE — magi-cursor-cli must not have an agents/ directory');
-    process.exit(1);
-  }
-  const written = readInstalledManifest(MAGI_CLI_DEST);
-  if (!written.ok) {
-    console.error(`INSTALL INCOMPLETE — magi-cursor-cli ${written.error}`);
-    process.exit(1);
-  }
-  const surface = checkManifestSurface(written.manifest, INSTALLED_MAGI_CLI_SURFACE);
-  if (!surface.ok) {
-    console.error(`INSTALL INCOMPLETE — magi-cursor-cli ${surface.error}`);
-    process.exit(1);
-  }
+  if (missing.length) throw new Error(`magi-cursor-cli missing: ${missing.join(', ')}`);
+  if (fs.existsSync(path.join(MAGI_CLI_DEST, 'agents'))) throw new Error('magi-cursor-cli must not have an agents/ directory');
+  checkSurface(MAGI_CLI_DEST, INSTALLED_MAGI_CLI_SURFACE, 'magi-cursor-cli');
 }
 
 function main() {
   fs.mkdirSync(PLUGINS_DIR, { recursive: true });
-
   installMagiCursor();
   installMagiCursorCli();
   installUserGlobals();
-
   checkMagi();
   checkMagiCli();
-
-  console.log(`MAGI Cursor plugin installed at ${MAGI_DEST}`);
-  console.log('  skill:  magi + cursor-host + cursor-cli reference');
-  console.log('  user:   ' + USER_SKILL_MAGI);
-  console.log('  rules:  arbiter, activation, orchestrator, live-check (plugin + ~/.cursor/rules)');
-  console.log('  agents: 9 seat briefs');
-  console.log('  commands: /magi, /magi-cli');
-  console.log('');
-  console.log(`MAGI Cursor CLI plugin installed at ${MAGI_CLI_DEST}`);
-  console.log('  skill:  magi-cli + cursor-cli reference');
-  console.log('  user:   ' + USER_SKILL_MAGI_CLI);
-  console.log('  rules:  arbiter, activation, orchestrator, live-check');
-  console.log('  agents: none (CLI mode)');
-  console.log('  command: /magi-cli');
-  console.log('');
-  console.log('Reload the Cursor window (Developer: Reload Window), then open Customize and enable both MAGI Cursor and MAGI Cursor CLI.');
+  console.log(`MAGI Cursor installed at ${MAGI_DEST}`);
+  console.log(`MAGI Cursor CLI installed at ${MAGI_CLI_DEST}`);
+  console.log('MAGI CLI runtime is installed-relative; C:\\src\\magi is no longer required merely to launch seats.');
+  console.log('The versioned standing-rules pack still requires ai-ops-vault (default C:\\src\\ai-ops-vault or MAGI_RULES_ROOT).');
+  console.log('Reload Cursor and enable both plugins.');
 }
 
 if (require.main === module) {
-  try {
-    main();
-    process.exit(0);
-  } catch (error) {
-    bail(error instanceof Error ? error.message : String(error));
-  }
+  try { main(); process.exit(0); }
+  catch (error) { bail(error instanceof Error ? error.message : String(error)); }
 }
 
-module.exports = {
-  magiCursorManifest,
-  magiCliManifest,
-  writeManifest,
-  readInstalledManifest,
-  checkMagi,
-  checkMagiCli,
-};
+module.exports = { CLI_RUNTIME_TOOLS, magiCursorManifest, magiCliManifest, writeManifest, readInstalledManifest, checkMagi, checkMagiCli };
