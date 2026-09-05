@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">MAGI tri-core command system</title>
+  <desc id="desc">Original retro-futurist illustration of the Grok arbiter above three interconnected vendor cores.</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="70%"><stop offset="0" stop-color="#17223a"/><stop offset=".55" stop-color="#070a12"/><stop offset="1" stop-color="#020305"/></radialGradient>
+    <radialGradient id="blue"><stop offset="0" stop-color="#9fd5ff"/><stop offset=".25" stop-color="#3197ff"/><stop offset="1" stop-color="#0a1a49"/></radialGradient>
+    <radialGradient id="amber"><stop offset="0" stop-color="#fff1af"/><stop offset=".25" stop-color="#ffbd3d"/><stop offset="1" stop-color="#4c2300"/></radialGradient>
+    <radialGradient id="green"><stop offset="0" stop-color="#aaffd0"/><stop offset=".25" stop-color="#31d98a"/><stop offset="1" stop-color="#063724"/></radialGradient>
+    <linearGradient id="horizon" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#ff315f" stop-opacity=".65"/><stop offset="1" stop-color="#331124" stop-opacity="0"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <style>
+      .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.08em}.label{font:700 26px system-ui,sans-serif;fill:#fff}.small{font:600 15px system-ui,sans-serif;fill:#d8deea;letter-spacing:.08em}.wire{fill:none;stroke:#ff315f;stroke-width:4;opacity:.78}.grid{stroke:#15223d;stroke-width:1}.core{stroke:#fff;stroke-opacity:.25;stroke-width:2}.hud{fill:none;stroke:#ff315f;stroke-width:3}.ghost{fill:#9cb1d0;opacity:.055}
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <g opacity=".55">
+    <path class="grid" d="M0 120h1600M0 240h1600M0 360h1600M0 480h1600M0 600h1600M0 720h1600"/>
+    <path class="grid" d="M200 0v900M400 0v900M600 0v900M800 0v900M1000 0v900M1200 0v900M1400 0v900"/>
+  </g>
+  <path d="M0 680 Q800 570 1600 680 L1600 900H0Z" fill="url(#horizon)" opacity=".42"/>
+
+  <g class="ghost">
+    <path d="M800 80c-128 0-216 92-216 214 0 80 28 146 76 198l-74 218h428l-74-218c48-52 76-118 76-198 0-122-88-214-216-214z"/>
+    <path d="M664 220l136 162 136-162-34 252H698z"/>
+  </g>
+
+  <g class="hud" opacity=".8"><path d="M70 70h270l40 40h110M1530 70h-270l-40 40h-110M70 830h310l40-40h100M1530 830h-310l-40-40h-100"/></g>
+
+  <g transform="translate(800 150)">
+    <polygon points="0,-68 86,-18 86,82 0,132 -86,82 -86,-18" fill="#10151f" stroke="#ff315f" stroke-width="4" filter="url(#glow)"/>
+    <text x="0" y="12" text-anchor="middle" class="label" font-size="24">GROK 4.6</text>
+    <text x="0" y="43" text-anchor="middle" class="small">ARBITER</text>
+    <text x="0" y="68" text-anchor="middle" class="small" fill="#ff7792">NON-VOTING</text>
+  </g>
+
+  <path class="wire" d="M800 280L430 420M800 280L800 420M800 280l370 140"/>
+  <path class="wire" d="M430 420Q800 690 1170 420M430 420Q800 190 1170 420" stroke-dasharray="12 10" opacity=".38"/>
+
+  <g transform="translate(430 500)">
+    <circle r="150" fill="url(#blue)" class="core" filter="url(#glow)"/>
+    <circle r="118" fill="none" stroke="#8ecbff" stroke-width="2" stroke-dasharray="8 12"/>
+    <text y="-18" text-anchor="middle" class="label">MELCHIOR</text>
+    <text y="18" text-anchor="middle" class="small">OPENAI</text>
+    <text y="56" text-anchor="middle" class="small">REASON · IMPLEMENT</text>
+  </g>
+  <g transform="translate(800 500)">
+    <circle r="150" fill="url(#amber)" class="core" filter="url(#glow)"/>
+    <circle r="118" fill="none" stroke="#ffe39a" stroke-width="2" stroke-dasharray="8 12"/>
+    <text y="-18" text-anchor="middle" class="label">BALTHASAR</text>
+    <text y="18" text-anchor="middle" class="small">ANTHROPIC</text>
+    <text y="56" text-anchor="middle" class="small">JUDGMENT · AGENTIC</text>
+  </g>
+  <g transform="translate(1170 500)">
+    <circle r="150" fill="url(#green)" class="core" filter="url(#glow)"/>
+    <circle r="118" fill="none" stroke="#a6ffd0" stroke-width="2" stroke-dasharray="8 12"/>
+    <text y="-18" text-anchor="middle" class="label">CASPER</text>
+    <text y="18" text-anchor="middle" class="small">GOOGLE</text>
+    <text y="56" text-anchor="middle" class="small">CONTEXT · BREADTH</text>
+  </g>
+
+  <g transform="translate(800 770)">
+    <path d="M-270 0h540" stroke="#ff315f" stroke-width="2"/>
+    <text y="-30" text-anchor="middle" class="mono" fill="#fff" font-size="20">CLASSIFY → DISPATCH → EXECUTE → CROSS-CHECK → PROVE → TALLY</text>
+    <text y="28" text-anchor="middle" class="mono" fill="#93a1b8" font-size="14">CODE DEFINES WHAT IS LEGAL. THE ARBITER CHOOSES ONLY AMONG LEGAL ROUTES.</text>
+  </g>
+</svg>
