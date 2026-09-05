@@ -10,18 +10,11 @@ const RULES_DIR = 'C:\\src\\ai-ops-vault\\projects\\magi-cli-rules';
 const VENDOR_MD = 'VENDOR.md';
 const RULES_INDEX = 'RULES/INDEX.md';
 
-// Backward-compatible marker set used by the existing smoke/tests. The new
-// production transaction adds STRICT_MARKERS + a staged-pack hash check.
 const REQUIRED_MARKERS = Object.freeze([
   { id: 'RULES/INDEX|magi-cli-rules|STANDING', anyOf: ['RULES/INDEX.md', 'RULES/INDEX', 'RULES\\INDEX.md', 'magi-cli-rules', 'STANDING.md', 'STANDING'] },
-  { id: 'magi-mode', anyOf: ['magi-mode'] },
-  { id: 'magi-dispatch', anyOf: ['magi-dispatch'] },
-  { id: 'mix-mode', anyOf: ['mix-mode'] },
-  { id: 'casper_via=agy', anyOf: ['casper_via=agy'] },
+  { id: 'SEAT-CONTRACT', anyOf: ['SEAT-CONTRACT.md', 'seat contract'] },
+  { id: 'skills-manifest', anyOf: ['skills-manifest.json', 'staged skills'] },
   { id: 'WRITE AUDIT|R07', anyOf: ['WRITE AUDIT', 'R07'] },
-  { id: 'engineering-orchestrator', anyOf: ['engineering-orchestrator'] },
-  { id: 'testing', anyOf: ['testing'] },
-  { id: 'codex-bridge|claude-bridge|gemini-bridge', anyOf: ['codex-bridge', 'claude-bridge', 'gemini-bridge'] },
 ]);
 
 const STRICT_MARKERS = Object.freeze([
@@ -35,8 +28,6 @@ const STRICT_MARKERS = Object.freeze([
   { id: 'not CONCLAVE', anyOf: ['not CONCLAVE', 'NOT CONCLAVE', 'R20'] },
   { id: 'no vault writes', anyOf: ['C:\\src\\vault', 'R21'] },
 ]);
-
-const BRIDGE_BY_VENDOR = Object.freeze({ openai: 'codex-bridge', google: 'gemini-bridge', anthropic: 'claude-bridge' });
 
 function usage() {
   return [
@@ -62,28 +53,26 @@ function parseArgs(argv) {
     } else throw argumentError(`Unknown option: ${flag}`);
   }
   if (options.role && !['implement', 'review', 'verify'].includes(options.role)) throw argumentError('--role must be implement, review, or verify');
-  if (options.vendor && !Object.hasOwn(BRIDGE_BY_VENDOR, options.vendor)) throw argumentError('--vendor must be openai, google, or anthropic');
+  if (options.vendor && !['openai', 'google', 'anthropic'].includes(options.vendor)) throw argumentError('--vendor must be openai, google, or anthropic');
   return options;
 }
 
 function markerHolds(marker, text) { return marker.anyOf.some((needle) => text.includes(needle)); }
 function scopeIsReal(text) {
   const match = text.match(/SCOPE\s*:\s*([^\r\n]+)/i);
-  return Boolean(match && !/[<>]|paste engineering-orchestrator|TODO|TBD/i.test(match[1]));
+  return Boolean(match && !/[<>]|TODO|TBD|placeholder/i.test(match[1]));
 }
 
 function missingMarkers(text, opts = {}) {
   if (typeof text !== 'string') return REQUIRED_MARKERS.map((m) => m.id);
   const missing = REQUIRED_MARKERS.filter((m) => !markerHolds(m, text)).map((m) => m.id);
   if (opts.role === 'implement' && !/\bimplement\b/i.test(text)) missing.push('implement');
+  if ((opts.role === 'review' || opts.role === 'verify') && !/read[- ]only|do not modify|no writes/i.test(text)) missing.push('read-only role');
   if (opts.requireStructural) {
     for (const marker of STRICT_MARKERS) if (!markerHolds(marker, text)) missing.push(marker.id);
     if (!scopeIsReal(text)) missing.push('real SCOPE block');
-    if (opts.vendor) {
-      const bridge = BRIDGE_BY_VENDOR[opts.vendor];
-      if (!text.includes(bridge)) missing.push(bridge);
-      if (opts.vendor === 'anthropic' && !/auth.*probe|headless.*probe|R16/i.test(text)) missing.push('Claude live auth + headless probe');
-    }
+    if (opts.vendor === 'google' && !/casper_via=agy|agy/i.test(text)) missing.push('casper_via=agy');
+    if (opts.vendor === 'anthropic' && !/R16|auth.*probe|headless.*probe/i.test(text)) missing.push('Claude R16 probe status');
   }
   return [...new Set(missing)];
 }
@@ -126,4 +115,4 @@ function main(argv = process.argv.slice(2), io = process) {
 }
 
 if (require.main === module) process.exitCode = main();
-module.exports = { BRIDGE_BY_VENDOR, REQUIRED_MARKERS, STRICT_MARKERS, RULES_DIR, RULES_INDEX, STANDING_PATH, VENDOR_MD, checkBriefFile, checkBriefText, formatMissing, main, missingMarkers, parseArgs, usage };
+module.exports = { REQUIRED_MARKERS, STRICT_MARKERS, RULES_DIR, RULES_INDEX, STANDING_PATH, VENDOR_MD, checkBriefFile, checkBriefText, formatMissing, main, missingMarkers, parseArgs, usage };
