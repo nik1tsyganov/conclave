@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "updated": "2026-09-05",
+  "principles": {
+    "leafSeat": true,
+    "subdispatchForbidden": true,
+    "arbiterOnlyOrchestration": true,
+    "reviewVerifyReadOnly": true,
+    "implementWriteScopedToWorktree": true,
+    "skillsAreAllowListed": true,
+    "classExtrasAreAdditive": true
+  },
+  "baseSkills": {
+    "openai": ["magi-mode", "magi-dispatch", "mix-mode", "testing", "codex-bridge"],
+    "anthropic": ["magi-mode", "magi-dispatch", "mix-mode", "testing", "claude-bridge"],
+    "google": ["magi-mode", "magi-dispatch", "mix-mode", "testing", "gemini-bridge"]
+  },
+  "roleSkills": {
+    "implement": ["implement"],
+    "review": ["code-minimalism"],
+    "verify": []
+  },
+  "classSkills": {
+    "architecture-planning": ["graph-engineering", "context-engineering"],
+    "standard-feature": [],
+    "bulk-mechanical": ["code-minimalism"],
+    "debug-mystery": ["context-engineering"],
+    "long-context-analysis": ["context-engineering"],
+    "agentic-long-run": ["loop-engineering", "harness-engineering"],
+    "security-sensitive": ["auth-security"],
+    "review-adversarial": ["code-minimalism"],
+    "test-verification": ["evaluation-engineering"],
+    "research-synthesis": ["context-engineering"]
+  },
+  "forbiddenSeatSkills": [
+    "engineering-orchestrator",
+    "dispatch-efficiency",
+    "dispatch-assessment",
+    "task-retrospective"
+  ],
+  "vendors": {
+    "openai": {
+      "roles": ["implement", "review", "verify"],
+      "writePermission": { "implement": "workspace-write", "review": "read-only", "verify": "read-only" },
+      "proof": ["sessionId", "vendorSideTokens", "sandbox", "modelObserved"]
+    },
+    "anthropic": {
+      "roles": ["implement", "review", "verify"],
+      "writePermission": { "implement": "bypassPermissions", "review": "plan", "verify": "plan" },
+      "proof": ["modelObserved", "effortObserved", "onTopic", "responseBytes"]
+    },
+    "google": {
+      "roles": ["implement", "review", "verify"],
+      "writePermission": { "implement": "dangerously-skip-permissions", "review": "sandbox", "verify": "sandbox" },
+      "proof": ["conversationId", "usage", "modelObserved", "responseBytes"]
+    }
+  }
+}
