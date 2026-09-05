@@ -1,7 +1,7 @@
 'use strict';
 
 const VENDORS = Object.freeze(['anthropic', 'openai', 'google']);
-const ROLES = Object.freeze(['implement', 'verify', 'review']);
+const ROLES = Object.freeze(['implement', 'verify', 'review', 'plan', 'research']);
 const HOST_MODES = Object.freeze(['cursor', 'cursor-cli']);
 
 function fail(message) {
