@@ -32,7 +32,7 @@ test('report revalidates successful evidence without changing any run bytes', as
   for (const row of run.dispatches) await runDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, 'ACK fixture\nPOSITION: APPROVE'));
   const before = fileBytes(run.runDir);
   const { report, outputDir } = createReport({ runDir: run.runDir, outputDir: output(t) });
-  assert.equal(report.status, 'PASS');
+  assert.equal(report.status, 'PASS', JSON.stringify(report.issues));
   assert.equal(report.dispatches.length, 3);
   assert.ok(report.dispatches.every(row => row.nativeId && row.modelObserved));
   assert.deepEqual(report.issues, []);
