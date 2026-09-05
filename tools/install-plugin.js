@@ -28,7 +28,7 @@ const CLI_RUNTIME_TOOLS = Object.freeze([
   'cli-process.js', 'cli-proof.js', 'cli-rules-stage.js', 'cli-runner.js', 'cli-skill-stage.js',
   'dispatch-evidence.js', 'dispatch-matrix.js', 'dispatch-run.js', 'dispatch-schema.js', 'magi-cli-preflight.js',
   'model-availability.js', 'model-probe.js', 'plan-seal.js', 'probe-evidence.js', 'vendor-native.js',
-  'run-finalize.js', 'panel-tally.js', 'plugin-surface.js',
+  'run-finalize.js', 'panel-tally.js', 'project-run-report.js', 'plugin-surface.js',
   'runtime-paths.js', 'seat-policy.js', 'telemetry-append.js', 'vendor-binaries.js',
   'dispatch-log.pass.jsonl', 'dispatch-log.fail.jsonl',
 ]);

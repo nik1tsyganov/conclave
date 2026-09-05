@@ -9,6 +9,8 @@ If the chat is CONCLAVE, open a separate MAGI chat. Run `magi-whoami --mode curs
 
 Read the MAGI CLI skill and its co-located `references/cursor-cli.md`, `dispatch-matrix.json`, `seat-profiles.json`, and `brief-rules-block.md`. The run guide contains the complete command arguments and plan-field contract.
 
+For real-project work, follow `references/project-runs.md` in that skill. Bound each attempt and export `project-run-report.js` at every stop, including failures before sealing. Keep the report and TRIAGE outside the product and run evidence.
+
 Grok 4.6 is the non-voting arbiter. It classifies, composes briefs and complete plans, dispatches vendor seats, and requests deterministic completion checks. It must not act as a substantive implementation, repair, plan, research, review, verification, or voting seat.
 
 ## Prepare
@@ -44,6 +46,8 @@ node tools/dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-di
 ```
 
 Route fields come from the sealed entry. Any changed route, author, scope, or brief requires a new complete plan validation and seal. Graph overrides and naked route flags grant no authority.
+
+For each implementation unit, finish implementation, then every planned verifier with native APPROVE, then review. Stop when a check fails. Review cannot use verification from a changed workspace.
 
 The runtime stages the bundled lean vendor card plus role/class skills. The seat reads its generated `SEAT-CONTRACT.md`, staged skills, and hashed rules. Seats are leaves; they cannot delegate, change policy, or edit evidence and telemetry.
 
