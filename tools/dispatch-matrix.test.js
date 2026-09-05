@@ -12,12 +12,21 @@ const matrix = loadMatrix();
 function availabilityFor(vendor, model, observedModel = model) {
   return { vendors: { [vendor]: { models: { [model]: { available: observedModel === model, observedModel } } } } };
 }
+function arbiter() { return { vendor: 'xai', model: 'grok-4.6', effort: 'high' }; }
 
 test('Astra is fail-closed until exact local model proof exists', () => {
   const route = { class: 'extreme-end-to-end', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high' };
-  assert.deepStrictEqual(routeAllowed(matrix, route, {}).ok, false);
-  assert.deepStrictEqual(routeAllowed(matrix, route, availabilityFor('openai', 'gpt-6-astra')).ok, true);
-  assert.deepStrictEqual(routeAllowed(matrix, route, availabilityFor('openai', 'gpt-6-astra', 'gpt-5.6-sol')).ok, false);
+  assert.strictEqual(routeAllowed(matrix, route, {}).ok, false);
+  assert.strictEqual(routeAllowed(matrix, route, availabilityFor('openai', 'gpt-6-astra')).ok, true);
+  assert.strictEqual(routeAllowed(matrix, route, availabilityFor('openai', 'gpt-6-astra', 'gpt-5.6-sol')).ok, false);
+});
+
+test('Astra escalation-only lanes require explicit reason', () => {
+  const base = { class: 'debug-mystery', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high' };
+  const availability = availabilityFor('openai', 'gpt-6-astra');
+  assert.match(routeAllowed(matrix, base, availability).reason, /escalation-only/);
+  assert.match(routeAllowed(matrix, { ...base, escalation: true }, availability).reason, /escalationReason/);
+  assert.strictEqual(routeAllowed(matrix, { ...base, escalation: true, escalationReason: 'prior frontier attempt failed gate' }, availability).ok, true);
 });
 
 test('Fable alias maps to current 5.1 canonical family in the catalog', () => {
@@ -25,6 +34,15 @@ test('Fable alias maps to current 5.1 canonical family in the catalog', () => {
   assert.strictEqual(routeAllowed(matrix, {
     class: 'agentic-long-run', role: 'implement', vendor: 'anthropic', model: 'fable', effort: 'xhigh',
   }).ok, true);
+});
+
+test('architecture planning is a read-only plan lane rather than implementation', () => {
+  assert.strictEqual(routeAllowed(matrix, {
+    class: 'architecture-planning', role: 'plan', vendor: 'anthropic', model: 'opus', effort: 'high',
+  }).ok, true);
+  assert.strictEqual(routeAllowed(matrix, {
+    class: 'architecture-planning', role: 'implement', vendor: 'anthropic', model: 'opus', effort: 'high',
+  }).ok, false);
 });
 
 test('standard feature rejects frontier over-routing not listed by policy', () => {
@@ -37,37 +55,60 @@ test('standard feature rejects frontier over-routing not listed by policy', () =
 
 test('Grok cannot occupy a seat', () => {
   assert.throws(() => validatePlan({
-    hostMode: 'cursor-cli',
-    arbiter: { vendor: 'xai', model: 'grok-4.6', effort: 'high' },
-    magiConvened: false,
+    hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: false,
     dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'xai', model: 'grok-4.6', effort: 'high' }],
   }, matrix), /may not occupy a seat/);
 });
 
-test('convened MAGI requires all three implementation vendors', () => {
+test('single implementation unit is not rejected by the 60 percent floor', () => {
+  assert.deepStrictEqual(validatePlan({
+    hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true,
+    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' }],
+  }, matrix), { ok: true, dispatches: 1, implementUnits: 1 });
+});
+
+test('two implementation units in convened MAGI require two vendors', () => {
   assert.throws(() => validatePlan({
-    hostMode: 'cursor-cli',
-    arbiter: { vendor: 'xai', model: 'grok-4.6', effort: 'high' },
-    magiConvened: true,
+    hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true,
+    dispatches: [
+      { unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' },
+      { unitId: 'u2', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' },
+    ],
+  }, matrix), /requires 2 implement vendors|distribution floor/);
+});
+
+test('three implementation units in convened MAGI require all three vendors', () => {
+  const availability = availabilityFor('google', 'gemini-3.8-flash-medium');
+  assert.doesNotThrow(() => validatePlan({
+    hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true,
     dispatches: [
       { unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' },
       { unitId: 'u2', class: 'standard-feature', role: 'implement', vendor: 'anthropic', model: 'sonnet', effort: 'medium' },
+      { unitId: 'u3', class: 'standard-feature', role: 'implement', vendor: 'google', model: 'gemini-3.8-flash-medium', effort: 'fused-medium' },
     ],
-  }, matrix), /requires 3 implement vendors/);
+  }, matrix, availability));
+});
+
+test('review-only MAGI panel is legal without fake implementation rows', () => {
+  assert.doesNotThrow(() => validatePlan({
+    hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true,
+    dispatches: [
+      { unitId: 'r1', class: 'review-adversarial', role: 'review', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'high', authorVendor: 'anthropic' },
+      { unitId: 'r1', class: 'review-adversarial', role: 'review', vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', authorVendor: 'anthropic' },
+    ],
+  }, matrix));
 });
 
 test('same-vendor review of authored work is rejected', () => {
   assert.throws(() => validatePlan({
-    hostMode: 'cursor-cli',
-    arbiter: { vendor: 'xai', model: 'grok-4.6', effort: 'high' },
-    magiConvened: false,
+    hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: false,
     dispatches: [{
       unitId: 'u1', class: 'review-adversarial', role: 'review', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'high', authorVendor: 'openai',
     }],
   }, matrix), /same-vendor review forbidden/);
 });
 
-test('availability loader accepts exact proof record format', () => {
+test('availability loader record supports exact proof format', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-matrix-'));
   const file = path.join(dir, 'availability.json');
   fs.writeFileSync(file, JSON.stringify(availabilityFor('openai', 'gpt-6-astra')), 'utf8');
