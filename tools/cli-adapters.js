@@ -40,6 +40,8 @@ function base(opts) {
   if (!opts || !opts.briefPath) throw new Error('briefPath is required');
   if (!opts.cwd) throw new Error('cwd is required');
   if (!opts.role) throw new Error('role is required');
+  if (!opts.seatContractPath) throw new Error('seatContractPath is required');
+  if (!opts.skillRoot) throw new Error('skillRoot is required');
   const brief = inspectBrief(opts.briefPath);
   return {
     brief,
@@ -47,12 +49,24 @@ function base(opts) {
     model: opts.model || DEFAULTS[opts.vendor].model,
     effort: opts.effort || DEFAULTS[opts.vendor].effort,
     role: opts.role,
+    seatContractPath: path.resolve(opts.seatContractPath),
+    skillRoot: path.resolve(opts.skillRoot),
   };
+}
+
+function seatPointerText(ctx) {
+  return `${pointerText(ctx.brief).trim()} Read ${ctx.seatContractPath} in full before doing any task work. Use only the MAGI-authorized staged skills listed there.`;
+}
+
+function seatPointerFile(ctx) {
+  const file = writePointerFile(ctx.brief.briefPath);
+  fs.appendFileSync(file, `Read ${ctx.seatContractPath} in full before doing any task work. Use only the MAGI-authorized staged skills listed there.\n`, 'utf8');
+  return file;
 }
 
 function openaiLaunch(opts) {
   const ctx = base({ ...opts, vendor: 'openai' });
-  const pointerFile = writePointerFile(ctx.brief.briefPath);
+  const pointerFile = seatPointerFile(ctx);
   return {
     vendor: 'openai', role: ctx.role, model: ctx.model, effort: ctx.effort,
     binary: resolveVendorBinary('openai', { env: opts.env, home: opts.home, mustExist: opts.mustExistBinary !== false }),
@@ -63,7 +77,7 @@ function openaiLaunch(opts) {
       '-C', ctx.cwd, '-o', opts.capturePath, '-',
     ],
     cwd: ctx.cwd, stdinFile: pointerFile, stdio: ['pipe', 'pipe', 'pipe'],
-    pointerFile, requestedSandbox: roleSandbox(ctx.role),
+    pointerFile, requestedSandbox: roleSandbox(ctx.role), skillRoot: ctx.skillRoot, seatContractPath: ctx.seatContractPath,
   };
 }
 
@@ -73,32 +87,35 @@ function googleLaunch(opts) {
   for (const key of ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENAI_USE_VERTEXAI', 'GOOGLE_APPLICATION_CREDENTIALS', 'CLAUDECODE']) delete env[key];
   const args = ['--model', ctx.model, '--output-format', 'json', '--print-timeout', '20m'];
   if (ctx.role === 'implement') args.push('--dangerously-skip-permissions'); else args.push('--sandbox');
-  const home = opts.home || os.homedir();
-  const addDirs = [path.join(home, '.claude', 'skills'), ctx.cwd, path.dirname(ctx.brief.briefPath)];
+  const addDirs = [ctx.cwd, path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath)];
   if (opts.rulesRoot) addDirs.push(opts.rulesRoot);
   for (const dir of [...new Set(addDirs)]) args.push('--add-dir', dir);
-  args.push('-p', pointerText(ctx.brief).trim());
+  args.push('-p', seatPointerText(ctx));
   return {
     vendor: 'google', role: ctx.role, model: ctx.model, effort: null,
     binary: resolveVendorBinary('google', { env: opts.env, home: opts.home, mustExist: opts.mustExistBinary !== false }),
-    args, env, cwd: ctx.cwd, stdio: ['ignore', 'pipe', 'pipe'],
+    args, env, cwd: ctx.cwd, stdio: ['ignore', 'pipe', 'pipe'], skillRoot: ctx.skillRoot, seatContractPath: ctx.seatContractPath,
   };
 }
 
 function anthropicLaunch(opts) {
   const ctx = base({ ...opts, vendor: 'anthropic' });
-  const pointerFile = writePointerFile(ctx.brief.briefPath);
+  const pointerFile = seatPointerFile(ctx);
   const permissionMode = ctx.role === 'implement'
     ? 'bypassPermissions'
     : (opts.reviewPermissionMode || process.env.MAGI_CLAUDE_REVIEW_PERMISSION_MODE || 'plan');
   const args = ['-p', '--model', ctx.model, '--effort', ctx.effort, '--permission-mode', permissionMode, '--add-dir', ctx.cwd];
-  const briefDir = path.win32.dirname(path.win32.resolve(ctx.brief.briefPath));
-  if (briefDir.toLowerCase() !== ctx.cwd.toLowerCase()) args.push('--add-dir', briefDir);
+  const addDirs = [path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath)];
+  if (opts.rulesRoot) addDirs.push(opts.rulesRoot);
+  for (const dir of [...new Set(addDirs)]) {
+    if (path.win32.resolve(dir).toLowerCase() !== ctx.cwd.toLowerCase()) args.push('--add-dir', dir);
+  }
   args.push('--output-format', 'text');
   return {
     vendor: 'anthropic', role: ctx.role, model: ctx.model, effort: ctx.effort,
     binary: resolveVendorBinary('anthropic', { env: opts.env, home: opts.home, mustExist: opts.mustExistBinary !== false }),
     args, cwd: ctx.cwd, stdinFile: pointerFile, stdio: ['pipe', 'pipe', 'pipe'], permissionMode,
+    skillRoot: ctx.skillRoot, seatContractPath: ctx.seatContractPath,
   };
 }
 
@@ -109,4 +126,4 @@ function buildLaunch(opts) {
   throw new Error(`unsupported vendor: ${opts.vendor}`);
 }
 
-module.exports = { DEFAULTS, allowedWorkspace, anthropicLaunch, buildLaunch, googleLaunch, openaiLaunch, roleSandbox };
+module.exports = { DEFAULTS, allowedWorkspace, anthropicLaunch, buildLaunch, googleLaunch, openaiLaunch, roleSandbox, seatPointerFile, seatPointerText };
