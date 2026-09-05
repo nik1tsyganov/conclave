@@ -228,3 +228,193 @@ test('a concurrent attestation lock prevents duplicate commits without changing 
   assert.equal((await accept(run, pending, native)).ok, true);
   assert.equal(native.calls(), 1);
 });
+
+test('altered pending log destinations cannot escape the sealed run during acceptance', async t => {
+  const run = claudeRun(t);
+  const native = fakeVendor();
+  const pending = await runDispatch(command(run), native);
+  const { file, state } = saved(run);
+  const outside = path.join(run.root, 'outside-run.jsonl');
+  state.logs = [outside];
+  writeJson(file, state);
+  const before = snapshotWorkspace(run.runDir);
+  await assert.rejects(accept(run, pending, native), /log destination/);
+  assert.deepEqual(snapshotWorkspace(run.runDir), before);
+  assert.equal(fs.existsSync(outside), false);
+  assert.equal(native.calls(), 1);
+});
+
+test('removed reordered duplicated or substituted pending log destinations reject without writes', async t => {
+  const mutations = [
+    state => { delete state.logs; },
+    state => { state.logs = []; },
+    state => { state.logs.reverse(); },
+    state => { state.logs.push(state.logs[0]); },
+    (state, run) => { state.logs = [path.join(run.runDir, 'substituted.jsonl')]; },
+  ];
+  for (const mutate of mutations) {
+    const run = claudeRun(t);
+    const native = fakeVendor();
+    const pending = await runDispatch(command(run), native);
+    const { file, state } = saved(run);
+    mutate(state, run);
+    writeJson(file, state);
+    const before = snapshotWorkspace(run.runDir);
+    await assert.rejects(accept(run, pending, native), /log destinations/);
+    assert.deepEqual(snapshotWorkspace(run.runDir), before);
+    assert.equal(inspectRun(run.runDir).outcomes[0].status, 'INVALID');
+    assert.equal(native.calls(), 1);
+  }
+});
+
+test('custom and shared log destinations stay bound through acceptance replay and finalization', async t => {
+  for (const shared of [false, true]) {
+    const run = claudeRun(t);
+    const native = fakeVendor();
+    const telemetryLog = path.join(run.runDir, 'custom', 'telemetry.jsonl');
+    const activationLog = shared ? telemetryLog : path.join(run.runDir, 'custom', 'activation.jsonl');
+    const pending = await runDispatch(command(run, ['--telemetry-log', telemetryLog, '--activation-log', activationLog]), native);
+    const destinations = { telemetryLog, activationLog };
+    for (const name of ['launch.json', 'checkpoint.json', 'handoff-envelope.json']) {
+      assert.deepEqual(JSON.parse(fs.readFileSync(path.join(path.dirname(pending.capturePath), name), 'utf8')).logDestinations, destinations);
+    }
+    // Resume without custom flags still uses the original protected destinations.
+    const accepted = await accept(run, pending, native);
+    assert.equal(accepted.ok, true);
+    assert.equal((await accept(run, pending, native)).replayed, true);
+    assert.equal(finalizeRun(run.runDir).executionStatus, 'PASS');
+    for (const log of new Set([telemetryLog, activationLog])) {
+      const rows = fs.readFileSync(log, 'utf8').trim().split('\n').map(JSON.parse);
+      assert.deepEqual(rows, [accepted.telemetry]);
+    }
+    assert.equal(fs.existsSync(path.join(run.runDir, 'telemetry', 'dispatches.jsonl')), false);
+    assert.equal(fs.existsSync(path.join(run.runDir, 'magi-dispatch-log.jsonl')), false);
+    assert.equal(native.calls(), 1);
+  }
+});
+
+test('committed destination substitution is invalid even when the replacement contains matching telemetry', async t => {
+  const run = claudeRun(t);
+  const native = fakeVendor();
+  const pending = await runDispatch(command(run), native);
+  const accepted = await accept(run, pending, native);
+  const outside = path.join(run.root, 'matching-outside.jsonl');
+  fs.writeFileSync(outside, `${JSON.stringify(accepted.telemetry)}\n`, 'utf8');
+  const outsideHash = hashFile(outside);
+  const { file, state } = saved(run);
+  state.logs = [outside];
+  writeJson(file, state);
+  assert.equal(inspectRun(run.runDir).outcomes[0].status, 'INVALID');
+  assert.equal(finalizeRun(run.runDir).executionStatus, 'FAIL');
+  await assert.rejects(runDispatch(command(run), native), /log destinations/);
+  assert.equal(hashFile(outside), outsideHash);
+  assert.equal(native.calls(), 1);
+});
+
+test('rewritten protected log destinations still cannot target a product or leave the run', async t => {
+  for (const product of [false, true]) {
+    const run = claudeRun(t);
+    const native = fakeVendor();
+    const pending = await runDispatch(command(run), native);
+    const destination = path.join(product ? run.cwd : run.root, 'escape.jsonl');
+    rewriteArtifact(run, 'launch.json', text => JSON.stringify({ ...JSON.parse(text), logDestinations: { telemetryLog: destination, activationLog: destination } }));
+    const before = snapshotWorkspace(run.runDir);
+    await assert.rejects(accept(run, pending, native), /log destinations must remain inside/);
+    assert.deepEqual(snapshotWorkspace(run.runDir), before);
+    assert.equal(fs.existsSync(destination), false);
+    assert.equal(native.calls(), 1);
+  }
+});
+
+test('a log parent replaced by a junction cannot redirect acceptance writes', async t => {
+  const run = claudeRun(t);
+  const native = fakeVendor();
+  const parent = path.join(run.runDir, 'custom-logs');
+  const pending = await runDispatch(command(run, ['--telemetry-log', path.join(parent, 'telemetry.jsonl'), '--activation-log', path.join(parent, 'activation.jsonl')]), native);
+  const target = path.join(run.root, 'outside-target');
+  fs.mkdirSync(target);
+  fs.symlinkSync(target, parent, 'junction');
+  const transaction = saved(run);
+  const before = fs.readFileSync(transaction.file);
+  await assert.rejects(accept(run, pending, native), /symlink|junction/);
+  assert.equal(fs.readFileSync(transaction.file).equals(before), true);
+  assert.deepEqual(fs.readdirSync(target), []);
+  assert.equal(native.calls(), 1);
+});
+
+test('a log destination cannot overlap native capture evidence before a child starts', async t => {
+  const run = claudeRun(t);
+  const native = fakeVendor();
+  const capture = path.join(run.runDir, 'out', 'd1', 'capture.txt');
+  const before = snapshotWorkspace(run.runDir);
+  await assert.rejects(runDispatch(command(run, ['--telemetry-log', capture]), native), /log destination.*overlap/);
+  assert.equal(native.calls(), 0);
+  assert.deepEqual(snapshotWorkspace(run.runDir), before);
+});
+
+test('initial log destinations cannot overwrite evidence directories run controls or planned evidence', async t => {
+  const paths = [
+    run => path.join(run.runDir, 'out', 'd1'),
+    run => path.join(run.runDir, 'out'),
+    run => path.join(run.runDir, 'out', 'd2', 'future.log'),
+    run => path.join(run.runDir, '.magi-dispatches', `${transactionKey(run.dispatches[0])}.json`),
+    run => path.join(run.runDir, '.magi-sessions', 'session.json'),
+    run => run.opts.plan,
+    run => path.join(run.runDir, 'plan-seal.json'),
+    run => path.join(run.runDir, 'availability.json'),
+    run => path.join(run.runDir, 'run-summary.json'),
+    run => path.join(run.runDir, 'implementation.jsonl'),
+  ];
+  for (const output of paths) {
+    const run = createSealedRun(t, [{ unitId: 'u1', vendor: 'anthropic', model: 'sonnet', effort: 'medium' },
+      { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium', authorVendor: 'anthropic' }]);
+    const native = fakeVendor();
+    const before = snapshotWorkspace(run.runDir);
+    await assert.rejects(runDispatch(command(run, ['--activation-log', output(run)]), native), /log destination.*overlap/);
+    assert.equal(native.calls(), 0);
+    assert.deepEqual(snapshotWorkspace(run.runDir), before);
+  }
+});
+
+test('logs cannot replace protected rule inputs stored inside the run', async t => {
+  const run = claudeRun(t);
+  const rulesRoot = path.join(run.runDir, 'source-rules');
+  fs.cpSync(run.opts.rulesRoot, rulesRoot, { recursive: true });
+  const native = fakeVendor();
+  const before = snapshotWorkspace(run.runDir);
+  await assert.rejects(runDispatch({ ...command(run), rulesRoot, telemetryLog: path.join(rulesRoot, 'STANDING.md') }, native), /log destination.*overlap/);
+  assert.equal(native.calls(), 0);
+  assert.deepEqual(snapshotWorkspace(run.runDir), before);
+});
+
+test('logs cannot overwrite a prerequisite in a custom evidence directory', async t => {
+  const run = createSealedRun(t, [{ unitId: 'u1' },
+    { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'sonnet', effort: 'medium', authorVendor: 'openai' }]);
+  const native = fakeVendor();
+  const evidenceDir = path.join(run.runDir, 'custom-author-evidence');
+  await runDispatch({ ...run.opts, dispatchId: 'd1', evidenceDir }, native);
+  const capture = path.join(evidenceDir, 'capture.txt');
+  const captureHash = hashFile(capture);
+  const before = snapshotWorkspace(run.runDir);
+  await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd2', telemetryLog: capture }, native), /log destination.*overlap/);
+  assert.equal(native.calls(), 1);
+  assert.equal(hashFile(capture), captureHash);
+  assert.deepEqual(snapshotWorkspace(run.runDir), before);
+});
+
+test('saved launch destination corruption cannot append into native evidence during acceptance', async t => {
+  const run = claudeRun(t);
+  const native = fakeVendor();
+  const pending = await runDispatch(command(run), native);
+  rewriteArtifact(run, 'launch.json', text => {
+    const launch = JSON.parse(text);
+    launch.logDestinations.telemetryLog = pending.capturePath;
+    return JSON.stringify(launch);
+  });
+  const before = snapshotWorkspace(run.runDir);
+  await assert.rejects(accept(run, pending, native), /log destination.*overlap/);
+  assert.deepEqual(snapshotWorkspace(run.runDir), before);
+  assert.equal(hashFile(pending.capturePath), pending.captureSha256);
+  assert.equal(inspectRun(run.runDir).outcomes[0].status, 'INVALID');
+  assert.equal(native.calls(), 1);
+});

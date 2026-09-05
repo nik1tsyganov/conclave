@@ -17,7 +17,7 @@ const { DEFAULT_PROFILES } = require('./seat-policy.js');
 const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, appendUniqueRow, assertPlainPath, compareWorkspace, hashFile, inside, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, writeJson: atomicJson } = require('./dispatch-evidence.js');
 const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, nativeLog, validateClaudeResponseLaunch } = require('./vendor-native.js');
 const { readSealedRun } = require('./plan-seal.js');
-const { SEQUENCE_PROTOCOL, verifyCheckpoint, verifyExecution, verifyPrerequisites } = require('./run-finalize.js');
+const { SEQUENCE_PROTOCOL, validateLogDestinations, verifyCheckpoint, verifyExecution, verifyPrerequisites } = require('./run-finalize.js');
 
 function argError(message) { const e = new Error(message); e.code = 'ARGUMENT_ERROR'; return e; }
 function policyError(message) { const e = new Error(message); e.code = 'POLICY_FAIL'; return e; }
@@ -118,7 +118,7 @@ function acceptCheckpoint(run, entry, transaction, captureSha256) {
       if (captureSha256 !== state.receipt.captureSha256) throw policyError('attestation capture hash does not match the committed capture');
       return { ok: true, replayed: true, proofId: state.receipt.proofId, receipt: state.receipt, telemetry: state.telemetry };
     }
-    verifyCheckpoint(run, entry, state, { current: true });
+    const execution = verifyCheckpoint(run, entry, state, { current: true });
     if (captureSha256 !== state.receipt.captureSha256) throw policyError('attestation capture hash does not match the checkpoint');
     const attestationPath = path.join(state.evidenceDir, 'attestation.json');
     if (fs.existsSync(attestationPath)) throw policyError('uncommitted attestation artifact already exists');
@@ -135,7 +135,7 @@ function acceptCheckpoint(run, entry, transaction, captureSha256) {
     const rewritten = [path.join(state.evidenceDir, 'receipt-ack.json'), handoffPath];
     const artifacts = state.artifacts.map(item => rewritten.includes(item.path) ? { ...item, sha256: hashFile(item.path) } : item);
     artifacts.push({ path: attestationPath, sha256: hashFile(attestationPath) });
-    for (const log of state.logs) appendUniqueRow(log, telemetry);
+    for (const log of execution.logs) appendUniqueRow(log, telemetry);
     atomicJson(transaction.file, { ...state, status: 'PASS', receipt, telemetry, artifacts, completedAt: new Date().toISOString() });
     return { ok: true, replayed: false, proofId: receipt.proofId, receipt, telemetry };
   } finally {
@@ -190,6 +190,7 @@ async function runDispatch(opts, dependencies = {}) {
   const activationLog = path.resolve(opts.activationLog || path.join(runDir, 'magi-dispatch-log.jsonl'));
   if ([telemetryLog, activationLog].some((file) => !inside(file, runDir) || inside(file, cwd))) throw policyError('dispatch logs must be inside the run directory and outside the product worktree');
   for (const file of [telemetryLog, activationLog, evidenceDir]) assertPlainPath(file);
+  validateLogDestinations(sealed, [telemetryLog, activationLog], evidenceDir, [DEFAULT_MATRIX, DEFAULT_PROFILES, ...[opts.rulesRoot, opts.skillSourceRoot].filter(Boolean)]);
   const prerequisites = fs.existsSync(transactionPath) ? null : verifyPrerequisites(sealed, binding.entry,
     ['review', 'verify'].includes(opts.role) ? snapshotWorkspace(cwd) : undefined, new Date().toISOString());
   const transaction = reserveTransaction(binding, evidenceDir, postRun ? ATTESTATION_PROTOCOL : undefined);
@@ -263,7 +264,7 @@ async function runDispatch(opts, dependencies = {}) {
     planId: opts.planId, planHash: opts.planHash, planEntry: binding.entry, escalation: opts.escalation === true, escalationReason: opts.escalationReason || null,
     binary: launch.binary, args: launch.args, cwd: launch.cwd, nativeLogPath: launch.nativeLogPath,
     responseProtocol,
-    ...(postRun ? { attestationProtocol: ATTESTATION_PROTOCOL } : {}),
+    ...(postRun ? { attestationProtocol: ATTESTATION_PROTOCOL, logDestinations: { telemetryLog, activationLog } } : {}),
     sequenceProtocol: SEQUENCE_PROTOCOL, startedAt: transaction.state.startedAt, prerequisites,
     matrixVersion: matrix.schemaVersion, seatProfileVersion: seatProfiles.schemaVersion,
     seatContractPath, skillManifestPath: skillStage.manifestPath, runtimeSha256,
@@ -273,6 +274,7 @@ async function runDispatch(opts, dependencies = {}) {
     ...Object.entries(skillStage.manifest.skills).flatMap(([skill, files]) => files.map((file) => path.join(skillStage.root, skill, file.path))),
     ...staged.manifest.files.map((item) => path.join(path.dirname(brief), item.path))];
   const protectedHashes = protectedPaths.map((file) => ({ path: file, sha256: hashFile(file) }));
+  validateLogDestinations(sealed, [telemetryLog, activationLog], evidenceDir, [...protectedPaths, staged.rulesRoot, skillStage.manifest.sourceRoot]);
   atomicJson(path.join(evidenceDir, 'plan-binding.json'), { planId: opts.planId, planHash: opts.planHash, entry: binding.entry });
   before = snapshotWorkspace(cwd);
   if (JSON.stringify(prerequisites) !== JSON.stringify(verifyPrerequisites(sealed, binding.entry, before, transaction.state.startedAt))) throw policyError('sequence prerequisites changed before launch');
@@ -358,7 +360,7 @@ async function runDispatch(opts, dependencies = {}) {
     seatContractSha256: crypto.createHash('sha256').update(fs.readFileSync(seatContractPath)).digest('hex'),
     skillsManifestSha256: crypto.createHash('sha256').update(fs.readFileSync(skillStage.manifestPath)).digest('hex'),
     rulesManifest: staged.manifestPath, completedAt: now.toISOString(),
-    ...(postRun ? { attestationProtocol: ATTESTATION_PROTOCOL } : {}),
+    ...(postRun ? { attestationProtocol: ATTESTATION_PROTOCOL, logDestinations: { telemetryLog, activationLog } } : {}),
   };
   if (postRun) { receipt.status = AWAITING_ATTESTATION; telemetry.status = AWAITING_ATTESTATION; }
   writeJson(path.join(evidenceDir, 'receipt-ack.json'), receipt);
@@ -372,7 +374,7 @@ async function runDispatch(opts, dependencies = {}) {
     fs.writeFileSync(path.join(evidenceDir, 'response.txt'), response, 'utf8');
     atomicJson(path.join(evidenceDir, 'checkpoint.json'), { schemaVersion: 1, status: AWAITING_ATTESTATION, protocol: ATTESTATION_PROTOCOL,
       planId: opts.planId, planHash: opts.planHash, dispatchId: opts.dispatchId, unitId: opts.unitId, proofId,
-      captureSha256: receipt.captureSha256, responseSha256: hashText(response), completedAt: receipt.completedAt,
+      captureSha256: receipt.captureSha256, responseSha256: hashText(response), completedAt: receipt.completedAt, logDestinations: receipt.logDestinations,
       protectedInputs: protectedHashes, recordedAt: new Date().toISOString() });
     for (const name of ['response.txt', 'checkpoint.json']) artifacts.push({ path: path.join(evidenceDir, name), sha256: hashFile(path.join(evidenceDir, name)) });
     const state = { ...transaction.state, status: AWAITING_ATTESTATION, receipt, telemetry, artifacts, logs, completedAt: new Date().toISOString() };

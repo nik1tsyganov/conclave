@@ -8,11 +8,38 @@ const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, assertPlainPath, compareWork
 const { verifyNativeProof, verifyProof } = require('./cli-proof.js');
 const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, validateClaudeResponseLaunch } = require('./vendor-native.js');
 const { tally } = require('./position-tally.js');
+const { canonicalPlainPath, pathsOverlap } = require('./runtime-paths.js');
 
 const SEQUENCE_PROTOCOL = 'magi-unit-sequence-v1';
 
 function readJson(file) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
 function same(a, b, label) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${label} disagrees with committed evidence`); }
+function validateLogDestinations(run, logs, evidenceDir, protectedPaths = []) {
+  const reserved = [evidenceDir, run.planPath, run.sealPath, run.availablePath,
+    ...['.magi-dispatches', '.magi-sessions', 'run-summary.json', 'telemetry.jsonl', 'implementation.jsonl'].map(name => path.join(run.root, name)),
+    ...protectedPaths];
+  for (const entry of run.plan.dispatches) {
+    reserved.push(entry.brief, path.join(run.root, 'out', entry.dispatchId));
+    const file = path.join(run.root, '.magi-dispatches', `${transactionKey(entry)}.json`);
+    assertPlainPath(file);
+    if (fs.existsSync(file)) {
+      const state = readJson(file);
+      reserved.push(state.evidenceDir, ...(state.artifacts || []).map(item => item.path));
+    }
+  }
+  const protectedFiles = reserved.map(canonicalPlainPath);
+  const root = canonicalPlainPath(run.root);
+  const products = run.plan.dispatches.map(entry => canonicalPlainPath(entry.cwd));
+  for (const file of logs) {
+    if (typeof file !== 'string' || !path.isAbsolute(file) || path.resolve(file) !== file) throw new Error('log destination must be an absolute normalized path');
+    const destination = canonicalPlainPath(file);
+    if (destination === root || !inside(destination, root) || products.some(product => inside(destination, product))) throw new Error('log destinations must remain inside the sealed run and outside product worktrees');
+    if (protectedFiles.some(protectedFile => pathsOverlap(destination, protectedFile))) throw new Error('log destination overlaps dispatch evidence, control files, or protected inputs');
+    assertPlainPath(file);
+    if (fs.existsSync(file) && !fs.statSync(file).isFile()) throw new Error('log destination is not a regular file');
+  }
+}
+
 function verifyPrerequisites(run, entry, before, startedAt) {
   if (!['review', 'verify'].includes(entry.role)) return [];
   const author = run.plan.dispatches.find(row => row.unitId === entry.unitId && row.role === 'implement');
@@ -90,6 +117,19 @@ function verifySavedExecution(run, entry, state, pending) {
   const envelope = readJson(artifact('handoff-envelope.json'));
   const { telemetryLog, ...receiptEnvelope } = envelope;
   same(receiptEnvelope, state.receipt, 'handoff');
+  let logs = state.logs;
+  if (postRun) {
+    const destinations = launch.logDestinations;
+    if (!destinations || typeof destinations !== 'object' || Array.isArray(destinations)) throw new Error('missing protected log destinations');
+    same(destinations, { telemetryLog: destinations.telemetryLog, activationLog: destinations.activationLog }, 'log destination fields');
+    logs = [...new Set([destinations.telemetryLog, destinations.activationLog])];
+    const rules = readJson(artifact('rules-source-after.json'));
+    const skills = Object.values(readJson(artifact('skills-source-after.json')));
+    validateLogDestinations(run, logs, state.evidenceDir, [rules.root, ...skills.map(skill => skill.root)]);
+    same(state.logs, logs, 'log destinations');
+    same(state.receipt.logDestinations, destinations, 'receipt log destinations');
+    if (telemetryLog !== destinations.telemetryLog) throw new Error('handoff log destination changed');
+  }
   const spec = run.matrix.vendors[entry.vendor].models[entry.model];
   const proof = (postRun ? verifyNativeProof : verifyProof)({ vendor: entry.vendor, capture: artifact('capture.txt'), log: artifact('vendor.log'), expectedModel: entry.model, expectedObservedModel: spec.canonical || entry.model, expectedEffort: entry.effort, expectedSandbox: entry.vendor === 'openai' ? (entry.role === 'implement' ? 'workspace-write' : 'read-only') : undefined, onTopic: true, responseProtocol });
   if (postRun) proof.attestationProtocol = ATTESTATION_PROTOCOL;
@@ -132,7 +172,7 @@ function verifySavedExecution(run, entry, state, pending) {
     const checkpoint = readJson(artifact('checkpoint.json'));
     if (state.receipt.captureSha256 !== hashFile(artifact('capture.txt'))) throw new Error('receipt capture hash differs from native output');
     const { protectedInputs, recordedAt, ...binding } = checkpoint;
-    same(binding, { schemaVersion: 1, status: AWAITING_ATTESTATION, protocol: ATTESTATION_PROTOCOL, planId: run.plan.planId, planHash: run.seal.planHash, dispatchId: entry.dispatchId, unitId: entry.unitId, proofId, captureSha256: hashFile(artifact('capture.txt')), responseSha256: hash(response), completedAt: state.receipt.completedAt }, 'attestation checkpoint');
+    same(binding, { schemaVersion: 1, status: AWAITING_ATTESTATION, protocol: ATTESTATION_PROTOCOL, planId: run.plan.planId, planHash: run.seal.planHash, dispatchId: entry.dispatchId, unitId: entry.unitId, proofId, captureSha256: hashFile(artifact('capture.txt')), responseSha256: hash(response), completedAt: state.receipt.completedAt, logDestinations: launch.logDestinations }, 'attestation checkpoint');
     if (!Array.isArray(protectedInputs) || !protectedInputs.length) throw new Error('checkpoint protected inputs are missing');
     for (const item of protectedInputs) {
       if (!state.artifacts.some(artifact => artifact.path === item.path && artifact.sha256 === item.sha256)) throw new Error('checkpoint protected input binding changed');
@@ -156,7 +196,7 @@ function verifySavedExecution(run, entry, state, pending) {
     if (launch.startedAt !== state.startedAt || !Number.isFinite(start) || !Number.isFinite(completed) || !Number.isFinite(committed) || completed < start || committed < completed) throw new Error('sequence timestamps disagree with committed evidence');
     same(launch.prerequisites, verifyPrerequisites(run, entry, before, launch.startedAt), 'sequence prerequisites');
   }
-  return { entry, state, proof, response, before, after };
+  return { entry, state, proof, response, before, after, logs };
 }
 
 function inspectRun(runDir) {
@@ -268,4 +308,4 @@ function main(argv = process.argv.slice(2)) {
   } catch (error) { process.stderr.write(`RUN_FINALIZE_FAIL: ${error.message}\n`); return 1; }
 }
 if (require.main === module) process.exitCode = main();
-module.exports = { SEQUENCE_PROTOCOL, assessRun, finalizeRun, inspectRun, main, nativePosition, tallyUnit, verifyCheckpoint, verifyExecution, verifyPrerequisites };
+module.exports = { SEQUENCE_PROTOCOL, assessRun, finalizeRun, inspectRun, main, nativePosition, tallyUnit, validateLogDestinations, verifyCheckpoint, verifyExecution, verifyPrerequisites };
