@@ -6,6 +6,7 @@ const path = require('node:path');
 const { ROLES } = require('./dispatch-schema.js');
 
 const DEFAULT_MATRIX = path.resolve(__dirname, '..', '.cursor', 'skills', 'magi-cli', 'references', 'dispatch-matrix.json');
+const DEFAULT_PROBE_MAX_AGE_MINUTES = 60;
 
 function argumentError(message) { const e = new Error(message); e.code = 'ARGUMENT_ERROR'; return e; }
 function policyError(message) { const e = new Error(message); e.code = 'POLICY_FAIL'; return e; }
@@ -18,6 +19,14 @@ function loadAvailability(file) {
   if (!file) return {};
   try { return JSON.parse(fs.readFileSync(path.resolve(file), 'utf8')); }
   catch (error) { throw argumentError(`cannot read availability file: ${error.message}`); }
+}
+
+function probeIsFresh(matrix, observed, nowMs = Date.now()) {
+  const maxMinutes = matrix.principles?.probeMaxAgeMinutes ?? DEFAULT_PROBE_MAX_AGE_MINUTES;
+  const observedMs = Date.parse(observed?.observedAt || '');
+  if (!Number.isFinite(observedMs)) return false;
+  const ageMs = nowMs - observedMs;
+  return ageMs >= -5 * 60_000 && ageMs <= maxMinutes * 60_000;
 }
 
 function routeAllowed(matrix, route, availability = {}) {
@@ -40,6 +49,9 @@ function routeAllowed(matrix, route, availability = {}) {
     const observed = availability?.vendors?.[route.vendor]?.models?.[route.model];
     if (!observed || observed.available !== true || observed.observedModel !== route.model) {
       return { ok: false, reason: `probe-required route unavailable: ${route.vendor}/${route.model}` };
+    }
+    if (!probeIsFresh(matrix, observed)) {
+      return { ok: false, reason: `probe-required route has stale/missing availability proof: ${route.vendor}/${route.model}` };
     }
   }
   return { ok: true, route: matched };
@@ -140,4 +152,4 @@ function main(argv = process.argv.slice(2), io = process) {
 }
 
 if (require.main === module) process.exitCode = main();
-module.exports = { DEFAULT_MATRIX, chooseRoute, loadAvailability, loadMatrix, routeAllowed, validatePlan, main };
+module.exports = { DEFAULT_MATRIX, DEFAULT_PROBE_MAX_AGE_MINUTES, chooseRoute, loadAvailability, loadMatrix, probeIsFresh, routeAllowed, validatePlan, main };
