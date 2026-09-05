@@ -2,10 +2,11 @@
   "name": "magi-cursor-plugin",
   "version": "0.1.0",
   "type": "commonjs",
-  "description": "MAGI tri-seat (Claude + Codex + Gemini) Cursor plugin",
+  "description": "Code-enforced MAGI tri-vendor Cursor and CLI runtime",
   "scripts": {
     "test": "node --test \"tools/*.test.js\"",
-    "check": "npm test && node tools/release-check.js"
+    "check": "npm test && node tools/release-check.js",
+    "check:cross-repo": "node tools/cross-repo-check.js"
   },
   "keywords": ["magi", "multi-vendor", "cursor", "dispatch"],
   "author": "Nikita Tsyganov",
