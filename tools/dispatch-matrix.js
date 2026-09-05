@@ -3,6 +3,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { ROLES } = require('./dispatch-schema.js');
 
 const DEFAULT_MATRIX = path.resolve(__dirname, '..', '.cursor', 'skills', 'magi-cli', 'references', 'dispatch-matrix.json');
 
@@ -29,6 +30,12 @@ function routeAllowed(matrix, route, availability = {}) {
   const modelSpec = matrix.vendors?.[route.vendor]?.models?.[route.model];
   if (!modelSpec) return { ok: false, reason: `model absent from vendor catalog: ${route.vendor}/${route.model}` };
   if (!modelSpec.efforts.includes(route.effort)) return { ok: false, reason: `effort ${route.effort} unsupported by ${route.model}` };
+  if (matched.escalationOnly) {
+    if (route.escalation !== true) return { ok: false, reason: `escalation-only route requires escalation=true: ${route.vendor}/${route.model}` };
+    if (typeof route.escalationReason !== 'string' || route.escalationReason.trim().length < 8) {
+      return { ok: false, reason: `escalation-only route requires escalationReason: ${route.vendor}/${route.model}` };
+    }
+  }
   if ((matched.requiresProbe || modelSpec.availability === 'probe-required')) {
     const observed = availability?.vendors?.[route.vendor]?.models?.[route.model];
     if (!observed || observed.available !== true || observed.observedModel !== route.model) {
@@ -49,7 +56,7 @@ function validatePlan(plan, matrix, availability = {}) {
   const implement = [];
   for (const route of plan.dispatches) {
     if (route.vendor === 'xai') throw policyError('arbiter/xai may not occupy a seat');
-    if (!['implement', 'review', 'verify'].includes(route.role)) throw policyError(`invalid role: ${route.role}`);
+    if (!ROLES.includes(route.role)) throw policyError(`invalid role: ${route.role}`);
     const allowed = routeAllowed(matrix, route, availability);
     if (!allowed.ok) throw policyError(allowed.reason);
     if (route.role === 'implement') implement.push(route);
@@ -58,11 +65,16 @@ function validatePlan(plan, matrix, availability = {}) {
     }
   }
 
-  if (plan.magiConvened === true) {
+  if (plan.magiConvened === true && implement.length > 0) {
     const vendors = new Set(implement.map((r) => r.vendor));
-    if (vendors.size < 3) throw policyError(`MAGI convened requires 3 implement vendors, got ${vendors.size}`);
+    const minimumDistinct = Math.min(3, implement.length);
+    if (vendors.size < minimumDistinct) {
+      throw policyError(`MAGI implementation split requires ${minimumDistinct} implement vendors for ${implement.length} units, got ${vendors.size}`);
+    }
   }
-  if (implement.length > 0) {
+
+  const floorMin = matrix.principles.distributionFloorMinimumImplementUnits ?? 2;
+  if (implement.length >= floorMin) {
     const counts = new Map();
     for (const row of implement) counts.set(row.vendor, (counts.get(row.vendor) || 0) + 1);
     for (const [vendor, count] of counts) {
@@ -70,16 +82,23 @@ function validatePlan(plan, matrix, availability = {}) {
     }
   }
 
-  return { ok: true, dispatches: plan.dispatches.length };
+  return { ok: true, dispatches: plan.dispatches.length, implementUnits: implement.length };
 }
 
-function chooseRoute(matrix, { className, role, excludedVendors = [], availability = {} }) {
+function chooseRoute(matrix, { className, role, excludedVendors = [], availability = {}, allowEscalation = false, escalationReason = null }) {
   const list = matrix.classes?.[className]?.[role];
   if (!Array.isArray(list)) throw policyError(`no route for ${className}/${role}`);
   for (const route of [...list].sort((a, b) => a.priority - b.priority)) {
     if (excludedVendors.includes(route.vendor)) continue;
-    const result = routeAllowed(matrix, { class: className, role, ...route }, availability);
-    if (result.ok) return { class: className, role, ...route };
+    if (route.escalationOnly && !allowEscalation) continue;
+    const candidate = {
+      class: className,
+      role,
+      ...route,
+      ...(route.escalationOnly ? { escalation: true, escalationReason } : {}),
+    };
+    const result = routeAllowed(matrix, candidate, availability);
+    if (result.ok) return candidate;
   }
   throw policyError(`no eligible route for ${className}/${role}`);
 }
