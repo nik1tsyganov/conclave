@@ -14,10 +14,10 @@ const { DEFAULT_MATRIX, bindDispatch, loadMatrix, loadAvailability } = require('
 const { loadProfiles, buildSeatProfile } = require('./seat-policy.js');
 const { stageSeatSkills, verifySeatSkills } = require('./cli-skill-stage.js');
 const { DEFAULT_PROFILES } = require('./seat-policy.js');
-const { appendUniqueRow, assertPlainPath, compareWorkspace, hashFile, inside, reserveTransaction, snapshotWorkspace, transactionKey, verifyCommittedRow, writeJson: atomicJson } = require('./dispatch-evidence.js');
+const { appendUniqueRow, assertPlainPath, compareWorkspace, hashFile, inside, reserveTransaction, snapshotWorkspace, transactionKey, writeJson: atomicJson } = require('./dispatch-evidence.js');
 const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, nativeLog, validateClaudeResponseLaunch } = require('./vendor-native.js');
 const { readSealedRun } = require('./plan-seal.js');
-const { verifyExecution } = require('./run-finalize.js');
+const { SEQUENCE_PROTOCOL, verifyExecution, verifyPrerequisites } = require('./run-finalize.js');
 
 function argError(message) { const e = new Error(message); e.code = 'ARGUMENT_ERROR'; return e; }
 function policyError(message) { const e = new Error(message); e.code = 'POLICY_FAIL'; return e; }
@@ -131,15 +131,9 @@ async function runDispatch(opts, dependencies = {}) {
   const activationLog = path.resolve(opts.activationLog || path.join(runDir, 'magi-dispatch-log.jsonl'));
   if ([telemetryLog, activationLog].some((file) => !inside(file, runDir) || inside(file, cwd))) throw policyError('dispatch logs must be inside the run directory and outside the product worktree');
   for (const file of [telemetryLog, activationLog, evidenceDir]) assertPlainPath(file);
-  if (['review', 'verify'].includes(opts.role)) {
-    const author = binding.plan.dispatches.find((row) => row.unitId === opts.unitId && row.role === 'implement');
-    if (author) {
-      const authorFile = path.join(runDir, '.magi-dispatches', `${transactionKey(author)}.json`);
-      if (!fs.existsSync(authorFile)) throw policyError('implementation must finish before its review or verification');
-      const state = JSON.parse(fs.readFileSync(authorFile, 'utf8'));
-      verifyCommittedRow(state.telemetry || {});
-    }
-  }
+  const transactionPath = path.join(runDir, '.magi-dispatches', `${transactionKey(binding.entry)}.json`);
+  const prerequisites = fs.existsSync(transactionPath) ? null : verifyPrerequisites(sealed, binding.entry,
+    ['review', 'verify'].includes(opts.role) ? snapshotWorkspace(cwd) : undefined, new Date().toISOString());
   const transaction = reserveTransaction(binding, evidenceDir);
   const responseProtocol = opts.vendor === 'anthropic' ? CLAUDE_RESPONSE_PROTOCOL : undefined;
   if (transaction.replayed) {
@@ -206,6 +200,7 @@ async function runDispatch(opts, dependencies = {}) {
     planId: opts.planId, planHash: opts.planHash, planEntry: binding.entry, escalation: opts.escalation === true, escalationReason: opts.escalationReason || null,
     binary: launch.binary, args: launch.args, cwd: launch.cwd, nativeLogPath: launch.nativeLogPath,
     responseProtocol,
+    sequenceProtocol: SEQUENCE_PROTOCOL, startedAt: transaction.state.startedAt, prerequisites,
     matrixVersion: matrix.schemaVersion, seatProfileVersion: seatProfiles.schemaVersion,
     seatContractPath, skillManifestPath: skillStage.manifestPath, runtimeSha256,
   });
@@ -216,6 +211,7 @@ async function runDispatch(opts, dependencies = {}) {
   const protectedHashes = protectedPaths.map((file) => ({ path: file, sha256: hashFile(file) }));
   atomicJson(path.join(evidenceDir, 'plan-binding.json'), { planId: opts.planId, planHash: opts.planHash, entry: binding.entry });
   before = snapshotWorkspace(cwd);
+  if (JSON.stringify(prerequisites) !== JSON.stringify(verifyPrerequisites(sealed, binding.entry, before, transaction.state.startedAt))) throw policyError('sequence prerequisites changed before launch');
   atomicJson(path.join(evidenceDir, 'workspace-before.json'), before);
   const rulesBefore = snapshotWorkspace(staged.rulesRoot);
   atomicJson(path.join(evidenceDir, 'rules-source-before.json'), rulesBefore);
@@ -248,6 +244,7 @@ async function runDispatch(opts, dependencies = {}) {
   if (Object.values(skillsAudit).some((audit) => !audit.ok)) throw policyError('external skill source changed during dispatch');
   if (opts.role === 'implement' && scopeAudit.changedFiles.length === 0) throw Object.assign(new Error('implementation produced no covered file change'), { code: 'SCOPE_FAIL' });
   for (const file of protectedHashes) if (hashFile(file.path) !== file.sha256) throw policyError(`protected input changed during dispatch: ${file.path}`);
+  if (JSON.stringify(prerequisites) !== JSON.stringify(verifyPrerequisites(sealed, binding.entry, before, transaction.state.startedAt))) throw policyError('sequence prerequisites changed during dispatch');
   verifyStagedRules(brief, staged.manifest);
   verifySeatSkills({ destinationRoot: skillStage.root, skills: seatProfile.skills, manifest: skillStage.manifest });
   if (!fs.existsSync(capturePath) || !fs.readFileSync(capturePath, 'utf8').trim()) throw Object.assign(new Error('vendor capture missing or empty'), { code: 'PROOF_FAIL' });
@@ -304,7 +301,7 @@ async function runDispatch(opts, dependencies = {}) {
   const logs = [...new Set([telemetryLog, activationLog])];
   for (const log of logs) appendUniqueRow(log, telemetry);
   // This commit marker is written last. Consumers reject incomplete projections.
-  atomicJson(transaction.file, { ...transaction.state, status: 'PASS', receipt, telemetry, artifacts, logs, completedAt: now.toISOString() });
+  atomicJson(transaction.file, { ...transaction.state, status: 'PASS', receipt, telemetry, artifacts, logs, completedAt: new Date().toISOString() });
   return { ok: true, proofId, receipt, telemetry };
   } catch (error) {
     if (before && !scopeAudit) {

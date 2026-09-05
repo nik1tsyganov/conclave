@@ -11,11 +11,13 @@ Run `magi-whoami --mode cursor-cli --slug <picker slug>` in Cursor. It checks th
 Set the external rule-pack path explicitly:
 
 ```powershell
-$env:MAGI_RULES_ROOT = 'C:/src/ai-ops-vault/projects/magi-cli-rules'
+$env:MAGI_RULES_ROOT = Join-Path $env:USERPROFILE '.cursor/magi-rules/v2'
 node tools/magi-cli-preflight.js --rules-root $env:MAGI_RULES_ROOT
 ```
 
 The active pack is STANDING v2 with `RULES/INDEX.md`, `VENDOR.md`, and exactly R01–R22. A missing pack fails. Native CLI authentication remains local to the machine. `claude auth status` is the Claude login check; the native model probe also verifies its subscription authentication. Never copy credentials from the kit.
+
+The example uses YESSIR's installed external pack. On another machine, supply its actual verified v2 pack. For bounded real-project attempts and failure recording, follow [the project handoff](../../magi-cli/references/project-runs.md).
 
 Binary resolution uses explicit overrides, environment overrides, configured/discovered installations, and known shims. Set `MAGI_CODEX_BIN`, `MAGI_CLAUDE_BIN`, or `MAGI_AGY_BIN` when an explicit binary is needed. An invalid explicit path fails. Preflight file checks do not establish authentication or model availability.
 

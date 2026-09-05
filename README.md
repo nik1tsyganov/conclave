@@ -34,7 +34,7 @@ The installer creates the MAGI Cursor and MAGI Cursor CLI plugins. The CLI plugi
 Supply the external standing-rule pack explicitly:
 
 ```powershell
-$env:MAGI_RULES_ROOT = 'C:/src/ai-ops-vault/projects/magi-cli-rules'
+$env:MAGI_RULES_ROOT = Join-Path $env:USERPROFILE '.cursor/magi-rules/v2'
 ```
 
 Use the matching STANDING v2 / R01–R22 pack. Credentials and availability evidence stay local to the executing host. Use normal binary discovery or the explicit `MAGI_CODEX_BIN`, `MAGI_CLAUDE_BIN`, and `MAGI_AGY_BIN` overrides. Invalid explicit binary paths fail.
@@ -42,6 +42,8 @@ Use the matching STANDING v2 / R01–R22 pack. Credentials and availability evid
 ## Run a checked plan
 
 The [CLI run guide](.cursor/skills/magi-cli/references/cursor-cli.md) contains the complete command reference and plan fields. Run these tools from either the source or installed runtime root.
+
+For real projects, give Cursor the [project-run handoff](.cursor/skills/magi-cli/references/project-runs.md). It includes a bounded launch prompt and a durable failure-recording process. The rules-path example above uses YESSIR's installed pack; other machines must supply their verified external v2 pack.
 
 1. Check the declared Cursor arbiter route with `magi-whoami --mode cursor-cli --slug <picker slug>`.
 2. Run `tools/magi-cli-preflight.js` with the external rules pack.

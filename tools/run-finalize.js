@@ -9,8 +9,39 @@ const { verifyProof } = require('./cli-proof.js');
 const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, validateClaudeResponseLaunch } = require('./vendor-native.js');
 const { tally } = require('./position-tally.js');
 
+const SEQUENCE_PROTOCOL = 'magi-unit-sequence-v1';
+
 function readJson(file) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
 function same(a, b, label) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${label} disagrees with committed evidence`); }
+function verifyPrerequisites(run, entry, before, startedAt) {
+  if (!['review', 'verify'].includes(entry.role)) return [];
+  const author = run.plan.dispatches.find(row => row.unitId === entry.unitId && row.role === 'implement');
+  if (!author) return [];
+  const verifiers = entry.role === 'review' ? run.plan.dispatches.filter(row => row.unitId === entry.unitId && row.role === 'verify') : [];
+  if (entry.role === 'review' && !verifiers.length) throw new Error('planned verification is required before review');
+  const start = Date.parse(startedAt);
+  if (!Number.isFinite(start)) throw new Error('sequence start time is missing or invalid');
+  return [author, ...verifiers].map(dependency => {
+    const file = path.join(run.root, '.magi-dispatches', `${transactionKey(dependency)}.json`);
+    const unfinished = dependency.role === 'implement' ? 'implementation must finish before its review or verification' : 'verification must finish before review';
+    assertPlainPath(file);
+    if (!fs.existsSync(file)) throw new Error(`${unfinished}: ${dependency.dispatchId}`);
+    const state = readJson(file);
+    if (state.status !== 'PASS') throw new Error(`${unfinished}: ${dependency.dispatchId}`);
+    const execution = verifyExecution(run, dependency, state);
+    const completed = Date.parse(state.receipt.completedAt);
+    const committed = Date.parse(state.completedAt);
+    if (!Number.isFinite(completed) || !Number.isFinite(committed) || committed < completed || committed > start) throw new Error(`sequence starts before prerequisite completed: ${dependency.dispatchId}`);
+    if (dependency.role === 'verify' && nativePosition(execution.response) !== 'APPROVE') throw new Error(`verification did not approve: ${dependency.dispatchId}`);
+    const audit = compareWorkspace(execution.after, before, dependency.role === 'implement' ? dependency.writeScope : []);
+    // Other completed units may change other paths before verification starts.
+    if (dependency.role === 'implement') {
+      if (audit.gitChanged || audit.changedFiles.some(file => file.allowed)) throw new Error('implementation scope changed before its review or verification');
+    } else if (!audit.ok) throw new Error('worktree changed after verification');
+    return { dispatchId: dependency.dispatchId, proofId: state.receipt.proofId, transactionSha256: hashFile(file) };
+  });
+}
+
 function verifyExecution(run, entry, state) {
   same(state.entry, entry, 'plan entry');
   if (state.planHash !== run.seal.planHash || state.planId !== run.plan.planId || state.requestHash !== hash(JSON.stringify({ planHash: run.seal.planHash, entry }))) throw new Error('transaction belongs to a different plan');
@@ -61,7 +92,15 @@ function verifyExecution(run, entry, state) {
   if (Object.values(skillsAudit).some((audit) => !audit.ok)) throw new Error('skill source changed during execution');
   const response = finalResponse(entry.vendor, fs.readFileSync(artifact('capture.txt'), 'utf8'), { responseProtocol });
   if (response.split(/\r?\n/, 1)[0] !== fs.readFileSync(entry.brief, 'utf8').split(/\r?\n/, 1)[0]) throw new Error('native response has wrong brief acknowledgement');
-  return { entry, state, proof, response, after };
+  if (['review', 'verify'].includes(entry.role) && run.plan.dispatches.some(row => row.unitId === entry.unitId && row.role === 'implement')) {
+    if (launch.sequenceProtocol !== SEQUENCE_PROTOCOL) throw new Error('missing or unsupported sequence protocol');
+    const start = Date.parse(launch.startedAt);
+    const completed = Date.parse(state.receipt.completedAt);
+    const committed = Date.parse(state.completedAt);
+    if (launch.startedAt !== state.startedAt || !Number.isFinite(start) || !Number.isFinite(completed) || !Number.isFinite(committed) || completed < start || committed < completed) throw new Error('sequence timestamps disagree with committed evidence');
+    same(launch.prerequisites, verifyPrerequisites(run, entry, before, launch.startedAt), 'sequence prerequisites');
+  }
+  return { entry, state, proof, response, before, after };
 }
 
 function inspectRun(runDir) {
@@ -113,8 +152,7 @@ function tallyUnit(run, unitId) {
   return { unitId, authorVendor, ...tally({ ballots, authorVendor }) };
 }
 
-function finalizeRun(runDir) {
-  const run = inspectRun(runDir);
+function assessRun(run) {
   const units = [];
   const unitIds = [...new Set(run.plan.dispatches.map((entry) => entry.unitId))];
   for (const unitId of unitIds) {
@@ -139,6 +177,12 @@ function finalizeRun(runDir) {
   }
   const executionStatus = run.outcomes.every((row) => row.status === 'PASS') ? 'PASS' : 'FAIL';
   const approvalStatus = units.some((unit) => unit.status === 'FAIL') ? 'FAIL' : units.every((unit) => unit.status === 'NOT_REQUIRED') ? 'NOT_REQUIRED' : 'PASS';
+  return { schemaVersion: 1, planId: run.plan.planId, planHash: run.seal.planHash, executionStatus, approvalStatus, ok: executionStatus === 'PASS' && approvalStatus !== 'FAIL', outcomes: run.outcomes, units, finalizedAt: new Date().toISOString() };
+}
+
+function finalizeRun(runDir) {
+  const run = inspectRun(runDir);
+  const result = assessRun(run);
   const rows = run.executions.map(({ state }) => state.telemetry);
   const terminalRows = run.outcomes.map((outcome) => rows.find((row) => row.dispatchId === outcome.dispatchId) || outcome);
   const writeRows = (file, values) => {
@@ -152,7 +196,6 @@ function finalizeRun(runDir) {
   for (const log of new Set(run.executions.flatMap(({ state }) => state.logs))) writeRows(log, rows.filter((row) => run.executions.find(({ state }) => state.telemetry === row).state.logs.includes(log)));
   writeRows(path.join(run.root, 'telemetry.jsonl'), terminalRows);
   writeRows(path.join(run.root, 'implementation.jsonl'), rows.filter((row) => row.role === 'implement'));
-  const result = { schemaVersion: 1, planId: run.plan.planId, planHash: run.seal.planHash, executionStatus, approvalStatus, ok: executionStatus === 'PASS' && approvalStatus !== 'FAIL', outcomes: run.outcomes, units, finalizedAt: new Date().toISOString() };
   writeJson(path.join(run.root, 'run-summary.json'), result);
   return result;
 }
@@ -165,4 +208,4 @@ function main(argv = process.argv.slice(2)) {
   } catch (error) { process.stderr.write(`RUN_FINALIZE_FAIL: ${error.message}\n`); return 1; }
 }
 if (require.main === module) process.exitCode = main();
-module.exports = { finalizeRun, inspectRun, main, nativePosition, tallyUnit, verifyExecution };
+module.exports = { SEQUENCE_PROTOCOL, assessRun, finalizeRun, inspectRun, main, nativePosition, tallyUnit, verifyExecution, verifyPrerequisites };

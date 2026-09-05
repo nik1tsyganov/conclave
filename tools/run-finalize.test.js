@@ -35,11 +35,12 @@ test('execution success is distinct from a rejected review', async (t) => {
   assert.equal(result.executionStatus, 'PASS'); assert.equal(result.approvalStatus, 'FAIL'); assert.equal(result.ok, false);
 });
 
-test('an approving review cannot conceal a rejecting verifier', async (t) => {
+test('a rejecting verifier prevents review and approval', async (t) => {
   const run = panelRun(t);
-  for (const row of run.dispatches) await runDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, `ACK fixture\nPOSITION: ${row.role === 'verify' ? 'REJECT' : 'APPROVE'}\nDone.`));
+  for (const row of run.dispatches.slice(0, 2)) await runDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, `ACK fixture\nPOSITION: ${row.role === 'verify' ? 'REJECT' : 'APPROVE'}\nDone.`));
+  await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd3' }, fakeVendor()), /verification did not approve/);
   const result = finalizeRun(run.runDir);
-  assert.equal(result.executionStatus, 'PASS'); assert.equal(result.approvalStatus, 'FAIL');
+  assert.equal(result.executionStatus, 'FAIL'); assert.equal(result.approvalStatus, 'FAIL');
 });
 
 test('changed product files invalidate previous approval', async (t) => {
@@ -68,7 +69,8 @@ test('critical class requires independent planned vendors and two native votes',
 
 test('ballots cannot be supplied by the arbiter or inferred from prose', async (t) => {
   const run = panelRun(t);
-  for (const row of run.dispatches) await runDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, 'ACK fixture\nThe arbiter says APPROVE.'));
+  for (const row of run.dispatches.slice(0, 2)) await runDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor(() => {}, 'ACK fixture\nThe arbiter says APPROVE.'));
+  await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd3' }, fakeVendor()), /exactly one POSITION/);
   assert.equal(finalizeRun(run.runDir).approvalStatus, 'FAIL');
   assert.throws(() => tallyUnit(inspectRun(run.runDir), 'u1'), /exactly one POSITION/);
 });

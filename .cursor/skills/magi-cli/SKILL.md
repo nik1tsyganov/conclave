@@ -13,6 +13,8 @@ Grok 4.6 coordinates the run. It classifies work, writes briefs and complete pla
 
 Read `references/cursor-cli.md` for the complete run procedure, `references/dispatch-matrix.json` for route legality, `references/seat-profiles.json` for capabilities, and `references/brief-rules-block.md` for brief instructions.
 
+For real-project work, follow `references/project-runs.md`: one bounded attempt, explicit stop conditions, and a diagnostic report plus TRIAGE at every stop. `project-run-report.js` revalidates available evidence and writes an external report; it cannot grant activation.
+
 The arbiter retains orchestration, routing, bridge, distribution, assessment, and retrospective work. Leaf seats receive the selected vendor card and role/class skills. Do not load the arbiter's full skill stack into a seat.
 
 ## Runtime procedure
