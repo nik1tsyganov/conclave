@@ -4,6 +4,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { verifyStagedRules } = require('./cli-rules-stage.js');
+const { ROLES } = require('./dispatch-schema.js');
 
 const STANDING_PATH = 'C:\\src\\ai-ops-vault\\projects\\magi-cli-rules\\STANDING.md';
 const RULES_DIR = 'C:\\src\\ai-ops-vault\\projects\\magi-cli-rules';
@@ -31,7 +32,7 @@ const STRICT_MARKERS = Object.freeze([
 
 function usage() {
   return [
-    'Usage: node tools/cli-brief-rules-check.js --brief <file> [--role implement|review|verify] [--vendor openai|google|anthropic] [--structural]',
+    'Usage: node tools/cli-brief-rules-check.js --brief <file> [--role implement|review|verify|plan|research] [--vendor openai|google|anthropic] [--structural]',
     'Exit 0 rules ok. Exit 1 missing/invalid rules. Exit 2 ARGUMENT_ERROR.',
   ].join('\n');
 }
@@ -52,7 +53,7 @@ function parseArgs(argv) {
       if (flag === '--vendor') options.vendor = value;
     } else throw argumentError(`Unknown option: ${flag}`);
   }
-  if (options.role && !['implement', 'review', 'verify'].includes(options.role)) throw argumentError('--role must be implement, review, or verify');
+  if (options.role && !ROLES.includes(options.role)) throw argumentError(`--role must be one of: ${ROLES.join(', ')}`);
   if (options.vendor && !['openai', 'google', 'anthropic'].includes(options.vendor)) throw argumentError('--vendor must be openai, google, or anthropic');
   return options;
 }
@@ -67,7 +68,7 @@ function missingMarkers(text, opts = {}) {
   if (typeof text !== 'string') return REQUIRED_MARKERS.map((m) => m.id);
   const missing = REQUIRED_MARKERS.filter((m) => !markerHolds(m, text)).map((m) => m.id);
   if (opts.role === 'implement' && !/\bimplement\b/i.test(text)) missing.push('implement');
-  if ((opts.role === 'review' || opts.role === 'verify') && !/read[- ]only|do not modify|no writes/i.test(text)) missing.push('read-only role');
+  if (opts.role && opts.role !== 'implement' && !/read[- ]only|do not modify|no writes/i.test(text)) missing.push('read-only role');
   if (opts.requireStructural) {
     for (const marker of STRICT_MARKERS) if (!markerHolds(marker, text)) missing.push(marker.id);
     if (!scopeIsReal(text)) missing.push('real SCOPE block');
