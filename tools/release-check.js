@@ -20,6 +20,7 @@ const REQUIRED = [
   'tools/cli-proof.js',
   'tools/cli-rules-stage.js',
   'tools/cli-skill-stage.js',
+  'tools/cross-repo-check.js',
   'tools/dispatch-matrix.js',
   'tools/dispatch-run.js',
   'tools/dispatch-schema.js',
@@ -40,12 +41,25 @@ function main(io = process) {
     return 1;
   }
   const matrix = loadMatrix();
-  if (matrix.schemaVersion < 2 || !matrix.vendors?.openai?.models?.['gpt-6-astra'] || matrix.vendors?.anthropic?.models?.fable?.canonical !== 'claude-fable-5-1') {
+  if (
+    matrix.schemaVersion < 3 ||
+    !matrix.vendors?.openai?.models?.['gpt-6-astra'] ||
+    matrix.vendors?.anthropic?.models?.fable?.canonical !== 'claude-fable-5-1' ||
+    !Array.isArray(matrix.classes?.['architecture-planning']?.plan) ||
+    !Array.isArray(matrix.classes?.['research-synthesis']?.research)
+  ) {
     io.stderr.write('RELEASE_CHECK_FAIL dispatch matrix is stale or incomplete\n');
     return 1;
   }
   const profiles = loadProfiles();
-  if (profiles.schemaVersion < 1 || profiles.principles?.leafSeat !== true || profiles.principles?.skillsAreAllowListed !== true) {
+  if (
+    profiles.schemaVersion < 3 ||
+    profiles.principles?.leafSeat !== true ||
+    profiles.principles?.skillsAreAllowListed !== true ||
+    profiles.principles?.bridgesAreArbiterOnly !== true ||
+    !profiles.roleSkills?.plan ||
+    !profiles.roleSkills?.research
+  ) {
     io.stderr.write('RELEASE_CHECK_FAIL seat profiles are stale or not fail-closed\n');
     return 1;
   }
