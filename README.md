@@ -1,6 +1,6 @@
 # MAGI
 
-MAGI is a **code-enforced, tri-vendor AI engineering system**. OpenAI, Anthropic, and Google occupy the three working seats. xAI/Grok 4.6 is the non-voting arbiter: it classifies work, proposes routes, writes briefs, launches seats, records lead telemetry, and performs mechanical tallying. It does **not** implement, review, verify, repair, or vote.
+MAGI is a **code-enforced, tri-vendor AI engineering system**. OpenAI, Anthropic, and Google occupy the working seats. xAI/Grok 4.6 is the non-voting arbiter: it classifies work, proposes routes, writes briefs, launches seats, records lead telemetry, and performs mechanical tallying. It does **not** act as a substantive implementation, planning, research, review, verification, repair, or voting seat.
 
 > The model proposes. Deterministic policy decides what is legal.
 
@@ -17,23 +17,21 @@ A standalone visual explainer lives in [`site/`](site/). Open [`site/index.html`
 
 MAGI is **not CONCLAVE**. CONCLAVE is a separate system with separate host rules.
 
-## Two host modes
+## Host modes
 
 - `/magi` — Cursor Task mode.
 - `/magi-cli` — vendor-CLI mode using Codex CLI, agy, and Claude Code. This mode is the focus of the fail-closed runtime in `tools/`.
 
 ## Code-enforced control plane
 
-`/magi-cli` no longer relies on the arbiter remembering a prose routing table.
-
 ```text
 Grok classifies
     ↓
 dispatch-plan.json
     ↓
-dispatch-matrix.js          class/vendor/model/effort/probe/distribution policy
+dispatch-matrix.js          class/vendor/model/effort/probe/escalation/distribution
     ↓
-seat-policy.js              role/permissions/skill allow-list/leaf-seat policy
+seat-policy.js              semantic role/permissions/skill allow-list/leaf-seat policy
     ↓
 cli-skill-stage.js          minimal per-seat staged skill pack + hashes
     ↓
@@ -43,48 +41,58 @@ dispatch-run.js             rechecks policy at the actual launch boundary
     ↓
 vendor CLI
     ↓
-cli-proof.js                observed model + vendor-native proof
+cli-proof.js                vendor-native proof, with requested/observed identity kept distinct
     ↓
 telemetry + receipt + activation + mechanical tally
 ```
 
 A deterministic failure cannot be waived by Grok or by a seat.
 
-### Routing authority
+## Routing authority
 
-`.cursor/skills/magi-cli/references/dispatch-matrix.json` is the machine-readable source for legal vendor/model/effort combinations by task class and role. `tools/dispatch-matrix.js` validates a whole plan before any vendor spend, and `tools/dispatch-run.js` validates the individual route again immediately before launch.
+`.cursor/skills/magi-cli/references/dispatch-matrix.json` is the machine-readable source for legal vendor/model/effort combinations by task class and semantic role.
 
 Current high-level policy:
 
 | Class | Preferred route |
 |---|---|
-| Architecture / extreme planning | GPT-6 Astra high/xhigh, then Opus / Gemini Pro |
+| Architecture / planning | Claude Opus high; Sol / Gemini Pro alternate; Astra only as explicit escalation |
 | Standard feature | GPT-5.6 Terra medium |
 | Bulk / mechanical | GPT-5.6 Luna medium |
-| Difficult debugging | GPT-5.6 Sol high |
+| Difficult debugging | Claude Fable xhigh / GPT-5.6 Sol high |
 | Long-running agentic implementation | Claude Fable xhigh |
 | Long-context analysis / research synthesis | Gemini Pro |
-| Security-sensitive | Opus xhigh, Astra xhigh, Gemini Pro panel |
-| Adversarial review | Sol/Astra high, Opus high, Gemini Pro |
+| Security-sensitive implementation | Opus xhigh with independent cross-vendor review; Astra is an escalation lane |
+| Adversarial review | Sol high, Opus high, Gemini Pro; Astra only as explicit escalation |
+| Extreme end-to-end implementation | GPT-6 Astra high when fresh probe evidence confirms availability |
 
-Probe-required models are **unavailable until the actual CLI proves the exact requested slug**. Silent vendor substitution is a failed route, not a successful fallback.
+Probe-required models are unavailable until the actual CLI proves the exact requested model. Probe records must also be fresh; the runtime default maximum age is 60 minutes. Silent model substitution is failure, not a successful fallback.
 
-### Seat capability authority
+Routes marked `escalationOnly` require an explicit escalation flag and reason. Grok cannot spend Astra merely because it prefers a stronger model.
 
-`.cursor/skills/magi-cli/references/seat-profiles.json` defines what each vendor seat may do:
+## Seat capability authority
 
-- legal roles;
-- permission profile per role;
-- required proof fields;
-- base skills;
-- role-specific skills;
-- class-specific skills;
-- forbidden arbiter/orchestration skills;
-- leaf-seat / no-subdispatch invariant.
+`.cursor/skills/magi-cli/references/seat-profiles.json` defines what each seat may do.
 
-`tools/cli-skill-stage.js` copies only that seat's allow-listed skills into the dispatch evidence directory and writes a hashed manifest. `dispatch-run.js` writes `SEAT-CONTRACT.md`, points the vendor process at that contract, and includes the contract + skill-manifest hashes in the receipt.
+Legal roles are:
 
-Review and verify seats are read-only. A vendor cannot review or verify work authored by the same vendor.
+- **implement** — scoped product writes; implementation/testing capabilities;
+- **review** — read-only review capability;
+- **verify** — read-only testing/evaluation capability;
+- **plan** — read-only planning/context capability;
+- **research** — read-only research/context capability.
+
+Routing, bridge, orchestration, distribution, assessment and retrospective skills are arbiter-only. Seats are leaf workers and cannot sub-dispatch.
+
+`tools/cli-skill-stage.js` copies only the seat's allow-listed skills into the dispatch evidence directory and writes a hash manifest. `dispatch-run.js` writes `SEAT-CONTRACT.md`, points the vendor process at that contract, and records contract/skill-manifest hashes in the receipt.
+
+## Permissions and review independence
+
+- OpenAI implement seats use `workspace-write`; every non-implement role is `read-only`.
+- Claude implement seats use the implementation permission path; non-implement roles use plan/read-only behavior.
+- Google/agy implement seats use the implementation permission path; non-implement roles use sandbox mode.
+
+A vendor cannot review or verify a unit that same vendor authored.
 
 ## Install
 
@@ -92,11 +100,9 @@ Review and verify seats are read-only. A vendor cannot review or verify work aut
 node C:\src\magi\tools\install-plugin.js
 ```
 
-The installer creates both local Cursor plugins and now copies the MAGI CLI runtime into the installed CLI plugin, including the matrix, seat-policy, proof, rules, binary-resolution, and skill-staging tools. The launcher no longer requires `C:\src\magi` merely to execute installed runtime code.
+The installer creates both local Cursor plugins and copies the MAGI CLI runtime into the installed CLI plugin, including matrix, seat-policy, proof, rules, binary-resolution, skill-staging, and model-availability tooling. The launcher no longer requires `C:\src\magi` merely to execute the installed runtime.
 
-The standing rules pack is still external and versioned under `ai-ops-vault`; set `MAGI_RULES_ROOT` when it is not at the default location.
-
-Then reload Cursor and enable **MAGI Cursor** and **MAGI Cursor CLI**.
+The standing rules pack remains external and versioned under `ai-ops-vault`; set `MAGI_RULES_ROOT` if it is not at the default location.
 
 ## `/magi-cli` front door
 
@@ -125,7 +131,7 @@ node tools\dispatch-run.js `
   --evidence-dir C:\path\evidence\api-001
 ```
 
-The transaction fails before vendor spend if the route, seat profile, required skills, or standing rules are invalid.
+The transaction fails before vendor spend if the route, seat profile, required staged skills, or standing rules are invalid.
 
 ## Evidence contract
 
@@ -144,36 +150,45 @@ receipt-ack.json
 handoff-envelope.json
 ```
 
-Vendor-native proof is mandatory:
+Proof semantics are deliberately explicit:
 
 - **OpenAI/Codex:** session ID, token usage, sandbox, observed model.
-- **Google/agy:** conversation ID, usage, response, exact observed model slug.
-- **Anthropic/Claude:** non-empty topical capture, requested model/effort evidence contract.
+- **Google/agy:** conversation ID, usage, response, exact observed model slug from the vendor run log.
+- **Anthropic/Claude:** healthy non-empty topical capture plus the requested model/effort. The current text-mode path labels identity evidence `requested-only`; it does not pretend the model identity was independently observed.
 
-## Distribution and review independence
+## Distribution and panels
 
-When MAGI is convened, real implementation work must reach all three available vendors. A seat convened and then starved is failed activation. The implementation distribution floor prevents one vendor from silently receiving more than 60% of eligible independent units when qualified alternatives exist.
+The ≤60% implementation floor applies when there are at least **two** implementation units. A one-unit implementation task is therefore legal.
 
-No vendor reviews or verifies its own authored unit. Position votes are tallied mechanically with `tools/position-tally.js`; Grok never votes.
+When MAGI is convened and implementation work exists, the plan must use `min(3, number of implementation units)` distinct implementation vendors:
+
+- 1 implementation unit → one implementation vendor;
+- 2 independent implementation units → two vendors;
+- 3+ independent implementation units → all three vendors when legal routes are available.
+
+Review-only, plan, research, or verification panels do not create fake implementation rows just to satisfy the floor.
+
+Position votes are tallied mechanically with `tools/position-tally.js`; Grok never votes.
 
 ## Rules
 
-The standing MAGI CLI rules live in `ai-ops-vault/projects/magi-cli-rules/`. `cli-rules-stage.js` copies the versioned pack beside a dispatch and records hashes. `cli-brief-rules-check.js` verifies the staged pack, concrete scope, correct vendor bridge, and vendor-specific requirements.
+The standing MAGI CLI rules live in `ai-ops-vault/projects/magi-cli-rules/`. `cli-rules-stage.js` copies the versioned pack beside a dispatch and records hashes. `cli-brief-rules-check.js` verifies the staged pack, concrete scope, seat-contract/skill-manifest references, role semantics, and vendor-specific requirements.
 
-Markdown documents explain policy. **Executable invariants live in code and machine-readable contracts.**
+Markdown explains policy. **Executable invariants live in code and machine-readable contracts.**
 
 ## Verification
 
 ```powershell
 npm test
 npm run check
+npm run check:cross-repo
 ```
 
-`npm run check` is the aggregate release gate for unit tests plus MAGI CLI contract checks.
+`npm run check` is the repository release gate. `check:cross-repo` compares the MAGI seat contract against `magi-kit` and the `ai-ops-vault` standing rules when all three repositories are available locally.
 
 ## Website
 
-The one-shot explanatory site is intentionally dependency-free:
+The one-shot explanatory site is dependency-free:
 
 ```text
 site/
@@ -183,7 +198,7 @@ site/
   architecture.svg
 ```
 
-The art is original project artwork using a retro-futurist anime command-system visual language; it is not an official Evangelion asset.
+The artwork is original project art using a retro-futurist anime command-system visual language; it is not an official Evangelion asset.
 
 ## Repository
 
