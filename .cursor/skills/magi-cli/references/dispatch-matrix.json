@@ -21,9 +21,9 @@
   "vendors": {
     "openai": {
       "models": {
-        "gpt-5.6-sol": { "efforts": ["low", "medium", "high", "xhigh", "max"], "tier": "frontier" },
-        "gpt-5.6-terra": { "efforts": ["low", "medium", "high", "xhigh", "max"], "tier": "balanced" },
-        "gpt-5.6-luna": { "efforts": ["none", "low", "medium", "high"], "tier": "throughput" }
+        "gpt-5.6-sol": { "efforts": ["none", "low", "medium", "high", "xhigh", "max"], "tier": "frontier" },
+        "gpt-5.6-terra": { "efforts": ["none", "low", "medium", "high", "xhigh", "max"], "tier": "balanced" },
+        "gpt-5.6-luna": { "efforts": ["none", "low", "medium", "high", "xhigh", "max"], "tier": "throughput" }
       }
     },
     "anthropic": {
