@@ -11,10 +11,11 @@ const DEFAULTS = Object.freeze({
   google: { model: 'gemini-3.1-pro-high', effort: null },
   anthropic: { model: 'fable', effort: 'xhigh' },
 });
+const READ_ONLY_ROLES = new Set(['review', 'verify', 'plan', 'research']);
 
 function roleSandbox(role) {
   if (role === 'implement') return 'workspace-write';
-  if (role === 'review' || role === 'verify') return 'read-only';
+  if (READ_ONLY_ROLES.has(role)) return 'read-only';
   throw new Error(`invalid role: ${role}`);
 }
 
@@ -126,4 +127,4 @@ function buildLaunch(opts) {
   throw new Error(`unsupported vendor: ${opts.vendor}`);
 }
 
-module.exports = { DEFAULTS, allowedWorkspace, anthropicLaunch, buildLaunch, googleLaunch, openaiLaunch, roleSandbox, seatPointerFile, seatPointerText };
+module.exports = { DEFAULTS, READ_ONLY_ROLES, allowedWorkspace, anthropicLaunch, buildLaunch, googleLaunch, openaiLaunch, roleSandbox, seatPointerFile, seatPointerText };
