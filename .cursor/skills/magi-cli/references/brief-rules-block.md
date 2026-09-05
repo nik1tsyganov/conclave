@@ -6,7 +6,7 @@ Paste into every MAGI CLI seat brief. `dispatch-run.js` stages the versioned rul
 STANDING RULES (MAGI CLI): Read staged STANDING.md and RULES/INDEX.md, then R01–R21. Delivery: pointer-only.
 SEAT: Read SEAT-CONTRACT.md and skills/skills-manifest.json before task work. Use only the staged skills listed by that contract.
 SCOPE: <replace with the concrete assigned work/read scope; no placeholder>.
-ROLE: <implement|review|verify>. Review/verify are read-only and must not modify product files.
+ROLE: <implement|review|verify|plan|research>. Every non-implement role is read-only and must not modify product files.
 Vendor: <codex|claude|agy> — casper_via=agy for Google. hostMode: cursor-cli. not CONCLAVE.
 MUST: WRITE AUDIT when role=implement; no C:\src\vault writes; no Gemini PAYG; leaf seat (no fan-out); SLICES≠vendors (R11).
 LIVE: R09 live-check. Claude dispatch requires R16 auth + headless probe status established by the arbiter before launch.
