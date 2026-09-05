@@ -148,7 +148,7 @@ The reporter reads and revalidates evidence. It writes only the new report direc
 
 An `AWAITING_ATTESTATION` state is incomplete. It is not a provider failure and cannot activate a change. Inspection and hash-bound acceptance are the expected continuation, not a retry. Actual terminal failures keep the original new-attempt rule.
 
-Successful dispatches link their verified evidence directories, including custom locations. Failed or invalid dispatches link the preserved transaction record; its evidence location is not presented as verified. Pending dispatches link the run directory.
+Successful dispatches link their verified evidence directories, including custom locations. Failed or invalid dispatches link the preserved transaction record; its evidence location is not presented as verified. A validated `AWAITING_ATTESTATION` checkpoint links its captured evidence directory without implying approval. Other unfinished dispatches link the run directory.
 
 Add `TRIAGE.md` alongside the generated report with:
 
