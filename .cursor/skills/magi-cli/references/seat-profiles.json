@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "updated": "2026-09-05",
   "principles": {
     "leafSeat": true,
@@ -9,7 +9,8 @@
     "implementWriteScopedToWorktree": true,
     "skillsAreAllowListed": true,
     "classExtrasAreAdditive": true,
-    "bridgesAreArbiterOnly": true
+    "bridgesAreArbiterOnly": true,
+    "proofMustDistinguishRequestedFromObserved": true
   },
   "arbiterSkills": [
     "engineering-orchestrator",
@@ -71,7 +72,8 @@
     "anthropic": {
       "roles": ["implement", "review", "verify", "plan", "research"],
       "writePermission": { "implement": "bypassPermissions", "review": "plan", "verify": "plan", "plan": "plan", "research": "plan" },
-      "proof": ["modelObserved", "effortObserved", "onTopic", "responseBytes"]
+      "proof": ["modelRequested", "effortRequested", "identityEvidence", "onTopic", "responseBytes"],
+      "proofCaveat": "Current Claude text-mode path proves the requested alias/effort and a healthy topical response, not vendor-native observed model identity. Do not label requested-only evidence as observed identity."
     },
     "google": {
       "roles": ["implement", "review", "verify", "plan", "research"],
