@@ -9,16 +9,18 @@ const { loadMatrix, routeAllowed, validatePlan } = require('./dispatch-matrix.js
 
 const matrix = loadMatrix();
 
-function availabilityFor(vendor, model, observedModel = model) {
-  return { vendors: { [vendor]: { models: { [model]: { available: observedModel === model, observedModel } } } } };
+function availabilityFor(vendor, model, observedModel = model, observedAt = new Date().toISOString()) {
+  return { vendors: { [vendor]: { models: { [model]: { available: observedModel === model, observedModel, observedAt } } } } };
 }
 function arbiter() { return { vendor: 'xai', model: 'grok-4.6', effort: 'high' }; }
 
-test('Astra is fail-closed until exact local model proof exists', () => {
+test('Astra is fail-closed until exact fresh local model proof exists', () => {
   const route = { class: 'extreme-end-to-end', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high' };
   assert.strictEqual(routeAllowed(matrix, route, {}).ok, false);
   assert.strictEqual(routeAllowed(matrix, route, availabilityFor('openai', 'gpt-6-astra')).ok, true);
   assert.strictEqual(routeAllowed(matrix, route, availabilityFor('openai', 'gpt-6-astra', 'gpt-5.6-sol')).ok, false);
+  const stale = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  assert.match(routeAllowed(matrix, route, availabilityFor('openai', 'gpt-6-astra', 'gpt-6-astra', stale)).reason, /stale/);
 });
 
 test('Astra escalation-only lanes require explicit reason', () => {
