@@ -133,9 +133,11 @@ After failure, include the captured failing command output:
 node tools/project-run-report.js --run-dir $magiRun --project-root $magiProject --output-dir $magiIssueDir --phase dispatch --error-file $magiFailureLog
 ```
 
-Use the actual failure phase: `preflight`, `probe`, `plan`, `dispatch`, `verify`, `review`, `finalize`, `activation`, or `project`. Set `$magiProject` to the actual product directory. Before a sealed run exists, pass the existing attempt directory as `--run-dir` and supply `--project-root`; the reporter cannot infer that boundary without a plan. Missing or broken seals are recorded as UNVERIFIED. For an activation or project-level failure after otherwise successful dispatches, `--error-file` preserves that failure in the report.
+Use the actual failure phase: `preflight`, `probe`, `plan`, `dispatch`, `verify`, `review`, `finalize`, `activation`, or `project`. Set `$magiProject` to the actual product directory. Before a sealed run exists, pass the existing attempt directory as `--run-dir`. Supply `--project-root` when a seal is missing or damaged; unverified plan paths cannot establish the product boundary. Missing or broken seals are recorded as UNVERIFIED. For an activation or project-level failure after otherwise successful dispatches, `--error-file` preserves that failure in the report.
 
 The reporter reads and revalidates evidence. It writes only the new report directory. It never changes receipts, native logs, telemetry, or activation decisions. Exit zero means the export succeeded; inspect the report's `status` separately. `NEEDS_ATTENTION` is expected for failed or incomplete attempts. Existing report directories cannot be overwritten.
+
+Successful dispatches link their verified evidence directories, including custom locations. Failed or invalid dispatches link the preserved transaction record; its evidence location is not presented as verified. Pending dispatches link the run directory.
 
 Add `TRIAGE.md` alongside the generated report with:
 

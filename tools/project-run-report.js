@@ -6,6 +6,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { inspectRun, assessRun } = require('./run-finalize.js');
+const { readSealedRun } = require('./plan-seal.js');
+const { transactionKey } = require('./dispatch-evidence.js');
 const { canonicalPlainPath, pathsOverlap, DEFAULT_ROOT } = require('./runtime-paths.js');
 
 const PHASES = ['preflight', 'probe', 'plan', 'dispatch', 'verify', 'review', 'finalize', 'activation', 'project'];
@@ -26,19 +28,16 @@ function createReport({ runDir, outputDir, phase = 'finalize', errorFile, projec
     if (!fs.statSync(product).isDirectory()) throw new Error('projectRoot must be an existing directory');
     protectedRoots.push(product);
   }
-  // Even a broken seal must not permit diagnostic writes into a declared product.
-  const planFile = path.join(root, 'dispatch-plan.json');
+  // Damaged or unsealed plan text cannot establish a product write boundary.
   let declaredPlan;
-  if (fs.existsSync(planFile)) {
-    try { declaredPlan = JSON.parse(fs.readFileSync(planFile, 'utf8')); } catch (error) {
-      // Malformed plans are reported below. Output must still be outside run/cwd/runtime.
-    }
+  try { declaredPlan = readSealedRun(root).plan; } catch (error) {
+    // An explicit product root is required below; integrity failure is reported later.
   }
   const declaredProducts = [];
   for (const entry of Array.isArray(declaredPlan?.dispatches) ? declaredPlan.dispatches : []) {
     if (typeof entry?.cwd === 'string' && path.isAbsolute(entry.cwd)) declaredProducts.push(canonicalPlainPath(entry.cwd));
   }
-  if (!projectRoot && !declaredProducts.length) throw new Error('--project-root is required before a plan declares product worktrees');
+  if (!projectRoot && !declaredProducts.length) throw new Error('--project-root is required when a valid sealed plan cannot establish product worktrees');
   protectedRoots.push(...declaredProducts);
   if (protectedRoots.some(protectedRoot => pathsOverlap(protectedRoot, destination))) throw new Error('outputDir must be outside the run, product, current directory, and runtime');
 
@@ -59,15 +58,17 @@ function createReport({ runDir, outputDir, phase = 'finalize', errorFile, projec
     dispatches = run.outcomes.map(outcome => {
       const entry = run.plan.dispatches.find(row => row.dispatchId === outcome.dispatchId);
       const execution = run.executions.find(row => row.entry.dispatchId === outcome.dispatchId);
+      const transactionPath = path.join(root, '.magi-dispatches', `${transactionKey(entry)}.json`);
       return { ...outcome, modelRequested: entry.model, effortRequested: entry.effort,
         modelObserved: execution?.proof.modelObserved ?? null,
         nativeId: execution?.proof.sessionId || execution?.proof.conversationId || null,
-        evidenceDir: path.join(root, 'out', outcome.dispatchId) };
+        evidenceDir: execution?.state.evidenceDir ?? null,
+        transactionPath: fs.existsSync(transactionPath) ? transactionPath : null };
     });
     for (const outcome of dispatches.filter(row => row.status !== 'PASS')) {
       issues.push({ kind: 'dispatch', dispatchId: outcome.dispatchId, unitId: outcome.unitId,
         status: outcome.status, message: outcome.error || `Dispatch is ${outcome.status}; no successful completion is proven.`,
-        evidencePath: outcome.evidenceDir });
+        evidencePath: outcome.evidenceDir || outcome.transactionPath || root });
     }
     for (const unit of assessment.units.filter(row => row.status === 'FAIL')) issues.push({ kind: 'approval', unitId: unit.unitId, status: unit.status, message: unit.reason });
   } catch (error) {

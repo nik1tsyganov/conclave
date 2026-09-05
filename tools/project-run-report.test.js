@@ -133,3 +133,42 @@ test('unknown and duplicate CLI options fail before creating output', () => {
     assert.equal(main(args, { stdout: { write() {} }, stderr: { write() {} } }), 2);
   }
 });
+
+test('a changed plan cannot redirect the reporter product boundary', t => {
+  const run = panel(t);
+  const file = path.join(run.runDir, 'dispatch-plan.json');
+  const plan = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const substitutedProduct = path.dirname(output(t));
+  for (const entry of plan.dispatches) entry.cwd = substitutedProduct;
+  fs.writeFileSync(file, JSON.stringify(plan));
+  const nested = path.join(run.cwd, 'unexpected-report');
+  assert.throws(() => createReport({ runDir: run.runDir, outputDir: nested }), /--project-root is required/);
+  assert.throws(() => createReport({ runDir: run.runDir, outputDir: nested, projectRoot: run.cwd }), /must be outside/);
+  assert.equal(fs.existsSync(nested), false);
+  const { report } = createReport({ runDir: run.runDir, outputDir: output(t), projectRoot: run.cwd });
+  assert.equal(report.status, 'NEEDS_ATTENTION');
+  assert.ok(report.issues.some(issue => issue.message === 'sealed run inputs changed'));
+});
+
+test('successful custom evidence directories and failed transactions have real report links', async t => {
+  const run = panel(t);
+  for (const row of run.dispatches) await runDispatch({ ...run.opts, dispatchId: row.dispatchId,
+    evidenceDir: path.join(run.runDir, 'custom-evidence', row.dispatchId) }, fakeVendor(() => {}, 'ACK fixture\nPOSITION: APPROVE'));
+  const { report } = createReport({ runDir: run.runDir, outputDir: output(t) });
+  assert.equal(report.status, 'PASS', JSON.stringify(report.issues));
+  for (const row of report.dispatches) {
+    assert.equal(row.evidenceDir, path.join(run.runDir, 'custom-evidence', row.dispatchId));
+    assert.ok(fs.existsSync(path.join(row.evidenceDir, 'proof.json')));
+    assert.ok(fs.existsSync(row.transactionPath));
+  }
+  const failed = panel(t);
+  const native = fakeVendor();
+  const launch = native.runLaunch;
+  native.runLaunch = async args => ({ ...await launch(args), ok: false, exitCode: 1 });
+  await assert.rejects(runDispatch({ ...failed.opts, dispatchId: 'd1', evidenceDir: path.join(failed.runDir, 'failed-custom') }, native));
+  const { report: failedReport } = createReport({ runDir: failed.runDir, outputDir: output(t) });
+  const issue = failedReport.issues.find(row => row.dispatchId === 'd1');
+  assert.ok(fs.existsSync(issue.evidencePath));
+  assert.equal(JSON.parse(fs.readFileSync(issue.evidencePath, 'utf8')).evidenceDir, path.join(failed.runDir, 'failed-custom'));
+  assert.equal(failedReport.dispatches[0].evidenceDir, null);
+});
