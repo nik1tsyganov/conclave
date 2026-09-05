@@ -1,0 +1,44 @@
+name: MAGI verification
+
+on:
+  push:
+    branches: [fix/magi-cli-hardening]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: magi-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Archive exact committed source (no git credentials or runtime files)
+        if: runner.os == 'Linux'
+        run: git archive --format=zip --output=source-snapshot.zip HEAD
+      - name: Repository tests and release checks (no vendor invocation)
+        run: npm run check
+      - name: Preserve private source snapshot for reproducible verification
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-${{ github.sha }}
+          path: source-snapshot.zip
+          if-no-files-found: error
+          retention-days: 3
