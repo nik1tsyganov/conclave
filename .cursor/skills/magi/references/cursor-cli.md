@@ -6,7 +6,9 @@ Run commands from the runtime root, where `tools/` exists. The source checkout s
 
 ## Establish the local prerequisites
 
-Run `magi-whoami --mode cursor-cli --slug <picker slug>` in Cursor. It checks the declared host route; it does not attest the actual host model. Grok 4.6 is the non-voting arbiter. It may classify, compose briefs, seal plans, dispatch, collect evidence, and request deterministic tallies. Substantive implementation, planning, research, verification, review, repair, and votes belong to vendor seats.
+From the runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6`. It compares the declared mode and exact slug with the runtime matrix; it does not prove the actual picker or host model. The command returns `LEGAL` with exit 0, rejects forbidden declarations with exit 1, and rejects missing, duplicate, unknown, or malformed arguments with exit 2.
+
+Grok 4.6 is the non-voting arbiter. It may classify, compose briefs, seal plans, dispatch, collect evidence, and request deterministic tallies. Substantive implementation, planning, research, verification, review, repair, and votes belong to vendor seats.
 
 Set the external rule-pack path explicitly:
 

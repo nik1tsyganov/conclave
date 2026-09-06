@@ -45,7 +45,7 @@ The [CLI run guide](.cursor/skills/magi-cli/references/cursor-cli.md) contains t
 
 For real projects, give Cursor the [project-run handoff](.cursor/skills/magi-cli/references/project-runs.md). It includes a bounded launch prompt and a durable failure-recording process. The rules-path example above uses YESSIR's installed pack; other machines must supply their verified external v2 pack.
 
-1. Check the declared Cursor arbiter route with `magi-whoami --mode cursor-cli --slug <picker slug>`.
+1. Check the declared Cursor arbiter route with `node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6`. This checks the declaration, not the actual picker.
 2. Run `tools/magi-cli-preflight.js` with the external rules pack.
 3. Perform a live check on the executing host. Use `claude auth status` for Claude and native probes for every intended model/effort.
 4. Write the complete dispatch plan with immutable brief hashes, roles, worktrees, scopes, author provenance, and any escalation reason.

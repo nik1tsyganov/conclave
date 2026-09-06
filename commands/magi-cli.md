@@ -5,7 +5,7 @@ description: Start or continue a plan-bound MAGI Cursor CLI run. Not CONCLAVE an
 
 # /magi-cli
 
-If the chat is CONCLAVE, open a separate MAGI chat. Run `magi-whoami --mode cursor-cli --slug <picker slug>`. Stop unless the declared route is LEGAL.
+If the chat is CONCLAVE, open a separate MAGI chat. From the MAGI runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6`. Stop unless the declared route is LEGAL. This checks the declaration against the runtime matrix; it does not prove the actual picker.
 
 Read the MAGI CLI skill and its co-located `references/cursor-cli.md`, `dispatch-matrix.json`, `seat-profiles.json`, and `brief-rules-block.md`. The run guide contains the complete command arguments and plan-field contract.
 
