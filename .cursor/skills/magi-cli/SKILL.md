@@ -7,7 +7,7 @@ description: Plan-bound MAGI Cursor CLI mode. Grok 4.6 is the non-voting arbiter
 
 ## Identity and authority
 
-Run `magi-whoami --mode cursor-cli --slug <picker slug>`. Stop unless the declared route is LEGAL. This declaration check does not attest the actual host model.
+From the MAGI runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6`. Stop unless the declared route is LEGAL. This declaration check uses the runtime matrix; it does not prove the actual picker or host model.
 
 Grok 4.6 coordinates the run. It classifies work, writes briefs and complete plans, invokes the deterministic runtime, and requests finalization and tallying. It never performs substantive implementation, repair, planning, research, review, verification, or voting as a seat.
 

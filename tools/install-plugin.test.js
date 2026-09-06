@@ -297,3 +297,43 @@ test('installed runtime loads contracts, all entry-point dependencies, and bundl
   assert.ok(evidence.skills >= 11);
   t.diagnostic(JSON.stringify(evidence));
 });
+
+test('documented startup command works without source or home policy in an isolated CLI install', t => {
+  const f = sourceFixture(t);
+  install(f);
+  const moved = path.join(f.root, 'source-unavailable');
+  assert.strictEqual(path.dirname(f.source), f.root);
+  assert.strictEqual(path.dirname(moved), f.root);
+  fs.renameSync(f.source, moved);
+  const home = path.join(f.root, 'empty-home');
+  fs.mkdirSync(home);
+  const guard = path.join(f.root, 'startup-guard.cjs');
+  put(guard, `
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const Module = require('node:module');
+    const child = require('node:child_process');
+    const installedRoot = fs.realpathSync.native(process.cwd());
+    const within = file => { const rel = path.relative(installedRoot, fs.realpathSync.native(file)); if (rel === '..' || rel.startsWith('..' + path.sep) || path.isAbsolute(rel)) throw new Error('read outside installed runtime: ' + file); };
+    const read = fs.readFileSync;
+    fs.readFileSync = function(file, ...args) { within(path.resolve(String(file))); return read.call(this, file, ...args); };
+    const resolve = Module._resolveFilename;
+    Module._resolveFilename = function(...args) { const file = resolve.apply(this, args); if (path.isAbsolute(file)) within(file); return file; };
+    for (const name of ['exec', 'execSync', 'execFile', 'execFileSync', 'spawn', 'spawnSync', 'fork']) child[name] = () => { throw new Error('child calls forbidden'); };
+  `);
+  const before = snapshot(f.installed);
+  const command = 'node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6';
+  const result = spawnSync(process.execPath, command.split(' ').slice(1), {
+    cwd: f.installed, env: { ...process.env, HOME: home, USERPROFILE: home, NODE_OPTIONS: `--require "${guard.replaceAll('\\', '/')}"` },
+    input: '', encoding: 'utf8', timeout: 30000, windowsHide: true, shell: false,
+  });
+  assert.strictEqual(result.status, 0, result.stderr || result.error?.message);
+  assert.match(result.stdout, /^LEGAL\b/);
+  assert.match(result.stdout, /declaration only.*not proof of the actual picker/i);
+  const guide = fs.readFileSync(path.join(f.installed, 'skills/magi-cli/references/cursor-cli.md'), 'utf8');
+  assert.ok(guide.includes(command), 'the tested startup command must appear literally in the installed guide');
+  assert.deepStrictEqual(snapshot(f.installed), before);
+  assert.deepStrictEqual(snapshot(home), []);
+  assert.strictEqual(fs.existsSync(f.source), false);
+  t.diagnostic(JSON.stringify({ command, exitCode: result.status, stdout: result.stdout.trim(), sourceAvailable: false, homeFiles: 0 }));
+});

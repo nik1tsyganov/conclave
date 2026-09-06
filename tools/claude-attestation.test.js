@@ -472,3 +472,55 @@ test('saved launch destination corruption cannot append into native evidence dur
   assert.equal(inspectRun(run.runDir).outcomes[0].status, 'INVALID');
   assert.equal(native.calls(), 1);
 });
+
+async function interruptAcceptance(t, boundary) {
+  const run = claudeRun(t); const native = fakeVendor();
+  const pending = await runDispatch(command(run), native);
+  const { file, state } = saved(run);
+  const targets = { receipt: path.join(state.evidenceDir, 'receipt-ack.json'), handoff: path.join(state.evidenceDir, 'handoff-envelope.json'), commit: file,
+    telemetry: state.receipt.logDestinations.telemetryLog, activation: state.receipt.logDestinations.activationLog };
+  const rename = fs.renameSync, append = fs.appendFileSync;
+  let injected = false;
+  const inject = target => {
+    if (!injected && path.resolve(target) === targets[boundary]) { injected = true; throw Object.assign(new Error(`synthetic ${boundary} write failure`), { code: 'EIO' }); }
+  };
+  fs.renameSync = function(from, to) { inject(to); return rename.apply(this, arguments); };
+  fs.appendFileSync = function(to) { inject(to); return append.apply(this, arguments); };
+  try { await assert.rejects(accept(run, pending, native), /synthetic .* write failure/); }
+  finally { fs.renameSync = rename; fs.appendFileSync = append; }
+  assert.equal(injected, true); assert.equal(saved(run).state.status, 'AWAITING_ATTESTATION');
+  return { run, native, pending };
+}
+
+test('interrupted receipt handoff log and transaction writes resume the exact attestation without another child', async t => {
+  for (const boundary of ['receipt', 'handoff', 'telemetry', 'activation', 'commit']) {
+    const { run, native, pending } = await interruptAcceptance(t, boundary);
+    const attestationPath = path.join(path.dirname(pending.capturePath), 'attestation.json');
+    const attestationHash = hashFile(attestationPath);
+    const result = await accept(run, pending, native);
+    assert.equal(result.ok, true); assert.equal(result.proofId, pending.proofId);
+    assert.equal(hashFile(attestationPath), attestationHash);
+    assert.equal((await accept(run, pending, native)).replayed, true);
+    assert.equal(native.calls(), 1); assert.equal(inspectRun(run.runDir).outcomes[0].status, 'PASS');
+    for (const log of saved(run).state.logs) assert.deepEqual(fs.readFileSync(log, 'utf8').trim().split('\n').map(JSON.parse), [result.telemetry]);
+  }
+});
+
+test('interrupted acceptance refuses altered bindings and current evidence before restoring any receipt', async t => {
+  for (const mutation of ['entry', 'capture', 'workspace', 'attestation', 'receipt']) {
+    const { run, native, pending } = await interruptAcceptance(t, 'handoff');
+    const { file, state } = saved(run);
+    if (mutation === 'entry') { state.entry.unitId = 'different-unit'; writeJson(file, state); }
+    if (mutation === 'capture') fs.appendFileSync(pending.capturePath, 'changed');
+    if (mutation === 'workspace') fs.appendFileSync(path.join(run.cwd, 'result.txt'), 'changed');
+    if (mutation === 'attestation') {
+      const target = path.join(state.evidenceDir, 'attestation.json');
+      writeJson(target, { ...JSON.parse(fs.readFileSync(target)), captureSha256: '0'.repeat(64) });
+    }
+    if (mutation === 'receipt') fs.appendFileSync(path.join(state.evidenceDir, 'receipt-ack.json'), 'changed');
+    const before = snapshotWorkspace(run.runDir);
+    await assert.rejects(accept(run, pending, native), /changed|differs|disagrees|match|belongs/);
+    assert.deepEqual(snapshotWorkspace(run.runDir), before);
+    assert.equal(native.calls(), 1); assert.equal(saved(run).state.status, 'AWAITING_ATTESTATION');
+  }
+});

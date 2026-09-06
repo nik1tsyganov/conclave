@@ -7,6 +7,7 @@ const { EventEmitter } = require('node:events');
 const { PassThrough } = require('node:stream');
 const { runLaunch } = require('./cli-runner.js');
 const { temporary } = require('./test-fixtures.js');
+const { spawn } = require('node:child_process');
 
 function childFixture() {
   const child = new EventEmitter(); child.pid = 4123; child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
@@ -37,7 +38,8 @@ test('nonzero exits, failed spawn and unconfirmed termination fail closed', asyn
   const child = childFixture();
   const promise = runLaunch({ vendor: 'openai', binary: 'fixture', args: [] }, { spawn: () => child });
   child.emit('close', 7); assert.equal((await promise).ok, false);
-  const bad = childFixture(); const missing = runLaunch({ vendor: 'openai', binary: 'absent', args: [] }, { spawn: () => bad });
+  const bad = childFixture(); delete bad.pid;
+  const missing = runLaunch({ vendor: 'openai', binary: 'absent', args: [] }, { spawn: () => bad });
   bad.emit('error', Object.assign(new Error('missing'), { code: 'ENOENT' })); await assert.rejects(missing, { code: 'ENOENT' });
   await assert.rejects(runLaunch({ vendor: 'google', binary: 'fixture', args: [] }, { spawn: childFixture, maxWallMs: 5, pollMs: 5, killGraceMs: 10, sampleCpuMs: () => 1, kill: () => {} }), { code: 'CHILD_EXIT_UNCONFIRMED' });
 });
@@ -45,4 +47,33 @@ test('CPU-idle detection handles buffered output without a stdio-only kill', asy
   const child = childFixture();
   const result = await runLaunch({ vendor: 'anthropic', binary: 'fixture', args: [] }, { spawn: () => child, maxWallMs: 500, pollMs: 5, idleCpuMs: 10, idleStdioMs: 5, sampleCpuMs: () => 10, kill: () => setImmediate(() => child.emit('close', 1)) });
   assert.equal(result.killReason, 'idle-cpu');
+});
+
+test('PID persistence failure terminates its owned real Node child and waits for close', async t => {
+  const root = temporary(t); let child; let closed = false;
+  t.after(() => { if (child && !closed) child.kill('SIGKILL'); });
+  let closePromise;
+  await assert.rejects(runLaunch({ vendor: 'google', binary: process.execPath, args: ['-e', 'setTimeout(() => process.exit(0), 10000)'], cwd: root }, {
+    spawn: (...args) => { child = spawn(...args); closePromise = new Promise(resolve => child.once('close', () => { closed = true; resolve(); })); return child; },
+    kill: pid => { assert.equal(pid, child.pid); child.kill('SIGKILL'); },
+    pidFile: path.join(root, 'missing-parent', 'child.pid'), killGraceMs: 5000,
+  }), error => error.code === 'ENOENT' && error.exitConfirmed === true && error.pid === child.pid && closed);
+  await closePromise; // The benign fixture expires itself even when termination is denied.
+  assert.equal(closed, true);
+  assert.throws(() => process.kill(child.pid, 0), { code: 'ESRCH' });
+});
+
+test('output persistence errors wait for close or explicitly report unconfirmed exit', async t => {
+  const root = temporary(t);
+  for (const confirmsExit of [true, false]) {
+    const child = childFixture(); let kills = 0; let closed = false;
+    const result = runLaunch({ vendor: 'google', binary: 'fixture', args: [] }, {
+      spawn: () => child, stdoutFile: root, sampleCpuMs: () => null, killGraceMs: 15,
+      kill: () => { kills++; if (confirmsExit) setImmediate(() => { closed = true; child.emit('close', 1); }); },
+    });
+    child.stdout.emit('data', Buffer.from('output'));
+    await assert.rejects(result, error => confirmsExit ? error.code === 'EISDIR' && error.exitConfirmed === true && closed : error.code === 'CHILD_EXIT_UNCONFIRMED' && error.exitConfirmed === false && error.pid === child.pid);
+    assert.equal(kills, 1);
+    if (!confirmsExit) child.emit('close', 1);
+  }
 });

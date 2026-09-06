@@ -107,7 +107,14 @@ function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
     }
   }
   if (!validId(plan.planId)) throw policyError('planId must be a safe non-empty identifier');
+  const checkedUnits = new Map();
   for (const route of plan.dispatches) {
+    if (['review', 'verify'].includes(route.role)) {
+      const previous = checkedUnits.get(route.unitId);
+      if (previous && previous.authorVendor !== route.authorVendor) throw policyError(`conflicting authorVendor for ${route.unitId}`);
+      if (previous && path.resolve(previous.cwd) !== path.resolve(route.cwd)) throw policyError(`check worktrees differ for ${route.unitId}`);
+      checkedUnits.set(route.unitId, route);
+    }
     if (['review', 'verify'].includes(route.role) && authors.has(route.unitId) && authors.get(route.unitId) !== route.authorVendor) throw policyError(`authorVendor contradicts implementation for ${route.unitId}`);
   }
   for (const author of implement) {

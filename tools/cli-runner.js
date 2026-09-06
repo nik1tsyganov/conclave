@@ -19,7 +19,6 @@ function runLaunch(launch, options = {}) {
       stdio: launch.stdio || ['pipe', 'pipe', 'pipe'],
     });
     const pid = child.pid;
-    if (options.pidFile) fs.writeFileSync(options.pidFile, `${pid}\n`, 'utf8');
     let stdout = '';
     let stderr = '';
     let settled = false;
@@ -31,6 +30,7 @@ function runLaunch(launch, options = {}) {
     let timer;
     let killTimer;
     let killReason = null;
+    let failureError = null;
     const decoders = { stdout: new StringDecoder('utf8'), stderr: new StringDecoder('utf8') };
 
     function killRecordedPid() {
@@ -56,38 +56,35 @@ function runLaunch(launch, options = {}) {
     }
     function collect(which) {
       return (chunk) => {
+        if (settled) return;
         const text = decoders[which].write(Buffer.from(chunk));
         if (which === 'stdout') stdout += text; else stderr += text;
         stdioBytes += Buffer.byteLength(chunk);
         lastStdioAtMs = Date.now();
         try { if (options[`${which}File`]) { assertPlainPath(options[`${which}File`]); fs.appendFileSync(options[`${which}File`], chunk); } }
-        catch (error) { killRecordedPid(); fail(error); }
+        catch (error) { requestKill('io-error', error); }
       };
     }
     if (child.stdout) child.stdout.on('data', collect('stdout'));
     if (child.stderr) child.stderr.on('data', collect('stderr'));
-    if (child.stdin) child.stdin.once('error', (error) => { if (error.code !== 'EPIPE') { killRecordedPid(); fail(error); } });
-    child.once('error', fail);
-
-    const stdinMode = (launch.stdio || ['pipe'])[0];
-    if (stdinMode !== 'ignore' && launch.stdinFile && child.stdin) {
-      const stream = fs.createReadStream(launch.stdinFile);
-      stream.once('error', (error) => { killRecordedPid(); fail(error); });
-      stream.pipe(child.stdin);
-    } else if (stdinMode !== 'ignore' && child.stdin) {
-      child.stdin.end();
-    }
+    if (child.stdin) child.stdin.once('error', (error) => { if (error.code !== 'EPIPE') requestKill('io-error', error); });
+    child.once('error', (error) => {
+      if (Number.isInteger(pid)) requestKill('process-error', error);
+      else fail(error); // A failed spawn has no child to terminate.
+    });
 
     const pollMs = options.pollMs ?? 1000;
-    function requestKill(reason) {
+    function requestKill(reason, error) {
       if (settled || killReason) return;
       killReason = reason;
+      failureError = error || null;
+      killTimer = setTimeout(() => fail(Object.assign(new Error('child exit was not confirmed after termination', { cause: failureError }), { code: 'CHILD_EXIT_UNCONFIRMED', pid, exitConfirmed: false })), options.killGraceMs ?? 10000);
       killRecordedPid();
-      killTimer = setTimeout(() => fail(Object.assign(new Error('child exit was not confirmed after termination'), { code: 'CHILD_EXIT_UNCONFIRMED' })), options.killGraceMs ?? 10000);
     }
     function cancel() { requestKill('cancelled'); }
     options.signal?.addEventListener('abort', cancel, { once: true });
     timer = setInterval(() => {
+      if (settled || killReason) return;
       const nowMs = Date.now();
       const cpuMs = (options.sampleCpuMs || sampleCpuMs)(pid);
       if (typeof cpuMs === 'number' && Number.isFinite(cpuMs)) {
@@ -113,8 +110,20 @@ function runLaunch(launch, options = {}) {
 
     child.once('close', (code) => {
       if (settled) return;
+      if (failureError) { fail(Object.assign(failureError, { pid, exitConfirmed: true })); return; }
       finish({ ok: code === 0 && !killReason, exitCode: code ?? 1, killed: Boolean(killReason), killReason, exitConfirmed: true });
     });
+    // Every post-spawn write runs with cleanup and close listeners installed.
+    try {
+      if (options.pidFile && Number.isInteger(pid)) fs.writeFileSync(options.pidFile, `${pid}\n`, 'utf8');
+      const stdinMode = (launch.stdio || ['pipe'])[0];
+      if (stdinMode !== 'ignore' && launch.stdinFile && child.stdin) {
+        const stream = fs.createReadStream(launch.stdinFile);
+        stream.once('error', (error) => requestKill('io-error', error));
+        stream.pipe(child.stdin);
+      } else if (stdinMode !== 'ignore' && child.stdin) child.stdin.end();
+    } catch (error) { requestKill('io-error', error); }
+    if (options.signal?.aborted) cancel();
   });
 }
 

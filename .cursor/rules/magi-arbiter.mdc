@@ -4,7 +4,7 @@ alwaysApply: true
 ---
 This file applies to MAGI runs. Ignore it in CONCLAVE (`/conclave`, `camerlengo-8`) and unrelated chats.
 
-Declare the mode with `magi-whoami` (`cursor` or `cursor-cli`). This checks the declared route, not the actual host model. For operational status, use a current check as described in [live-check.mdc](live-check.mdc).
+For native Cursor mode, declare the route with the existing `magi-whoami` (`cursor`) check. For `cursor-cli`, use the runtime-local command below. These checks declare the route, not the actual host model. For operational status, use a current check as described in [live-check.mdc](live-check.mdc).
 
 ## Arbiter boundary
 
@@ -16,6 +16,8 @@ Declare the mode with `magi-whoami` (`cursor` or `cursor-cli`). This checks the 
 ## Cursor CLI only
 
 For `hostMode: cursor-cli` or `/magi-cli`, use the [MAGI CLI skill](../skills/magi-cli/SKILL.md) and its [run procedure](../skills/magi-cli/references/cursor-cli.md). Its dispatch matrix selects legal vendor/model/effort combinations by role and class. Grok 4.6 is the non-voting arbiter; substantive planning and research also belong to vendor seats.
+
+From the runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6`. Stop unless it returns `LEGAL` with exit 0. This validates the declaration against the runtime matrix; it does not prove the actual picker.
 
 Before the first production dispatch:
 

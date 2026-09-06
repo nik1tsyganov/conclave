@@ -62,9 +62,11 @@ On YESSIR's machine, the installed runtime is:
 $magiRuntime = Join-Path $env:USERPROFILE '.cursor/plugins/local/magi-cursor-cli'
 $magiRules = Join-Path $env:USERPROFILE '.cursor/magi-rules/v2'
 Set-Location -LiteralPath $magiRuntime
-node (Join-Path $env:USERPROFILE '.claude/skills/magi-mode/references/magi-whoami.js') --mode cursor-cli --slug cursor-grok-4.6-high-fast
+node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6
 node tools/magi-cli-preflight.js --rules-root $magiRules
 ```
+
+The startup command checks the declared route against the installed matrix. It does not prove the actual Cursor picker.
 
 Use the installed runtime for project work. The old `C:/src/ai-ops-vault` checkout on this machine can carry an earlier rules pack. Do not substitute it for the installed v2 pack. Preflight must prove the STANDING v2 fingerprint and exactly R01–R22.
 

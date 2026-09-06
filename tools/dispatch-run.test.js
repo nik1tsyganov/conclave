@@ -92,6 +92,34 @@ test('valid launch records scope and native evidence; retry returns the same tra
   await assert.rejects(runDispatch(opts, native), /committed evidence changed/);
 });
 
+test('completed non-Claude replays use launch-time probes while unstarted work still needs fresh probes', async t => {
+  for (const entry of [{}, { role: 'review', class: 'review-adversarial', vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', authorVendor: 'openai' }]) {
+    const run = createSealedRun(t, [entry]); const unstarted = createSealedRun(t, [entry]);
+    const native = fakeVendor(); const noChild = fakeVendor(); const opts = { ...run.opts, dispatchId: 'd1' };
+    const first = await runDispatch(opts, native);
+    const now = Date.now; const future = now() + 61 * 60 * 1000;
+    Date.now = () => future;
+    try {
+      const replay = await runDispatch(opts, native);
+      assert.equal(replay.replayed, true); assert.equal(replay.proofId, first.proofId);
+      await assert.rejects(runDispatch({ ...unstarted.opts, dispatchId: 'd1' }, noChild), /stale|availability/);
+      fs.appendFileSync(path.join(run.runDir, 'out/d1/capture.txt'), 'tamper');
+      await assert.rejects(runDispatch(opts, native), /committed evidence changed/);
+    } finally { Date.now = now; }
+    assert.equal(native.calls(), 1); assert.equal(noChild.calls(), 0);
+  }
+});
+
+test('unconfirmed child termination records an incomplete workspace audit and blocks the dispatch', async t => {
+  const run = createSealedRun(t); const native = fakeVendor();
+  native.runLaunch = async () => { throw Object.assign(new Error('child exit was not confirmed after termination'), { code: 'CHILD_EXIT_UNCONFIRMED', pid: 4123, exitConfirmed: false }); };
+  await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1' }, native), { code: 'CHILD_EXIT_UNCONFIRMED' });
+  const failure = JSON.parse(fs.readFileSync(path.join(run.runDir, 'out/d1/receipt-ack.json')));
+  assert.equal(failure.status, 'FAIL'); assert.equal(failure.scopeAudit.incomplete, true);
+  assert.equal(failure.scopeAudit.exitConfirmed, false); assert.equal(failure.scopeAudit.childPid, 4123);
+  await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1' }, native), /logical dispatch is FAIL/);
+});
+
 test('read-only or out-of-scope writes fail and cannot produce successful telemetry', async (t) => {
   for (const entry of [{}, { role: 'verify', class: 'test-verification', authorVendor: 'anthropic' }]) {
     const run = createSealedRun(t, [entry]);

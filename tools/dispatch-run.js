@@ -118,9 +118,52 @@ function checkpointResult(state, replayed) {
     captureSha256: state.receipt.captureSha256 };
 }
 
+function recoverAttestation(run, entry, state, captureSha256) {
+  const directory = state.evidenceDir;
+  const attestationPath = path.join(directory, 'attestation.json');
+  if (!fs.existsSync(attestationPath)) return null;
+  assertPlainPath(attestationPath);
+  if (state.status !== AWAITING_ATTESTATION || !inside(directory, run.root) || run.plan.dispatches.some(row => inside(directory, row.cwd))) throw policyError('invalid interrupted attestation directory');
+  const checkpointPath = path.join(directory, 'checkpoint.json');
+  const checkpoint = JSON.parse(fs.readFileSync(checkpointPath, 'utf8'));
+  const attestation = JSON.parse(fs.readFileSync(attestationPath, 'utf8'));
+  const { acceptedAt, ...binding } = attestation;
+  const expected = { schemaVersion: 1, protocol: ATTESTATION_PROTOCOL, decision: 'ON_TOPIC', planId: state.planId, planHash: state.planHash,
+    dispatchId: entry.dispatchId, unitId: entry.unitId, proofId: state.receipt.proofId, captureSha256, checkpointSha256: hashFile(checkpointPath) };
+  if (JSON.stringify(binding) !== JSON.stringify(expected) || !Number.isFinite(Date.parse(acceptedAt)) || !Number.isFinite(Date.parse(checkpoint.recordedAt)) ||
+      Date.parse(acceptedAt) < Date.parse(checkpoint.recordedAt) || Date.parse(acceptedAt) > Date.now()) throw policyError('uncommitted attestation does not match the protected checkpoint');
+  const receiptPath = path.join(directory, 'receipt-ack.json');
+  const handoffPath = path.join(directory, 'handoff-envelope.json');
+  const telemetryLog = state.receipt.logDestinations?.telemetryLog;
+  const projections = new Map([[receiptPath, state.receipt], [handoffPath, { ...state.receipt, telemetryLog }]]);
+  const restores = [];
+  // Only the two deterministic receipt projections may differ. Their original bytes
+  // must still match the authoritative pending transaction's recorded hashes.
+  for (const [file, pending] of projections) {
+    assertPlainPath(file);
+    const text = `${JSON.stringify(pending, null, 2)}\n`;
+    const items = state.artifacts.filter(item => item.path === file);
+    if (items.length !== 1 || items[0].sha256 !== hashText(text)) throw policyError('interrupted attestation has no original receipt binding');
+    const current = fs.readFileSync(file, 'utf8');
+    const completed = `${JSON.stringify({ ...pending, status: 'PASS' }, null, 2)}\n`;
+    if (current !== text && current !== completed) throw policyError('interrupted attestation receipt changed unexpectedly');
+    if (current !== text) restores.push([file, pending]);
+  }
+  for (const item of state.artifacts) {
+    assertPlainPath(item.path);
+    if (item.path === attestationPath || (!projections.has(item.path) && hashFile(item.path) !== item.sha256)) throw policyError('protected checkpoint evidence changed during interrupted attestation');
+  }
+  validateLogDestinations(run, state.logs, directory, state.artifacts.map(item => item.path));
+  // Validate the complete checkpoint without writes, treating only these exact
+  // receipt projections as pending. Restore nothing until every check passes.
+  verifyCheckpoint(run, entry, state, { current: true, allowReceiptProjections: true });
+  for (const [file, pending] of restores) atomicJson(file, pending);
+  return attestation;
+}
+
 function acceptCheckpoint(run, entry, transaction, captureSha256) {
   if (captureSha256 !== transaction.state.receipt.captureSha256) throw policyError('attestation capture hash does not match the checkpoint');
-  verifyCheckpoint(run, entry, transaction.state, { current: true });
+  if (!fs.existsSync(path.join(transaction.state.evidenceDir, 'attestation.json'))) verifyCheckpoint(run, entry, transaction.state, { current: true });
   const lock = `${transaction.file}.attestation.lock`;
   assertPlainPath(lock);
   let handle;
@@ -133,18 +176,18 @@ function acceptCheckpoint(run, entry, transaction, captureSha256) {
       if (captureSha256 !== state.receipt.captureSha256) throw policyError('attestation capture hash does not match the committed capture');
       return { ok: true, replayed: true, proofId: state.receipt.proofId, receipt: state.receipt, telemetry: state.telemetry };
     }
+    const recovered = recoverAttestation(run, entry, state, captureSha256);
     const execution = verifyCheckpoint(run, entry, state, { current: true });
     if (captureSha256 !== state.receipt.captureSha256) throw policyError('attestation capture hash does not match the checkpoint');
     const attestationPath = path.join(state.evidenceDir, 'attestation.json');
-    if (fs.existsSync(attestationPath)) throw policyError('uncommitted attestation artifact already exists');
-    const attestation = { schemaVersion: 1, protocol: ATTESTATION_PROTOCOL, decision: 'ON_TOPIC', planId: state.planId, planHash: state.planHash,
+    const attestation = recovered || { schemaVersion: 1, protocol: ATTESTATION_PROTOCOL, decision: 'ON_TOPIC', planId: state.planId, planHash: state.planHash,
       dispatchId: entry.dispatchId, unitId: entry.unitId, proofId: state.receipt.proofId, captureSha256,
       checkpointSha256: hashFile(path.join(state.evidenceDir, 'checkpoint.json')), acceptedAt: new Date().toISOString() };
     const receipt = { ...state.receipt, status: 'PASS' };
     const telemetry = validateDispatchRow({ ...state.telemetry, status: 'PASS' }, { requireCursorCli: true, requireArbiter: true, requireDispatchId: true, requireUnitId: true, requireProof: true });
     const handoffPath = path.join(state.evidenceDir, 'handoff-envelope.json');
     const { telemetryLog } = JSON.parse(fs.readFileSync(handoffPath, 'utf8'));
-    atomicJson(attestationPath, attestation);
+    if (!recovered) atomicJson(attestationPath, attestation);
     atomicJson(path.join(state.evidenceDir, 'receipt-ack.json'), receipt);
     atomicJson(handoffPath, { ...receipt, telemetryLog });
     const rewritten = [path.join(state.evidenceDir, 'receipt-ack.json'), handoffPath];
@@ -204,8 +247,11 @@ async function runDispatch(opts, dependencies = {}) {
     if (!savedState || ![AWAITING_ATTESTATION, 'PASS'].includes(savedState.status) || savedState.attestationProtocol !== ATTESTATION_PROTOCOL) throw policyError('post-run attestation requires an existing Claude checkpoint; premature attestation cannot launch a child');
     if (savedState.receipt?.captureSha256 !== opts.captureSha256) throw policyError('attestation capture hash does not match the checkpoint');
   }
-  // A finished Claude child keeps its proven launch-time availability. This path never launches.
-  const resumeAt = postRun && savedState?.attestationProtocol === ATTESTATION_PROTOCOL && [AWAITING_ATTESTATION, 'PASS'].includes(savedState.status) ? Date.parse(savedState.startedAt) : undefined;
+  // Completed evidence keeps its proven launch-time availability. These paths never launch.
+  const resuming = savedState?.status === 'PASS' || (postRun && savedState?.attestationProtocol === ATTESTATION_PROTOCOL && savedState.status === AWAITING_ATTESTATION);
+  if (savedState?.status === 'PASS') verifyExecution(sealed, planEntry, savedState);
+  const resumeAt = resuming ? Date.parse(savedState.startedAt) : undefined;
+  if (resuming && !Number.isFinite(resumeAt)) throw policyError('completed dispatch is missing its launch time');
   const binding = bindDispatch(opts, matrix, availability, resumeAt);
   if (inside(binding.planPath, cwd)) throw policyError('dispatch plan must be outside the product worktree');
   opts = { ...opts, ...binding.entry, cwd, planHash: binding.planHash, planId: binding.plan.planId };
@@ -414,6 +460,10 @@ async function runDispatch(opts, dependencies = {}) {
   atomicJson(transaction.file, { ...transaction.state, status: 'PASS', receipt, telemetry, artifacts, logs, completedAt: new Date().toISOString() });
   return { ok: true, proofId, receipt, telemetry };
   } catch (error) {
+    if (error.code === 'CHILD_EXIT_UNCONFIRMED' || error.exitConfirmed === false) {
+      scopeAudit = { ok: false, incomplete: true, exitConfirmed: false, childPid: error.pid,
+        error: 'Child exit is unconfirmed; the child may still be running and no final workspace audit is available.' };
+    }
     if (before && !scopeAudit) {
       try { scopeAudit = compareWorkspace(before, snapshotWorkspace(cwd), opts.writeScope); } catch (auditError) { scopeAudit = { ok: false, error: auditError.message }; }
     }
