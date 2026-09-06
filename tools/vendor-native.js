@@ -50,12 +50,14 @@ function validateClaudeStructuredResponse(records) {
 }
 
 function strictJsonRecords(capture) {
+  capture = String(capture).replace(/^\uFEFF/, '');
   try { return [JSON.parse(capture)]; } catch {}
   try { return String(capture).split(/\r?\n/).filter(line => line.trim()).map(line => JSON.parse(line)); }
   catch { throw responseError('Claude capture is malformed structured data'); }
 }
 
 function jsonRecords(text) {
+  text = String(text).replace(/^\uFEFF/, '');
   try { return [JSON.parse(text)]; } catch {}
   return String(text).split(/\r?\n/).flatMap((line) => { try { return [JSON.parse(line)]; } catch { return []; } });
 }
@@ -71,6 +73,15 @@ function finalResponse(vendor, capture, options = {}) {
   const result = records.filter((item) => item.type === 'result').at(-1);
   return typeof result?.result === 'string' ? result.result.trim() : '';
 }
+function mergeGoogleIdentityLog(baseLog, raw) {
+  const identityLines = text => String(text).split(/\r?\n/).filter(line => GOOGLE_IDENTITY_LINE.test(line));
+  const base = identityLines(baseLog);
+  const native = identityLines(raw);
+  // A mirrored sequence is redundant. Keep differing sequences intact: removing
+  // individual shared rows could hide a conflicting model/session association.
+  if (native.length && native.length === base.length && native.every((line, index) => line === base[index])) return baseLog;
+  return `${baseLog}\n${native.join('\n')}\n`;
+}
 function nativeLog(vendor, capture, baseLog, { home = os.homedir(), cwd, nativeLogPath } = {}) {
   if (vendor === 'openai') return baseLog;
   const records = jsonRecords(capture);
@@ -80,14 +91,14 @@ function nativeLog(vendor, capture, baseLog, { home = os.homedir(), cwd, nativeL
     if (nativeLogPath) {
       const raw = fs.readFileSync(nativeLogPath, 'utf8');
       if (!raw.includes(id)) throw new Error('Google dispatch log does not contain its native conversation ID');
-      return `${baseLog}\n${raw.split(/\r?\n/).filter((line) => GOOGLE_IDENTITY_LINE.test(line)).join('\n')}\n`;
+      return mergeGoogleIdentityLog(baseLog, raw);
     }
     const root = path.join(home, '.gemini', 'antigravity-cli', 'log');
     for (const name of fs.readdirSync(root).filter((name) => /^cli-.*\.log$/.test(name)).sort().reverse()) {
       const raw = fs.readFileSync(path.join(root, name), 'utf8');
       if (!raw.includes(id)) continue;
       // Preserve native identity lines verbatim; do not copy unrelated prompts or account data.
-      return `${baseLog}\n${raw.split(/\r?\n/).filter((line) => GOOGLE_IDENTITY_LINE.test(line)).join('\n')}\n`;
+      return mergeGoogleIdentityLog(baseLog, raw);
     }
     throw new Error('matching Google native per-run log missing');
   }

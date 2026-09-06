@@ -2,7 +2,7 @@
 
 const assert = require('node:assert');
 const test = require('node:test');
-const { parseClaude, parseCodex, parseGoogle, verifyProof, main } = require('./cli-proof.js');
+const { parseClaude, parseCodex, parseGoogle, verifyNativeProof, verifyProof, main } = require('./cli-proof.js');
 const fs = require('node:fs');
 
 test('Codex proof positive captures observed model, sandbox, session and tokens exactly', () => {
@@ -64,6 +64,33 @@ I0905 12:24:55.788127       1 session.go:171] Print mode: conversation=c1, sendi
   const proof = parseGoogle(capture, log, 'gemini-3.1');
   assert.strictEqual(proof.modelObserved, 'gemini-3.1');
   assert.strictEqual(proof.conversationId, 'c1');
+});
+
+test('Google SUCCESS cannot override explicit native errors', () => {
+  const envelope = { status: 'SUCCESS', conversation_id: 'c1', usage: { total_tokens: 10 }, response: 'The code handles error and is_error fields.' };
+  const log = 'I0905 12:24:51.447595       1 printmode.go:173] Print mode: starting (model="gemini-3.1", conversationID="c1")\nI0905 12:24:55.788127       1 session.go:171] Print mode: conversation=c1, sending message';
+  for (const fields of [{ is_error: true }, { error: 'execution failed' }, { error: { message: 'execution failed' } }]) {
+    assert.throws(() => parseGoogle(JSON.stringify({ ...envelope, ...fields }), log, 'gemini-3.1'), /error result\/status/);
+  }
+  assert.equal(parseGoogle(JSON.stringify({ ...envelope, is_error: false, error: null }), log, 'gemini-3.1').conversationId, 'c1');
+});
+
+test('standalone OpenAI proof requires nonempty capture as well as valid banner proof', t => {
+  const path = require('node:path');
+  const root = require('./test-fixtures.js').temporary(t);
+  const capture = path.join(root, 'capture.txt');
+  const log = path.join(root, 'native.log');
+  fs.writeFileSync(log, 'OpenAI Codex v1.0\n--------\nsession id: s1\nmodel: gpt-5.6-terra\nsandbox: read-only\nreasoning effort: medium\n--------\ntokens used\n123\n', 'utf8');
+  const options = { vendor: 'openai', capture, log, expectedModel: 'gpt-5.6-terra', expectedEffort: 'medium', expectedSandbox: 'read-only' };
+  for (const blank of ['', ' \t\r\n', '\uFEFF \n']) {
+    fs.writeFileSync(capture, blank, 'utf8');
+    assert.throws(() => verifyNativeProof(options), /capture is empty/);
+    let error = '';
+    assert.equal(main(['--vendor', 'openai', '--capture', capture, '--log', log], { stdout: { write: () => {} }, stderr: { write: value => { error += value; } } }), 1);
+    assert.match(error, /PROOF_FAIL.*capture is empty/);
+  }
+  fs.writeFileSync(capture, 'Task complete.\n', 'utf8');
+  assert.equal(verifyNativeProof(options).sessionId, 's1');
 });
 
 test('Google proof rejects silent model substitution and agy same-file wrong conversation and unrelated first model', () => {

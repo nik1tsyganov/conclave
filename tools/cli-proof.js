@@ -102,6 +102,7 @@ function parseGoogle(captureText, logText, expectedModel) {
   try { envelope = JSON.parse(String(captureText).trim()); }
   catch { throw proofError('Google/agy capture is not valid JSON'); }
   if (envelope.status !== 'SUCCESS') throw proofError(`Google/agy status is ${envelope.status || 'missing'}, expected SUCCESS`);
+  if (envelope.is_error || envelope.error) throw proofError('Google/agy capture contains error result/status');
   if (!envelope.conversation_id || typeof envelope.conversation_id !== 'string' || envelope.conversation_id.trim() === '') throw proofError('Google/agy proof missing conversation_id');
   if (!envelope.usage || typeof envelope.usage !== 'object' || Array.isArray(envelope.usage)) throw proofError('Google/agy proof missing or malformed usage');
 
@@ -340,7 +341,10 @@ function verifyNativeProof(options) {
   if (options.identityPolicy) throw proofError('identity policy overrides are not supported');
   if (options.responseProtocol !== undefined && options.vendor !== 'anthropic') throw proofError('Claude structured response protocol cannot apply to another vendor');
 
-  if (options.vendor === 'openai') return parseCodex(log, options.expectedModel, options);
+  if (options.vendor === 'openai') {
+    if (!capture.trim()) throw proofError('Codex capture is empty');
+    return parseCodex(log, options.expectedModel, options);
+  }
   if (options.vendor === 'google') return parseGoogle(capture, log, options.expectedModel);
   if (options.vendor === 'anthropic') {
     const claudeOpts = { ...options, logText: log, requireObservedEffort: true };
