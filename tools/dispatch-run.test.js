@@ -8,6 +8,48 @@ const { createSealedRun, fakeVendor } = require('./test-fixtures.js');
 const { inspectRun, finalizeRun } = require('./run-finalize.js');
 const { hashFile, writeJson } = require('./dispatch-evidence.js');
 
+for (const route of require('./dispatch-matrix.js').loadMatrix().classes['test-verification'].verify) {
+  test(`${route.vendor} contract requires reads from actual staged instruction files before task work`, async (t) => {
+    const run = createSealedRun(t, [{ vendor: route.vendor, model: route.model, effort: route.effort,
+      role: 'verify', class: 'test-verification', authorVendor: route.vendor === 'openai' ? 'anthropic' : 'openai' }]);
+    // Product-local decoys must not become the instruction lookup location.
+    fs.writeFileSync(path.join(run.cwd, 'STANDING.md'), 'Wrong instruction source.');
+    const native = fakeVendor((launch) => {
+      const contract = fs.readFileSync(launch.seatContractPath, 'utf8');
+      const briefDir = path.dirname(launch.briefPath);
+      const rulesDir = path.join(briefDir, 'RULES');
+      const files = ['STANDING.md', 'VENDOR.md', 'RULES/INDEX.md', 'rules-manifest.json'].map(name => path.join(briefDir, name));
+      files.push(path.join(launch.skillRoot, 'skills-manifest.json'));
+      for (const file of files) {
+        assert.equal(path.isAbsolute(file), true);
+        assert.equal(fs.statSync(file).isFile(), true);
+        assert.ok(contract.includes(file), `missing staged instruction path: ${file}`);
+      }
+      const indexed = fs.readFileSync(path.join(rulesDir, 'INDEX.md'), 'utf8').trim().split(/\r?\n/);
+      assert.equal(indexed.length, 22);
+      for (const file of indexed) assert.equal(fs.statSync(path.join(rulesDir, file)).isFile(), true);
+      const manifest = JSON.parse(fs.readFileSync(path.join(launch.skillRoot, 'skills-manifest.json'), 'utf8'));
+      for (const skill of Object.keys(manifest.skills)) {
+        const file = path.join(launch.skillRoot, skill, 'SKILL.md');
+        assert.equal(fs.statSync(file).isFile(), true);
+        assert.ok(contract.includes(file), `missing required skill path: ${file}`);
+      }
+      assert.match(contract, /Read every indexed rule file, including all R01-R22 rules, in full before task work/);
+      assert.match(contract, /Required staged skills: read every listed SKILL\.md in full before task work/);
+      assert.match(contract, /missing or unreadable.*stop task work and report a blocker/);
+      assert.match(contract, /Never waive a required read/);
+      assert.ok(contract.includes(`staged brief directory: ${briefDir}`));
+      assert.ok(contract.includes(`staged rule directory: ${rulesDir}`));
+      assert.match(contract, /Do not resolve instruction paths against the product working directory/);
+      assert.ok(contract.includes(`Resolve task and product paths against the assigned worktree unless the brief specifies otherwise: ${launch.cwd}`));
+      assert.match(contract, /Read-only role: do not modify product files/);
+    });
+    const result = await runDispatch({ ...run.opts, dispatchId: 'd1' }, native);
+    assert.equal(result.status === 'AWAITING_ATTESTATION' || result.ok, true);
+    assert.equal(native.calls(), 1);
+  });
+}
+
 test('naked route and ad hoc escalation cannot launch', async () => {
   await assert.rejects(runDispatch({ vendor: 'openai', model: 'gpt-6-astra' }), /--plan and --dispatch-id/);
   assert.throws(() => parseArgs(['--escalation', 'true']), /unknown option/);

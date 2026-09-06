@@ -94,6 +94,8 @@ The initial Claude launch uses the command above without `--on-topic` or `--capt
 
 This is an expected inspection checkpoint. It is not execution PASS, approval, or a failed vendor call. Pending work cannot unlock verification, review, finalization, or activation. Read both returned files and judge whether the response addresses the bound brief. Topicality inspection does not replace the independent verification or review seats.
 
+The generated seat contract gives absolute paths to the staged rules and role skills. Seats must read those required files before task work. Relative rule links resolve beside the staged brief, not the product working directory. A seat that reports required files missing or unread must stop and report the blocker; it cannot waive those instructions. Before accepting a product seat, inspect its report and available native read evidence for that failure. A topical response or valid receipt alone does not prove instruction compliance.
+
 Only after that inspection, run the same dispatch command with the returned capture hash:
 
 ```powershell

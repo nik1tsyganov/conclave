@@ -112,6 +112,8 @@ For ordinary feature trials, the three suggested entries are:
 
 The matrix and fresh probes govern actual eligibility. This table does not override them. Google review briefs must request file-read tools and existing test evidence. Do not require RunCommand in its sandbox. Claude read-only seats can use Read/Glob/Grep; they cannot execute test commands. Select checker roles that can perform the required check.
 
+Each generated seat contract names the staged rules and required role skills by absolute path. Before accepting a seat, inspect its report and available native read evidence. Missing or unread required instructions are a blocker, even if the task answer is topical. Preserve that evidence and export the stopped trial; do not let the seat declare those instructions optional.
+
 Use `plan-seal.js` once for the complete plan. Dispatch only sealed entries through `dispatch-run.js`. An implementation unit's review now requires every planned verifier to finish with valid native APPROVE evidence. A changed workspace invalidates the previous verification. Review-only panels have no implementation sequence to satisfy.
 
 Claude returns an `AWAITING_ATTESTATION` checkpoint after the native call and deterministic checks. Its exit code is zero, but `ok` is false because execution has not been accepted. Read the returned `responsePath` and `capturePath`; confirm that the response addresses the bound brief. Then complete the same dispatch with `--on-topic --capture-sha256 <returned captureSha256>`. This does not launch another call or consume another task-dispatch slot. Do not provide either flag before a capture exists. If topicality is uncertain, stop and export the pending report. See the CLI reference for the exact command.

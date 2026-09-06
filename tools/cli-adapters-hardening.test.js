@@ -100,6 +100,23 @@ test('every adapter keeps even a single-line brief body out of launch arguments 
   }
 });
 
+test('every adapter requires contract-listed reads before product work and treats missing instructions as blockers', (t) => {
+  const f = fixture(t);
+  for (const build of [openaiLaunch, googleLaunch, anthropicLaunch]) {
+    const launch = build({ ...f, cwd: 'C:\\src\\product-a', model: 'fixture', effort: 'high', role: 'verify',
+      capturePath: path.join(f.dir, 'capture.txt'), env: fakeBins, mustExistBinary: false });
+    const pointer = launch.stdinFile ? fs.readFileSync(launch.stdinFile, 'utf8') : launch.args[launch.args.indexOf('-p') + 1];
+    assert.ok(pointer.includes('Complete every required instruction read in that contract before product work.'));
+    assert.ok(pointer.includes('If any required instruction is missing or unreadable, stop and report a blocker.'));
+    assert.ok(pointer.length <= 2000);
+    if (launch.vendor === 'anthropic') {
+      const system = launch.args[launch.args.indexOf('--append-system-prompt') + 1];
+      assert.ok(system.includes('Complete every required instruction read in that contract before product work.'));
+      assert.ok(system.includes('Native permissions still apply.'));
+    }
+  }
+});
+
 test('oversized seat pointers fail before a pointer file is written', (t) => {
   const f = fixture(t);
   for (const build of [openaiLaunch, googleLaunch, anthropicLaunch]) {

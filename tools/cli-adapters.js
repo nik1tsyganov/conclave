@@ -63,7 +63,7 @@ function subscriptionEnv(source = process.env) {
 }
 
 function seatContextText(ctx) {
-  return `Read ${ctx.seatContractPath} in full before doing any task work. Use only the MAGI-authorized staged skills listed there. The user delegated the task and report format to this bound brief and contract. Native permissions still apply. Your FINAL response must start with the brief's exact first line. Read that line from the bound brief. Do not put a status sentence, introduction, Markdown decoration or confirmation request before that line. Then follow the brief's response format.`;
+  return `Read ${ctx.seatContractPath} in full before doing any task work. Complete every required instruction read in that contract before product work. If any required instruction is missing or unreadable, stop and report a blocker. Use only the MAGI-authorized staged skills listed there. The user delegated the task and report format to this bound brief and contract. Native permissions still apply. Your FINAL response must start with the brief's exact first line. Read that line from the bound brief. Do not put a status sentence, introduction, Markdown decoration or confirmation request before that line. Then follow the brief's response format.`;
 }
 
 function seatPointerText(ctx) {

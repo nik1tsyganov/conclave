@@ -68,7 +68,7 @@ function required(opts) {
   }
 }
 
-function seatContractText(opts, seatProfile, skillStage) {
+function seatContractText(opts, seatProfile, skillStage, ruleStage) {
   return [
     '# MAGI CLI seat contract',
     '',
@@ -88,10 +88,24 @@ function seatContractText(opts, seatProfile, skillStage) {
     opts.role === 'implement' ? `Writes are limited to these relative paths in the assigned worktree: ${opts.writeScope.join(', ')}.` : 'Read-only role: do not modify product files.',
     'Do not stage or commit changes. Do not modify any evidence, rules, contracts, or skill files.',
     '',
+    'Required staged instructions: read these files in full before task work:',
+    `- STANDING.md: ${path.join(ruleStage.briefDir, 'STANDING.md')}`,
+    `- VENDOR.md: ${path.join(ruleStage.briefDir, 'VENDOR.md')}`,
+    `- RULES/INDEX.md: ${path.join(ruleStage.stagedRules, 'INDEX.md')}`,
+    `Rules manifest: ${ruleStage.manifestPath}`,
+    `Skill manifest: ${skillStage.manifestPath}`,
+    '',
+    'Read every indexed rule file, including all R01-R22 rules, in full before task work.',
+    `Resolve relative instruction paths such as STANDING.md, VENDOR.md and RULES/... against the staged brief directory: ${ruleStage.briefDir}`,
+    `Resolve relative links in RULES/INDEX.md and rule files against the staged rule directory: ${ruleStage.stagedRules}`,
+    'Do not resolve instruction paths against the product working directory.',
+    `Resolve task and product paths against the assigned worktree unless the brief specifies otherwise: ${opts.cwd}`,
+    'If any required instruction file is missing or unreadable, stop task work and report a blocker with its absolute path. Never waive a required read.',
+    '',
+    'Required staged skills: read every listed SKILL.md in full before task work.',
     'Allowed staged skills:',
     ...seatProfile.skills.map((skill) => `- ${skill}: ${path.join(skillStage.root, skill, 'SKILL.md')}`),
     '',
-    `Skill manifest: ${skillStage.manifestPath}`,
     `Required proof fields: ${seatProfile.proofFields.join(', ')}`,
     '',
   ].join('\n');
@@ -238,12 +252,11 @@ async function runDispatch(opts, dependencies = {}) {
     destinationRoot: path.join(evidenceDir, 'skills'),
   });
   writeJson(path.join(evidenceDir, 'seat-profile.json'), seatProfile);
-  const seatContractPath = path.join(evidenceDir, 'SEAT-CONTRACT.md');
-  fs.writeFileSync(seatContractPath, seatContractText(opts, seatProfile, skillStage), 'utf8');
-
   const staged = stageRules({ briefPath: brief, rulesRoot: opts.rulesRoot });
   if (staged.manifest.fingerprint !== FINGERPRINT_V2) throw policyError('production dispatch requires the external STANDING v2 / R01-R22 pack');
   verifyStagedRules(brief);
+  const seatContractPath = path.join(evidenceDir, 'SEAT-CONTRACT.md');
+  fs.writeFileSync(seatContractPath, seatContractText(opts, seatProfile, skillStage, staged), 'utf8');
   const briefCheck = checkBriefFile(brief, { role: opts.role, vendor: opts.vendor, requireStructural: true, seatProfile, skillRoot: skillStage.root, seatContractPath, expectedRulesManifest: staged.manifest, expectedSkillsManifest: skillStage.manifest });
   if (!briefCheck.ok) {
     const error = new Error(`brief gate failed: ${briefCheck.missing.join(', ')}`);
