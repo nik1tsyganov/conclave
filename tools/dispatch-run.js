@@ -6,13 +6,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildLaunch } = require('./cli-adapters.js');
 const { runLaunch } = require('./cli-runner.js');
-const { DEFAULT_RULES_ROOT, FINGERPRINT_V2, stageRules, verifyStagedRules } = require('./cli-rules-stage.js');
+const { DEFAULT_RULES_ROOT, FINGERPRINT_V2, prepareRulesSource, stageRules, verifyStagedRules } = require('./cli-rules-stage.js');
 const { checkBriefFile } = require('./cli-brief-rules-check.js');
 const { verifyNativeProof, verifyProof } = require('./cli-proof.js');
 const { validateDispatchRow, ROLES } = require('./dispatch-schema.js');
 const { DEFAULT_MATRIX, bindDispatch, loadMatrix, loadAvailability } = require('./dispatch-matrix.js');
 const { loadProfiles, buildSeatProfile } = require('./seat-policy.js');
-const { stageSeatSkills, verifySeatSkills } = require('./cli-skill-stage.js');
+const { prepareSeatSkills, stageSeatSkills, verifySeatSkills } = require('./cli-skill-stage.js');
 const { DEFAULT_PROFILES } = require('./seat-policy.js');
 const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, appendUniqueRow, assertPlainPath, compareWorkspace, hashFile, inside, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, writeJson: atomicJson } = require('./dispatch-evidence.js');
 const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, nativeLog, validateClaudeResponseLaunch } = require('./vendor-native.js');
@@ -28,6 +28,7 @@ function writeJson(file, value) { atomicJson(file, value); }
 
 function parseArgs(argv) {
   const out = { onTopic: false };
+  const seen = new Set();
   const values = new Set([
     '--vendor', '--role', '--class', '--brief', '--cwd', '--model', '--effort', '--dispatch-id', '--unit-id',
     '--evidence-dir', '--telemetry-log', '--activation-log', '--rules-root', '--review-permission-mode',
@@ -35,6 +36,8 @@ function parseArgs(argv) {
   ]);
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
+    if (seen.has(flag)) throw argError(`duplicate option: ${flag}`);
+    seen.add(flag);
     if (flag === '--on-topic') { out.onTopic = true; continue; }
     if (flag === '--help' || flag === '-h') { out.help = true; continue; }
     if (!values.has(flag)) throw argError(`unknown option: ${flag}`);
@@ -204,6 +207,8 @@ function acceptCheckpoint(run, entry, transaction, captureSha256) {
 
 async function runDispatch(opts, dependencies = {}) {
   if (!opts.plan || !opts.dispatchId) throw argError('--plan and --dispatch-id are required');
+  const maxWallMs = opts.maxWallMs === undefined ? 2700000 : Number(opts.maxWallMs);
+  if (!Number.isSafeInteger(maxWallMs) || maxWallMs < 1 || maxWallMs > 2700000) throw argError('--max-wall-ms must be an integer between 1 and 2700000');
   const planPath = fs.realpathSync(opts.plan);
   const runDir = path.dirname(planPath);
   if (opts.runDir && fs.realpathSync(opts.runDir) !== runDir) throw policyError('--run-dir does not contain the sealed plan');
@@ -266,6 +271,15 @@ async function runDispatch(opts, dependencies = {}) {
     opts.skillSourceRoot = opts.skillSourceRoot || resolveRuntimePaths().seatSkillsRoot;
   }
   validateLogDestinations(sealed, [telemetryLog, activationLog], evidenceDir, [DEFAULT_MATRIX, DEFAULT_PROFILES, ...[opts.rulesRoot, opts.skillSourceRoot].filter(Boolean)]);
+  if (!savedState) {
+    if (fs.existsSync(evidenceDir) && (!fs.lstatSync(evidenceDir).isDirectory() || fs.readdirSync(evidenceDir).length)) throw policyError('evidence directory must be new or empty');
+    const profile = buildSeatProfile(loadProfiles(), { vendor: opts.vendor, role: opts.role, class: opts.class, arbiter: false, subdispatch: false });
+    prepareSeatSkills({ skills: profile.skills, sourceRoot: opts.skillSourceRoot, destinationRoot: path.join(evidenceDir, 'skills') });
+    const rules = prepareRulesSource({ rulesRoot: opts.rulesRoot });
+    if (rules.fingerprint !== FINGERPRINT_V2) throw policyError('production dispatch requires the external STANDING v2 / R01-R22 pack');
+    const stagedRules = path.join(evidenceDir, 'brief', 'RULES');
+    if (inside(stagedRules, rules.root) || inside(rules.root, stagedRules)) throw policyError('rules source and staging directory must not overlap');
+  }
   const prerequisites = fs.existsSync(transactionPath) ? null : verifyPrerequisites(sealed, binding.entry,
     ['review', 'verify'].includes(opts.role) ? snapshotWorkspace(cwd) : undefined, new Date().toISOString());
   const transaction = reserveTransaction(binding, evidenceDir, postRun ? ATTESTATION_PROTOCOL : undefined);
@@ -358,8 +372,6 @@ async function runDispatch(opts, dependencies = {}) {
   const skillSources = () => Object.fromEntries(seatProfile.skills.map((skill) => [skill, snapshotWorkspace(path.join(skillStage.manifest.sourceRoot, skill))]));
   const skillsBefore = skillSources();
   atomicJson(path.join(evidenceDir, 'skills-source-before.json'), skillsBefore);
-  const maxWallMs = opts.maxWallMs === undefined ? 2700000 : Number(opts.maxWallMs);
-  if (!Number.isFinite(maxWallMs) || maxWallMs < 1 || maxWallMs > 2700000) throw argError('--max-wall-ms must be between 1 and 2700000');
   const result = await (dependencies.runLaunch || runLaunch)(launch, { pidFile, stdoutFile: stdoutPath, stderrFile: stderrPath, maxWallMs, signal: dependencies.signal });
   for (const file of [telemetryLog, activationLog, capturePath, path.join(evidenceDir, 'vendor.log'), transaction.file, path.join(runDir, '.magi-sessions'), ...(launch.nativeLogPath ? [launch.nativeLogPath] : [])]) assertPlainPath(file);
   const after = snapshotWorkspace(cwd);

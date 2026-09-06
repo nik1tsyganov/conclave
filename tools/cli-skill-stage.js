@@ -78,7 +78,7 @@ function copySkill(source, destination) {
   return writeSkill(readSkill(from), to);
 }
 
-function stageSeatSkills(options = {}) {
+function prepareSeatSkills(options = {}) {
   try {
     const skills = allowedSkills(options.skills);
     const sourceRoot = canonicalPlainPath(options.sourceRoot || resolveRuntimePaths().seatSkillsRoot);
@@ -94,6 +94,16 @@ function stageSeatSkills(options = {}) {
         verifySeatSkills({ destinationRoot, skills: Object.keys(previous.skills || {}), manifest: previous });
       }
     }
+    return { sourceRoot, destinationRoot, prepared };
+  } catch (error) {
+    if (error.code === 'SKILL_STAGE_FAIL') throw error;
+    throw stageError(error.message);
+  }
+}
+
+function stageSeatSkills(options = {}) {
+  try {
+    const { sourceRoot, destinationRoot, prepared } = prepareSeatSkills(options);
     fs.rmSync(destinationRoot, { recursive: true, force: true });
     fs.mkdirSync(destinationRoot, { recursive: true });
     const manifest = { schemaVersion: 1, generatedAt: new Date().toISOString(), sourceRoot, skills: {} };
@@ -160,4 +170,4 @@ function verifySeatSkills({ destinationRoot, skills, manifest }) {
   }
 }
 
-module.exports = { FORBIDDEN_ARBITER_SKILLS, copySkill, regularFiles, stageError, stageSeatSkills, verifySeatSkills };
+module.exports = { FORBIDDEN_ARBITER_SKILLS, copySkill, prepareSeatSkills, regularFiles, stageError, stageSeatSkills, verifySeatSkills };

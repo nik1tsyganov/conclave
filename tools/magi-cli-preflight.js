@@ -7,7 +7,7 @@ const path = require('node:path');
 const { resolveVendorBinary } = require('./vendor-binaries.js');
 const { FINGERPRINT_V2, listRuleFiles } = require('./cli-rules-stage.js');
 const { FORBIDDEN_ARBITER_SKILLS, regularFiles } = require('./cli-skill-stage.js');
-const { canonicalPlainPath, resolveRulesRoot, resolveRuntimePaths } = require('./runtime-paths.js');
+const { CLI_RUNTIME_TOOLS, canonicalPlainPath, resolveRulesRoot, resolveRuntimePaths } = require('./runtime-paths.js');
 const { loadProfiles } = require('./seat-policy.js');
 
 function unique(values) { return [...new Set(values)]; }
@@ -33,6 +33,14 @@ function check(options = {}) {
     paths = resolveRuntimePaths({ root: options.runtimeRoot });
     profiles = loadProfiles(options.seatProfiles || paths.seatProfilesPath);
     return { value: paths.root };
+  });
+  if (paths) record('runtime:files', () => {
+    for (const name of CLI_RUNTIME_TOOLS) {
+      const file = canonicalPlainPath(path.join(paths.toolsDir, name));
+      if (!fs.existsSync(file) || !fs.lstatSync(file).isFile()) throw new Error(`required runtime file missing: ${file}`);
+      fs.accessSync(file, fs.constants.R_OK);
+    }
+    return { count: CLI_RUNTIME_TOOLS.length };
   });
 
   for (const vendor of ['openai', 'google', 'anthropic']) {
@@ -76,6 +84,7 @@ function check(options = {}) {
       const rulesDir = path.join(rulesRoot, 'RULES');
       const names = listRuleFiles(rulesDir);
       if (!names.some(name => name.startsWith('R22-'))) throw new Error('rules pack missing R22');
+      if (names.length !== 22) throw new Error('production rules pack must contain exactly R01-R22');
       for (const name of names) {
         if (!fs.lstatSync(path.join(rulesDir, name)).isFile()) throw new Error(`rule must be a regular file: ${name}`);
       }

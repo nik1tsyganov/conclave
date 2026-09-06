@@ -5,9 +5,10 @@ const path = require('node:path');
 const { loadMatrix } = require('./dispatch-matrix.js');
 const { hashFile, writeJson } = require('./dispatch-evidence.js');
 const { verifyProbe } = require('./probe-evidence.js');
+const { readJsonFile } = require('./json-file.js');
 
 function load(file) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+  try { return readJsonFile(file); }
   catch (error) { if (error.code === 'ENOENT') return { schemaVersion: 2, vendors: {} }; throw error; }
 }
 function record(options) {
@@ -32,9 +33,12 @@ function record(options) {
 }
 function parseArgs(argv) {
   const opts = {};
+  const seen = new Set();
   for (let i = 0; i < argv.length; i++) {
+    if (seen.has(argv[i])) throw new Error(`duplicate option: ${argv[i]}`);
+    seen.add(argv[i]);
     if (argv[i] === '--help') { opts.help = true; continue; }
-    if (!['--file', '--probe', '--note'].includes(argv[i]) || !argv[i + 1]) throw new Error(`invalid option: ${argv[i]}`);
+    if (!['--file', '--probe', '--note'].includes(argv[i]) || !argv[i + 1] || argv[i + 1].startsWith('--')) throw new Error(`invalid option: ${argv[i]}`);
     opts[argv[i].slice(2)] = argv[++i];
   }
   return opts;
