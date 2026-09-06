@@ -78,3 +78,25 @@ for (const kind of ['rules', 'skills', 'evidence']) {
     assert.equal(native.calls(), 1);
   });
 }
+
+for (const kind of ['SKILL.md', 'VENDOR.md', 'RULES/INDEX.md', 'RULES/R22-fixture.md']) {
+  test(`blank required ${kind} is rejected before reserving a dispatch`, async t => {
+    const run = createSealedRun(t);
+    const native = fakeVendor();
+    const file = kind === 'SKILL.md'
+      ? path.join(run.opts.skillSourceRoot, fs.readdirSync(run.opts.skillSourceRoot)[0], kind)
+      : path.join(run.opts.rulesRoot, kind);
+    const original = fs.readFileSync(file);
+    for (const body of ['', '\ufeff \t\r\n']) {
+      fs.writeFileSync(file, body, 'utf8');
+      const before = snapshot(run.root);
+      await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1' }, native), /empty|required.*content/);
+      assert.equal(native.calls(), 0);
+      assert.deepEqual(snapshot(run.root), before);
+    }
+    fs.writeFileSync(file, original);
+    const result = await runDispatch({ ...run.opts, dispatchId: 'd1' }, native);
+    assert.equal(result.ok, true);
+    assert.equal(native.calls(), 1);
+  });
+}

@@ -69,7 +69,7 @@ function prepareRulesSource({ rulesRoot }) {
     if (fs.lstatSync(source).isSymbolicLink()) throw new Error('rules source must not contain symbolic links');
     if (source !== root && source !== rules) {
       if (!fs.lstatSync(source).isFile()) throw new Error(`rule source must be a regular file: ${source}`);
-      fs.readFileSync(source);
+      if (!fs.readFileSync(source, 'utf8').trim()) throw new Error(`required rule content is empty: ${source}`);
     }
   }
   return { root, standing, vendor, rules, ruleFiles, fingerprint: firstLine };

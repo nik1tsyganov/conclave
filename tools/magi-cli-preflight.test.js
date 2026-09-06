@@ -180,3 +180,21 @@ test('v2 preflight rejects an additional rule ID', t => {
   assert.equal(result.ok, false);
   assert.match(result.findings.find(row => row.check === 'rules:R01-R22').error, /exactly R01-R22/);
 });
+
+for (const relative of ['SKILL.md', 'STANDING.md', 'VENDOR.md', 'RULES/INDEX.md', 'RULES/R01-fixture.md', 'RULES/R22-fixture.md']) {
+  test(`blank required ${relative} fails preflight without writes`, t => {
+    const f = fixture(t);
+    const file = relative === 'SKILL.md'
+      ? path.join(f.runtimeRoot, 'seat-skills', 'testing', relative)
+      : path.join(f.rulesRoot, relative);
+    const original = fs.readFileSync(file);
+    for (const body of ['', '\ufeff \t\r\n']) {
+      fs.writeFileSync(file, body, 'utf8');
+      const before = snapshot(f.root);
+      assert.equal(check(f).ok, false);
+      assert.deepEqual(snapshot(f.root), before);
+    }
+    fs.writeFileSync(file, original);
+    assert.equal(check(f).ok, true);
+  });
+}

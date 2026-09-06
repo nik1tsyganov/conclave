@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 'use strict';
 const fs = require('node:fs');
-const path = require('node:path');
 const { loadMatrix } = require('./dispatch-matrix.js');
-const { hashFile, writeJson } = require('./dispatch-evidence.js');
+const { assertPlainPath, hashFile, writeJson } = require('./dispatch-evidence.js');
 const { verifyProbe } = require('./probe-evidence.js');
 const { readJsonFile } = require('./json-file.js');
+const { canonicalPlainPath, pathsOverlap } = require('./runtime-paths.js');
 
 function load(file) {
   try { return readJsonFile(file); }
@@ -19,8 +19,13 @@ function record(options) {
   const spec = matrix.vendors?.[raw.vendor]?.models?.[raw.requestedModel];
   if (!spec?.efforts.includes(raw.effort)) throw new Error('probe model/effort is outside catalog');
   const verified = verifyProbe(file, { vendor: raw.vendor, model: raw.requestedModel, effort: raw.effort, observedModel: spec.canonical || raw.requestedModel });
+  const destination = canonicalPlainPath(options.file);
+  assertPlainPath(destination);
+  if ([file, verified.capture, verified.log].some(evidence => pathsOverlap(destination, canonicalPlainPath(evidence)))) {
+    throw new Error('availability output overlaps verified probe evidence');
+  }
   const entry = { available: true, vendor: verified.vendor, requestedModel: verified.requestedModel, observedModel: verified.observedModel, effort: verified.effort, observedAt: verified.completedAt, evidence: { path: file, sha256: hashFile(file) }, note: options.note || null };
-  const data = load(options.file);
+  const data = load(destination);
   data.schemaVersion = 2;
   data.vendors ||= {};
   const vendor = data.vendors[raw.vendor] ||= { models: {} };
@@ -28,7 +33,7 @@ function record(options) {
   const model = vendor.models[raw.requestedModel] ||= { efforts: {} };
   model.efforts ||= {};
   model.efforts[raw.effort] = entry;
-  writeJson(path.resolve(options.file), data);
+  writeJson(destination, data);
   return entry;
 }
 function parseArgs(argv) {

@@ -56,6 +56,7 @@ function check(options = {}) {
       const root = path.join(paths.seatSkillsRoot, skill);
       const file = path.join(root, 'SKILL.md');
       if (!regularFiles(root).includes(file)) throw new Error(`bundled seat skill missing regular SKILL.md: ${file}`);
+      if (!fs.readFileSync(file, 'utf8').trim()) throw new Error(`required SKILL.md is empty: ${file}`);
       return { value: file };
     });
   }
@@ -69,7 +70,9 @@ function check(options = {}) {
     rulesRoot = canonicalPlainPath(resolveRulesRoot({ rulesRoot: options.rulesRoot, env: options.env }));
     const files = regularFiles(rulesRoot);
     for (const relative of ['STANDING.md', 'VENDOR.md', 'RULES/INDEX.md']) {
-      if (!files.includes(path.join(rulesRoot, ...relative.split('/')))) throw new Error(`external rules pack missing ${relative}; set MAGI_RULES_ROOT or pass rulesRoot`);
+      const file = path.join(rulesRoot, ...relative.split('/'));
+      if (!files.includes(file)) throw new Error(`external rules pack missing ${relative}; set MAGI_RULES_ROOT or pass rulesRoot`);
+      if (!fs.readFileSync(file, 'utf8').trim()) throw new Error(`required rule content is empty: ${relative}`);
     }
     return { value: rulesRoot };
   });
@@ -87,6 +90,7 @@ function check(options = {}) {
       if (names.length !== 22) throw new Error('production rules pack must contain exactly R01-R22');
       for (const name of names) {
         if (!fs.lstatSync(path.join(rulesDir, name)).isFile()) throw new Error(`rule must be a regular file: ${name}`);
+        if (!fs.readFileSync(path.join(rulesDir, name), 'utf8').trim()) throw new Error(`required rule content is empty: ${name}`);
       }
       return { value: rulesDir, observed: names.map(name => name.slice(0, 3)) };
     });

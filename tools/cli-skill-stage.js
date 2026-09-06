@@ -51,7 +51,9 @@ function regularFiles(root, current = root, out = [], directories = []) {
 
 function readSkill(source) {
   const files = regularFiles(source).map(file => ({ path: path.relative(source, file).replaceAll('\\', '/'), body: fs.readFileSync(file) }));
-  if (!files.some(file => file.path === 'SKILL.md')) throw stageError('skill missing SKILL.md: ' + source);
+  const instruction = files.find(file => file.path === 'SKILL.md');
+  if (!instruction) throw stageError('skill missing SKILL.md: ' + source);
+  if (!instruction.body.toString('utf8').trim()) throw stageError('required SKILL.md is empty: ' + source);
   const seen = new Set();
   for (const file of files) {
     if (!safeRelativePath(file.path) || seen.has(file.path.toLowerCase())) throw stageError('unsafe or duplicate skill path: ' + file.path);

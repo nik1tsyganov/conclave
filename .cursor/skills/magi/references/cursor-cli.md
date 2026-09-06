@@ -17,7 +17,7 @@ $env:MAGI_RULES_ROOT = Join-Path $env:USERPROFILE '.cursor/magi-rules/v2'
 node tools/magi-cli-preflight.js --rules-root $env:MAGI_RULES_ROOT
 ```
 
-The active pack is STANDING v2 with `RULES/INDEX.md`, `VENDOR.md`, and exactly R01–R22. Missing or extra rules fail. Preflight also checks the required runtime tool files. Native CLI authentication remains local to the machine. `claude auth status` is the Claude login check; the native model probe also verifies its subscription authentication. Never copy credentials from the kit.
+The active pack is STANDING v2 with `RULES/INDEX.md`, `VENDOR.md`, and exactly R01–R22. Missing or extra rules fail. Required rule files and each bundled `SKILL.md` must contain non-whitespace text. Preflight also checks the required runtime tool files. Native CLI authentication remains local to the machine. `claude auth status` is the Claude login check; the native model probe also verifies its subscription authentication. Never copy credentials from the kit.
 
 The example uses YESSIR's installed external pack. On another machine, supply its actual verified v2 pack. For bounded real-project attempts and failure recording, follow [the project handoff](../../magi-cli/references/project-runs.md).
 
@@ -38,7 +38,7 @@ Use a new evidence directory for each probe. Repeat for every pair selected by t
 
 By default, a probe creates a scratch workspace under its evidence directory. If you supply `--cwd`, it must already exist and must not contain the evidence directory. Keep both paths outside the runtime. An unconfirmed child exit leaves incomplete scope evidence; inspect the recorded PID and stop before another attempt.
 
-Availability imports replay the hashed native capture and log. The 60-minute freshness checks use the original probe timestamps. Re-importing a probe does not renew them. Missing, changed, expired, or mismatched native evidence fails.
+Availability imports replay the hashed native capture and log. Use a separate availability output file; it must not replace the probe, capture, or log. The 60-minute freshness checks use the original probe timestamps. Re-importing a probe does not renew them. Missing, changed, expired, or mismatched native evidence fails.
 
 ## Prepare the complete plan
 
