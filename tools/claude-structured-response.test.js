@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const { CLAUDE_RESPONSE_PROTOCOL, finalResponse } = require('./vendor-native.js');
+const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, nativeLog } = require('./vendor-native.js');
 const { parseClaude, verifyProof } = require('./cli-proof.js');
 const { runDispatch } = require('./dispatch-run.js');
 const { finalizeRun, inspectRun } = require('./run-finalize.js');
@@ -59,6 +59,50 @@ test('structured report extraction preserves native bytes and leaves plain probe
   assert.throws(() => finalResponse('anthropic', native.capture, protocol), /structured_output/);
   assert.throws(() => finalResponse('anthropic', capture, { responseProtocol: 'legacy' }), /protocol/);
   assert.throws(() => finalResponse('google', capture, protocol), /another vendor/);
+});
+
+test('Claude BOM capture has consistent proof, response and native session extraction', t => {
+  const root = temporary(t);
+  const response = `${RESPONSE}\r\nKeep inner BOM: \uFEFF and trailing whitespace\t \r\n`;
+  const native = nativeCapture('anthropic', 'claude-sonnet-5', 'medium', response);
+  const terminal = { ...JSON.parse(native.capture), structured_output: { response } };
+  const transcriptDir = path.join(root, '.claude', 'projects', 'fixture');
+  fs.mkdirSync(transcriptDir, { recursive: true });
+  fs.writeFileSync(path.join(transcriptDir, `${terminal.session_id}.jsonl`), native.log, 'utf8');
+  for (const records of [[terminal], [{ type: 'system', subtype: 'init', session_id: terminal.session_id, model: 'claude-sonnet-5' }, terminal]]) {
+    const capture = '\uFEFF' + records.map(JSON.stringify).join('\r\n') + '\r\n';
+    assert.equal(finalResponse('anthropic', capture, protocol), response);
+    assert.equal(finalResponse('anthropic', capture), response.trim());
+    assert.ok(nativeLog('anthropic', capture, '', { home: root }).includes(native.log.trim()));
+    const proof = parseClaude(capture, 'sonnet', 'medium', true, { ...protocol, expectedObservedModel: 'claude-sonnet-5', logText: native.log, requireObservedEffort: true });
+    assert.equal(proof.sessionId, terminal.session_id);
+    assert.equal(proof.responseBytes, Buffer.byteLength(capture, 'utf8'));
+    assert.throws(() => finalResponse('anthropic', capture + '{"partial":', protocol), /malformed structured/);
+  }
+});
+
+test('production Claude BOM capture commits and replays without rewriting raw evidence', async t => {
+  const run = claudeRun(t);
+  const native = fakeVendor();
+  const launch = native.runLaunch;
+  let raw;
+  native.runLaunch = async spec => {
+    const result = await launch(spec);
+    raw = '\uFEFF' + result.stdout;
+    return { ...result, stdout: raw };
+  };
+  const first = await completeSyntheticDispatch({ ...run.opts, dispatchId: 'd1' }, native);
+  const capture = path.join(run.runDir, 'out/d1/capture.txt');
+  const digest = hashFile(capture);
+  assert.equal(fs.readFileSync(capture, 'utf8'), raw);
+  assert.deepEqual(fs.readFileSync(capture).subarray(0, 3), Buffer.from([0xef, 0xbb, 0xbf]));
+  assert.equal(inspectRun(run.runDir).executions[0].response, RESPONSE);
+  assert.equal(finalizeRun(run.runDir).executionStatus, 'PASS');
+  const replay = await runDispatch({ ...run.opts, dispatchId: 'd1' }, native);
+  assert.equal(replay.proofId, first.proofId);
+  assert.equal(replay.replayed, true);
+  assert.equal(hashFile(capture), digest);
+  assert.equal(native.calls(), 1);
 });
 
 test('structured proof still requires native model, effort, session, numeric usage and status', t => {

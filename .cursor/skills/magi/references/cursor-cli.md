@@ -17,7 +17,7 @@ $env:MAGI_RULES_ROOT = Join-Path $env:USERPROFILE '.cursor/magi-rules/v2'
 node tools/magi-cli-preflight.js --rules-root $env:MAGI_RULES_ROOT
 ```
 
-The active pack is STANDING v2 with `RULES/INDEX.md`, `VENDOR.md`, and exactly R01–R22. A missing pack fails. Native CLI authentication remains local to the machine. `claude auth status` is the Claude login check; the native model probe also verifies its subscription authentication. Never copy credentials from the kit.
+The active pack is STANDING v2 with `RULES/INDEX.md`, `VENDOR.md`, and exactly R01–R22. Missing or extra rules fail. Required rule files and each bundled `SKILL.md` must contain non-whitespace text. Preflight also checks the required runtime tool files. Native CLI authentication remains local to the machine. `claude auth status` is the Claude login check; the native model probe also verifies its subscription authentication. Never copy credentials from the kit.
 
 The example uses YESSIR's installed external pack. On another machine, supply its actual verified v2 pack. For bounded real-project attempts and failure recording, follow [the project handoff](../../magi-cli/references/project-runs.md).
 
@@ -30,22 +30,26 @@ The catalog in `dispatch-matrix.json` defines legal combinations. Catalog member
 For one catalog route:
 
 ```powershell
-node tools/model-probe.js --vendor openai --model gpt-5.6-terra --effort medium --evidence-dir C:/magi-runs/probes/terra-medium
-node tools/model-availability.js --file C:/magi-runs/availability.json --probe C:/magi-runs/probes/terra-medium/probe.json
+node tools/model-probe.js --vendor openai --model gpt-5.6-terra --effort medium --evidence-dir C:/src/magi-runs/probes/terra-medium
+node tools/model-availability.js --file C:/src/magi-runs/availability.json --probe C:/src/magi-runs/probes/terra-medium/probe.json
 ```
 
 Use a new evidence directory for each probe. Repeat for every pair selected by the plan. Google efforts use the matrix's fused names, such as `fused-high`. Probes invoke native CLIs and use included subscription capacity. Offline contract tests do not perform these calls.
 
-Availability imports replay the hashed native capture and log. The 60-minute freshness window starts at the original completed probe time. Re-importing a probe does not renew it. Missing, changed, expired, or mismatched native evidence fails.
+By default, a probe creates a scratch workspace under its evidence directory. If you supply `--cwd`, it must already exist and must not contain the evidence directory. Keep both paths outside the runtime. An unconfirmed child exit leaves incomplete scope evidence; inspect the recorded PID and stop before another attempt.
+
+Availability imports replay the hashed native capture and log. Use a separate availability output file; it must not replace the probe, capture, or log. The 60-minute freshness checks use the original probe timestamps. Re-importing a probe does not renew them. Missing, changed, expired, or mismatched native evidence fails.
 
 ## Prepare the complete plan
 
 Write each brief as a UTF-8 file. Put its unique acknowledgment line first. Include `brief-rules-block.md` and replace every placeholder before hashing. A final response must begin with that bound BRIEF first line. The STANDING fingerprint is a separate pack check.
 
+Write operator JSON files as UTF-8. A leading UTF-8 BOM from PowerShell 5.1 is accepted; plan hashes still cover the original bytes. UTF-16 and malformed UTF-8 are rejected. Supply each CLI option once; repeated selectors are errors.
+
 Calculate the final brief hash with:
 
 ```powershell
-(Get-FileHash -Algorithm SHA256 -LiteralPath C:/magi-runs/briefs/implement.md).Hash.ToLowerInvariant()
+(Get-FileHash -Algorithm SHA256 -LiteralPath C:/src/magi-runs/briefs/implement.md).Hash.ToLowerInvariant()
 ```
 
 The plan contains these fields:
@@ -73,18 +77,20 @@ Implementation distribution counts implementation units only. A convened run use
 Validate and copy the complete draft plan into a new run directory:
 
 ```powershell
-node tools/plan-seal.js --plan C:/magi-runs/draft-plan.json --run-dir C:/magi-runs/run-001 --availability C:/magi-runs/availability.json
+node tools/plan-seal.js --plan C:/src/magi-runs/draft-plan.json --run-dir C:/src/magi-runs/run-001 --availability C:/src/magi-runs/availability.json
 ```
 
-The seal binds plan bytes, brief hashes, matrix, and seat profiles. Changes require a new complete plan validation and a new run directory. A `vendorOverride` in `graph.json`, a SLICES vendor column, or an ad-hoc route flag grants no authority.
+The seal binds plan bytes, brief hashes, matrix, and seat profiles. Keep the run directory outside product worktrees and the runtime. Known destination collisions fail before copying plan files. Changes require a new complete plan validation and a new run directory. A `vendorOverride` in `graph.json`, a SLICES vendor column, or an ad-hoc route flag grants no authority.
 
 Launch a selected sealed entry:
 
 ```powershell
-node tools/dispatch-run.js --plan C:/magi-runs/run-001/dispatch-plan.json --run-dir C:/magi-runs/run-001 --dispatch-id implement-1 --rules-root $env:MAGI_RULES_ROOT
+node tools/dispatch-run.js --plan C:/src/magi-runs/run-001/dispatch-plan.json --run-dir C:/src/magi-runs/run-001 --dispatch-id implement-1 --rules-root $env:MAGI_RULES_ROOT
 ```
 
 Repeat for the remaining dispatch IDs after their real dependencies complete. Route fields come from the sealed entry. Changed class, author, role, model, effort, scope, or brief fails before execution. A duplicate logical dispatch cannot append a second successful telemetry row. Preserve failed evidence; a corrected attempt needs a newly authorized plan/run.
+
+Local input errors rejected before transaction reservation leave that dispatch unstarted. Correct the reported input and check the run state. An existing RUNNING or terminal FAIL transaction must not be reset. Every planned check remains required; agreeing checks from one vendor count as only one panel vote, and conflicting positions block approval.
 
 ### Claude: inspect, then attest the returned capture
 
@@ -101,7 +107,7 @@ The generated seat contract gives absolute paths to the staged rules and role sk
 Only after that inspection, run the same dispatch command with the returned capture hash:
 
 ```powershell
-node tools/dispatch-run.js --plan C:/magi-runs/run-001/dispatch-plan.json --run-dir C:/magi-runs/run-001 --dispatch-id implement-1 --rules-root $env:MAGI_RULES_ROOT --on-topic --capture-sha256 <returned-sha256>
+node tools/dispatch-run.js --plan C:/src/magi-runs/run-001/dispatch-plan.json --run-dir C:/src/magi-runs/run-001 --dispatch-id implement-1 --rules-root $env:MAGI_RULES_ROOT --on-topic --capture-sha256 <returned-sha256>
 ```
 
 This completes the saved transaction without launching another child. It revalidates the capture, protected inputs, scope, workspace, and prerequisite evidence. A mismatched hash or changed evidence cannot qualify. Never supply topicality flags on a first launch: the response does not yet exist to inspect.
@@ -145,8 +151,8 @@ A scope audit rejects product writes outside the declared scope. It does not san
 After the planned dependencies and checks complete:
 
 ```powershell
-node tools/run-finalize.js --run-dir C:/magi-runs/run-001
-node tools/panel-tally.js --run-dir C:/magi-runs/run-001 --unit-id api-1
+node tools/run-finalize.js --run-dir C:/src/magi-runs/run-001
+node tools/panel-tally.js --run-dir C:/src/magi-runs/run-001 --unit-id api-1
 ```
 
 Execution PASS and approval are separate results. A successful implementation alone is insufficient for approval. Ordinary approval requires foreign verification and review, with every review returning native APPROVE. For critical units, the finalizer requires at least two eligible native APPROVE positions after author recusal.

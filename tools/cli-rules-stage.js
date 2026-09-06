@@ -4,7 +4,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const { resolveRulesRoot } = require('./runtime-paths.js');
+const { canonicalPlainPath, resolveRulesRoot } = require('./runtime-paths.js');
 
 const FINGERPRINT = 'MAGI-CLI-STANDING v1 — Read this file in full; repeat this line verbatim before any other work.';
 // Trusted, version-adaptable: parent adds each new pack's exact fingerprint line
@@ -39,7 +39,7 @@ function listRuleFiles(rulesDir) {
   return names;
 }
 
-function stageRules({ briefPath, rulesRoot }) {
+function prepareRulesSource({ rulesRoot }) {
   let root;
   try { root = resolveRulesRoot({ rulesRoot, defaultRulesRoot: DEFAULT_RULES_ROOT }); }
   catch (error) { error.code = 'RULES_SOURCE_MISSING'; throw error; }
@@ -55,6 +55,7 @@ function stageRules({ briefPath, rulesRoot }) {
       throw error;
     }
   }
+  root = canonicalPlainPath(root);
   const firstLine = fs.readFileSync(standing, 'utf8').split(/\r?\n/, 1)[0];
   if (!TRUSTED_FINGERPRINTS.includes(firstLine)) {
     const error = new Error(`STANDING.md fingerprint mismatch: ${JSON.stringify(firstLine)}`);
@@ -63,9 +64,19 @@ function stageRules({ briefPath, rulesRoot }) {
   }
   const ruleFiles = listRuleFiles(rules);
   if (firstLine === FINGERPRINT_V2 && !ruleFiles.some((name) => name.startsWith('R22-'))) throw new Error('rules pack missing R22');
+  if (firstLine === FINGERPRINT_V2 && ruleFiles.length !== 22) throw new Error('v2 rules pack must contain exactly R01-R22');
   for (const source of [root, rules, standing, vendor, path.join(rules, 'INDEX.md'), ...ruleFiles.map((name) => path.join(rules, name))]) {
     if (fs.lstatSync(source).isSymbolicLink()) throw new Error('rules source must not contain symbolic links');
+    if (source !== root && source !== rules) {
+      if (!fs.lstatSync(source).isFile()) throw new Error(`rule source must be a regular file: ${source}`);
+      if (!fs.readFileSync(source, 'utf8').trim()) throw new Error(`required rule content is empty: ${source}`);
+    }
   }
+  return { root, standing, vendor, rules, ruleFiles, fingerprint: firstLine };
+}
+
+function stageRules({ briefPath, rulesRoot }) {
+  const { root, standing, vendor, rules, ruleFiles, fingerprint: firstLine } = prepareRulesSource({ rulesRoot });
   const briefDir = fs.realpathSync(path.dirname(path.resolve(briefPath)));
   const stagedRules = path.join(briefDir, 'RULES');
   const sourceRoot = fs.realpathSync(root);
@@ -134,6 +145,7 @@ function validateManifestShape(manifest, label) {
     const id = `R${String(i).padStart(2, '0')}`;
     if (!ruleIds.has(id)) throw new Error(`${label} is missing ${id}`);
   }
+  if (manifest.fingerprint === FINGERPRINT_V2 && ruleIds.size !== 22) throw new Error(`${label} must contain exactly R01-R22`);
 }
 
 function verifyStagedRules(briefPath, expectedManifest) {
@@ -187,4 +199,4 @@ function main(argv = process.argv.slice(2), io = process) {
 }
 
 if (require.main === module) process.exitCode = main();
-module.exports = { DEFAULT_RULES_ROOT, FINGERPRINT, FINGERPRINT_V2, TRUSTED_FINGERPRINTS, listRuleFiles, stageRules, verifyStagedRules };
+module.exports = { DEFAULT_RULES_ROOT, FINGERPRINT, FINGERPRINT_V2, TRUSTED_FINGERPRINTS, listRuleFiles, prepareRulesSource, stageRules, verifyStagedRules };

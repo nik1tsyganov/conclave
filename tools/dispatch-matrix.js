@@ -6,6 +6,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { ROLES } = require('./dispatch-schema.js');
 const { verifyProbe } = require('./probe-evidence.js');
+const { parseJsonBytes, readJsonFile } = require('./json-file.js');
 
 const DEFAULT_MATRIX = require('./runtime-paths.js').resolveRuntimePaths().matrixPath;
 const DEFAULT_PROBE_MAX_AGE_MINUTES = 60;
@@ -16,12 +17,12 @@ function sha256(value) { return crypto.createHash('sha256').update(value).digest
 function validId(value) { return typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(value); }
 
 function loadMatrix(file = DEFAULT_MATRIX) {
-  return JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'));
+  return readJsonFile(path.resolve(file));
 }
 
 function loadAvailability(file) {
   if (!file) return {};
-  try { return JSON.parse(fs.readFileSync(path.resolve(file), 'utf8')); }
+  try { return readJsonFile(path.resolve(file)); }
   catch (error) { throw argumentError(`cannot read availability file: ${error.message}`); }
 }
 
@@ -154,7 +155,7 @@ function readValidatedPlan(file, expectedHash, matrix, availability = {}, nowMs 
   const bytes = fs.readFileSync(planPath);
   const planHash = sha256(bytes);
   if (expectedHash !== undefined && expectedHash !== planHash) throw policyError('plan hash changed since validation');
-  const plan = JSON.parse(bytes.toString('utf8'));
+  const plan = parseJsonBytes(bytes);
   const validation = validatePlan(plan, matrix, availability, nowMs);
   return { plan, planPath, planHash, ...validation };
 }
@@ -197,8 +198,11 @@ function chooseRoute(matrix, { className, role, excludedVendors = [], availabili
 
 function parseArgs(argv) {
   const out = {};
+  const seen = new Set();
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
+    if (seen.has(flag)) throw argumentError(`duplicate option: ${flag}`);
+    seen.add(flag);
     if (flag === '--help' || flag === '-h') { out.help = true; continue; }
     if (['--plan', '--matrix', '--availability'].includes(flag)) {
       const value = argv[++i];

@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { readJsonFile } = require('./json-file.js');
 
 const VENDORS = Object.freeze(['openai', 'google', 'anthropic']);
 
@@ -44,7 +45,7 @@ function candidates(vendor, options = {}) {
   }[vendor];
   if (override) return [path.resolve(override)];
   const configPath = options.configFile || env.MAGI_VENDOR_CONFIG;
-  const config = options.config || (configPath ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : {});
+  const config = options.config || (configPath ? readJsonFile(configPath) : {});
   const configured = config.vendors?.[vendor]?.binary;
   if (configured) return [path.resolve(configured)];
 

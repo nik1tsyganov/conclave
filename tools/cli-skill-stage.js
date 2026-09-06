@@ -51,7 +51,9 @@ function regularFiles(root, current = root, out = [], directories = []) {
 
 function readSkill(source) {
   const files = regularFiles(source).map(file => ({ path: path.relative(source, file).replaceAll('\\', '/'), body: fs.readFileSync(file) }));
-  if (!files.some(file => file.path === 'SKILL.md')) throw stageError('skill missing SKILL.md: ' + source);
+  const instruction = files.find(file => file.path === 'SKILL.md');
+  if (!instruction) throw stageError('skill missing SKILL.md: ' + source);
+  if (!instruction.body.toString('utf8').trim()) throw stageError('required SKILL.md is empty: ' + source);
   const seen = new Set();
   for (const file of files) {
     if (!safeRelativePath(file.path) || seen.has(file.path.toLowerCase())) throw stageError('unsafe or duplicate skill path: ' + file.path);
@@ -78,7 +80,7 @@ function copySkill(source, destination) {
   return writeSkill(readSkill(from), to);
 }
 
-function stageSeatSkills(options = {}) {
+function prepareSeatSkills(options = {}) {
   try {
     const skills = allowedSkills(options.skills);
     const sourceRoot = canonicalPlainPath(options.sourceRoot || resolveRuntimePaths().seatSkillsRoot);
@@ -94,6 +96,16 @@ function stageSeatSkills(options = {}) {
         verifySeatSkills({ destinationRoot, skills: Object.keys(previous.skills || {}), manifest: previous });
       }
     }
+    return { sourceRoot, destinationRoot, prepared };
+  } catch (error) {
+    if (error.code === 'SKILL_STAGE_FAIL') throw error;
+    throw stageError(error.message);
+  }
+}
+
+function stageSeatSkills(options = {}) {
+  try {
+    const { sourceRoot, destinationRoot, prepared } = prepareSeatSkills(options);
     fs.rmSync(destinationRoot, { recursive: true, force: true });
     fs.mkdirSync(destinationRoot, { recursive: true });
     const manifest = { schemaVersion: 1, generatedAt: new Date().toISOString(), sourceRoot, skills: {} };
@@ -160,4 +172,4 @@ function verifySeatSkills({ destinationRoot, skills, manifest }) {
   }
 }
 
-module.exports = { FORBIDDEN_ARBITER_SKILLS, copySkill, regularFiles, stageError, stageSeatSkills, verifySeatSkills };
+module.exports = { FORBIDDEN_ARBITER_SKILLS, copySkill, prepareSeatSkills, regularFiles, stageError, stageSeatSkills, verifySeatSkills };

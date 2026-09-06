@@ -11,16 +11,26 @@ const { loadMatrix } = require('./dispatch-matrix.js');
 const { runLaunch } = require('./cli-runner.js');
 const { verifyProof } = require('./cli-proof.js');
 const { finalResponse, nativeLog } = require('./vendor-native.js');
-const { compareWorkspace, hashFile, snapshotWorkspace, writeJson } = require('./dispatch-evidence.js');
+const { compareWorkspace, hashFile, inside, snapshotWorkspace, writeJson } = require('./dispatch-evidence.js');
+const { canonicalPlainPath, pathsOverlap, DEFAULT_ROOT } = require('./runtime-paths.js');
 const { challengeMatches } = require('./probe-evidence.js');
 
 async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 120000 }, dependencies = {}) {
   const spec = loadMatrix().vendors?.[vendor]?.models?.[model];
   if (!spec?.efforts.includes(effort)) throw new Error('probe model/effort is outside the vendor catalog');
+  if (!Number.isSafeInteger(maxWallMs) || maxWallMs < 1 || maxWallMs > 120000) throw new Error('maxWallMs must be an integer between 1 and 120000');
+  if (!evidenceDir) throw new Error('probe evidenceDir is required');
   const root = path.resolve(evidenceDir);
-  if (fs.existsSync(root) && fs.readdirSync(root).length) throw new Error('probe evidence directory must be new or empty');
-  fs.mkdirSync(root, { recursive: true });
   const work = path.resolve(cwd || path.join(root, 'workspace'));
+  const canonicalRoot = canonicalPlainPath(root);
+  const canonicalWork = canonicalPlainPath(work);
+  if (inside(canonicalRoot, canonicalWork)) throw new Error('probe evidence directory must be outside its workspace');
+  const runtime = canonicalPlainPath(DEFAULT_ROOT);
+  if ([canonicalRoot, canonicalWork].some(file => pathsOverlap(file, runtime))) throw new Error('probe paths must be outside the runtime');
+  if (cwd && (!fs.existsSync(work) || !fs.statSync(work).isDirectory())) throw new Error('explicit probe cwd must be an existing directory');
+  if (fs.existsSync(root) && fs.readdirSync(root).length) throw new Error('probe evidence directory must be new or empty');
+  const binary = resolveVendorBinary(vendor);
+  fs.mkdirSync(root, { recursive: true });
   fs.mkdirSync(work, { recursive: true });
   const challenge = `MAGI_PROBE_${crypto.randomBytes(16).toString('hex')}`;
   const prompt = `Reply with exactly ${challenge} in your final response. Do not use tools. Do not modify any files.\n`;
@@ -30,7 +40,6 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
   const log = path.join(root, 'vendor.log');
   const nativeLogPath = vendor === 'google' ? path.join(root, 'native-cli.log') : undefined;
   const env = { ...subscriptionEnv(), AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
-  const binary = resolveVendorBinary(vendor);
   if (vendor === 'anthropic') {
     const auth = JSON.parse(execFileSync(binary, ['auth', 'status'], { env, encoding: 'utf8', windowsHide: true, timeout: 15000 }));
     if (auth.loggedIn !== true || auth.authMethod !== 'claude.ai') throw new Error('Claude subscription authentication is not available');
@@ -45,7 +54,7 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
   writeJson(path.join(root, 'launch.json'), { vendor, model, effort, binary, args, cwd: work, startedAt });
   const before = snapshotWorkspace(work);
   try {
-  const result = await (dependencies.runLaunch || runLaunch)(launch, { stdoutFile: path.join(root, 'stdout.log'), stderrFile: path.join(root, 'stderr.log'), maxWallMs });
+  const result = await (dependencies.runLaunch || runLaunch)(launch, { pidFile: path.join(root, 'child.pid'), stdoutFile: path.join(root, 'stdout.log'), stderrFile: path.join(root, 'stderr.log'), maxWallMs });
   const completedAt = new Date().toISOString();
   writeJson(path.join(root, 'process-result.json'), { ...result, stdout: undefined, stderr: undefined, startedAt, completedAt });
   const audit = compareWorkspace(before, snapshotWorkspace(work), []);
@@ -65,20 +74,29 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
   writeJson(path.join(root, 'probe.json'), record);
   return { ...record, probeFile: path.join(root, 'probe.json') };
   } catch (error) {
-    writeJson(path.join(root, 'probe.json'), { schemaVersion: 1, status: 'FAIL', vendor, requestedModel: model, effort, startedAt, completedAt: new Date().toISOString(), error: error.message });
+    const cleanup = { errorCode: error.code || null, pid: error.pid ?? null, exitConfirmed: error.exitConfirmed ?? null };
+    if (error.exitConfirmed === false) writeJson(path.join(root, 'scope-audit.json'), { ok: false, complete: false, reason: 'child exit is unconfirmed; no final workspace evidence', ...cleanup });
+    writeJson(path.join(root, 'probe.json'), { schemaVersion: 1, status: 'FAIL', vendor, requestedModel: model, effort, startedAt, completedAt: new Date().toISOString(), error: error.message, ...cleanup });
     throw error;
   }
 }
-async function main(argv = process.argv.slice(2)) {
-  try {
+function parseArgs(argv) {
     const opts = {};
+    const seen = new Set();
     for (let i = 0; i < argv.length; i += 2) {
-      if (!['--vendor', '--model', '--effort', '--evidence-dir', '--cwd'].includes(argv[i]) || !argv[i + 1]) throw new Error('Usage: model-probe --vendor <vendor> --model <model> --effort <effort> --evidence-dir <new directory>');
+      if (seen.has(argv[i])) throw new Error(`duplicate option: ${argv[i]}`);
+      seen.add(argv[i]);
+      if (!['--vendor', '--model', '--effort', '--evidence-dir', '--cwd'].includes(argv[i]) || !argv[i + 1] || argv[i + 1].startsWith('--')) throw new Error('Usage: model-probe --vendor <vendor> --model <model> --effort <effort> --evidence-dir <new directory>');
       opts[argv[i].slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = argv[i + 1];
     }
+    return opts;
+}
+async function main(argv = process.argv.slice(2)) {
+  try {
+    const opts = parseArgs(argv);
     const result = await probe(opts);
     process.stdout.write(`${JSON.stringify({ status: result.status, vendor: result.vendor, requestedModel: result.requestedModel, observedModel: result.observedModel, effort: result.effort, probeFile: result.probeFile })}\n`); return 0;
   } catch (error) { process.stderr.write(`MODEL_PROBE_FAIL: ${error.message}\n`); return 1; }
 }
 if (require.main === module) main().then((code) => { process.exitCode = code; });
-module.exports = { main, probe };
+module.exports = { main, parseArgs, probe };

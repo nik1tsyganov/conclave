@@ -260,12 +260,17 @@ function tallyUnit(run, unitId) {
   if (!planned.length) throw new Error('unit absent from sealed plan');
   const authorVendor = planned.find((entry) => entry.role === 'implement')?.vendor || planned.find((entry) => entry.authorVendor)?.authorVendor;
   if (!authorVendor) throw new Error('panel author provenance is missing');
-  const ballots = [];
+  const ballotsByVendor = new Map();
   for (const execution of run.executions.filter(({ entry }) => entry.unitId === unitId && ['review', 'verify'].includes(entry.role))) {
     const current = snapshotWorkspace(execution.entry.cwd);
     if (!compareWorkspace(execution.after, current, []).ok) throw new Error('worktree changed after panel evidence');
-    ballots.push({ vendor: execution.entry.vendor, position: nativePosition(execution.response), role: execution.entry.role });
+    const ballot = { vendor: execution.entry.vendor, position: nativePosition(execution.response), role: execution.entry.role };
+    const prior = ballotsByVendor.get(ballot.vendor);
+    if (prior && prior.position !== ballot.position) throw new Error(`conflicting positions from ${ballot.vendor}`);
+    // Every checking row was validated above; agreeing rows still provide only one vendor vote.
+    if (!prior) ballotsByVendor.set(ballot.vendor, ballot);
   }
+  const ballots = [...ballotsByVendor.values()];
   return { unitId, authorVendor, ...tally({ ballots, authorVendor }) };
 }
 

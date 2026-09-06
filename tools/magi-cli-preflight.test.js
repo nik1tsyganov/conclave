@@ -8,6 +8,7 @@ const child = require('node:child_process');
 const test = require('node:test');
 const { check, main } = require('./magi-cli-preflight.js');
 const { FINGERPRINT, FINGERPRINT_V2 } = require('./cli-rules-stage.js');
+const { CLI_RUNTIME_TOOLS } = require('./runtime-paths.js');
 
 function put(file, body = 'fixture\n') {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -29,6 +30,7 @@ function fixture(t) {
   put(seatProfiles, JSON.stringify(profiles));
   put(path.join(references, 'dispatch-matrix.json'), '{}');
   fs.mkdirSync(path.join(runtimeRoot, 'tools'));
+  for (const name of CLI_RUNTIME_TOOLS) put(path.join(runtimeRoot, 'tools', name));
   for (const skill of ['seat-openai', 'testing']) put(path.join(runtimeRoot, 'seat-skills', skill, 'SKILL.md'), 'lean bundled skill');
   put(path.join(home, '.claude', 'skills', 'testing', 'SKILL.md'), 'wrong full home skill');
   put(path.join(rulesRoot, 'STANDING.md'), FINGERPRINT_V2 + '\n');
@@ -160,3 +162,39 @@ test('CLI rejects missing or unknown options with a structured result', () => {
     assert.equal(JSON.parse(output).ok, false);
   }
 });
+
+test('an incomplete runtime cannot pass startup preflight', t => {
+  const f = fixture(t);
+  fs.rmSync(path.join(f.runtimeRoot, 'tools', 'plan-seal.js'), { force: true });
+  const before = snapshot(f.root);
+  const result = check(f);
+  assert.equal(result.ok, false);
+  assert.match(result.findings.find(row => row.check === 'runtime:files').error, /plan-seal\.js/);
+  assert.deepEqual(snapshot(f.root), before);
+});
+
+test('v2 preflight rejects an additional rule ID', t => {
+  const f = fixture(t);
+  put(path.join(f.rulesRoot, 'RULES', 'R23-extra.md'));
+  const result = check(f);
+  assert.equal(result.ok, false);
+  assert.match(result.findings.find(row => row.check === 'rules:R01-R22').error, /exactly R01-R22/);
+});
+
+for (const relative of ['SKILL.md', 'STANDING.md', 'VENDOR.md', 'RULES/INDEX.md', 'RULES/R01-fixture.md', 'RULES/R22-fixture.md']) {
+  test(`blank required ${relative} fails preflight without writes`, t => {
+    const f = fixture(t);
+    const file = relative === 'SKILL.md'
+      ? path.join(f.runtimeRoot, 'seat-skills', 'testing', relative)
+      : path.join(f.rulesRoot, relative);
+    const original = fs.readFileSync(file);
+    for (const body of ['', '\ufeff \t\r\n']) {
+      fs.writeFileSync(file, body, 'utf8');
+      const before = snapshot(f.root);
+      assert.equal(check(f).ok, false);
+      assert.deepEqual(snapshot(f.root), before);
+    }
+    fs.writeFileSync(file, original);
+    assert.equal(check(f).ok, true);
+  });
+}
