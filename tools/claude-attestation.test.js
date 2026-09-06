@@ -103,6 +103,27 @@ test('missing malformed and mismatched checkpoint hashes leave pending evidence 
   }
 });
 
+test('a new Claude PASS still requires its matching capture hash when attesting a replay', async t => {
+  const run = claudeRun(t);
+  const native = fakeVendor();
+  const pending = await runDispatch(command(run), native);
+  await accept(run, pending, native);
+  for (const extra of [['--on-topic'], ['--on-topic', '--capture-sha256', '0'.repeat(64)]]) {
+    const before = snapshotWorkspace(run.runDir);
+    await assert.rejects(runDispatch(command(run, extra), native), /attestation|SHA-256/);
+    assert.deepEqual(snapshotWorkspace(run.runDir), before);
+    assert.equal(native.calls(), 1);
+  }
+  const { file, state } = saved(run);
+  delete state.attestationProtocol;
+  writeJson(file, state);
+  const before = snapshotWorkspace(run.runDir);
+  await assert.rejects(runDispatch(command(run, ['--on-topic']), native), /attestation|SHA-256/);
+  assert.equal(inspectRun(run.runDir).outcomes[0].status, 'INVALID');
+  assert.deepEqual(snapshotWorkspace(run.runDir), before);
+  assert.equal(native.calls(), 1);
+});
+
 test('pending output cannot satisfy a dependent verifier', async t => {
   const run = createSealedRun(t, [{ unitId: 'u1', vendor: 'anthropic', model: 'sonnet', effort: 'medium' },
     { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium', authorVendor: 'anthropic' }]);
@@ -383,6 +404,39 @@ test('logs cannot replace protected rule inputs stored inside the run', async t 
   const native = fakeVendor();
   const before = snapshotWorkspace(run.runDir);
   await assert.rejects(runDispatch({ ...command(run), rulesRoot, telemetryLog: path.join(rulesRoot, 'STANDING.md') }, native), /log destination.*overlap/);
+  assert.equal(native.calls(), 0);
+  assert.deepEqual(snapshotWorkspace(run.runDir), before);
+});
+
+test('environment rules resolve before initial destination validation creates evidence', async t => {
+  const run = claudeRun(t);
+  const rulesRoot = path.join(run.runDir, 'environment-rules');
+  fs.cpSync(run.opts.rulesRoot, rulesRoot, { recursive: true });
+  const previous = process.env.MAGI_RULES_ROOT;
+  process.env.MAGI_RULES_ROOT = rulesRoot;
+  t.after(() => { if (previous === undefined) delete process.env.MAGI_RULES_ROOT; else process.env.MAGI_RULES_ROOT = previous; });
+  const { rulesRoot: explicitRules, ...opts } = command(run);
+  const native = fakeVendor();
+  const before = snapshotWorkspace(run.runDir);
+  await assert.rejects(runDispatch({ ...opts, telemetryLog: path.join(rulesRoot, 'STANDING.md') }, native), /log destination.*overlap/);
+  assert.equal(native.calls(), 0);
+  assert.deepEqual(snapshotWorkspace(run.runDir), before);
+});
+
+test('default bundled skills resolve before initial destination validation creates evidence', async t => {
+  const run = claudeRun(t);
+  const runtime = path.join(run.runDir, 'runtime');
+  fs.cpSync(__dirname, path.join(runtime, 'tools'), { recursive: true });
+  const refs = '.cursor/skills/magi-cli/references';
+  fs.mkdirSync(path.join(runtime, refs), { recursive: true });
+  for (const name of ['dispatch-matrix.json', 'seat-profiles.json']) fs.copyFileSync(path.join(__dirname, '..', refs, name), path.join(runtime, refs, name));
+  fs.cpSync(run.opts.skillSourceRoot, path.join(runtime, 'seat-skills'), { recursive: true });
+  const isolatedDispatch = require(path.join(runtime, 'tools/dispatch-run.js')).runDispatch;
+  const { skillSourceRoot: explicitSkills, ...opts } = command(run);
+  const native = fakeVendor();
+  const before = snapshotWorkspace(run.runDir);
+  const skill = fs.readdirSync(path.join(runtime, 'seat-skills'))[0];
+  await assert.rejects(isolatedDispatch({ ...opts, telemetryLog: path.join(runtime, 'seat-skills', skill, 'SKILL.md') }, native), /log destination.*overlap/);
   assert.equal(native.calls(), 0);
   assert.deepEqual(snapshotWorkspace(run.runDir), before);
 });

@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildLaunch } = require('./cli-adapters.js');
 const { runLaunch } = require('./cli-runner.js');
-const { FINGERPRINT_V2, stageRules, verifyStagedRules } = require('./cli-rules-stage.js');
+const { DEFAULT_RULES_ROOT, FINGERPRINT_V2, stageRules, verifyStagedRules } = require('./cli-rules-stage.js');
 const { checkBriefFile } = require('./cli-brief-rules-check.js');
 const { verifyNativeProof, verifyProof } = require('./cli-proof.js');
 const { validateDispatchRow, ROLES } = require('./dispatch-schema.js');
@@ -17,6 +17,7 @@ const { DEFAULT_PROFILES } = require('./seat-policy.js');
 const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, appendUniqueRow, assertPlainPath, compareWorkspace, hashFile, inside, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, writeJson: atomicJson } = require('./dispatch-evidence.js');
 const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, nativeLog, validateClaudeResponseLaunch } = require('./vendor-native.js');
 const { readSealedRun } = require('./plan-seal.js');
+const { resolveRulesRoot, resolveRuntimePaths } = require('./runtime-paths.js');
 const { SEQUENCE_PROTOCOL, validateLogDestinations, verifyCheckpoint, verifyExecution, verifyPrerequisites } = require('./run-finalize.js');
 
 function argError(message) { const e = new Error(message); e.code = 'ARGUMENT_ERROR'; return e; }
@@ -174,7 +175,15 @@ async function runDispatch(opts, dependencies = {}) {
   assertPlainPath(transactionPath);
   const savedState = fs.existsSync(transactionPath) ? JSON.parse(fs.readFileSync(transactionPath, 'utf8')) : null;
   const postRun = planEntry.vendor === 'anthropic';
-  const attesting = postRun && (opts.onTopic === true || opts.captureSha256 !== undefined);
+  let legacyReplay = false;
+  if (postRun && opts.onTopic === true && opts.captureSha256 === undefined && savedState?.status === 'PASS' &&
+      savedState.attestationProtocol === undefined && seal.attestationProtocol === undefined) {
+    // The producing command attested historical PASS runs without a checkpoint hash.
+    // Validate their native evidence before accepting that command contract again.
+    verifyExecution(sealed, planEntry, savedState);
+    legacyReplay = true;
+  }
+  const attesting = postRun && !legacyReplay && (opts.onTopic === true || opts.captureSha256 !== undefined);
   if (opts.captureSha256 !== undefined && !postRun) throw argError('--capture-sha256 is only for Claude post-run attestation');
   if (attesting) {
     if (opts.onTopic !== true || typeof opts.captureSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(opts.captureSha256)) throw argError('post-run attestation requires --on-topic and --capture-sha256 with a lowercase SHA-256');
@@ -190,6 +199,12 @@ async function runDispatch(opts, dependencies = {}) {
   const activationLog = path.resolve(opts.activationLog || path.join(runDir, 'magi-dispatch-log.jsonl'));
   if ([telemetryLog, activationLog].some((file) => !inside(file, runDir) || inside(file, cwd))) throw policyError('dispatch logs must be inside the run directory and outside the product worktree');
   for (const file of [telemetryLog, activationLog, evidenceDir]) assertPlainPath(file);
+  if (!savedState) {
+    // Use the same configured sources as staging before reserving or writing evidence.
+    try { opts.rulesRoot = resolveRulesRoot({ rulesRoot: opts.rulesRoot, defaultRulesRoot: DEFAULT_RULES_ROOT }); }
+    catch (error) { error.code = 'RULES_SOURCE_MISSING'; throw error; }
+    opts.skillSourceRoot = opts.skillSourceRoot || resolveRuntimePaths().seatSkillsRoot;
+  }
   validateLogDestinations(sealed, [telemetryLog, activationLog], evidenceDir, [DEFAULT_MATRIX, DEFAULT_PROFILES, ...[opts.rulesRoot, opts.skillSourceRoot].filter(Boolean)]);
   const prerequisites = fs.existsSync(transactionPath) ? null : verifyPrerequisites(sealed, binding.entry,
     ['review', 'verify'].includes(opts.role) ? snapshotWorkspace(cwd) : undefined, new Date().toISOString());
