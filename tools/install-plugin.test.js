@@ -313,7 +313,8 @@ test('documented startup command works without source or home policy in an isola
     const path = require('node:path');
     const Module = require('node:module');
     const child = require('node:child_process');
-    const within = file => { const rel = path.relative(process.cwd(), file); if (rel === '..' || rel.startsWith('..' + path.sep) || path.isAbsolute(rel)) throw new Error('read outside installed runtime: ' + file); };
+    const installedRoot = fs.realpathSync.native(process.cwd());
+    const within = file => { const rel = path.relative(installedRoot, fs.realpathSync.native(file)); if (rel === '..' || rel.startsWith('..' + path.sep) || path.isAbsolute(rel)) throw new Error('read outside installed runtime: ' + file); };
     const read = fs.readFileSync;
     fs.readFileSync = function(file, ...args) { within(path.resolve(String(file))); return read.call(this, file, ...args); };
     const resolve = Module._resolveFilename;
