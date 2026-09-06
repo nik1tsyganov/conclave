@@ -5,9 +5,15 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync, spawnSync } = require('node:child_process');
 
+const ATTESTATION_PROTOCOL = 'magi-claude-post-run-attestation-v1';
+const AWAITING_ATTESTATION = 'AWAITING_ATTESTATION';
+
 function evidenceError(message, code = 'EVIDENCE_FAIL') { return Object.assign(new Error(message), { code }); }
 function hash(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
 function hashFile(file) { return hash(fs.readFileSync(file)); }
+function runtimeManifest() {
+  return fs.readdirSync(__dirname).filter(name => name.endsWith('.js') && !name.endsWith('.test.js')).sort().map(name => ({ path: name, sha256: hashFile(path.join(__dirname, name)) }));
+}
 function assertPlainPath(file) {
   let current = path.resolve(file);
   while (true) {
@@ -78,18 +84,19 @@ function compareWorkspace(before, after, scope = []) {
   return { ok: !gitChanged && changedFiles.every((file) => file.allowed), changedFiles, gitChanged, coverage: after.coverage };
 }
 function transactionKey(entry) { return hash(JSON.stringify([entry.dispatchId, entry.unitId, entry.role])); }
-function reserveTransaction(binding, evidenceDir) {
+function reserveTransaction(binding, evidenceDir, attestationProtocol) {
   const root = path.join(path.dirname(binding.planPath), '.magi-dispatches');
   assertPlainPath(root);
   fs.mkdirSync(root, { recursive: true });
   const file = path.join(root, `${transactionKey(binding.entry)}.json`);
   const requestHash = hash(JSON.stringify({ planHash: binding.planHash, entry: binding.entry }));
-  const state = { schemaVersion: 1, status: 'RUNNING', requestHash, planHash: binding.planHash, planId: binding.plan.planId, entry: binding.entry, evidenceDir, startedAt: new Date().toISOString() };
+  const state = { schemaVersion: 1, status: 'RUNNING', requestHash, planHash: binding.planHash, planId: binding.plan.planId, entry: binding.entry, evidenceDir, startedAt: new Date().toISOString(), ...(attestationProtocol ? { attestationProtocol } : {}) };
   try { fs.writeFileSync(file, `${JSON.stringify(state)}\n`, { encoding: 'utf8', flag: 'wx' }); }
   catch (error) {
     if (error.code !== 'EEXIST') throw error;
     const previous = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (previous.requestHash !== requestHash) throw evidenceError('logical dispatch already belongs to a different validated plan', 'DUPLICATE_DISPATCH');
+    if (previous.status === AWAITING_ATTESTATION) return { file, state: previous, pending: true, replayed: true };
     if (previous.status !== 'PASS') throw evidenceError(`logical dispatch is ${previous.status}; use a new dispatch ID and validate its plan`, 'DUPLICATE_DISPATCH');
     verifyCommittedRow(previous.telemetry);
     return { file, state: previous, replayed: true };
@@ -115,10 +122,7 @@ function verifyCommittedRow(row, { checkLogs = true } = {}) {
   if (row.schemaVersion !== 2 || row.status !== 'PASS' || !row.transactionPath) throw evidenceError('activation requires a committed dispatch transaction');
   const state = JSON.parse(fs.readFileSync(row.transactionPath, 'utf8'));
   if (state.status !== 'PASS' || JSON.stringify(state.telemetry) !== JSON.stringify(row)) throw evidenceError('telemetry and committed transaction disagree');
-  if (!Array.isArray(state.artifacts) || state.artifacts.length < 5) throw evidenceError('committed transaction has incomplete evidence');
-  for (const item of state.artifacts) {
-    if (hashFile(item.path) !== item.sha256) throw evidenceError(`committed evidence changed: ${item.path}`);
-  }
+  verifyArtifacts(state);
   for (const log of checkLogs ? state.logs || [] : []) {
     const matches = fs.readFileSync(log, 'utf8').split(/\r?\n/).filter(Boolean).map(JSON.parse).filter((item) => item.dispatchId === row.dispatchId && item.unitId === row.unitId && item.role === row.role);
     if (matches.length !== 1 || JSON.stringify(matches[0]) !== JSON.stringify(row)) throw evidenceError('dispatch log and committed transaction disagree');
@@ -126,4 +130,12 @@ function verifyCommittedRow(row, { checkLogs = true } = {}) {
   return state;
 }
 
-module.exports = { appendUniqueRow, assertPlainPath, compareWorkspace, hash, hashFile, inside, reserveTransaction, snapshotWorkspace, transactionKey, verifyCommittedRow, writeJson };
+function verifyArtifacts(state) {
+  if (!Array.isArray(state.artifacts) || state.artifacts.length < 5) throw evidenceError('committed transaction has incomplete evidence');
+  for (const item of state.artifacts) {
+    assertPlainPath(item.path);
+    if (hashFile(item.path) !== item.sha256) throw evidenceError(`committed evidence changed: ${item.path}`);
+  }
+}
+
+module.exports = { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, appendUniqueRow, assertPlainPath, compareWorkspace, hash, hashFile, inside, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, verifyArtifacts, verifyCommittedRow, writeJson };

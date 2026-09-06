@@ -4,15 +4,42 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { readSealedRun } = require('./plan-seal.js');
-const { assertPlainPath, compareWorkspace, hash, hashFile, inside, snapshotWorkspace, transactionKey, verifyCommittedRow, writeJson } = require('./dispatch-evidence.js');
-const { verifyProof } = require('./cli-proof.js');
+const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, assertPlainPath, compareWorkspace, hash, hashFile, inside, runtimeManifest, snapshotWorkspace, transactionKey, verifyArtifacts, verifyCommittedRow, writeJson } = require('./dispatch-evidence.js');
+const { verifyNativeProof, verifyProof } = require('./cli-proof.js');
 const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, validateClaudeResponseLaunch } = require('./vendor-native.js');
 const { tally } = require('./position-tally.js');
+const { canonicalPlainPath, pathsOverlap } = require('./runtime-paths.js');
 
 const SEQUENCE_PROTOCOL = 'magi-unit-sequence-v1';
 
 function readJson(file) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
 function same(a, b, label) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${label} disagrees with committed evidence`); }
+function validateLogDestinations(run, logs, evidenceDir, protectedPaths = []) {
+  const reserved = [evidenceDir, run.planPath, run.sealPath, run.availablePath,
+    ...['.magi-dispatches', '.magi-sessions', 'run-summary.json', 'telemetry.jsonl', 'implementation.jsonl'].map(name => path.join(run.root, name)),
+    ...protectedPaths];
+  for (const entry of run.plan.dispatches) {
+    reserved.push(entry.brief, path.join(run.root, 'out', entry.dispatchId));
+    const file = path.join(run.root, '.magi-dispatches', `${transactionKey(entry)}.json`);
+    assertPlainPath(file);
+    if (fs.existsSync(file)) {
+      const state = readJson(file);
+      reserved.push(state.evidenceDir, ...(state.artifacts || []).map(item => item.path));
+    }
+  }
+  const protectedFiles = reserved.map(canonicalPlainPath);
+  const root = canonicalPlainPath(run.root);
+  const products = run.plan.dispatches.map(entry => canonicalPlainPath(entry.cwd));
+  for (const file of logs) {
+    if (typeof file !== 'string' || !path.isAbsolute(file) || path.resolve(file) !== file) throw new Error('log destination must be an absolute normalized path');
+    const destination = canonicalPlainPath(file);
+    if (destination === root || !inside(destination, root) || products.some(product => inside(destination, product))) throw new Error('log destinations must remain inside the sealed run and outside product worktrees');
+    if (protectedFiles.some(protectedFile => pathsOverlap(destination, protectedFile))) throw new Error('log destination overlaps dispatch evidence, control files, or protected inputs');
+    assertPlainPath(file);
+    if (fs.existsSync(file) && !fs.statSync(file).isFile()) throw new Error('log destination is not a regular file');
+  }
+}
+
 function verifyPrerequisites(run, entry, before, startedAt) {
   if (!['review', 'verify'].includes(entry.role)) return [];
   const author = run.plan.dispatches.find(row => row.unitId === entry.unitId && row.role === 'implement');
@@ -43,16 +70,43 @@ function verifyPrerequisites(run, entry, before, startedAt) {
 }
 
 function verifyExecution(run, entry, state) {
+  if (state.status !== 'PASS') throw new Error('execution has no committed PASS transaction');
+  return verifySavedExecution(run, entry, state, false);
+}
+
+function verifyCheckpoint(run, entry, state, { current = false } = {}) {
+  if (state.status !== AWAITING_ATTESTATION || entry.vendor !== 'anthropic') throw new Error('dispatch is not awaiting Claude attestation');
+  const execution = verifySavedExecution(run, entry, state, true);
+  if (current) {
+    if (!compareWorkspace(execution.after, snapshotWorkspace(entry.cwd), []).ok) throw new Error('workspace changed after the attestation checkpoint');
+    const artifact = name => path.join(state.evidenceDir, name);
+    same(readJson(artifact('runtime-manifest.json')), runtimeManifest(), 'current runtime');
+    const rules = readJson(artifact('rules-source-after.json'));
+    if (!compareWorkspace(rules, snapshotWorkspace(rules.root), []).ok) throw new Error('rules source changed after the attestation checkpoint');
+    for (const skill of Object.values(readJson(artifact('skills-source-after.json')))) {
+      if (!compareWorkspace(skill, snapshotWorkspace(skill.root), []).ok) throw new Error('skill source changed after the attestation checkpoint');
+    }
+  }
+  return execution;
+}
+
+function verifySavedExecution(run, entry, state, pending) {
   same(state.entry, entry, 'plan entry');
   if (state.planHash !== run.seal.planHash || state.planId !== run.plan.planId || state.requestHash !== hash(JSON.stringify({ planHash: run.seal.planHash, entry }))) throw new Error('transaction belongs to a different plan');
   const transactionPath = path.join(run.root, '.magi-dispatches', `${transactionKey(entry)}.json`);
   if (state.telemetry?.transactionPath !== transactionPath || !inside(state.evidenceDir, run.root)) throw new Error('transaction evidence is outside its sealed run');
-  verifyCommittedRow(state.telemetry, { checkLogs: false });
+  if (pending) verifyArtifacts(state);
+  else verifyCommittedRow(state.telemetry, { checkLogs: false });
+  if (state.receipt.status !== state.status || state.telemetry.status !== state.status) throw new Error('receipt/telemetry completion status mismatch');
   const artifact = (name) => path.join(state.evidenceDir, name);
   for (const name of ['capture.txt', 'vendor.log', 'proof.json', 'receipt-ack.json', 'handoff-envelope.json', 'scope-audit.json', 'plan-binding.json', 'launch.json', 'workspace-before.json', 'workspace-after.json', 'runtime-manifest.json', 'rules-source-before.json', 'rules-source-after.json', 'rules-source-audit.json', 'skills-source-before.json', 'skills-source-after.json', 'skills-source-audit.json']) {
     if (!state.artifacts.some((item) => item.path === artifact(name) && item.sha256 === hashFile(artifact(name)))) throw new Error(`missing committed artifact: ${name}`);
   }
   const launch = readJson(artifact('launch.json'));
+  const postRun = entry.vendor === 'anthropic' && Boolean(run.seal.attestationProtocol || state.attestationProtocol || launch.attestationProtocol || state.receipt.attestationProtocol);
+  if (pending && !postRun) throw new Error('checkpoint is missing its attestation protocol');
+  if (postRun && [state.attestationProtocol, launch.attestationProtocol, state.receipt.attestationProtocol].some(value => value !== ATTESTATION_PROTOCOL)) throw new Error('missing or unsupported attestation protocol');
+  if (postRun && run.seal.attestationProtocol !== undefined && run.seal.attestationProtocol !== ATTESTATION_PROTOCOL) throw new Error('unsupported sealed attestation protocol');
   const responseProtocol = entry.vendor === 'anthropic' ? CLAUDE_RESPONSE_PROTOCOL : undefined;
   if (responseProtocol) validateClaudeResponseLaunch(launch);
   const runtimeSha256 = hash(JSON.stringify(readJson(artifact('runtime-manifest.json'))));
@@ -63,8 +117,22 @@ function verifyExecution(run, entry, state) {
   const envelope = readJson(artifact('handoff-envelope.json'));
   const { telemetryLog, ...receiptEnvelope } = envelope;
   same(receiptEnvelope, state.receipt, 'handoff');
+  let logs = state.logs;
+  if (postRun) {
+    const destinations = launch.logDestinations;
+    if (!destinations || typeof destinations !== 'object' || Array.isArray(destinations)) throw new Error('missing protected log destinations');
+    same(destinations, { telemetryLog: destinations.telemetryLog, activationLog: destinations.activationLog }, 'log destination fields');
+    logs = [...new Set([destinations.telemetryLog, destinations.activationLog])];
+    const rules = readJson(artifact('rules-source-after.json'));
+    const skills = Object.values(readJson(artifact('skills-source-after.json')));
+    validateLogDestinations(run, logs, state.evidenceDir, [rules.root, ...skills.map(skill => skill.root)]);
+    same(state.logs, logs, 'log destinations');
+    same(state.receipt.logDestinations, destinations, 'receipt log destinations');
+    if (telemetryLog !== destinations.telemetryLog) throw new Error('handoff log destination changed');
+  }
   const spec = run.matrix.vendors[entry.vendor].models[entry.model];
-  const proof = verifyProof({ vendor: entry.vendor, capture: artifact('capture.txt'), log: artifact('vendor.log'), expectedModel: entry.model, expectedObservedModel: spec.canonical || entry.model, expectedEffort: entry.effort, expectedSandbox: entry.vendor === 'openai' ? (entry.role === 'implement' ? 'workspace-write' : 'read-only') : undefined, onTopic: true, responseProtocol });
+  const proof = (postRun ? verifyNativeProof : verifyProof)({ vendor: entry.vendor, capture: artifact('capture.txt'), log: artifact('vendor.log'), expectedModel: entry.model, expectedObservedModel: spec.canonical || entry.model, expectedEffort: entry.effort, expectedSandbox: entry.vendor === 'openai' ? (entry.role === 'implement' ? 'workspace-write' : 'read-only') : undefined, onTopic: true, responseProtocol });
+  if (postRun) proof.attestationProtocol = ATTESTATION_PROTOCOL;
   Object.assign(proof, { planId: run.plan.planId, planHash: run.seal.planHash, escalation: entry.escalation === true, escalationReason: entry.escalationReason || null });
   const proofId = hash(JSON.stringify(proof));
   same(readJson(artifact('proof.json')), { proofId, class: entry.class, ...proof }, 'native proof');
@@ -92,6 +160,34 @@ function verifyExecution(run, entry, state) {
   if (Object.values(skillsAudit).some((audit) => !audit.ok)) throw new Error('skill source changed during execution');
   const response = finalResponse(entry.vendor, fs.readFileSync(artifact('capture.txt'), 'utf8'), { responseProtocol });
   if (response.split(/\r?\n/, 1)[0] !== fs.readFileSync(entry.brief, 'utf8').split(/\r?\n/, 1)[0]) throw new Error('native response has wrong brief acknowledgement');
+  if (postRun) {
+    const started = Date.parse(state.startedAt);
+    const finished = Date.parse(state.receipt.completedAt);
+    const committed = Date.parse(state.completedAt);
+    if (launch.startedAt !== state.startedAt || !Number.isFinite(started) || !Number.isFinite(finished) || !Number.isFinite(committed) || finished < started || committed < finished) throw new Error('invalid attestation execution timestamps');
+    for (const name of ['checkpoint.json', 'response.txt', ...(!pending ? ['attestation.json'] : [])]) {
+      if (!state.artifacts.some(item => item.path === artifact(name) && item.sha256 === hashFile(artifact(name)))) throw new Error(`missing committed attestation artifact: ${name}`);
+    }
+    if (fs.readFileSync(artifact('response.txt'), 'utf8') !== response) throw new Error('checkpoint response differs from native output');
+    const checkpoint = readJson(artifact('checkpoint.json'));
+    if (state.receipt.captureSha256 !== hashFile(artifact('capture.txt'))) throw new Error('receipt capture hash differs from native output');
+    const { protectedInputs, recordedAt, ...binding } = checkpoint;
+    same(binding, { schemaVersion: 1, status: AWAITING_ATTESTATION, protocol: ATTESTATION_PROTOCOL, planId: run.plan.planId, planHash: run.seal.planHash, dispatchId: entry.dispatchId, unitId: entry.unitId, proofId, captureSha256: hashFile(artifact('capture.txt')), responseSha256: hash(response), completedAt: state.receipt.completedAt, logDestinations: launch.logDestinations }, 'attestation checkpoint');
+    if (!Array.isArray(protectedInputs) || !protectedInputs.length) throw new Error('checkpoint protected inputs are missing');
+    for (const item of protectedInputs) {
+      if (!state.artifacts.some(artifact => artifact.path === item.path && artifact.sha256 === item.sha256)) throw new Error('checkpoint protected input binding changed');
+    }
+    const completed = Date.parse(state.receipt.completedAt);
+    const recorded = Date.parse(recordedAt);
+    if (!Number.isFinite(recorded) || !Number.isFinite(completed) || recorded < completed) throw new Error('invalid attestation checkpoint timestamp');
+    if (!pending) {
+      const { acceptedAt, ...attestation } = readJson(artifact('attestation.json'));
+      same(attestation, { schemaVersion: 1, protocol: ATTESTATION_PROTOCOL, decision: 'ON_TOPIC', planId: run.plan.planId, planHash: run.seal.planHash, dispatchId: entry.dispatchId, unitId: entry.unitId, proofId, captureSha256: checkpoint.captureSha256, checkpointSha256: hashFile(artifact('checkpoint.json')) }, 'post-run attestation');
+      const accepted = Date.parse(acceptedAt);
+      const committed = Date.parse(state.completedAt);
+      if (!Number.isFinite(accepted) || accepted < recorded || !Number.isFinite(committed) || committed < accepted) throw new Error('invalid post-run attestation timestamp');
+    }
+  }
   if (['review', 'verify'].includes(entry.role) && run.plan.dispatches.some(row => row.unitId === entry.unitId && row.role === 'implement')) {
     if (launch.sequenceProtocol !== SEQUENCE_PROTOCOL) throw new Error('missing or unsupported sequence protocol');
     const start = Date.parse(launch.startedAt);
@@ -100,7 +196,7 @@ function verifyExecution(run, entry, state) {
     if (launch.startedAt !== state.startedAt || !Number.isFinite(start) || !Number.isFinite(completed) || !Number.isFinite(committed) || completed < start || committed < completed) throw new Error('sequence timestamps disagree with committed evidence');
     same(launch.prerequisites, verifyPrerequisites(run, entry, before, launch.startedAt), 'sequence prerequisites');
   }
-  return { entry, state, proof, response, before, after };
+  return { entry, state, proof, response, before, after, logs };
 }
 
 function inspectRun(runDir) {
@@ -116,7 +212,7 @@ function inspectRun(runDir) {
         const state = readJson(file);
         same(state.entry, entry, 'transaction entry');
         if (state.planHash !== run.seal.planHash) throw new Error('transaction plan hash mismatch');
-        if (!['PASS', 'FAIL', 'RUNNING'].includes(state.status)) throw new Error('unknown transaction status');
+        if (!['PASS', 'FAIL', 'RUNNING', AWAITING_ATTESTATION].includes(state.status)) throw new Error('unknown transaction status');
         outcome.status = state.status;
         if (state.status === 'PASS') {
           const execution = verifyExecution(run, entry, state);
@@ -124,6 +220,10 @@ function inspectRun(runDir) {
           if (sessions.has(session)) throw new Error('native session reused across dispatches');
           sessions.add(session);
           executions.push(execution);
+        } else if (state.status === AWAITING_ATTESTATION) {
+          verifyCheckpoint(run, entry, state);
+          outcome.error = 'Claude output awaits post-run inspection and capture-bound --on-topic attestation; no completion or approval is committed.';
+          outcome.evidenceDir = state.evidenceDir;
         } else if (state.error) outcome.error = state.error;
       } catch (error) { outcome.status = 'INVALID'; outcome.error = error.message; }
     }
@@ -208,4 +308,4 @@ function main(argv = process.argv.slice(2)) {
   } catch (error) { process.stderr.write(`RUN_FINALIZE_FAIL: ${error.message}\n`); return 1; }
 }
 if (require.main === module) process.exitCode = main();
-module.exports = { SEQUENCE_PROTOCOL, assessRun, finalizeRun, inspectRun, main, nativePosition, tallyUnit, verifyExecution, verifyPrerequisites };
+module.exports = { SEQUENCE_PROTOCOL, assessRun, finalizeRun, inspectRun, main, nativePosition, tallyUnit, validateLogDestinations, verifyCheckpoint, verifyExecution, verifyPrerequisites };

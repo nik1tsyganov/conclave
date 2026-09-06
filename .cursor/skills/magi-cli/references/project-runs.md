@@ -33,6 +33,11 @@ Run implementation, then successful verification, then review, then finalization
 activation-check, and the receipt-bound panel tally. Stop at the first failed
 command, missing proof, non-APPROVE position, or failed scope/approval check.
 
+For Claude, launch without topicality flags. Handle AWAITING_ATTESTATION as
+the documented inspection checkpoint. Read its response and raw capture,
+then accept only that inspected capture with --on-topic --capture-sha256.
+This completion must reuse the saved call. Never pre-attest unseen output.
+
 Budget: at most three fresh exact-pair probes and three task dispatches for this
 one-unit attempt. Reuse valid unexpired probes where possible. No automatic
 fallback, repair loop, repeated battery, extra billing, or framework edits.
@@ -91,6 +96,8 @@ Use a unique attempt ID. Keep these directories outside all product worktrees. D
 
 Read project instructions and inspect current git state. Choose a clean worktree if existing changes overlap the intended scope. Preserve the user's files and identity. Record the starting revision and working state.
 
+Check the chosen worktree's test prerequisites before spending native calls. Git worktrees do not inherit `node_modules`. Use existing dependency-free checks where they cover the requested behavior. If required tests or browser checks lack their tools, record an environment blocker before dispatch. Do not silently download tools through `npx`, add a dependency link that the scope audit rejects, or label an unprepared worktree a product defect.
+
 Choose one concrete behavior and its acceptance checks. Examples include a reproducible bug fix, one missing input validation case, or one small feature with an observable result. A successful no-op does not test the implementation path.
 
 Prepare all briefs before sealing. Each brief must contain the literal required template blocks, actual rule paths, the correct role/vendor/host values, a unique first-line ACK, and the exact read/write boundary. Hash the finished bytes. Checker entries bind the implementer's vendor, unit, and worktree.
@@ -105,7 +112,11 @@ For ordinary feature trials, the three suggested entries are:
 
 The matrix and fresh probes govern actual eligibility. This table does not override them. Google review briefs must request file-read tools and existing test evidence. Do not require RunCommand in its sandbox. Claude read-only seats can use Read/Glob/Grep; they cannot execute test commands. Select checker roles that can perform the required check.
 
+Each generated seat contract names the staged rules and required role skills by absolute path. Before accepting a seat, inspect its report and available native read evidence. Missing or unread required instructions are a blocker, even if the task answer is topical. Preserve that evidence and export the stopped trial; do not let the seat declare those instructions optional.
+
 Use `plan-seal.js` once for the complete plan. Dispatch only sealed entries through `dispatch-run.js`. An implementation unit's review now requires every planned verifier to finish with valid native APPROVE evidence. A changed workspace invalidates the previous verification. Review-only panels have no implementation sequence to satisfy.
+
+Claude returns an `AWAITING_ATTESTATION` checkpoint after the native call and deterministic checks. Its exit code is zero, but `ok` is false because execution has not been accepted. Read the returned `responsePath` and `capturePath`; confirm that the response addresses the bound brief. Then complete the same dispatch with `--on-topic --capture-sha256 <returned captureSha256>`. This does not launch another call or consume another task-dispatch slot. Do not provide either flag before a capture exists. If topicality is uncertain, stop and export the pending report. See the CLI reference for the exact command.
 
 On a successful attempt, run these tools in order, using the same sealed run directory:
 
@@ -137,7 +148,9 @@ Use the actual failure phase: `preflight`, `probe`, `plan`, `dispatch`, `verify`
 
 The reporter reads and revalidates evidence. It writes only the new report directory. It never changes receipts, native logs, telemetry, or activation decisions. Exit zero means the export succeeded; inspect the report's `status` separately. `NEEDS_ATTENTION` is expected for failed or incomplete attempts. Existing report directories cannot be overwritten.
 
-Successful dispatches link their verified evidence directories, including custom locations. Failed or invalid dispatches link the preserved transaction record; its evidence location is not presented as verified. Pending dispatches link the run directory.
+An `AWAITING_ATTESTATION` state is incomplete. It is not a provider failure and cannot activate a change. Inspection and hash-bound acceptance are the expected continuation, not a retry. Actual terminal failures keep the original new-attempt rule.
+
+Successful dispatches link their verified evidence directories, including custom locations. Failed or invalid dispatches link the preserved transaction record; its evidence location is not presented as verified. A validated `AWAITING_ATTESTATION` checkpoint links its captured evidence directory without implying approval. Other unfinished dispatches link the run directory.
 
 Add `TRIAGE.md` alongside the generated report with:
 

@@ -178,14 +178,13 @@ function parseGoogle(captureText, logText, expectedModel) {
   };
 }
 
-function parseClaude(captureText, expectedModel, expectedEffort, onTopic, options = {}) {
+function parseClaudeEvidence(captureText, expectedModel, expectedEffort, options = {}) {
   if (options.identityPolicy) throw proofError('Claude identity policy overrides are not supported');
   if (options.responseProtocol !== undefined) requireClaudeResponseProtocol(options.responseProtocol);
   const capture = String(captureText || '');
   if (!capture.trim()) throw proofError('Claude capture is empty');
   if (!expectedModel) throw proofError('Claude expected model is required');
   if (!expectedEffort) throw proofError('Claude expected effort is required');
-  if (onTopic !== true) throw proofError('Claude topicality must be explicitly attested with --on-topic after arbiter inspection');
 
   const trimmed = capture.trim();
   let parsedEvents = [];
@@ -315,7 +314,6 @@ function parseClaude(captureText, expectedModel, expectedEffort, onTopic, option
       sessionId: sessionIds.size === 1 ? [...sessionIds][0] : null,
       usage,
       vendorSideTokens,
-      onTopic: true,
       ...(structuredResponse !== null ? { responseProtocol: CLAUDE_RESPONSE_PROTOCOL } : {}),
       responseBytes: Buffer.byteLength(capture, 'utf8'),
     };
@@ -328,7 +326,14 @@ function parseClaude(captureText, expectedModel, expectedEffort, onTopic, option
   throw proofError('Claude proof requires structured native evidence');
 }
 
-function verifyProof(options) {
+function parseClaude(captureText, expectedModel, expectedEffort, onTopic, options = {}) {
+  if (onTopic !== true) throw proofError('Claude topicality must be explicitly attested with --on-topic after arbiter inspection');
+  const { responseProtocol, responseBytes, ...proof } = parseClaudeEvidence(captureText, expectedModel, expectedEffort, options);
+  // Preserve the historical public proof shape and property order.
+  return { ...proof, onTopic: true, ...(responseProtocol ? { responseProtocol } : {}), responseBytes };
+}
+
+function verifyNativeProof(options) {
   const capture = read(options.capture, '--capture');
   const log = read(options.log, '--log');
 
@@ -339,9 +344,15 @@ function verifyProof(options) {
   if (options.vendor === 'google') return parseGoogle(capture, log, options.expectedModel);
   if (options.vendor === 'anthropic') {
     const claudeOpts = { ...options, logText: log, requireObservedEffort: true };
-    return parseClaude(capture, options.expectedModel, options.expectedEffort, options.onTopic, claudeOpts);
+    return parseClaudeEvidence(capture, options.expectedModel, options.expectedEffort, claudeOpts);
   }
   throw argumentError(`unsupported vendor: ${options.vendor}`);
+}
+
+function verifyProof(options) {
+  if (options.vendor !== 'anthropic') return verifyNativeProof(options);
+  return parseClaude(read(options.capture, '--capture'), options.expectedModel, options.expectedEffort, options.onTopic,
+    { ...options, logText: read(options.log, '--log'), requireObservedEffort: true });
 }
 
 function parseArgs(argv) {
@@ -384,4 +395,4 @@ function main(argv = process.argv.slice(2), io = process) {
 
 if (require.main === module) process.exitCode = main();
 
-module.exports = { AUTH_NEEDLES, parseClaude, parseCodex, parseGoogle, verifyProof, main };
+module.exports = { AUTH_NEEDLES, parseClaude, parseCodex, parseGoogle, verifyNativeProof, verifyProof, main };
