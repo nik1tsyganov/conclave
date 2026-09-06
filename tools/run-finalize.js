@@ -74,9 +74,9 @@ function verifyExecution(run, entry, state) {
   return verifySavedExecution(run, entry, state, false);
 }
 
-function verifyCheckpoint(run, entry, state, { current = false } = {}) {
+function verifyCheckpoint(run, entry, state, { current = false, allowReceiptProjections = false } = {}) {
   if (state.status !== AWAITING_ATTESTATION || entry.vendor !== 'anthropic') throw new Error('dispatch is not awaiting Claude attestation');
-  const execution = verifySavedExecution(run, entry, state, true);
+  const execution = verifySavedExecution(run, entry, state, true, allowReceiptProjections);
   if (current) {
     if (!compareWorkspace(execution.after, snapshotWorkspace(entry.cwd), []).ok) throw new Error('workspace changed after the attestation checkpoint');
     const artifact = name => path.join(state.evidenceDir, name);
@@ -90,17 +90,34 @@ function verifyCheckpoint(run, entry, state, { current = false } = {}) {
   return execution;
 }
 
-function verifySavedExecution(run, entry, state, pending) {
+function verifySavedExecution(run, entry, state, pending, allowReceiptProjections = false) {
   same(state.entry, entry, 'plan entry');
   if (state.planHash !== run.seal.planHash || state.planId !== run.plan.planId || state.requestHash !== hash(JSON.stringify({ planHash: run.seal.planHash, entry }))) throw new Error('transaction belongs to a different plan');
   const transactionPath = path.join(run.root, '.magi-dispatches', `${transactionKey(entry)}.json`);
   if (state.telemetry?.transactionPath !== transactionPath || !inside(state.evidenceDir, run.root)) throw new Error('transaction evidence is outside its sealed run');
-  if (pending) verifyArtifacts(state);
+  const projections = new Map();
+  if (pending && allowReceiptProjections) {
+    projections.set(path.join(state.evidenceDir, 'receipt-ack.json'), state.receipt);
+    projections.set(path.join(state.evidenceDir, 'handoff-envelope.json'), { ...state.receipt, telemetryLog: state.receipt?.logDestinations?.telemetryLog });
+    if (!Array.isArray(state.artifacts) || state.artifacts.length < 5) throw new Error('checkpoint has incomplete evidence');
+    for (const item of state.artifacts) {
+      assertPlainPath(item.path);
+      if (!projections.has(item.path)) {
+        if (hashFile(item.path) !== item.sha256) throw new Error(`committed evidence changed: ${item.path}`);
+        continue;
+      }
+      const original = projections.get(item.path);
+      const text = `${JSON.stringify(original, null, 2)}\n`;
+      const completed = `${JSON.stringify({ ...original, status: 'PASS' }, null, 2)}\n`;
+      const current = fs.readFileSync(item.path, 'utf8');
+      if (hash(text) !== item.sha256 || (current !== text && current !== completed)) throw new Error('interrupted attestation receipt changed unexpectedly');
+    }
+  } else if (pending) verifyArtifacts(state);
   else verifyCommittedRow(state.telemetry, { checkLogs: false });
   if (state.receipt.status !== state.status || state.telemetry.status !== state.status) throw new Error('receipt/telemetry completion status mismatch');
   const artifact = (name) => path.join(state.evidenceDir, name);
   for (const name of ['capture.txt', 'vendor.log', 'proof.json', 'receipt-ack.json', 'handoff-envelope.json', 'scope-audit.json', 'plan-binding.json', 'launch.json', 'workspace-before.json', 'workspace-after.json', 'runtime-manifest.json', 'rules-source-before.json', 'rules-source-after.json', 'rules-source-audit.json', 'skills-source-before.json', 'skills-source-after.json', 'skills-source-audit.json']) {
-    if (!state.artifacts.some((item) => item.path === artifact(name) && item.sha256 === hashFile(artifact(name)))) throw new Error(`missing committed artifact: ${name}`);
+    if (!state.artifacts.some((item) => item.path === artifact(name) && item.sha256 === (projections.has(item.path) ? hash(`${JSON.stringify(projections.get(item.path), null, 2)}\n`) : hashFile(artifact(name))))) throw new Error(`missing committed artifact: ${name}`);
   }
   const launch = readJson(artifact('launch.json'));
   const postRun = entry.vendor === 'anthropic' && Boolean(run.seal.attestationProtocol || state.attestationProtocol || launch.attestationProtocol || state.receipt.attestationProtocol);
@@ -113,8 +130,8 @@ function verifySavedExecution(run, entry, state, pending) {
   if (launch.runtimeSha256 !== runtimeSha256 || state.receipt.runtimeSha256 !== runtimeSha256) throw new Error('runtime identity mismatch');
   same(launch.planEntry, entry, 'launch');
   same(readJson(artifact('plan-binding.json')), { planId: run.plan.planId, planHash: run.seal.planHash, entry }, 'binding');
-  same(readJson(artifact('receipt-ack.json')), state.receipt, 'receipt');
-  const envelope = readJson(artifact('handoff-envelope.json'));
+  same(projections.get(artifact('receipt-ack.json')) || readJson(artifact('receipt-ack.json')), state.receipt, 'receipt');
+  const envelope = projections.get(artifact('handoff-envelope.json')) || readJson(artifact('handoff-envelope.json'));
   const { telemetryLog, ...receiptEnvelope } = envelope;
   same(receiptEnvelope, state.receipt, 'handoff');
   let logs = state.logs;
