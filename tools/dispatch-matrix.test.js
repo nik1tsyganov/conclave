@@ -110,6 +110,35 @@ test('review-only MAGI panel is legal without fake implementation rows', () => {
   }, matrix));
 });
 
+function reviewOnlyRows() {
+  return [
+    { unitId: 'r1', class: 'review-adversarial', role: 'review', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'high', authorVendor: 'anthropic' },
+    { unitId: 'r1', class: 'review-adversarial', role: 'review', vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', authorVendor: 'anthropic' },
+  ];
+}
+
+test('review-only ballots cannot disagree about the author of one unit', () => {
+  const rows = reviewOnlyRows();
+  rows[1].authorVendor = 'openai';
+  for (const dispatches of [rows, [...rows].reverse()]) {
+    assert.throws(() => validatePlan({ hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true, dispatches }, matrix), /conflicting authorVendor/);
+  }
+});
+
+test('review-only ballots cannot combine different product worktrees', () => {
+  const rows = reviewOnlyRows();
+  rows[1].cwd = path.join(root, 'different-product');
+  for (const dispatches of [rows, [...rows].reverse()]) {
+    assert.throws(() => validatePlan({ hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true, dispatches }, matrix), /check worktrees differ/);
+  }
+});
+
+test('separate review-only units may have different authors and worktrees', () => {
+  const rows = reviewOnlyRows();
+  rows[1] = { ...rows[1], unitId: 'r2', authorVendor: 'openai', cwd: path.join(root, 'another-product') };
+  assert.doesNotThrow(() => validatePlan({ hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true, dispatches: rows }, matrix));
+});
+
 test('same-vendor review of authored work is rejected', () => {
   assert.throws(() => validatePlan({
     hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: false,
