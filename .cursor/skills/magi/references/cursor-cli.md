@@ -6,7 +6,7 @@ Run commands from the runtime root, where `tools/` exists. The source checkout s
 
 ## Establish the local prerequisites
 
-From the runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6`. It compares the declared mode and exact slug with the runtime matrix; it does not prove the actual picker or host model. The command returns `LEGAL` with exit 0, rejects forbidden declarations with exit 1, and rejects missing, duplicate, unknown, or malformed arguments with exit 2.
+From the runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6`. In a Synara-hosted Grok thread, `--mode synara` is also LEGAL with the same arbiter slug. It compares the declared mode and exact slug with the runtime matrix; it does not prove the actual picker or host model. The command returns `LEGAL` with exit 0, rejects forbidden declarations with exit 1, and rejects missing, duplicate, unknown, or malformed arguments with exit 2. Seats still launch through native `claude.exe` / `codex.exe` / `agy.exe`. Synara is the outer harness; MAGI remains the seat runtime.
 
 Grok 4.6 is the non-voting arbiter. It may classify, compose briefs, seal plans, dispatch, collect evidence, and request deterministic tallies. Substantive implementation, planning, research, verification, review, repair, and votes belong to vendor seats.
 
@@ -36,7 +36,15 @@ node tools/model-availability.js --file C:/src/magi-runs/availability.json --pro
 
 Use a new evidence directory for each probe. Repeat for every pair selected by the plan. Google efforts use the matrix's fused names, such as `fused-high`. Probes invoke native CLIs and use included subscription capacity. Offline contract tests do not perform these calls.
 
-A native probe that starts as one catalog model and answers as another after a vendor fallback (for example Fable `[cyber]` falling back to Opus) is FAIL. Remap to a pair whose probe identity matches, or leave that route unavailable. Do not treat the fallback as the requested model.
+A native probe that starts as one catalog model and answers as another after a vendor fallback (for example Fable `[cyber]` falling back to Opus) is FAIL. Remap to a pair whose probe identity matches, or leave that route unavailable. Do not treat the fallback as the requested model. After a Fable identity conflict, run `node tools/synara-catalog.js --remap-probe <probe.json> --catalog <synara-catalog.json>` and probe the suggested Opus pair; never accept the mismatched identity.
+
+When the arbiter is Synara-hosted, snapshot live `synara_capabilities` before sealing:
+
+```powershell
+node tools/synara-catalog.js --import C:/src/magi-runs/synara-capabilities.json --out C:/src/magi-runs/synara-catalog.json
+```
+
+Pass that file as `--synara-catalog` to `plan-seal.js`. Seal may narrow the static dispatch-matrix to models Synara currently lists. It must not invent routes Synara does not list, and it must not skip MAGI probes or `cli-proof`. Google fused efforts stay MAGI-side; `launch.json` records both `magiEffort` and the Synara option key (`reasoningEffort` vs `effort`).
 
 By default, a probe creates a scratch workspace under its evidence directory. If you supply `--cwd`, it must already exist and must not contain the evidence directory. Keep both paths outside the runtime. An unconfirmed child exit leaves incomplete scope evidence; inspect the recorded PID and stop before another attempt.
 
@@ -61,7 +69,7 @@ The plan contains these fields:
 | Field | Contract |
 |---|---|
 | `planId` | Unique safe identifier for the whole run. |
-| `hostMode` | `cursor-cli`. |
+| `hostMode` | `cursor-cli` for plain Cursor Agent, or `synara` when this Grok arbiter is Synara-hosted. |
 | `arbiter` | `{"vendor":"xai","model":"grok-4.6","effort":"high"}`; the matrix also accepts xhigh. |
 | `magiConvened` | True when a MAGI panel is convened; required for critical classes. |
 | `dispatches` | All intended implementation, review, verification, planning, and research entries. |
@@ -82,6 +90,7 @@ Validate and copy the complete draft plan into a new run directory:
 
 ```powershell
 node tools/plan-seal.js --plan C:/src/magi-runs/draft-plan.json --run-dir C:/src/magi-runs/run-001 --availability C:/src/magi-runs/availability.json
+# synara hostMode also requires --synara-catalog <normalized catalog.json>
 ```
 
 The seal binds plan bytes, brief hashes, matrix, and seat profiles. Keep the run directory outside product worktrees and the runtime. Known destination collisions fail before copying plan files. Changes require a new complete plan validation and a new run directory. A `vendorOverride` in `graph.json`, a SLICES vendor column, or an ad-hoc route flag grants no authority.
@@ -164,6 +173,15 @@ Execution PASS and approval are separate results. A successful implementation al
 Review responses contain exactly one final `POSITION: APPROVE`, `POSITION: REJECT`, or `POSITION: ABSTAIN` line. `panel-tally.js` reads these votes from verified captured responses and uses the existing position-tally arithmetic. Handwritten ballots and a model's own tally cannot activate work. Grok never votes.
 
 `cli-launch.js` is an internal/legacy transport helper. Standalone `cli-smoke.js` builds offline pointer-delivery plans from staged inputs; its `activationEligible` result is false. Neither is a production activation path.
+
+## Synara host helpers (not seats)
+
+Synara worktrees, `browser_*`, wait, interrupt, and diagnose are harness helpers. They are not MAGI seats.
+
+- Point an implement `cwd` at a Synara worktree that already sits under `MAGI_DEV_ROOT` or `MAGI_ALLOWED_WORKSPACE_ROOTS`. Launch remains `dispatch-run.js`.
+- After a MAGI implement, run host `browser_*` checks and stage the files with `node tools/host-helper-evidence.js --run-dir <sealed-run> --label <id> --from <evidence-dir>`. Put that destination on verify/review `evidenceReadDirs`. Those directories are extra reads, never a MAGI `POSITION`.
+- `synara_wait_for_threads` joins Synara threads only. It does not join `dispatch-run` child PIDs. Use `node tools/magi-synara-watch.js` for leftover `RUNNING` transactions and synara-capture `ask` revert. The watchdog notifies; it never rewrites a receipt to PASS.
+- Do not create Casper, Balthasar, or Melchior as Synara threads. Do not substitute Cursor Task elector slugs for seats.
 
 ## Offline checks
 

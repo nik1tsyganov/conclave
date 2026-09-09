@@ -20,6 +20,12 @@ function roleSandbox(role) {
   throw new Error(`invalid role: ${role}`);
 }
 
+function extraReadDirs(opts, env) {
+  if (opts.evidenceReadDirs === undefined) return [];
+  if (!Array.isArray(opts.evidenceReadDirs)) throw new Error('evidenceReadDirs must be an array');
+  return opts.evidenceReadDirs.map((dir) => allowedWorkspace(dir, env));
+}
+
 function windowsUnder(candidate, root) {
   const c = path.win32.resolve(candidate).toLowerCase();
   const r = path.win32.resolve(root).toLowerCase();
@@ -103,7 +109,7 @@ function googleLaunch(opts) {
   const nativeLogPath = path.join(path.dirname(opts.capturePath || ctx.seatContractPath), 'native-cli.log');
   const args = ['--model', ctx.model, '--output-format', 'json', '--print-timeout', '20m', '--log-file', nativeLogPath];
   if (ctx.role === 'implement') args.push('--dangerously-skip-permissions'); else args.push('--sandbox');
-  const addDirs = [ctx.cwd, path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath)];
+  const addDirs = [ctx.cwd, path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath), ...extraReadDirs(opts, opts.env || process.env)];
   if (opts.rulesRoot) addDirs.push(opts.rulesRoot);
   for (const dir of [...new Set(addDirs)]) args.push('--add-dir', dir);
   args.push('-p', seatPointerText(ctx));
@@ -128,7 +134,7 @@ function anthropicLaunch(opts) {
   // Append to the native system prompt; never replace its permission controls.
   args.push('--append-system-prompt', seatContextText(ctx));
   if (ctx.role !== 'implement') args.push('--tools', 'Read,Glob,Grep', '--allowedTools', 'Read,Glob,Grep');
-  const addDirs = [path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath)];
+  const addDirs = [path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath), ...extraReadDirs(opts, opts.env || process.env)];
   if (opts.rulesRoot) addDirs.push(opts.rulesRoot);
   for (const dir of [...new Set(addDirs)]) {
     if (path.win32.resolve(dir).toLowerCase() !== ctx.cwd.toLowerCase()) args.push('--add-dir', dir);

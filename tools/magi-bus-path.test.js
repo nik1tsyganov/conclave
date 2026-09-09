@@ -34,7 +34,7 @@ describe('magi-bus-path', () => {
     assert.strictEqual(DEFAULT_MAGI_BUS_ROOT, CLAUDE_BUS_ROOT);
     assert.strictEqual(DEFAULT_MAGI_BUS_ROOT, path.join(tmpdir(), 'magi-bus'));
     assert.strictEqual(getRepoRoot(), ROOT);
-    assert.deepStrictEqual(HOST_MODES, ['cursor', 'cursor-cli']);
+    assert.deepStrictEqual(HOST_MODES, ['cursor', 'cursor-cli', 'synara']);
   });
 
   it('allows repo paths and MAGI_BUS_ROOT, refuses prefix traps and outsiders', () => {
@@ -60,7 +60,8 @@ describe('magi-bus-path', () => {
   it('accepts both hostMode values and rejects others', () => {
     assert.strictEqual(assertHostMode('cursor'), 'cursor');
     assert.strictEqual(assertHostMode('cursor-cli'), 'cursor-cli');
-    assert.throws(() => assertHostMode('claude-code'), /hostMode must be cursor or cursor-cli/);
-    assert.throws(() => assertHostMode(undefined), /hostMode must be cursor or cursor-cli/);
+    assert.strictEqual(assertHostMode('synara'), 'synara');
+    assert.throws(() => assertHostMode('claude-code'), /hostMode must be cursor, cursor-cli, or synara/);
+    assert.throws(() => assertHostMode(undefined), /hostMode must be cursor, cursor-cli, or synara/);
   });
 });

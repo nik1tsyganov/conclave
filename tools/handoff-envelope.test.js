@@ -69,6 +69,7 @@ describe('handoff-envelope', () => {
   it('maps hostMode to magi / magi-cli and keeps dispatch schema untouched', () => {
     assert.strictEqual(systemFromHostMode('cursor'), 'magi');
     assert.strictEqual(systemFromHostMode('cursor-cli'), 'magi-cli');
+    assert.strictEqual(systemFromHostMode('synara'), 'magi-cli');
     assert.deepStrictEqual(SYSTEMS, ['magi', 'magi-cli']);
     assert.deepStrictEqual(STATUSES, ['accepted', 'blocked', 'done', 'failed']);
     assert.ok(DEFAULT_LOG.endsWith(path.join('telemetry', 'handoffs.jsonl')));

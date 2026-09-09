@@ -37,6 +37,26 @@ test('host-resolver', async (t) => {
     assert.deepStrictEqual(out, { hostMode: 'cursor-cli', tripped: false, reason: 'already-cli' });
   });
 
+  await t.test('--from synara stays synara even if error text would trip cursor', () => {
+    const res = run('--from synara --error-text "usage limit" --json');
+    assert.strictEqual(res.status, 0);
+    const out = JSON.parse(res.stdout);
+    assert.deepStrictEqual(out, { hostMode: 'synara', tripped: false, reason: 'already-synara' });
+  });
+
+  await t.test('--force synara trips to synara', () => {
+    const res = run('--force synara --json');
+    assert.strictEqual(res.status, 0);
+    const out = JSON.parse(res.stdout);
+    assert.deepStrictEqual(out, { hostMode: 'synara', tripped: true, reason: 'forced' });
+  });
+
+  await t.test('invalid --from banana is rejected', () => {
+    const res = run('--from banana --json');
+    assert.notEqual(res.status, 0);
+    assert.ok((res.stderr || res.stdout).includes('invalid --from'));
+  });
+
   await t.test('--force cursor-cli trips to cursor-cli', () => {
     const res = run('--force cursor-cli --json');
     assert.strictEqual(res.status, 0);

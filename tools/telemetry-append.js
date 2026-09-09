@@ -40,8 +40,8 @@ catch (error) { fail(`invalid JSON: ${error.message}`); }
 try {
   validateDispatchRow(row, {
     requireHostMode: true,
-    requireCursorCli: row.hostMode === 'cursor-cli',
-    requireArbiter: row.hostMode === 'cursor-cli',
+    requireCursorCli: row.hostMode === 'cursor-cli' || row.hostMode === 'synara',
+    requireArbiter: row.hostMode === 'cursor-cli' || row.hostMode === 'synara',
     requireDispatchId: row.schemaVersion === 1,
     requireUnitId: row.schemaVersion === 1,
     requireProof: row.schemaVersion === 1,

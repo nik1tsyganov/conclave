@@ -15,11 +15,12 @@ function main(argv = process.argv.slice(2), io = process) {
     }
     const slug = require('./dispatch-matrix.js').loadMatrix().principles?.arbiterModel;
     if (typeof slug !== 'string' || !slug) throw new Error('POLICY_ERROR: runtime matrix has no arbiterModel');
-    if (options['--mode'] !== 'cursor-cli' || options['--slug'] !== slug) {
-      io.stderr.write(`ILLEGAL: cursor-cli requires the runtime arbiter slug ${slug}. Declaration only; not proof of the actual picker.\n`);
+    const mode = options['--mode'];
+    if (!['cursor-cli', 'synara'].includes(mode) || options['--slug'] !== slug) {
+      io.stderr.write(`ILLEGAL: cursor-cli and synara require the runtime arbiter slug ${slug}. Declaration only; not proof of the actual picker.\n`);
       return 1;
     }
-    io.stdout.write(`LEGAL: cursor-cli ${slug}. Declaration only; not proof of the actual picker.\n`);
+    io.stdout.write(`LEGAL: ${mode} ${slug}. Declaration only; not proof of the actual picker.\n`);
     return 0;
   } catch (error) {
     io.stderr.write(`${error.message}\n`);

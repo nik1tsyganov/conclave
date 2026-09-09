@@ -5,7 +5,7 @@ description: Start or continue a plan-bound MAGI Cursor CLI run. Not CONCLAVE an
 
 # /magi-cli
 
-If the chat is CONCLAVE, open a separate MAGI chat. From the MAGI runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6`. Stop unless the declared route is LEGAL. This checks the declaration against the runtime matrix; it does not prove the actual picker.
+If the chat is CONCLAVE, open a separate MAGI chat. From the MAGI runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6`. In a Synara-hosted Grok thread, `--mode synara` is also LEGAL. Stop unless the declared route is LEGAL. This checks the declaration against the runtime matrix; it does not prove the actual picker. Seats remain native CLIs.
 
 Read the MAGI CLI skill and its co-located `references/cursor-cli.md`, `dispatch-matrix.json`, `seat-profiles.json`, and `brief-rules-block.md`. The run guide contains the complete command arguments and plan-field contract.
 
@@ -25,7 +25,7 @@ Unknown or unproven model/effort pairs are unavailable. Availability replays has
 
 ## Seal the complete plan
 
-The plan binds `planId`, `hostMode: cursor-cli`, the xAI/Grok arbiter, and every dispatch entry. Each entry includes `dispatchId`, `unitId`, `class`, `role`, `vendor`, `model`, `effort`, absolute `cwd` and `brief`, `briefSha256`, and relative `writeScope`.
+The plan binds `planId`, `hostMode: cursor-cli` (or `synara` when Synara hosts this arbiter), the xAI/Grok arbiter, and every dispatch entry. Each entry includes `dispatchId`, `unitId`, `class`, `role`, `vendor`, `model`, `effort`, absolute `cwd` and `brief`, `briefSha256`, and relative `writeScope`. Verify/review entries may list absolute `evidenceReadDirs` for non-voting host-helper files.
 
 Non-implementation roles use an empty write scope and remain read-only. Review/verify entries require a different, correct `authorVendor`. Astra requires `escalation: true` and a substantive reason with at least 16 characters and three distinct words.
 
@@ -35,7 +35,7 @@ Claude implementation uses `--safe-mode --permission-mode bypassPermissions`. Sa
 
 Critical classes require `magiConvened: true` and two distinct foreign review/verify vendors on the same unit and worktree. Implementation vendor count scales as `min(3, implementation units)`; the 60% cap starts at two units. Do not invent implementation rows for read-only panels.
 
-Run `plan-seal.js --plan <draft.json> --run-dir <new-run-dir> --availability <availability.json>`. Stop on failure.
+Run `plan-seal.js --plan <draft.json> --run-dir <new-run-dir> --availability <availability.json>`. A synara host also requires `--synara-catalog`. Stop on failure.
 
 ## Dispatch and conclude
 
