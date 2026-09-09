@@ -178,9 +178,16 @@ Review responses contain exactly one final `POSITION: APPROVE`, `POSITION: REJEC
 
 Synara worktrees, `browser_*`, wait, interrupt, and diagnose are harness helpers. They are not MAGI seats.
 
-- Point an implement `cwd` at a Synara worktree that already sits under `MAGI_DEV_ROOT` or `MAGI_ALLOWED_WORKSPACE_ROOTS`. Launch remains `dispatch-run.js`.
+- Point an implement `cwd` at a Synara worktree that already sits under `MAGI_DEV_ROOT` or `MAGI_ALLOWED_WORKSPACE_ROOTS`. Confirm it with `node tools/host-helper-worktree.js --cwd <worktree> --out <binding.json>`. Launch remains `dispatch-run.js`.
 - After a MAGI implement, run host `browser_*` checks and stage the files with `node tools/host-helper-evidence.js --run-dir <sealed-run> --label <id> --from <evidence-dir>`. Put that destination on verify/review `evidenceReadDirs`. Those directories are extra reads, never a MAGI `POSITION`.
-- `synara_wait_for_threads` joins Synara threads only. It does not join `dispatch-run` child PIDs. Use `node tools/magi-synara-watch.js` for leftover `RUNNING` transactions and synara-capture `ask` revert. The watchdog notifies; it never rewrites a receipt to PASS.
+- `synara_wait_for_threads` joins Synara threads only. It does not join `dispatch-run` child PIDs. For parallel MAGI seats, launch each `dispatch-run.js` yourself, then record and wait:
+
+```powershell
+node tools/magi-synara-watch.js --record-join --run-dir C:/src/magi-runs/run-001 --dispatch-id implement-1 --dispatch-id verify-1
+node tools/magi-synara-watch.js --wait --run-dir C:/src/magi-runs/run-001 --dispatch-id implement-1 --dispatch-id verify-1
+```
+
+That writes `join-manifest.json` and joins MAGI transactions only. The periodic `magi-synara-watch.js --run-roots` scan also reads those manifests for leftover `RUNNING` children and synara-capture `ask` revert. The watchdog notifies; it never rewrites a receipt to PASS.
 - Do not create Casper, Balthasar, or Melchior as Synara threads. Do not substitute Cursor Task elector slugs for seats.
 
 ## Offline checks
