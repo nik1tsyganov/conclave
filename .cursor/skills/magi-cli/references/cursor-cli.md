@@ -36,6 +36,8 @@ node tools/model-availability.js --file C:/src/magi-runs/availability.json --pro
 
 Use a new evidence directory for each probe. Repeat for every pair selected by the plan. Google efforts use the matrix's fused names, such as `fused-high`. Probes invoke native CLIs and use included subscription capacity. Offline contract tests do not perform these calls.
 
+A native probe that starts as one catalog model and answers as another after a vendor fallback (for example Fable `[cyber]` falling back to Opus) is FAIL. Remap to a pair whose probe identity matches, or leave that route unavailable. Do not treat the fallback as the requested model.
+
 By default, a probe creates a scratch workspace under its evidence directory. If you supply `--cwd`, it must already exist and must not contain the evidence directory. Keep both paths outside the runtime. An unconfirmed child exit leaves incomplete scope evidence; inspect the recorded PID and stop before another attempt.
 
 Availability imports replay the hashed native capture and log. Use a separate availability output file; it must not replace the probe, capture, or log. The 60-minute freshness checks use the original probe timestamps. Re-importing a probe does not renew them. Missing, changed, expired, or mismatched native evidence fails.

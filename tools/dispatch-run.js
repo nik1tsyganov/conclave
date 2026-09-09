@@ -490,17 +490,25 @@ async function runDispatch(opts, dependencies = {}) {
   }
 }
 
-async function main(argv = process.argv.slice(2), io = process) {
+async function main(argv = process.argv.slice(2), io = process, dependencies = {}) {
+  const host = dependencies.process || process;
+  const controller = dependencies.abortController || new AbortController();
+  const stop = () => controller.abort();
+  host.once('SIGINT', stop);
+  host.once('SIGTERM', stop);
   try {
     const opts = parseArgs(argv);
     if (opts.help) { io.stdout.write(`${usage()}\n`); return 0; }
-    const result = await runDispatch(opts);
+    const result = await runDispatch(opts, { ...dependencies, signal: dependencies.signal || controller.signal });
     io.stdout.write(`${JSON.stringify(result)}\n`);
     return 0;
   } catch (error) {
     const code = error.code || 'DISPATCH_FAIL';
     io.stderr.write(`${code}: ${error.message}\n`);
     return ['ARGUMENT_ERROR', 'BINARY_MISSING', 'RULES_SOURCE_MISSING', 'SKILL_STAGE_FAIL'].includes(code) ? 2 : 1;
+  } finally {
+    host.removeListener('SIGINT', stop);
+    host.removeListener('SIGTERM', stop);
   }
 }
 
