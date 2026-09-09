@@ -17,7 +17,7 @@
     },
     "hostMode": {
       "type": "string",
-      "enum": ["cursor", "cursor-cli"]
+      "enum": ["cursor", "cursor-cli", "synara"]
     },
     "routedBy": {
       "type": "string",

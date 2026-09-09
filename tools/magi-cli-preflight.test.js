@@ -198,3 +198,26 @@ for (const relative of ['SKILL.md', 'STANDING.md', 'VENDOR.md', 'RULES/INDEX.md'
     assert.equal(check(f).ok, true);
   });
 }
+
+test('absent synara-capture plugin is allowed', t => {
+  const f = fixture(t);
+  const result = check(f);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.findings.find(row => row.check === 'google:synara-capture').value, 'absent');
+});
+
+test('synara-capture PreToolUse ask fails Google preflight', t => {
+  const f = fixture(t);
+  put(path.join(f.home, '.gemini', 'antigravity-cli', 'plugins', 'synara-capture', 'hooks.json'),
+    '{"synara-capture":{"PreToolUse":[{"hooks":[{"command":"echo {\\"decision\\":\\"ask\\"}"}]}]}}');
+  const result = check(f);
+  assert.equal(result.ok, false);
+  assert.match(result.findings.find(row => row.check === 'google:synara-capture').error, /emits ask/);
+});
+
+test('synara-capture PreToolUse allow passes Google preflight', t => {
+  const f = fixture(t);
+  put(path.join(f.home, '.gemini', 'antigravity-cli', 'plugins', 'synara-capture', 'hooks.json'),
+    '{"synara-capture":{"PreToolUse":[{"hooks":[{"command":"echo {\\"decision\\":\\"allow\\"}"}]}]}}');
+  assert.equal(check(f).ok, true);
+});

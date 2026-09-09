@@ -7,7 +7,7 @@ description: Plan-bound MAGI Cursor CLI mode. Grok 4.6 is the non-voting arbiter
 
 ## Identity and authority
 
-From the MAGI runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6`. Stop unless the declared route is LEGAL. This declaration check uses the runtime matrix; it does not prove the actual picker or host model.
+From the MAGI runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6`. In a Synara-hosted Grok thread, `--mode synara` is also LEGAL. Stop unless the declared route is LEGAL. This declaration check uses the runtime matrix; it does not prove the actual picker or host model. Seats still launch through native vendor CLIs.
 
 Grok 4.6 coordinates the run. It classifies work, writes briefs and complete plans, invokes the deterministic runtime, and requests finalization and tallying. It never performs substantive implementation, repair, planning, research, review, verification, or voting as a seat.
 
@@ -22,8 +22,8 @@ The arbiter retains orchestration, routing, bridge, distribution, assessment, an
 1. Set `MAGI_RULES_ROOT` to the external STANDING v2 / R01–R22 pack. Run `tools/magi-cli-preflight.js`.
 2. Use `claude auth status` for the Claude login check. Run `model-probe.js --vendor --model --effort --evidence-dir` for every selected exact pair.
 3. Import each captured `probe.json` with `model-availability.js --file <availability.json> --probe <probe.json>`. Evidence expires after 60 minutes from its original completion time. Re-imports do not renew it.
-4. Finalize the briefs, then write the complete plan with unique dispatch IDs, immutable brief hashes, absolute worktrees, relative scopes, author provenance, and any escalation reason.
-5. Run `plan-seal.js --plan <draft.json> --run-dir <new-run-dir> --availability <availability.json>`.
+4. Finalize the briefs, then write the complete plan with unique dispatch IDs, immutable brief hashes, absolute worktrees, relative scopes, author provenance, and any escalation reason. Do not brief seats to inspect MAGI CLI runtime, plugin, vendor-bridge, or dispatcher source.
+5. Run `plan-seal.js --plan <draft.json> --run-dir <new-run-dir> --availability <availability.json>`. A `hostMode: synara` plan also requires `--synara-catalog` from `synara-catalog.js --import`.
 6. Launch each selected entry with `dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-dir> --dispatch-id <id> --availability <availability.json> --rules-root <external-v2-pack>`.
 7. Run `run-finalize.js --run-dir <run-dir>` and `panel-tally.js --run-dir <run-dir> --unit-id <unit>`.
 

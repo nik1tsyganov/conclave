@@ -17,6 +17,7 @@ const { DEFAULT_PROFILES } = require('./seat-policy.js');
 const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, appendUniqueRow, assertPlainPath, compareWorkspace, hashFile, inside, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, writeJson: atomicJson } = require('./dispatch-evidence.js');
 const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, nativeLog, validateClaudeResponseLaunch } = require('./vendor-native.js');
 const { readSealedRun } = require('./plan-seal.js');
+const { launchOverlay, loadCatalog } = require('./synara-catalog.js');
 const { resolveRulesRoot, resolveRuntimePaths } = require('./runtime-paths.js');
 const { SEQUENCE_PROTOCOL, validateLogDestinations, verifyCheckpoint, verifyExecution, verifyPrerequisites } = require('./run-finalize.js');
 
@@ -89,6 +90,9 @@ function seatContractText(opts, seatProfile, skillStage, ruleStage) {
     'This is a leaf seat. Do not dispatch, delegate, spawn, or ask another model/agent to perform work.',
     'This seat is not the arbiter. Do not change routing, model choice, panel membership, or deterministic gate outcomes.',
     opts.role === 'implement' ? `Writes are limited to these relative paths in the assigned worktree: ${opts.writeScope.join(', ')}.` : 'Read-only role: do not modify product files.',
+    ...(Array.isArray(opts.evidenceReadDirs) && opts.evidenceReadDirs.length
+      ? [`Additional host-helper read directories (not MAGI votes, never a POSITION): ${opts.evidenceReadDirs.join(', ')}.`]
+      : []),
     'Do not stage or commit changes. Do not modify any evidence, rules, contracts, or skill files.',
     '',
     'Required staged instructions: read these files in full before task work:',
@@ -336,6 +340,7 @@ async function runDispatch(opts, dependencies = {}) {
     capturePath, skillRoot: skillStage.root, seatContractPath,
     reviewPermissionMode: opts.reviewPermissionMode,
     responseProtocol,
+    evidenceReadDirs: opts.evidenceReadDirs,
   });
   if (responseProtocol) validateClaudeResponseLaunch(launch);
   if (launch.nativeLogPath) {
@@ -347,11 +352,17 @@ async function runDispatch(opts, dependencies = {}) {
   const runtimeSha256 = hashText(JSON.stringify(runtimeFiles));
   atomicJson(path.join(evidenceDir, 'runtime-manifest.json'), runtimeFiles);
   const launchPath = path.join(evidenceDir, 'launch.json');
+  const catalogPath = path.join(runDir, 'synara-catalog.json');
+  const synaraOverlay = fs.existsSync(catalogPath)
+    ? launchOverlay(loadCatalog(catalogPath), opts.vendor, opts.model, opts.effort)
+    : {};
   writeJson(launchPath, {
     class: opts.class, vendor: launch.vendor, role: launch.role, model: opts.model, effort: opts.effort,
     planId: opts.planId, planHash: opts.planHash, planEntry: binding.entry, escalation: opts.escalation === true, escalationReason: opts.escalationReason || null,
     binary: launch.binary, args: launch.args, cwd: launch.cwd, nativeLogPath: launch.nativeLogPath,
     responseProtocol,
+    ...(Object.keys(synaraOverlay).length ? synaraOverlay : {}),
+    ...(Array.isArray(opts.evidenceReadDirs) && opts.evidenceReadDirs.length ? { evidenceReadDirs: opts.evidenceReadDirs } : {}),
     ...(postRun ? { attestationProtocol: ATTESTATION_PROTOCOL, logDestinations: { telemetryLog, activationLog } } : {}),
     sequenceProtocol: SEQUENCE_PROTOCOL, startedAt: transaction.state.startedAt, prerequisites,
     matrixVersion: matrix.schemaVersion, seatProfileVersion: seatProfiles.schemaVersion,
@@ -427,7 +438,7 @@ async function runDispatch(opts, dependencies = {}) {
   const now = new Date();
   const telemetry = validateDispatchRow({
     schemaVersion: 2, status: 'PASS', date: now.toISOString().slice(0, 10), dispatchId: opts.dispatchId, unitId: opts.unitId,
-    class: opts.class, vendor: opts.vendor, role: opts.role, hostMode: 'cursor-cli', routedBy: 'arbiter', capturedBy: 'lead',
+    class: opts.class, vendor: opts.vendor, role: opts.role, hostMode: sealed.plan.hostMode, routedBy: 'arbiter', capturedBy: 'lead',
     model: opts.model, modelRequested: opts.model, modelObserved: proof.modelObserved, effort: opts.effort, proofId, vendorSideTokens: proof.vendorSideTokens ?? null,
     authorVendor: opts.authorVendor || null, planId: opts.planId, planHash: opts.planHash, escalation: opts.escalation === true, escalationReason: opts.escalationReason || null,
     transactionPath: transaction.file,
@@ -490,17 +501,25 @@ async function runDispatch(opts, dependencies = {}) {
   }
 }
 
-async function main(argv = process.argv.slice(2), io = process) {
+async function main(argv = process.argv.slice(2), io = process, dependencies = {}) {
+  const host = dependencies.process || process;
+  const controller = dependencies.abortController || new AbortController();
+  const stop = () => controller.abort();
+  host.once('SIGINT', stop);
+  host.once('SIGTERM', stop);
   try {
     const opts = parseArgs(argv);
     if (opts.help) { io.stdout.write(`${usage()}\n`); return 0; }
-    const result = await runDispatch(opts);
+    const result = await runDispatch(opts, { ...dependencies, signal: dependencies.signal || controller.signal });
     io.stdout.write(`${JSON.stringify(result)}\n`);
     return 0;
   } catch (error) {
     const code = error.code || 'DISPATCH_FAIL';
     io.stderr.write(`${code}: ${error.message}\n`);
     return ['ARGUMENT_ERROR', 'BINARY_MISSING', 'RULES_SOURCE_MISSING', 'SKILL_STAGE_FAIL'].includes(code) ? 2 : 1;
+  } finally {
+    host.removeListener('SIGINT', stop);
+    host.removeListener('SIGTERM', stop);
   }
 }
 

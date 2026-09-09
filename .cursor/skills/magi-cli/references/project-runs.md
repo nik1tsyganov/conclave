@@ -63,6 +63,7 @@ $magiRuntime = Join-Path $env:USERPROFILE '.cursor/plugins/local/magi-cursor-cli
 $magiRules = Join-Path $env:USERPROFILE '.cursor/magi-rules/v2'
 Set-Location -LiteralPath $magiRuntime
 node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6
+# Synara-hosted arbiter: also LEGAL with --mode synara
 node tools/magi-cli-preflight.js --rules-root $magiRules
 ```
 
@@ -174,6 +175,14 @@ Related earlier report paths:
 The issues directory is the durable queue. Link recurring symptoms to earlier reports; retain each occurrence. Do not call a timeout, denied tool, wrong path, empty capture, or failed wrapper a provider outage without provider evidence. Do not label all pending dispatches as defects.
 
 Give the next repair session the report directory and original run directory. Reproduce first. Fix only the proven cause. Add a relevant regression test, obtain independent verification and review, then run the same project acceptance checks in a fresh attempt. Keep the old failure. Close its TRIAGE entry by linking the passing correction; do not replace its generated report.
+
+## Synara as the outer harness
+
+When this Grok arbiter is hosted in Synara, use `hostMode: synara` and snapshot `synara_capabilities` with `synara-catalog.js` before sealing. Map MAGI vendor names to Synara providers only for catalog checks (`openai`/`codex`, `anthropic`/`claudeAgent`, `google`/`antigravity`). Launch remains `dispatch-run.js`.
+
+Use Synara worktrees as an implement `cwd` when the worktree is already inside MAGI allowed roots. Use `browser_*` only as a host helper after MAGI implement; stage those files with `host-helper-evidence.js` and list the destination on verify/review `evidenceReadDirs`. Never tally a Synara-thread helper as a MAGI `POSITION`. `synara_wait_for_threads` does not join `dispatch-run` PIDs; `magi-synara-watch.js` reports leftover `RUNNING` children and synara-capture `ask` revert without rewriting receipts.
+
+Do not create MAGI seats as Synara threads. Do not substitute Cursor Task elector slugs for seats.
 
 ## Scope of this handoff
 

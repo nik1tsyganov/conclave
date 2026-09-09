@@ -4,7 +4,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { ROLES } = require('./dispatch-schema.js');
+const { isCliHostMode, ROLES } = require('./dispatch-schema.js');
 const { verifyProbe } = require('./probe-evidence.js');
 const { parseJsonBytes, readJsonFile } = require('./json-file.js');
 
@@ -70,7 +70,7 @@ function routeAllowed(matrix, route, availability = {}, nowMs = Date.now()) {
 
 function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
   if (!plan || typeof plan !== 'object' || Array.isArray(plan)) throw policyError('plan must be an object');
-  if (plan.hostMode !== 'cursor-cli') throw policyError('hostMode must be cursor-cli');
+  if (!isCliHostMode(plan.hostMode)) throw policyError('hostMode must be cursor-cli or synara');
   if (plan.arbiter?.vendor !== 'xai') throw policyError('arbiter vendor must be xai');
   if (plan.arbiter?.model !== matrix.principles.arbiterModel) throw policyError(`arbiter model must be ${matrix.principles.arbiterModel}`);
   if (!['high', 'xhigh'].includes(plan.arbiter?.effort)) throw policyError('arbiter effort must be high or xhigh');
@@ -96,6 +96,13 @@ function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
     if (!/^[a-f0-9]{64}$/.test(route.briefSha256 || '')) throw policyError(`briefSha256 required for ${route.dispatchId}`);
     if (!Array.isArray(route.writeScope) || (route.role === 'implement' && route.writeScope.length === 0)) throw policyError(`writeScope required for ${route.dispatchId}`);
     if (route.role !== 'implement' && route.writeScope.length) throw policyError('read-only roles must have empty writeScope');
+    if (route.evidenceReadDirs !== undefined) {
+      if (!Array.isArray(route.evidenceReadDirs)) throw policyError(`evidenceReadDirs must be an array for ${route.dispatchId}`);
+      if (route.role === 'implement' && route.evidenceReadDirs.length) throw policyError(`implement cannot take evidenceReadDirs: ${route.dispatchId}`);
+      for (const dir of route.evidenceReadDirs) {
+        if (typeof dir !== 'string' || !path.isAbsolute(dir) || /[\x00]/.test(dir)) throw policyError(`absolute evidenceReadDirs path required for ${route.dispatchId}`);
+      }
+    }
     for (const name of route.writeScope) {
       if (typeof name !== 'string' || !name || name.includes('\\') || name.split('/').some((part) => part === '..' || part === '.' || part === '.git' || !part) || path.isAbsolute(name) || /[:*?\x00-\x1f]/.test(name)) throw policyError(`invalid writeScope path: ${name}`);
     }

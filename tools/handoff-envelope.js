@@ -121,7 +121,7 @@ function rejectJoinKeys(row) {
 function systemFromHostMode(hostMode) {
   assertHostMode(hostMode);
   if (hostMode === 'cursor') return 'magi';
-  if (hostMode === 'cursor-cli') return 'magi-cli';
+  if (hostMode === 'cursor-cli' || hostMode === 'synara') return 'magi-cli';
   const _exhaustive = hostMode;
   throw new HandoffError(`unhandled hostMode: ${_exhaustive}`);
 }

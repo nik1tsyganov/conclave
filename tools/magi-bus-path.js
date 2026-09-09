@@ -17,7 +17,7 @@ const path = require('node:path');
 const { MAGI_BUS_ROOT: CLAUDE_BUS_ROOT } = require('./cli-claude.js');
 
 const DEFAULT_MAGI_BUS_ROOT = CLAUDE_BUS_ROOT;
-const HOST_MODES = Object.freeze(['cursor', 'cursor-cli']);
+const HOST_MODES = Object.freeze(['cursor', 'cursor-cli', 'synara']);
 
 function getRepoRoot() {
   return path.resolve(__dirname, '..');
@@ -75,7 +75,7 @@ function assertInJail(filePath, label = 'path') {
 
 function assertHostMode(hostMode) {
   if (!HOST_MODES.includes(hostMode)) {
-    throw new Error(`hostMode must be cursor or cursor-cli, got ${hostMode}`);
+    throw new Error(`hostMode must be cursor, cursor-cli, or synara, got ${hostMode}`);
   }
   return hostMode;
 }

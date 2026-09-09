@@ -12,6 +12,25 @@ const { loadProfiles } = require('./seat-policy.js');
 
 function unique(values) { return [...new Set(values)]; }
 
+function synaraCaptureHookPaths(home) {
+  return [
+    path.join(home, '.gemini', 'antigravity-cli', 'plugins', 'synara-capture', 'hooks.json'),
+    path.join(home, '.gemini', 'config', 'plugins', 'synara-capture', 'hooks.json'),
+  ];
+}
+
+function inspectSynaraCaptureHooks(home) {
+  const files = synaraCaptureHookPaths(home).filter((file) => fs.existsSync(file));
+  for (const file of files) {
+    if (!fs.lstatSync(file).isFile()) throw new Error(`synara-capture hooks path is not a regular file: ${file}`);
+    const text = fs.readFileSync(file, 'utf8');
+    if (/"decision"\s*:\s*"ask"/.test(text) || /\\"decision\\":\\"ask\\"/.test(text)) {
+      throw new Error(`inactive synara-capture PreToolUse emits ask (${file}); MAGI Google instruction reads will fail`);
+    }
+  }
+  return { value: files.length ? files : 'absent' };
+}
+
 function requiredSeatSkills(profiles) {
   return unique([
     ...Object.values(profiles.baseSkills || {}).flat(),
@@ -96,6 +115,8 @@ function check(options = {}) {
     });
   }
 
+  record('google:synara-capture', () => inspectSynaraCaptureHooks(home));
+
   return { ok: findings.every((f) => f.ok), arbiterSkills, seatSkills, findings };
 }
 
@@ -118,4 +139,4 @@ function main(argv = process.argv.slice(2), io = process) {
 }
 
 if (require.main === module) process.exitCode = main();
-module.exports = { check, main, requiredSeatSkills };
+module.exports = { check, inspectSynaraCaptureHooks, main, requiredSeatSkills, synaraCaptureHookPaths };

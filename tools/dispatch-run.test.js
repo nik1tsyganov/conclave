@@ -226,3 +226,15 @@ test('authorized Astra escalation appears in launch, proof, telemetry and receip
     assert.equal(row.escalation, true); assert.equal(row.escalationReason, reason);
   }
 });
+
+test('an aborted vendor child fails the transaction instead of leaving it RUNNING', async (t) => {
+  const run = createSealedRun(t);
+  const controller = new AbortController();
+  const native = fakeVendor();
+  native.runLaunch = async () => {
+    controller.abort();
+    return { ok: false, exitCode: 1, killed: true, killReason: 'cancelled', stdout: '', stderr: '', exitConfirmed: true };
+  };
+  await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1' }, { ...native, signal: controller.signal }), /vendor child failed/);
+  assert.equal(inspectRun(run.runDir).outcomes[0].status, 'FAIL');
+});

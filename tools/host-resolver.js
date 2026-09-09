@@ -35,12 +35,12 @@ function parseArgs(argv) {
     process.exit(2);
   }
 
-  if (!['cursor', 'cursor-cli'].includes(args.from)) {
+  if (!['cursor', 'cursor-cli', 'synara'].includes(args.from)) {
     console.error(`not a pass: invalid --from ${args.from}`);
     process.exit(2);
   }
 
-  if (args.force && args.force !== 'cursor-cli') {
+  if (args.force && !['cursor-cli', 'synara'].includes(args.force)) {
     console.error(`not a pass: invalid --force ${args.force}`);
     process.exit(2);
   }
@@ -76,12 +76,16 @@ function main() {
     }
   }
 
-  if (args.force === 'cursor-cli') {
-    return { hostMode: 'cursor-cli', tripped: true, reason: 'forced', isJson: args.json };
+  if (args.force === 'cursor-cli' || args.force === 'synara') {
+    return { hostMode: args.force, tripped: true, reason: 'forced', isJson: args.json };
   }
 
   if (args.from === 'cursor-cli') {
     return { hostMode: 'cursor-cli', tripped: false, reason: 'already-cli', isJson: args.json };
+  }
+
+  if (args.from === 'synara') {
+    return { hostMode: 'synara', tripped: false, reason: 'already-synara', isJson: args.json };
   }
 
   if (args.capacityState) {

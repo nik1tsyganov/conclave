@@ -13,7 +13,8 @@ function invoke(argv) {
 
 test('the exact runtime arbiter declaration is legal in either argument order', () => {
   const slug = loadMatrix().principles.arbiterModel;
-  for (const args of [['--mode', 'cursor-cli', '--slug', slug], ['--slug', slug, '--mode', 'cursor-cli']]) {
+  for (const args of [['--mode', 'cursor-cli', '--slug', slug], ['--slug', slug, '--mode', 'cursor-cli'],
+    ['--mode', 'synara', '--slug', slug], ['--slug', slug, '--mode', 'synara']]) {
     const result = invoke(args);
     assert.equal(result.exitCode, 0);
     assert.match(result.stdout, /^LEGAL\b/);
@@ -24,8 +25,8 @@ test('the exact runtime arbiter declaration is legal in either argument order', 
 
 test('forbidden modes and inexact or foreign slugs are illegal', () => {
   const slug = loadMatrix().principles.arbiterModel;
-  for (const [mode, declared] of [['cursor', slug], ['claude', slug], ['cursor-cli', slug.toUpperCase()],
-    ['cursor-cli', `cursor-${slug}-high-fast`], ['cursor-cli', 'gpt-5.6-sol']]) {
+  for (const [mode, declared] of [['cursor', slug], ['claude', slug], ['banana', slug], ['cursor-cli', slug.toUpperCase()],
+    ['cursor-cli', `cursor-${slug}-high-fast`], ['cursor-cli', 'gpt-5.6-sol'], ['synara', 'gpt-5.6-sol']]) {
     const result = invoke(['--mode', mode, '--slug', declared]);
     assert.equal(result.exitCode, 1);
     assert.equal(result.stdout, '');
@@ -36,6 +37,7 @@ test('forbidden modes and inexact or foreign slugs are illegal', () => {
 test('the declared slug follows runtime policy rather than a built-in model list', t => {
   t.mock.method(require('./dispatch-matrix.js'), 'loadMatrix', () => ({ principles: { arbiterModel: 'fixture-arbiter' } }));
   assert.equal(invoke(['--mode', 'cursor-cli', '--slug', 'fixture-arbiter']).exitCode, 0);
+  assert.equal(invoke(['--mode', 'synara', '--slug', 'fixture-arbiter']).exitCode, 0);
   assert.equal(invoke(['--mode', 'cursor-cli', '--slug', 'grok-4.6']).exitCode, 1);
 });
 

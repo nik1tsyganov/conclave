@@ -20,6 +20,12 @@ function roleSandbox(role) {
   throw new Error(`invalid role: ${role}`);
 }
 
+function extraReadDirs(opts, env) {
+  if (opts.evidenceReadDirs === undefined) return [];
+  if (!Array.isArray(opts.evidenceReadDirs)) throw new Error('evidenceReadDirs must be an array');
+  return opts.evidenceReadDirs.map((dir) => allowedWorkspace(dir, env));
+}
+
 function windowsUnder(candidate, root) {
   const c = path.win32.resolve(candidate).toLowerCase();
   const r = path.win32.resolve(root).toLowerCase();
@@ -58,7 +64,7 @@ function base(opts) {
 
 function subscriptionEnv(source = process.env) {
   const env = { ...source };
-  for (const key of ['OPENAI_API_KEY', 'AZURE_OPENAI_API_KEY', 'OPENAI_BASE_URL', 'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENAI_USE_VERTEXAI', 'GOOGLE_APPLICATION_CREDENTIALS', 'CLAUDECODE']) delete env[key];
+  for (const key of ['OPENAI_API_KEY', 'AZURE_OPENAI_API_KEY', 'OPENAI_BASE_URL', 'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENAI_USE_VERTEXAI', 'GOOGLE_APPLICATION_CREDENTIALS', 'CLAUDECODE', 'SYNARA_ANTIGRAVITY_EVENTS', 'SYNARA_ANTIGRAVITY_HOOK_DECISION']) delete env[key];
   return env;
 }
 
@@ -99,11 +105,11 @@ function openaiLaunch(opts) {
 function googleLaunch(opts) {
   const ctx = base({ ...opts, vendor: 'google' });
   const env = { ...subscriptionEnv(opts.env), AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
-  for (const key of ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENAI_USE_VERTEXAI', 'GOOGLE_APPLICATION_CREDENTIALS', 'CLAUDECODE']) delete env[key];
+  for (const key of ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENAI_USE_VERTEXAI', 'GOOGLE_APPLICATION_CREDENTIALS', 'CLAUDECODE', 'SYNARA_ANTIGRAVITY_EVENTS', 'SYNARA_ANTIGRAVITY_HOOK_DECISION']) delete env[key];
   const nativeLogPath = path.join(path.dirname(opts.capturePath || ctx.seatContractPath), 'native-cli.log');
   const args = ['--model', ctx.model, '--output-format', 'json', '--print-timeout', '20m', '--log-file', nativeLogPath];
   if (ctx.role === 'implement') args.push('--dangerously-skip-permissions'); else args.push('--sandbox');
-  const addDirs = [ctx.cwd, path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath)];
+  const addDirs = [ctx.cwd, path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath), ...extraReadDirs(opts, opts.env || process.env)];
   if (opts.rulesRoot) addDirs.push(opts.rulesRoot);
   for (const dir of [...new Set(addDirs)]) args.push('--add-dir', dir);
   args.push('-p', seatPointerText(ctx));
@@ -128,7 +134,7 @@ function anthropicLaunch(opts) {
   // Append to the native system prompt; never replace its permission controls.
   args.push('--append-system-prompt', seatContextText(ctx));
   if (ctx.role !== 'implement') args.push('--tools', 'Read,Glob,Grep', '--allowedTools', 'Read,Glob,Grep');
-  const addDirs = [path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath)];
+  const addDirs = [path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath), ...extraReadDirs(opts, opts.env || process.env)];
   if (opts.rulesRoot) addDirs.push(opts.rulesRoot);
   for (const dir of [...new Set(addDirs)]) {
     if (path.win32.resolve(dir).toLowerCase() !== ctx.cwd.toLowerCase()) args.push('--add-dir', dir);

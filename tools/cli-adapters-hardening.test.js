@@ -143,3 +143,19 @@ test('Google and Claude launchers mount only staged seat skill root, not full gl
   assert.ok(claude.args.includes(path.resolve(f.skillRoot)));
   assert.ok(!google.args.includes('C:\\Users\\test\\.claude\\skills'));
 });
+
+test('Google launches drop inherited Synara Antigravity capture environment', (t) => {
+  const f = fixture(t);
+  const launch = googleLaunch({
+    briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
+    cwd: 'C:\\src\\product-a', model: 'gemini-3.1-pro-high', role: 'research', mustExistBinary: false,
+    env: {
+      ...fakeBins,
+      SYNARA_ANTIGRAVITY_EVENTS: 'C:\\tmp\\synara-events.ndjson',
+      SYNARA_ANTIGRAVITY_HOOK_DECISION: 'ask',
+    },
+  });
+  assert.ok(!Object.prototype.hasOwnProperty.call(launch.env, 'SYNARA_ANTIGRAVITY_EVENTS'));
+  assert.ok(!Object.prototype.hasOwnProperty.call(launch.env, 'SYNARA_ANTIGRAVITY_HOOK_DECISION'));
+  assert.strictEqual(launch.env.AGY_CLI_DISABLE_AUTO_UPDATE, 'true');
+});

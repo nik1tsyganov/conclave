@@ -64,6 +64,27 @@ test('standard feature rejects frontier over-routing not listed by policy', () =
   assert.match(result.reason, /route not in matrix/);
 });
 
+test('synara is a legal CLI hostMode and banana is not', () => {
+  assert.deepStrictEqual(validatePlan({
+    hostMode: 'synara', arbiter: arbiter(), magiConvened: true,
+    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' }],
+  }, matrix), { ok: true, dispatches: 1, implementUnits: 1 });
+  assert.throws(() => validatePlan({
+    hostMode: 'banana', arbiter: arbiter(), magiConvened: true,
+    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' }],
+  }, matrix), /hostMode must be cursor-cli or synara/);
+});
+
+test('implement cannot take evidenceReadDirs', () => {
+  assert.throws(() => validatePlan({
+    hostMode: 'synara', arbiter: arbiter(), magiConvened: true,
+    dispatches: [{
+      unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium',
+      evidenceReadDirs: [root],
+    }],
+  }, matrix), /implement cannot take evidenceReadDirs/);
+});
+
 test('Grok cannot occupy a seat', () => {
   assert.throws(() => validatePlan({
     hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: false,
