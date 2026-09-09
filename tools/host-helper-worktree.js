@@ -8,8 +8,9 @@ const { writeJson } = require('./dispatch-evidence.js');
 
 function bindWorktree({ cwd, out, env }) {
   if (!cwd) throw new Error('--cwd is required');
-  const resolved = allowedWorkspace(cwd, env || process.env);
+  const resolved = path.resolve(cwd);
   if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) throw new Error('cwd must be an existing directory');
+  allowedWorkspace(resolved, env || process.env);
   const binding = {
     schemaVersion: 1,
     kind: 'host-helper-worktree',
