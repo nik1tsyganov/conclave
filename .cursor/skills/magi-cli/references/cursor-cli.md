@@ -44,6 +44,8 @@ Availability imports replay the hashed native capture and log. Use a separate av
 
 Write each brief as a UTF-8 file. Put its unique acknowledgment line first. Include `brief-rules-block.md` and replace every placeholder before hashing. A final response must begin with that bound BRIEF first line. The STANDING fingerprint is a separate pack check.
 
+Do not brief seats to read MAGI CLI runtime, plugin, vendor-bridge, or dispatcher source. Product work stays in the assigned worktree. Asking Anthropic seats to inspect those internals has triggered `reasoning_extraction` refusals.
+
 Write operator JSON files as UTF-8. A leading UTF-8 BOM from PowerShell 5.1 is accepted; plan hashes still cover the original bytes. UTF-16 and malformed UTF-8 are rejected. Supply each CLI option once; repeated selectors are errors.
 
 Calculate the final brief hash with:
