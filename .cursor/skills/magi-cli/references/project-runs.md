@@ -180,7 +180,7 @@ Give the next repair session the report directory and original run directory. Re
 
 When this Grok arbiter is hosted in Synara, use `hostMode: synara` and snapshot `synara_capabilities` with `synara-catalog.js` before sealing. Map MAGI vendor names to Synara providers only for catalog checks (`openai`/`codex`, `anthropic`/`claudeAgent`, `google`/`antigravity`). Launch remains `dispatch-run.js`.
 
-Use Synara worktrees as an implement `cwd` when the worktree is already inside MAGI allowed roots. Use `browser_*` only as a host helper after MAGI implement; stage those files with `host-helper-evidence.js` and list the destination on verify/review `evidenceReadDirs`. Never tally a Synara-thread helper as a MAGI `POSITION`. `synara_wait_for_threads` does not join `dispatch-run` PIDs; `magi-synara-watch.js` reports leftover `RUNNING` children and synara-capture `ask` revert without rewriting receipts.
+Use Synara worktrees as an implement `cwd` when the worktree is already inside MAGI allowed roots. Bind that path with `host-helper-worktree.js` before sealing. Use `browser_*` only as a host helper after MAGI implement; stage those files with `host-helper-evidence.js` and list the destination on verify/review `evidenceReadDirs`. Never tally a Synara-thread helper as a MAGI `POSITION`. `synara_wait_for_threads` does not join `dispatch-run` PIDs. Record a `join-manifest.json` with `magi-synara-watch.js --record-join`, then `--wait` on the sealed run directory. The same watch scan reports leftover `RUNNING` children and synara-capture `ask` revert without rewriting receipts.
 
 Do not create MAGI seats as Synara threads. Do not substitute Cursor Task elector slugs for seats.
 

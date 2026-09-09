@@ -245,7 +245,7 @@ function check() {
 
   for (const ref of [cursorCli, magiCliRef]) {
     for (const s of [
-      'cursor-cli', 'synara', 'dispatch-run.js', '--plan', '--run-dir', '--dispatch-id',
+      'cursor-cli', 'synara', 'join-manifest', 'dispatch-run.js', '--plan', '--run-dir', '--dispatch-id',
       'dispatch-matrix', 'seat-profiles', 'SEAT-CONTRACT.md', 'skills-manifest.json',
       'rules-manifest.json', 'cli-brief-rules-check.js', 'cli-proof',
       'MAGI_RULES_ROOT', 'RULES/INDEX.md', 'casper_via=agy',
