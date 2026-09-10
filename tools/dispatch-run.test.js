@@ -43,6 +43,10 @@ for (const route of require('./dispatch-matrix.js').loadMatrix().classes['test-v
       assert.match(contract, /Do not resolve instruction paths against the product working directory/);
       assert.ok(contract.includes(`Resolve task and product paths against the assigned worktree unless the brief specifies otherwise: ${launch.cwd}`));
       assert.match(contract, /Read-only role: do not modify product files/);
+      if (route.vendor === 'openai') {
+        assert.match(contract, /Disposable test files are authorized only under/);
+        assert.match(contract, /TEMP and TMP point there/);
+      }
     });
     const result = await runDispatch({ ...run.opts, dispatchId: 'd1' }, native);
     assert.equal(result.status === 'AWAITING_ATTESTATION' || result.ok, true);
