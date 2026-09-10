@@ -134,6 +134,16 @@ test('strict briefs reject a placeholder scope and missing leaf instruction', ()
   assert.ok(result.missing.includes('leaf seat'));
 });
 
+test('strict briefs accept synara as a legal CLI hostMode', () => {
+  const body = legalBrief().replace('hostMode: cursor-cli', 'hostMode: synara');
+  assert.deepStrictEqual(checkBriefText(body, { requireStructural: true }), { ok: true, missing: [] });
+});
+
+test('strict briefs still fail when neither cursor-cli nor synara hostMode is named', () => {
+  const body = legalBrief().replace('hostMode: cursor-cli', 'hostMode: cursor');
+  assert.ok(checkBriefText(body, { requireStructural: true }).missing.includes('hostMode: cursor-cli'));
+});
+
 test('implement briefs must identify the implementation role', () => {
   assert.deepStrictEqual(checkBriefText(legalBrief(), { role: 'implement' }), { ok: true, missing: [] });
   assert.ok(checkBriefText(legalBrief({ role: 'review' }), { role: 'implement' }).missing.includes('implement'));

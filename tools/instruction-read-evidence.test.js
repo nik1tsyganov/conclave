@@ -189,6 +189,40 @@ test('Codex native UserMessage metadata does not count as product work', t => {
   assert.equal(verify(f, 'openai', rows).status, 'PASS');
 });
 
+function relativeProductRead(f, index = 99) {
+  const cmd = "Get-Content -Raw -LiteralPath 'lib\\d1-sum.js' -Encoding UTF8";
+  const args = { cmd, workdir: f.run.cwd, max_output_tokens: 10000 };
+  const output = 'function sum(a, b) {\n  return a - b;\n}\n';
+  const callId = `product-read-${index}`;
+  return [
+    { type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: callId,
+      input: `const r = await tools.exec_command(${JSON.stringify(args)});\ntext(r.output);` } },
+    { type: 'event_msg', payload: { type: 'item_completed', thread_id: SESSION, item: { type: 'CommandExecution', id: `exec-product-${index}`,
+      command: [path.join(f.run.root, 'pwsh.exe'), '-Command', cmd], cwd: pathToFileURL(f.run.cwd).href,
+      status: 'completed', exit_code: 0, stdout: output, stderr: '', formatted_output: output } } },
+    { type: 'response_item', payload: { type: 'custom_tool_call_output', call_id: callId,
+      output: [{ type: 'input_text', text: 'Script completed\nOutput:\n' }, { type: 'input_text', text: output }] } },
+  ];
+}
+
+test('Codex accepts a relative product Get-Content after every required instruction read', t => {
+  const f = fixture(t);
+  const rows = [...codexRows(f), ...relativeProductRead(f)];
+  assert.equal(verify(f, 'openai', rows).status, 'PASS');
+});
+
+test('Codex treats a relative product Get-Content before coverage as missing reads, not a path-shape crash', t => {
+  const f = fixture(t);
+  const rows = codexRows(f);
+  rows.splice(1, 0, ...relativeProductRead(f));
+  assert.throws(() => verify(f, 'openai', rows), (error) => {
+    assert.equal(error.code, 'INSTRUCTION_READ_FAIL');
+    assert.match(error.message, /reads are missing/);
+    assert.doesNotMatch(error.message, /absolute file path/);
+    return true;
+  });
+});
+
 test('Google native view_file batches correlate full content by logical step even when storage rows are reordered', t => {
   const f = fixture(t); const rows = googleRows(f);
   const ordered = verify(f, 'google', rows);

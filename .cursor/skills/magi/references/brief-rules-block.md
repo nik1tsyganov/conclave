@@ -8,7 +8,7 @@ SEAT: Read the generated SEAT-CONTRACT.md at the pointer's exact path and its li
 ACK: The final response begins with the first line of the bound BRIEF.md. The STANDING fingerprint is a separate pack-integrity check.
 SCOPE: <replace with the concrete assigned work/read scope; no placeholder>.
 ROLE: <implement|review|verify|plan|research>. Every non-implement role is read-only and must not modify product files.
-Vendor: <codex|claude|agy> — casper_via=agy for Google. hostMode: cursor-cli. not CONCLAVE.
+Vendor: <codex|claude|agy> — casper_via=agy for Google. hostMode: cursor-cli or synara. not CONCLAVE.
 MUST: WRITE AUDIT when role=implement; no C:\src\vault writes; no Gemini PAYG; leaf seat (no fan-out); SLICES≠vendors (R11).
 LIVE: R09 live-check. Claude dispatch requires R16 auth + headless probe status established by the arbiter before launch.
 COMMS: The runtime writes the receipt ACK, handoff envelope, and output hashes. TELEMETRY: R17 exactly one runtime-owned row per logical dispatch. Seats must not edit these artifacts.

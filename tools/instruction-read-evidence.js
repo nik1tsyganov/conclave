@@ -141,7 +141,10 @@ function codexReads(rows, sessionId, required) {
     if (row.type === 'response_item' && ['custom_tool_call', 'function_call'].includes(item?.type)) {
       if (pending) fail('ambiguous overlapping Codex tool calls');
       const read = codexReadCall(item);
-      if (!read) { requireComplete(found, required); continue; }
+      if (!read || typeof read.file !== 'string' || !path.isAbsolute(read.file)) {
+        requireComplete(found, required);
+        continue;
+      }
       const key = plainPath(read.file);
       if (!required.has(key)) { requireComplete(found, required); continue; }
       if (!item.call_id || seen.has(item.call_id) || plainPath(read.args.workdir) !== cwd) fail('Codex read call identity or cwd mismatch');

@@ -21,7 +21,7 @@ const REQUIRED_MARKERS = Object.freeze([
 ]);
 
 const STRICT_MARKERS = Object.freeze([
-  { id: 'hostMode: cursor-cli', anyOf: ['hostMode: cursor-cli', 'hostMode `cursor-cli`'] },
+  { id: 'hostMode: cursor-cli', anyOf: ['hostMode: cursor-cli', 'hostMode `cursor-cli`', 'hostMode: synara', 'hostMode `synara`'] },
   { id: 'pointer-only', anyOf: ['pointer-only', 'pointer only', 'pointer delivery'] },
   { id: 'leaf seat', anyOf: ['leaf seat', 'no fan-out', 'MUST NOT sub-dispatch'] },
   { id: 'receipt/handoff', anyOf: ['receipt ACK', 'receipt-ack', 'handoff envelope', 'handoff-envelope'] },
