@@ -130,7 +130,7 @@ Repeating the initial command while pending only returns its checkpoint. If the 
 
 Launches read the sealed availability snapshot. An optional `--availability` argument must be a byte-identical copy. Refreshing expired probes requires a new complete plan and seal.
 
-The runtime derives capabilities from `seat-profiles.json`. It stages the vendor card (`seat-openai`, `seat-anthropic`, or `seat-google`), role skills, and class extras. The bundled lean source is the default. Full home orchestration and bridge skills are not seat capabilities.
+The runtime derives capabilities from `seat-profiles.json`. It stages the vendor card (`seat-openai`, `seat-anthropic`, or `seat-google`), role skills, and domain class extras only. Long-run classes add no host loop or harness copies. The bundled lean source is the default. Full home orchestration and bridge skills are not seat capabilities.
 
 Every generated `SEAT-CONTRACT.md` points to the actual `skills/skills-manifest.json`. Rules are copied beside the bound brief with `rules-manifest.json`. `cli-brief-rules-check.js` verifies the generated profile, permissions, pointers, files, and hashes. Skill names in prose cannot establish file existence.
 

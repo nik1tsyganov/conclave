@@ -1,3 +1,3 @@
-{"vendor":"anthropic","role":"implement"}
-{"vendor":"anthropic","role":"implement"}
-{"vendor":"anthropic","role":"implement"}
+{"vendor":"anthropic","role":"implement","dispatchId":"d1","unitId":"u1"}
+{"vendor":"anthropic","role":"implement","dispatchId":"d2","unitId":"u2"}
+{"vendor":"anthropic","role":"implement","dispatchId":"d3","unitId":"u3"}

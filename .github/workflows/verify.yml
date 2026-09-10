@@ -2,7 +2,7 @@ name: MAGI verification
 
 on:
   push:
-    branches: [fix/magi-cli-hardening]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:

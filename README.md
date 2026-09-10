@@ -70,7 +70,7 @@ The runner consumes route fields from the sealed entry. It rejects changed class
 
 ## Seat capabilities and scope
 
-[Seat profiles](.cursor/skills/magi-cli/references/seat-profiles.json) select the vendor card, role skills, and class extras. The runtime stages only those lean files and hashes them.
+[Seat profiles](.cursor/skills/magi-cli/references/seat-profiles.json) select the vendor card, role skills, and domain class extras. Long-run classes add no host loop or harness copies. The runtime stages only those lean files and hashes them.
 
 - `implement` permits product writes only within the declared relative paths.
 - `review`, `verify`, `plan`, and `research` are read-only roles.

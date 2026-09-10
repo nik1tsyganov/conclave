@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { inspectHooks, inspectJoinManifest, waitForDispatches, watch, writeJoinManifest } = require('./magi-synara-watch.js');
+const { inspectHooks, inspectJoinManifest, main, waitForDispatches, watch, writeJoinManifest } = require('./magi-synara-watch.js');
 
 test('watchdog is silent when hooks allow and no leftover RUNNING pid', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-watch-clean-'));
@@ -56,6 +56,31 @@ test('join waits for terminal MAGI transactions and never claims Synara wait', (
   assert.equal(result.notify, false);
   assert.equal(result.synaraWaitJoins, false);
   assert.equal(result.settled[0].dispatchId, 'd1');
+});
+
+test('scan exit is fail-closed when leftovers exist and clean otherwise', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-watch-exit-'));
+  test.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const hooks = path.join(root, 'hooks.json');
+  fs.writeFileSync(hooks, JSON.stringify({ hooks: { PreToolUse: [{ hooks: [{ decision: 'allow' }] }] } }), 'utf8');
+  const runRoot = path.join(root, 'runs');
+  fs.mkdirSync(path.join(runRoot, '.magi-dispatches'), { recursive: true });
+  fs.writeFileSync(path.join(runRoot, '.magi-dispatches', 'ok.json'), JSON.stringify({ status: 'PASS', evidenceDir: path.join(runRoot, 'out', 'd1') }), 'utf8');
+  assert.equal(main(['--run-roots', runRoot, '--hooks', hooks]), 0);
+  const evidenceDir = path.join(root, 'out', 'dead');
+  fs.mkdirSync(evidenceDir, { recursive: true });
+  fs.writeFileSync(path.join(evidenceDir, 'child.pid'), '42424244\n', 'utf8');
+  fs.writeFileSync(path.join(runRoot, '.magi-dispatches', 'dead.json'), JSON.stringify({
+    status: 'RUNNING', evidenceDir, entry: { dispatchId: 'dead' },
+  }), 'utf8');
+  assert.equal(main(['--run-roots', runRoot, '--hooks', hooks]), 1);
+});
+
+test('wait without a dispatch id fails before treating an empty run as joined', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-join-empty-'));
+  test.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  assert.throws(() => waitForDispatches({ runDir: root, dispatchIds: [], timeoutMs: 40, pollMs: 10 }), /--wait requires --dispatch-id/);
+  assert.equal(main(['--wait', '--run-dir', root]), 2);
 });
 
 test('join times out on a missing dispatch id', () => {

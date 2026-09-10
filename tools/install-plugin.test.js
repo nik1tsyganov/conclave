@@ -294,7 +294,7 @@ test('installed runtime loads contracts, all entry-point dependencies, and bundl
   const evidence = JSON.parse(result.stdout);
   assert.strictEqual(evidence.layout, 'installed');
   assert.strictEqual(evidence.nativeCalls, 0);
-  assert.ok(evidence.skills >= 11);
+  assert.ok(evidence.skills >= 9);
   t.diagnostic(JSON.stringify(evidence));
 });
 
