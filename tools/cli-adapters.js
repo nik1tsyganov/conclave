@@ -3,6 +3,8 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { isDeepStrictEqual } = require('node:util');
+const { assertPlainPath, inside } = require('./dispatch-evidence.js');
 const { inspectBrief, pointerText } = require('./cli-pointer.js');
 const { resolveVendorBinary } = require('./vendor-binaries.js');
 const { CLAUDE_RESPONSE_PROTOCOL, CLAUDE_RESPONSE_SCHEMA } = require('./vendor-native.js');
@@ -14,6 +16,7 @@ const DEFAULTS = Object.freeze({
   anthropic: { model: 'fable', effort: 'xhigh' },
 });
 const READ_ONLY_ROLES = new Set(['review', 'verify', 'plan', 'research']);
+const OPENAI_SCRATCH_PROTOCOL = 'magi-openai-readonly-scratch-v1';
 
 function roleSandbox(role) {
   if (role === 'implement') return 'workspace-write';
@@ -25,6 +28,64 @@ function extraReadDirs(opts) {
   if (opts.evidenceReadDirs === undefined) return [];
   if (!Array.isArray(opts.evidenceReadDirs)) throw new Error('evidenceReadDirs must be an array');
   return validateEvidenceReadDirs(opts);
+}
+
+function openaiScratchPolicy({ runDir, dispatchId, role, cwd, capturePath }) {
+  if (!READ_ONLY_ROLES.has(role)) throw new Error('OpenAI scratch requires a non-implement role');
+  if (!runDir || !path.isAbsolute(runDir) || typeof dispatchId !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(dispatchId)) {
+    throw new Error('OpenAI scratch requires a bound runDir and dispatchId');
+  }
+  const evidenceDir = path.join(path.resolve(runDir), 'out', dispatchId);
+  const scratchPath = path.join(evidenceDir, 'scratch');
+  if (!capturePath || hostResolve(capturePath) !== hostResolve(path.join(evidenceDir, 'capture.txt'))) {
+    throw new Error('OpenAI scratch capture must belong to its bound dispatch');
+  }
+  if (!cwd || inside(scratchPath, cwd) || inside(cwd, scratchPath) || hostResolve(scratchPath) === hostResolve(cwd)) {
+    throw new Error('OpenAI scratch must not overlap the product workspace');
+  }
+  return { protocol: OPENAI_SCRATCH_PROTOCOL, profile: 'magi_readonly_scratch', scratchPath };
+}
+
+function openaiScratchEnv(policy) {
+  return {
+    TEMP: policy.scratchPath,
+    TMP: policy.scratchPath,
+    npm_config_cache: path.join(policy.scratchPath, 'npm-cache'),
+    npm_config_update_notifier: 'false',
+  };
+}
+
+function openaiArgs({ role, model, effort, cwd, capturePath }, policy) {
+  const permissionArgs = policy ? [
+    '-c', `default_permissions=${JSON.stringify(policy.profile)}`,
+    // Replace the entire named profile so a global rule cannot add another grant.
+    '-c', `permissions.${policy.profile}={ extends = ":read-only", filesystem = { ${JSON.stringify(policy.scratchPath.replaceAll('\\', '/'))} = "write" }, network = { enabled = false } }`,
+  ] : ['-s', roleSandbox(role)];
+  return ['exec', '--skip-git-repo-check', ...permissionArgs, '-m', model,
+    '-c', `model_reasoning_effort=${effort}`,
+    '-c', 'memories.use_memories=false', '-c', 'memories.generate_memories=false',
+    '-C', cwd, '-o', capturePath, '-'];
+}
+
+function validateOpenaiScratchLaunch(launch, expected) {
+  if (!expected.cwd || !launch || launch.vendor !== 'openai' || launch.role !== expected.role || launch.cwd !== hostResolve(expected.cwd)) {
+    throw new Error('OpenAI scratch launch identity mismatch');
+  }
+  const bound = { ...expected, cwd: hostResolve(expected.cwd) };
+  const policy = openaiScratchPolicy(bound);
+  const scratchEnv = openaiScratchEnv(policy);
+  if (!isDeepStrictEqual(launch.scratchPermissions, policy) || !isDeepStrictEqual(launch.scratchEnv, scratchEnv)) {
+    throw new Error('OpenAI scratch policy or environment is not bound to this dispatch');
+  }
+  const args = openaiArgs(bound, policy);
+  if (!isDeepStrictEqual(launch.args, args)) throw new Error('OpenAI scratch launch arguments differ from the exact restricted profile');
+  if (launch.env) {
+    for (const [key, value] of Object.entries(scratchEnv)) {
+      const matches = Object.keys(launch.env).filter(name => name.toLowerCase() === key.toLowerCase());
+      if (matches.length !== 1 || launch.env[matches[0]] !== value) throw new Error('OpenAI scratch runtime environment mismatch');
+    }
+  }
+  return policy;
 }
 
 function windowsUnder(candidate, root) {
@@ -99,19 +160,32 @@ function seatPointerFile(ctx) {
 
 function openaiLaunch(opts) {
   const ctx = base({ ...opts, vendor: 'openai' });
+  if (opts.readonlyScratch !== undefined && typeof opts.readonlyScratch !== 'boolean') throw new Error('readonlyScratch must be boolean');
+  const policy = opts.readonlyScratch ? openaiScratchPolicy({ ...opts, cwd: ctx.cwd }) : null;
+  const env = subscriptionEnv(opts.env);
+  let scratchEnv;
+  if (policy) {
+    for (const protectedPath of [ctx.brief.briefPath, ctx.seatContractPath, ctx.skillRoot, opts.rulesRoot, opts.capturePath].filter(Boolean)) {
+      if (inside(path.resolve(protectedPath), policy.scratchPath) || ((protectedPath === ctx.skillRoot || protectedPath === opts.rulesRoot) && inside(policy.scratchPath, path.resolve(protectedPath)))) {
+        throw new Error('OpenAI scratch overlaps protected instructions or evidence');
+      }
+    }
+    assertPlainPath(policy.scratchPath);
+    fs.mkdirSync(policy.scratchPath, { recursive: true });
+    assertPlainPath(policy.scratchPath);
+    scratchEnv = openaiScratchEnv(policy);
+    for (const key of Object.keys(env)) if (Object.keys(scratchEnv).some(name => name.toLowerCase() === key.toLowerCase())) delete env[key];
+    Object.assign(env, scratchEnv);
+  }
   const pointerFile = seatPointerFile(ctx);
   return {
     vendor: 'openai', role: ctx.role, model: ctx.model, effort: ctx.effort,
     binary: resolveVendorBinary('openai', { env: opts.env, home: opts.home, mustExist: opts.mustExistBinary !== false }),
-    args: [
-      'exec', '--skip-git-repo-check', '-s', roleSandbox(ctx.role), '-m', ctx.model,
-      '-c', `model_reasoning_effort=${ctx.effort}`,
-      '-c', 'memories.use_memories=false', '-c', 'memories.generate_memories=false',
-      '-C', ctx.cwd, '-o', opts.capturePath, '-',
-    ],
-    cwd: ctx.cwd, env: subscriptionEnv(opts.env), stdinFile: pointerFile, stdio: ['pipe', 'pipe', 'pipe'],
-    pointerFile, requestedSandbox: roleSandbox(ctx.role), skillRoot: ctx.skillRoot, seatContractPath: ctx.seatContractPath,
+    args: openaiArgs({ ...ctx, capturePath: opts.capturePath }, policy),
+    cwd: ctx.cwd, env, stdinFile: pointerFile, stdio: ['pipe', 'pipe', 'pipe'],
+    pointerFile, requestedSandbox: policy ? 'custom permissions' : roleSandbox(ctx.role), skillRoot: ctx.skillRoot, seatContractPath: ctx.seatContractPath,
     ...(ctx.evidenceReadDirs.length ? { evidenceReadDirs: ctx.evidenceReadDirs } : {}),
+    ...(policy ? { scratchPermissions: policy, scratchEnv } : {}),
   };
 }
 
@@ -170,4 +244,4 @@ function buildLaunch(opts) {
   throw new Error(`unsupported vendor: ${opts.vendor}`);
 }
 
-module.exports = { DEFAULTS, READ_ONLY_ROLES, allowedWorkspace, anthropicLaunch, buildLaunch, googleLaunch, openaiLaunch, roleSandbox, seatPointerFile, seatPointerText, subscriptionEnv };
+module.exports = { DEFAULTS, READ_ONLY_ROLES, OPENAI_SCRATCH_PROTOCOL, allowedWorkspace, anthropicLaunch, buildLaunch, googleLaunch, openaiLaunch, openaiScratchPolicy, validateOpenaiScratchLaunch, roleSandbox, seatPointerFile, seatPointerText, subscriptionEnv };

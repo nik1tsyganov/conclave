@@ -84,10 +84,11 @@ function createSealedRun(t, entries = [{}], options = {}) {
   const planObject = { planId: 'fixture-run', hostMode: 'cursor-cli', arbiter: { vendor: 'xai', model: 'grok-4.6', effort: 'high' }, ...options, dispatches };
   const planSource = path.join(root, 'source-plan.json'); writeJson(planSource, planObject);
   const runDir = path.join(root, 'run');
-  const sealed = require('./plan-seal.js').sealPlan({ plan: planSource, runDir, availability });
   const profiles = require('./seat-policy.js').loadProfiles();
   const skills = [...new Set(dispatches.flatMap((entry) => require('./seat-policy.js').buildSeatProfile(profiles, entry).skills))];
-  const opts = { plan: sealed.planPath, runDir, rulesRoot: ruleFixture(root), skillSourceRoot: skillFixture(root, skills) };
+  const skillSourceRoot = skillFixture(root, skills);
+  const sealed = require('./plan-seal.js').sealPlan({ plan: planSource, runDir, availability, skillSourceRoot });
+  const opts = { plan: sealed.planPath, runDir, rulesRoot: ruleFixture(root), skillSourceRoot };
   return { root, cwd, runDir, opts, dispatches, available, availability, planSource, planObject, sealed };
 }
 
@@ -96,7 +97,7 @@ function fakeVendor(action = () => {}, response = 'ACK fixture\nPOSITION: APPROV
   const transcripts = new Map();
   const buildLaunch = (opts) => ({ ...opts, vendor: opts.vendor, role: opts.role, binary: process.execPath,
     args: opts.vendor === 'anthropic' ? ['--json-schema', JSON.stringify(require('./vendor-native.js').CLAUDE_RESPONSE_SCHEMA)] : [],
-    requestedSandbox: opts.role === 'implement' ? 'workspace-write' : 'read-only' });
+    requestedSandbox: opts.requestedSandbox || (opts.role === 'implement' ? 'workspace-write' : 'read-only') });
   const runLaunch = async (launch) => {
     calls++;
     const id = require('node:crypto').randomUUID();

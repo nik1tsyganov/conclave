@@ -426,20 +426,23 @@ test('environment rules resolve before initial destination validation creates ev
 
 test('default bundled skills resolve before initial destination validation creates evidence', async t => {
   const run = claudeRun(t);
-  const runtime = path.join(run.runDir, 'runtime');
+  const runDir = path.join(run.root, 'bound-run');
+  const runtime = path.join(runDir, 'runtime');
   fs.cpSync(__dirname, path.join(runtime, 'tools'), { recursive: true });
   const refs = '.cursor/skills/magi-cli/references';
   fs.mkdirSync(path.join(runtime, refs), { recursive: true });
   for (const name of ['dispatch-matrix.json', 'seat-profiles.json']) fs.copyFileSync(path.join(__dirname, '..', refs, name), path.join(runtime, refs, name));
   fs.cpSync(run.opts.skillSourceRoot, path.join(runtime, 'seat-skills'), { recursive: true });
+  const sealed = require('./plan-seal.js').sealPlan({ plan: run.planSource, runDir, availability: run.availability,
+    skillSourceRoot: path.join(runtime, 'seat-skills') });
   const isolatedDispatch = require(path.join(runtime, 'tools/dispatch-run.js')).runDispatch;
   const { skillSourceRoot: explicitSkills, ...opts } = command(run);
   const native = fakeVendor();
-  const before = snapshotWorkspace(run.runDir);
+  const before = snapshotWorkspace(runDir);
   const skill = fs.readdirSync(path.join(runtime, 'seat-skills'))[0];
-  await assert.rejects(isolatedDispatch({ ...opts, telemetryLog: path.join(runtime, 'seat-skills', skill, 'SKILL.md') }, native), /log destination.*overlap/);
+  await assert.rejects(isolatedDispatch({ ...opts, plan: sealed.planPath, runDir, telemetryLog: path.join(runtime, 'seat-skills', skill, 'SKILL.md') }, native), /log destination.*overlap/);
   assert.equal(native.calls(), 0);
-  assert.deepEqual(snapshotWorkspace(run.runDir), before);
+  assert.deepEqual(snapshotWorkspace(runDir), before);
 });
 
 test('logs cannot overwrite a prerequisite in a custom evidence directory', async t => {

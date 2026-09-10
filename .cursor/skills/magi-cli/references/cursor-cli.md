@@ -91,9 +91,10 @@ Validate and copy the complete draft plan into a new run directory:
 ```powershell
 node tools/plan-seal.js --plan C:/src/magi-runs/draft-plan.json --run-dir C:/src/magi-runs/run-001 --availability C:/src/magi-runs/availability.json
 # synara hostMode also requires --synara-catalog <normalized catalog.json>
+# optional: --skill-source-root <dir> binds skill bytes into seal schemaVersion 2
 ```
 
-The seal binds plan bytes, brief hashes, matrix, and seat profiles. Keep the run directory outside product worktrees and the runtime. Known destination collisions fail before copying plan files. Changes require a new complete plan validation and a new run directory. A `vendorOverride` in `graph.json`, a SLICES vendor column, or an ad-hoc route flag grants no authority.
+The seal binds plan bytes, brief hashes, matrix snapshots, seat profiles, and skill-source hashes. New work requires schemaVersion 2. OpenAI checking roles use scoped readonly scratch under `run/out/<dispatchId>/scratch`. Keep the run directory outside product worktrees and the runtime. Known destination collisions fail before copying plan files. Changes require a new complete plan validation and a new run directory. A `vendorOverride` in `graph.json`, a SLICES vendor column, or an ad-hoc route flag grants no authority.
 
 Launch a selected sealed entry:
 

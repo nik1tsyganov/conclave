@@ -128,7 +128,7 @@ function verifySavedExecution(run, entry, state, pending, allowReceiptProjection
   const launch = readJson(artifact('launch.json'));
   if (entry.evidenceReadDirs?.length) {
     const dirs = validateEvidenceReadDirs(entry, { plan: run.plan, runDir: run.root, requireExisting: true,
-      forbiddenRoots: [readJson(artifact('rules-source-before.json')).root].filter(Boolean) });
+      forbiddenRoots: [run.seal.skillSource?.sourceRoot, readJson(artifact('rules-source-before.json')).root].filter(Boolean) });
     validateEvidenceReadLaunch(launch, entry, dirs, { cwd: entry.cwd, briefPath: artifact('brief/BRIEF.md'), skillRoot: artifact('skills'), seatContractPath: artifact('SEAT-CONTRACT.md') });
     for (const name of ['evidence-reads-before.json', 'evidence-reads-after.json']) {
       if (!state.artifacts.some(item => item.path === artifact(name) && item.sha256 === hashFile(artifact(name)))) throw new Error(`missing committed evidence input artifact: ${name}`);

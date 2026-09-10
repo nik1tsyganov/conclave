@@ -73,6 +73,24 @@ function writeSkill(files, destination) {
   return manifest;
 }
 
+function skillFileHashes(files) {
+  return files.map(file => ({ path: file.path, bytes: file.body.length, sha256: digest(file.body) }));
+}
+
+function bindSkillSource({ sourceRoot = resolveRuntimePaths().seatSkillsRoot, skills }) {
+  sourceRoot = canonicalPlainPath(sourceRoot);
+  return { sourceRoot, skills: Object.fromEntries(allowedSkills(skills).sort().map(skill =>
+    [skill, skillFileHashes(readSkill(path.join(sourceRoot, skill)))])) };
+}
+
+function verifySkillSource(binding, sourceRoot = binding?.sourceRoot) {
+  if (!binding || !binding.skills || !isDeepStrictEqual(binding,
+    bindSkillSource({ sourceRoot, skills: Object.keys(binding.skills) }))) {
+    throw stageError('skill source differs from sealed identity or content');
+  }
+  return binding;
+}
+
 function copySkill(source, destination) {
   const from = canonicalPlainPath(source);
   const to = canonicalPlainPath(destination);
@@ -87,6 +105,10 @@ function prepareSeatSkills(options = {}) {
     const destinationRoot = canonicalPlainPath(options.destinationRoot);
     if (pathsOverlap(sourceRoot, destinationRoot)) throw stageError('skill source and destination overlap; refusing to delete the source');
     const prepared = skills.map(skill => ({ skill, files: readSkill(path.join(sourceRoot, skill)) }));
+    if (options.sourceBinding && (sourceRoot !== options.sourceBinding.sourceRoot || prepared.some(entry =>
+      !isDeepStrictEqual(skillFileHashes(entry.files), options.sourceBinding.skills?.[entry.skill])))) {
+      throw stageError('skill source differs from sealed identity or content');
+    }
     if (fs.existsSync(destinationRoot)) {
       if (!fs.lstatSync(destinationRoot).isDirectory()) throw stageError('skill destination is not a directory');
       if (fs.readdirSync(destinationRoot).length) {
@@ -172,4 +194,4 @@ function verifySeatSkills({ destinationRoot, skills, manifest }) {
   }
 }
 
-module.exports = { FORBIDDEN_ARBITER_SKILLS, copySkill, prepareSeatSkills, regularFiles, stageError, stageSeatSkills, verifySeatSkills };
+module.exports = { FORBIDDEN_ARBITER_SKILLS, bindSkillSource, copySkill, prepareSeatSkills, regularFiles, stageError, stageSeatSkills, verifySeatSkills, verifySkillSource };

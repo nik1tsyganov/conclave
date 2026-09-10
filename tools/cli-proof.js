@@ -3,6 +3,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { validateOpenaiScratchLaunch } = require('./cli-adapters.js');
 const { CLAUDE_RESPONSE_PROTOCOL, requireClaudeResponseProtocol, validateClaudeStructuredResponse } = require('./vendor-native.js');
 
 const AUTH_NEEDLES = ['not logged in', 'please run /login', 'auth required', 'authentication required'];
@@ -65,10 +66,20 @@ function parseCodex(logText, expectedModel, options = {}) {
 
   const session = getField(/^[ \t]*session id[ \t]*:[ \t]*(\S+)/gim, 'session id');
   const model = getField(/^[ \t]*model[ \t]*:[ \t]*(\S+)/gim, 'model');
-  const sandbox = getField(/^[ \t]*sandbox[ \t]*:[ \t]*([^\s]+)/gim, 'sandbox');
+  const sandboxLabel = getField(/^[ \t]*sandbox[ \t]*:[ \t]*([^\r\n]+)/gim, 'sandbox').trim();
+  const sandbox = sandboxLabel === 'custom permissions' ? sandboxLabel : sandboxLabel.split(/\s+/)[0];
   const effort = getField(/^[ \t]*reasoning effort[ \t]*:[ \t]*(\S+)/gim, 'reasoning effort');
 
-  if (sandbox !== 'workspace-write' && sandbox !== 'read-only') throw proofError(`Codex proof missing/invalid sandbox: ${sandbox}`);
+  let scratchPermissions;
+  if (sandbox === 'custom permissions') {
+    if (options.expectedSandbox !== 'custom permissions') throw proofError('Codex custom permissions require an expected bound scratch launch');
+    try {
+      scratchPermissions = validateOpenaiScratchLaunch(options.launch, {
+        runDir: options.runDir, dispatchId: options.dispatchId, role: options.expectedRole,
+        cwd: options.expectedCwd, capturePath: options.capture, model: expectedModel, effort: options.expectedEffort,
+      });
+    } catch (error) { throw proofError(`Codex scratch launch validation failed: ${error.message}`); }
+  } else if (sandbox !== 'workspace-write' && sandbox !== 'read-only') throw proofError(`Codex proof missing/invalid sandbox: ${sandbox}`);
   if (options.expectedSandbox && sandbox !== options.expectedSandbox) throw proofError(`Codex sandbox mismatch: expected ${options.expectedSandbox}, observed ${sandbox}`);
 
   const VALID_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
@@ -93,7 +104,8 @@ function parseCodex(logText, expectedModel, options = {}) {
     effortObserved: effort,
     modelRequested: expectedModel || null,
     effortRequested: options.expectedEffort || null,
-    identityEvidence: 'exact'
+    identityEvidence: 'exact',
+    ...(scratchPermissions ? { scratchPermissions } : {})
   };
 }
 

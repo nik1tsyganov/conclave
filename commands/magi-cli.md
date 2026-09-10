@@ -35,7 +35,7 @@ Claude implementation uses `--safe-mode --permission-mode bypassPermissions`. Sa
 
 Critical classes require `magiConvened: true` and two distinct foreign review/verify vendors on the same unit and worktree. Implementation vendor count scales as `min(3, implementation units)`; the 60% cap starts at two units. Do not invent implementation rows for read-only panels.
 
-Run `plan-seal.js --plan <draft.json> --run-dir <new-run-dir> --availability <availability.json>`. A synara host also requires `--synara-catalog`. Stop on failure.
+Run `plan-seal.js --plan <draft.json> --run-dir <new-run-dir> --availability <availability.json>`. A synara host also requires `--synara-catalog`. Optional `--skill-source-root` binds skill bytes into seal schemaVersion 2. Stop on failure.
 
 ## Dispatch and conclude
 
