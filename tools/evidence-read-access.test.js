@@ -10,6 +10,7 @@ const { sealPlan, readSealedRun } = require('./plan-seal.js');
 const { runDispatch } = require('./dispatch-run.js');
 const { inspectRun } = require('./run-finalize.js');
 const { hashFile, writeJson, transactionKey } = require('./dispatch-evidence.js');
+const { canonicalPlainPath } = require('./runtime-paths.js');
 
 function accessFixture(t, vendor = 'google') {
   const route = vendor === 'anthropic' ? { vendor, model: 'opus', effort: 'high' } : { vendor, model: 'gemini-3.1-pro-high', effort: 'fused-high' };
@@ -29,6 +30,10 @@ function nativeFixture(action) {
   return native;
 }
 function inputs(run) { fs.mkdirSync(run.evidence); fs.writeFileSync(path.join(run.evidence, 'browser.json'), '{"case":"synthetic"}'); }
+function granted(args, dir) {
+  const target = canonicalPlainPath(dir);
+  return args.some(arg => typeof arg === 'string' && path.isAbsolute(arg) && canonicalPlainPath(arg) === target);
+}
 async function complete(run, native) {
   const result = await runDispatch({ ...run.opts, dispatchId: 'd1' }, native);
   return result.status === 'AWAITING_ATTESTATION' ? runDispatch({ ...run.opts, dispatchId: 'd1', onTopic: true, captureSha256: result.captureSha256 }, native) : result;
@@ -42,7 +47,7 @@ test('Google checking launch grants the explicitly bound sibling evidence direct
     briefPath, seatContractPath: path.join(root, 'SEAT-CONTRACT.md'), skillRoot: path.join(root, 'skills'),
     capturePath: path.join(root, 'capture.txt'), evidenceReadDirs: [evidence],
     env: { MAGI_AGY_BIN: process.execPath }, mustExistBinary: false });
-  assert.ok(launch.args.includes(evidence), 'sealed sibling evidence must be in native add-dir grants');
+  assert.ok(granted(launch.args, evidence), 'sealed sibling evidence must be in native add-dir grants');
   assert.ok(launch.args.includes('--sandbox'));
 });
 
@@ -57,8 +62,8 @@ for (const vendor of ['google', 'anthropic']) {
     assert.equal((await runDispatch({ ...run.opts, dispatchId: 'd1' }, native)).replayed, true);
     assert.equal(native.calls(), 1);
     const launch = JSON.parse(fs.readFileSync(path.join(run.runDir, 'out/d1/launch.json')));
-    assert.deepEqual(launch.evidenceReadDirs, [fs.realpathSync(run.evidence)]);
-    assert.ok(launch.args.includes(run.evidence));
+    assert.deepEqual(launch.evidenceReadDirs, [canonicalPlainPath(run.evidence)]);
+    assert.ok(granted(launch.args, run.evidence));
     assert.equal(inspectRun(run.runDir).executions.length, 1);
   });
 }
@@ -199,7 +204,7 @@ test('exact same-unit prerequisite output requires completed PASS evidence, not 
   const prior = { ...entry, dispatchId: 'author', role: 'implement', evidenceReadDirs: undefined };
   const dir = path.join(run.runDir, 'out/author'); entry.evidenceReadDirs = [dir];
   const plan = { ...run.planObject, dispatches: [prior, entry] };
-  assert.deepEqual(validateEvidenceReadDirs(entry, { plan, runDir: run.runDir }), [dir]);
+  assert.deepEqual(validateEvidenceReadDirs(entry, { plan, runDir: run.runDir }), [canonicalPlainPath(dir)]);
   fs.mkdirSync(dir, { recursive: true });
   const stateFile = path.join(run.runDir, '.magi-dispatches', `${transactionKey(prior)}.json`);
   for (const status of ['RUNNING', 'AWAITING_ATTESTATION', 'FAIL']) {
@@ -207,7 +212,7 @@ test('exact same-unit prerequisite output requires completed PASS evidence, not 
     assert.throws(() => validateEvidenceReadDirs(entry, { plan, runDir: run.runDir, requireExisting: true }), /not complete/);
   }
   writeJson(stateFile, { status: 'PASS', evidenceDir: dir, completedAt: new Date().toISOString() });
-  assert.deepEqual(validateEvidenceReadDirs(entry, { plan, runDir: run.runDir, requireExisting: true }), [dir]);
+  assert.deepEqual(validateEvidenceReadDirs(entry, { plan, runDir: run.runDir, requireExisting: true }), [canonicalPlainPath(dir)]);
   assert.throws(() => validateEvidenceReadDirs(entry, { plan: { dispatches: [{ ...prior, unitId: 'other' }, entry] }, runDir: run.runDir }), /same-unit prerequisite/);
 });
 
@@ -254,7 +259,7 @@ test('OpenAI evidence grants leave the exact scratch argv and environment unchan
     env: { MAGI_CODEX_BIN: process.execPath }, mustExistBinary: false };
   const before = buildLaunch(opts); const after = buildLaunch({ ...opts, evidenceReadDirs: [evidence] });
   assert.deepEqual(after.args, before.args); assert.deepEqual(after.env, before.env);
-  assert.deepEqual(after.evidenceReadDirs, [evidence]);
+  assert.deepEqual(after.evidenceReadDirs, [canonicalPlainPath(evidence)]);
 });
 
 test('replay checks sealed directory grants even after a launch artifact hash is refreshed', async t => {
