@@ -12,7 +12,8 @@ const { CLI_RUNTIME_TOOLS } = require('./runtime-paths.js');
 
 function put(file, body = 'fixture\n') {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, body, 'utf8');
+  if (Buffer.isBuffer(body)) fs.writeFileSync(file, body);
+  else fs.writeFileSync(file, body, 'utf8');
 }
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-preflight-'));
@@ -243,4 +244,200 @@ test('synara-capture PreToolUse allow passes Google preflight', t => {
   put(path.join(f.home, '.gemini', 'antigravity-cli', 'plugins', 'synara-capture', 'hooks.json'),
     '{"synara-capture":{"PreToolUse":[{"hooks":[{"command":"echo {\\"decision\\":\\"allow\\"}"}]}]}}');
   assert.equal(check(f).ok, true);
+});
+
+test('Windows preflight rejects the 22-NUL native sandbox regression without writes', t => {
+  const f = fixture(t);
+  f.platform = 'win32';
+  const state = path.join(f.home, '.codex', '.sandbox', 'deny_read_acl_state.json');
+  put(state, Buffer.alloc(22));
+  const before = snapshot(f.root);
+  const result = check(f);
+  assert.equal(result.ok, false);
+  assert.match(result.findings.find(row => row.check === 'sandbox:openai-state').error, /UTF-8 JSON/);
+  assert.deepEqual(snapshot(f.root), before);
+});
+
+for (const [label, body] of [
+  ['empty', ''], ['whitespace only', ' \r\n'], ['truncated', '{"paths":'],
+  ['malformed', '{no}'], ['BOM', '\ufeff{}'], ['embedded NUL', '{}\0'],
+  ['invalid UTF-8', Buffer.from([0x22, 0xff, 0x22])],
+]) {
+  test(`Windows preflight rejects ${label} native sandbox state without writes`, t => {
+    const f = fixture(t);
+    f.platform = 'win32';
+    put(path.join(f.home, '.codex', '.sandbox', 'deny_read_acl_state.json'), body);
+    const before = snapshot(f.root);
+    const result = check(f);
+    assert.equal(result.ok, false);
+    assert.match(result.findings.find(row => row.check === 'sandbox:openai-state').error, /UTF-8 JSON/);
+    assert.deepEqual(snapshot(f.root), before);
+  });
+}
+
+test('Windows preflight checks JSON syntax without guessing the native state schema', t => {
+  const f = fixture(t);
+  f.platform = 'win32';
+  const file = path.join(f.home, '.codex', '.sandbox', 'deny_read_acl_state.json');
+  for (const body of ['{}', '{"example":["read path",42,true]}', 'null']) {
+    put(file, body);
+    const before = snapshot(f.root);
+    const result = check(f);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    const row = result.findings.find(row => row.check === 'sandbox:openai-state');
+    assert.equal(row.status, 'syntax-valid');
+    assert.match(row.scope, /shell and staged-file access remain untested/);
+    assert.deepEqual(snapshot(f.root), before);
+  }
+});
+
+test('absent Windows state is uninitialized and never claims shell readiness', t => {
+  const f = fixture(t);
+  f.platform = 'win32';
+  const before = snapshot(f.root);
+  const result = check(f);
+  assert.equal(result.ok, true);
+  const row = result.findings.find(row => row.check === 'sandbox:openai-state');
+  assert.equal(row.status, 'uninitialized');
+  assert.match(row.scope, /remain untested/);
+  assert.deepEqual(snapshot(f.root), before);
+});
+
+test('Windows state uses CODEX_HOME instead of the default home', t => {
+  const f = fixture(t);
+  f.platform = 'win32';
+  f.env.CODEX_HOME = path.join(f.root, 'override');
+  const defaultFile = path.join(f.home, '.codex', '.sandbox', 'deny_read_acl_state.json');
+  const overrideFile = path.join(f.env.CODEX_HOME, '.sandbox', 'deny_read_acl_state.json');
+  put(defaultFile, Buffer.alloc(22));
+  put(overrideFile, '{}');
+  const before = snapshot(f.root);
+  const result = check(f);
+  assert.equal(result.ok, true);
+  assert.equal(result.findings.find(row => row.check === 'sandbox:openai-state').value,
+    path.join(fs.realpathSync.native(f.env.CODEX_HOME), '.sandbox', 'deny_read_acl_state.json'));
+  assert.deepEqual(snapshot(f.root), before);
+  put(defaultFile, '{}');
+  put(overrideFile, Buffer.alloc(22));
+  assert.equal(check(f).ok, false);
+});
+
+test('non-Windows preflight skips corrupt native Windows state', t => {
+  const f = fixture(t);
+  f.platform = 'linux';
+  put(path.join(f.home, '.codex', '.sandbox', 'deny_read_acl_state.json'), Buffer.alloc(22));
+  const before = snapshot(f.root);
+  const result = check(f);
+  assert.equal(result.ok, true);
+  assert.equal(result.findings.find(row => row.check === 'sandbox:openai-state').status, 'not-applicable');
+  assert.deepEqual(snapshot(f.root), before);
+});
+
+test('Windows state rejects directories and files above the bounded read size', t => {
+  const f = fixture(t);
+  f.platform = 'win32';
+  const file = path.join(f.home, '.codex', '.sandbox', 'deny_read_acl_state.json');
+  fs.mkdirSync(file, { recursive: true });
+  let before = snapshot(f.root);
+  let result = check(f);
+  assert.equal(result.ok, false);
+  assert.match(result.findings.find(row => row.check === 'sandbox:openai-state').error, /regular file/);
+  assert.deepEqual(snapshot(f.root), before);
+  fs.rmdirSync(file);
+  put(file, Buffer.alloc(1024 * 1024 + 1, 0x20));
+  before = snapshot(f.root);
+  result = check(f);
+  assert.equal(result.ok, false);
+  assert.match(result.findings.find(row => row.check === 'sandbox:openai-state').error, /read limit/);
+  assert.deepEqual(snapshot(f.root), before);
+});
+
+test('Windows state reports unreadable files instead of treating them as absent', t => {
+  const f = fixture(t);
+  f.platform = 'win32';
+  const file = path.join(f.home, '.codex', '.sandbox', 'deny_read_acl_state.json');
+  put(file, '{}');
+  const before = snapshot(f.root);
+  const originalOpen = fs.openSync;
+  t.mock.method(fs, 'openSync', (target, ...args) => {
+    if (target === file) throw Object.assign(new Error('fixture denied'), { code: 'EACCES' });
+    return originalOpen(target, ...args);
+  });
+  const result = check(f);
+  assert.equal(result.ok, false);
+  assert.match(result.findings.find(row => row.check === 'sandbox:openai-state').error, /unreadable.*EACCES/);
+  t.mock.restoreAll();
+  assert.deepEqual(snapshot(f.root), before);
+});
+
+test('empty CODEX_HOME uses the default native home', t => {
+  const f = fixture(t);
+  f.platform = 'win32';
+  f.env.CODEX_HOME = '';
+  const file = path.join(f.home, '.codex', '.sandbox', 'deny_read_acl_state.json');
+  put(file, Buffer.alloc(22));
+  const result = check(f);
+  assert.equal(result.ok, false);
+  assert.ok(result.findings.find(row => row.check === 'sandbox:openai-state').error.includes(file));
+});
+
+test('CODEX_HOME must exist as a directory and cannot silently select an absent state', t => {
+  const f = fixture(t);
+  f.platform = 'win32';
+  f.env.CODEX_HOME = path.join(f.root, 'missing-home');
+  let before = snapshot(f.root);
+  let result = check(f);
+  assert.equal(result.ok, false);
+  assert.match(result.findings.find(row => row.check === 'sandbox:openai-state').error, /Invalid CODEX_HOME.*ENOENT/);
+  assert.deepEqual(snapshot(f.root), before);
+  put(f.env.CODEX_HOME, '{}');
+  before = snapshot(f.root);
+  result = check(f);
+  assert.equal(result.ok, false);
+  assert.match(result.findings.find(row => row.check === 'sandbox:openai-state').error, /existing directory/);
+  assert.deepEqual(snapshot(f.root), before);
+});
+
+test('MAGI rejects relative and whitespace CODEX_HOME overrides instead of checking the wrong cwd', t => {
+  const f = fixture(t);
+  f.platform = 'win32';
+  for (const override of ['relative-home', '   ']) {
+    f.env.CODEX_HOME = override;
+    const before = snapshot(f.root);
+    const result = check(f);
+    assert.equal(result.ok, false);
+    assert.match(result.findings.find(row => row.check === 'sandbox:openai-state').error, /fully qualified CODEX_HOME/);
+    assert.deepEqual(snapshot(f.root), before);
+  }
+});
+
+test('CODEX_HOME directory aliases resolve to the native canonical home', t => {
+  const f = fixture(t);
+  f.platform = 'win32';
+  const target = path.join(f.root, 'native-home');
+  put(path.join(target, '.sandbox', 'deny_read_acl_state.json'), '{}');
+  f.env.CODEX_HOME = path.join(f.root, 'home-alias');
+  fs.symlinkSync(target, f.env.CODEX_HOME, 'junction');
+  const before = snapshot(f.root);
+  const result = check(f);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.findings.find(row => row.check === 'sandbox:openai-state').value,
+    path.join(fs.realpathSync.native(target), '.sandbox', 'deny_read_acl_state.json'));
+  assert.deepEqual(snapshot(f.root), before);
+});
+
+test('MAGI rejects Windows drive-root-relative CODEX_HOME even when the directory exists', { skip: process.platform !== 'win32' }, t => {
+  const f = fixture(t);
+  f.platform = 'win32';
+  const target = path.join(f.root, 'native-home');
+  put(path.join(target, '.sandbox', 'deny_read_acl_state.json'), '{}');
+  const rootRelative = target.slice(2);
+  for (const override of [rootRelative.replaceAll('/', '\\'), rootRelative.replaceAll('\\', '/')]) {
+    f.env.CODEX_HOME = override;
+    const before = snapshot(f.root);
+    const result = check(f);
+    assert.equal(result.ok, false);
+    assert.match(result.findings.find(row => row.check === 'sandbox:openai-state').error, /fully qualified CODEX_HOME/);
+    assert.deepEqual(snapshot(f.root), before);
+  }
 });

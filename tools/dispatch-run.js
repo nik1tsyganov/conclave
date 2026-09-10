@@ -97,6 +97,9 @@ function seatContractText(opts, seatProfile, skillStage, ruleStage) {
     'This is a leaf seat. Do not dispatch, delegate, spawn, or ask another model/agent to perform work.',
     'This seat is not the arbiter. Do not change routing, model choice, panel membership, or deterministic gate outcomes.',
     opts.role === 'implement' ? `Writes are limited to these relative paths in the assigned worktree: ${opts.writeScope.join(', ')}.` : 'Read-only role: do not modify product files.',
+    ...(opts.vendor === 'openai' && opts.role !== 'implement' && opts.evidenceDir
+      ? [`Disposable test files are authorized only under ${path.join(opts.evidenceDir, 'scratch')}. TEMP and TMP point there. This exception does not permit changing product files or sibling evidence.`]
+      : []),
     'Do not stage or commit changes. Do not modify any evidence, rules, contracts, or skill files.',
     ...(Array.isArray(opts.evidenceReadDirs) && opts.evidenceReadDirs.length
       ? ['Additional host-helper read directories (not MAGI votes, never a POSITION):', ...opts.evidenceReadDirs.map(dir => `- ${dir}`), 'These evidence directories are frozen inputs. Do not change, create or delete their contents.']
