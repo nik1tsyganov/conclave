@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const { isCliHostMode, ROLES } = require('./dispatch-schema.js');
 const { verifyProbe } = require('./probe-evidence.js');
 const { parseJsonBytes, readJsonFile } = require('./json-file.js');
+const { validateEvidenceReadDirs } = require('./evidence-read-access.js');
 
 const DEFAULT_MATRIX = require('./runtime-paths.js').resolveRuntimePaths().matrixPath;
 const DEFAULT_PROBE_MAX_AGE_MINUTES = 60;
@@ -96,13 +97,8 @@ function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
     if (!/^[a-f0-9]{64}$/.test(route.briefSha256 || '')) throw policyError(`briefSha256 required for ${route.dispatchId}`);
     if (!Array.isArray(route.writeScope) || (route.role === 'implement' && route.writeScope.length === 0)) throw policyError(`writeScope required for ${route.dispatchId}`);
     if (route.role !== 'implement' && route.writeScope.length) throw policyError('read-only roles must have empty writeScope');
-    if (route.evidenceReadDirs !== undefined) {
-      if (!Array.isArray(route.evidenceReadDirs)) throw policyError(`evidenceReadDirs must be an array for ${route.dispatchId}`);
-      if (route.role === 'implement' && route.evidenceReadDirs.length) throw policyError(`implement cannot take evidenceReadDirs: ${route.dispatchId}`);
-      for (const dir of route.evidenceReadDirs) {
-        if (typeof dir !== 'string' || !path.isAbsolute(dir) || /[\x00]/.test(dir)) throw policyError(`absolute evidenceReadDirs path required for ${route.dispatchId}`);
-      }
-    }
+    if (route.role === 'implement' && route.evidenceReadDirs?.length) throw policyError(`implement cannot take evidenceReadDirs: ${route.dispatchId}`);
+    validateEvidenceReadDirs(route);
     for (const name of route.writeScope) {
       if (typeof name !== 'string' || !name || name.includes('\\') || name.split('/').some((part) => part === '..' || part === '.' || part === '.git' || !part) || path.isAbsolute(name) || /[:*?\x00-\x1f]/.test(name)) throw policyError(`invalid writeScope path: ${name}`);
     }

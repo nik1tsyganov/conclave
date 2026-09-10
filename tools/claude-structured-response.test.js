@@ -22,9 +22,10 @@ function changeTerminal(native, mutate) {
   const run = native.runLaunch;
   native.runLaunch = async launch => {
     const result = await run(launch);
-    const terminal = JSON.parse(result.stdout);
+    const nativeRows = result.stdout.split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
+    const terminal = nativeRows.find(row => row.type === 'result');
     const records = mutate(terminal) || [terminal];
-    result.stdout = records.map(row => JSON.stringify(row)).join('\n');
+    result.stdout = [...nativeRows.filter(row => row.type !== 'result'), ...records].map(row => JSON.stringify(row)).join('\n');
     return result;
   };
   return native;
@@ -35,9 +36,11 @@ function changeTerminal(native, mutate) {
 function rewriteArtifact(result, file, update) {
   const state = JSON.parse(fs.readFileSync(result.receipt.transactionPath, 'utf8'));
   const artifact = path.join(state.evidenceDir, file);
-  const value = update(JSON.parse(fs.readFileSync(artifact, 'utf8')));
-  if (file === 'capture.txt') fs.writeFileSync(artifact, JSON.stringify(value), 'utf8');
-  else writeJson(artifact, value);
+  if (file === 'capture.txt') {
+    const rows = fs.readFileSync(artifact, 'utf8').split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
+    const changed = rows.map(row => row.type === 'result' ? update(row) : row);
+    fs.writeFileSync(artifact, changed.map(row => JSON.stringify(row)).join('\n'), 'utf8');
+  } else writeJson(artifact, update(JSON.parse(fs.readFileSync(artifact, 'utf8'))));
   for (const item of state.artifacts.filter(item => item.path === artifact)) item.sha256 = hashFile(artifact);
   writeJson(result.receipt.transactionPath, state);
 }

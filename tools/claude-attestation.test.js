@@ -159,8 +159,9 @@ test('native replay rejects a malformed checkpoint payload even after refreshed 
   const native = fakeVendor();
   const pending = await runDispatch(command(run), native);
   rewriteArtifact(run, 'capture.txt', text => {
-    const row = JSON.parse(text); delete row.structured_output; row.result = 'ACK fixture\nPOSITION: APPROVE';
-    return JSON.stringify(row);
+    const rows = text.split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
+    const row = rows.find(item => item.type === 'result'); delete row.structured_output; row.result = 'ACK fixture\nPOSITION: APPROVE';
+    return rows.map(item => JSON.stringify(item)).join('\n');
   });
   await assert.rejects(accept(run, pending, native), /structured_output/);
   assert.equal(native.calls(), 1);

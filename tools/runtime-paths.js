@@ -15,6 +15,7 @@ const CLI_RUNTIME_TOOLS = Object.freeze([
   'run-finalize.js', 'panel-tally.js', 'project-run-report.js', 'plugin-surface.js',
   'runtime-paths.js', 'seat-policy.js', 'telemetry-append.js', 'vendor-binaries.js', 'json-file.js',
   'synara-catalog.js', 'magi-synara-watch.js', 'host-helper-evidence.js', 'host-helper-worktree.js',
+  'instruction-read-evidence.js', 'evidence-read-access.js',
   'dispatch-log.pass.jsonl', 'dispatch-log.fail.jsonl',
 ]);
 

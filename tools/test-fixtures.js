@@ -93,11 +93,15 @@ function createSealedRun(t, entries = [{}], options = {}) {
 
 function fakeVendor(action = () => {}, response = 'ACK fixture\nPOSITION: APPROVE\nDone.') {
   let calls = 0;
+  const transcripts = new Map();
   const buildLaunch = (opts) => ({ ...opts, vendor: opts.vendor, role: opts.role, binary: process.execPath,
     args: opts.vendor === 'anthropic' ? ['--json-schema', JSON.stringify(require('./vendor-native.js').CLAUDE_RESPONSE_SCHEMA)] : [],
     requestedSandbox: opts.role === 'implement' ? 'workspace-write' : 'read-only' });
   const runLaunch = async (launch) => {
     calls++;
+    const id = require('node:crypto').randomUUID();
+    const instructionRows = syntheticInstructionRows(launch, id);
+    transcripts.set(id, { path: path.join(path.dirname(launch.capturePath), 'synthetic-native-source.jsonl'), text: instructionRows.map(row => JSON.stringify(row)).join('\n') + '\n' });
     if (launch.role === 'implement') fs.writeFileSync(path.join(launch.cwd, 'result.txt'), 'implemented');
     await action(launch);
     const model = launch.vendor === 'anthropic' ? require('./dispatch-matrix.js').loadMatrix().vendors.anthropic.models[launch.model].canonical : launch.model;
@@ -108,12 +112,55 @@ function fakeVendor(action = () => {}, response = 'ACK fixture\nPOSITION: APPROV
       terminal.result = JSON.stringify(terminal.structured_output);
       native.capture = JSON.stringify(terminal);
     }
-    const id = require('node:crypto').randomUUID();
     native.capture = native.capture.replaceAll(SESSION, id); native.log = native.log.replaceAll(SESSION, id);
+    if (launch.vendor === 'anthropic') native.capture = transcripts.get(id).text + native.capture;
     if (launch.vendor === 'openai') fs.writeFileSync(launch.capturePath, native.capture);
     return { ok: true, exitCode: 0, stdout: launch.vendor === 'openai' ? response : native.capture, stderr: native.log, exitConfirmed: true };
   };
-  return { buildLaunch, runLaunch, calls: () => calls };
+  const collect = id => {
+    if (!transcripts.has(id)) throw new Error('missing synthetic native read transcript');
+    return transcripts.get(id);
+  };
+  return { buildLaunch, runLaunch, codexSessionTranscript: collect, googleSessionTranscript: collect, calls: () => calls };
+}
+
+// Test-only native event fixtures. Production acceptance always runs the same strict validator.
+function syntheticInstructionRows(launch, sessionId) {
+  const briefDir = path.dirname(launch.briefPath);
+  const options = { briefPath: launch.briefPath, seatContractPath: launch.seatContractPath, skillRoot: launch.skillRoot,
+    seatProfile: JSON.parse(fs.readFileSync(path.join(path.dirname(launch.seatContractPath), 'seat-profile.json'), 'utf8')),
+    rulesManifest: JSON.parse(fs.readFileSync(path.join(briefDir, 'rules-manifest.json'), 'utf8')),
+    skillsManifest: JSON.parse(fs.readFileSync(path.join(launch.skillRoot, 'skills-manifest.json'), 'utf8')) };
+  const files = require('./instruction-read-evidence.js').collectRequiredInstructionFiles(options).files;
+  if (launch.vendor === 'anthropic') return files.flatMap((file, index) => {
+    const text = file.text.replaceAll('\r\n', '\n'); const lines = text.split('\n'); const id = `synthetic-read-${index}`;
+    return [{ type: 'assistant', session_id: sessionId, message: { content: [{ type: 'tool_use', id, name: 'Read', input: { file_path: file.path } }] } },
+      { type: 'user', session_id: sessionId, message: { content: [{ type: 'tool_result', tool_use_id: id,
+        content: lines.map((line, n) => `${n + 1}\t${line}`).join('\n') }] },
+      tool_use_result: { type: 'text', file: { filePath: file.path, content: text, startLine: 1, numLines: lines.length, totalLines: lines.length } } }];
+  });
+  if (launch.vendor === 'openai') return [{ type: 'session_meta', payload: { id: sessionId, cwd: launch.cwd } }, ...files.flatMap((file, index) => {
+    const cmd = `Get-Content -Raw -LiteralPath '${file.path.replaceAll("'", "''")}' -Encoding UTF8`;
+    const args = { cmd, workdir: launch.cwd, max_output_tokens: 10000 }; const output = file.text + '\n'; const id = `synthetic-read-${index}`;
+    return [{ type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: id,
+      input: `const r = await tools.exec_command(${JSON.stringify(args)}); text(r.output);` } },
+      { type: 'event_msg', payload: { type: 'item_completed', thread_id: sessionId, item: { type: 'CommandExecution', id: `synthetic-exec-${index}`,
+        command: ['powershell.exe', '-Command', cmd], cwd: launch.cwd, status: 'completed', exit_code: 0, stdout: output, stderr: '', formatted_output: output } } },
+      { type: 'response_item', payload: { type: 'custom_tool_call_output', call_id: id, output: [{ type: 'input_text', text: output }] } }];
+  })];
+  if (launch.vendor === 'google') {
+    const time = new Date().toISOString(); const common = { source: 'MODEL', status: 'DONE', created_at: time };
+    const explanation = 'The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.';
+    return [{ step_index: 0, type: 'USER_INPUT', source: 'USER_EXPLICIT', status: 'DONE', created_at: time, content: 'Synthetic fixture: read the bound brief and contract.' },
+      { ...common, step_index: 1, type: 'PLANNER_RESPONSE', tool_calls: files.map(file => ({ name: 'view_file', args: { AbsolutePath: file.path } })) },
+      ...files.map((file, index) => {
+        const lines = file.text.replaceAll('\r\n', '\n').split('\n');
+        return { ...common, step_index: index + 2, type: 'GENERIC', content:
+          `Created At: ${time}\nCompleted At: ${time}\nFile Path: \`${require('node:url').pathToFileURL(file.path).href}\`\nTotal Lines: ${lines.length}\nTotal Bytes: ${file.bytes}\nShowing lines 1 to ${lines.length}\n${explanation}\n` +
+          lines.map((line, n) => `${n + 1}: ${line}`).join('\n') + '\nThe above content shows the entire, complete file contents of the requested file.\n' };
+      })];
+  }
+  throw new Error('unknown synthetic native vendor');
 }
 Object.assign(module.exports, { createSealedRun, fakeVendor });
 
