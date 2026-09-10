@@ -2,7 +2,7 @@
 
 This directory holds the self-evaluation telemetry log for MAGI Cursor CLI dispatches.
 
-Because Cursor has no capture hook, the Grok arbiter lead-writes a row to `dispatches.jsonl` after every CLI/Task dispatch using `tools/telemetry-append.js`.
+Because Cursor has no capture hook, the Grok arbiter lead-writes a row to `dispatches.jsonl` after every CLI/Task dispatch using `tools/telemetry-append.js`. Sealed CLI runs keep a fail-closed copy inside the run directory. When `MAGI_VAULT_ROOT` is set, `run-finalize.js` also links those rows into `ai-ops-vault/projects/magi/telemetry/dispatches.jsonl` and writes `projects/magi/analysis/latest.md`. That vault copy is the durable MAGI analysis log. Do not treat a disposable run directory as the only copy.
 
 The formal row contract is `telemetry/schema.json`. Validate a row or JSONL log with:
 

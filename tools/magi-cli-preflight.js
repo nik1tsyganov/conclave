@@ -8,6 +8,7 @@ const { resolveVendorBinary } = require('./vendor-binaries.js');
 const { FINGERPRINT_V2, listRuleFiles } = require('./cli-rules-stage.js');
 const { FORBIDDEN_ARBITER_SKILLS, regularFiles } = require('./cli-skill-stage.js');
 const { CLI_RUNTIME_TOOLS, canonicalPlainPath, resolveRulesRoot, resolveRuntimePaths } = require('./runtime-paths.js');
+const { resolveVaultRoot } = require('./magi-vault.js');
 const { loadProfiles } = require('./seat-policy.js');
 
 function unique(values) { return [...new Set(values)]; }
@@ -116,6 +117,11 @@ function check(options = {}) {
   }
 
   record('google:synara-capture', () => inspectSynaraCaptureHooks(home));
+  record('vault:root', () => {
+    const raw = (options.env !== undefined ? options.env : process.env).MAGI_VAULT_ROOT;
+    if (!raw) return { value: null, note: 'set MAGI_VAULT_ROOT to ai-ops-vault for MAGI telemetry, skill sync, and analysis' };
+    return { value: resolveVaultRoot({ vaultRoot: raw, env: options.env !== undefined ? options.env : process.env }) };
+  });
 
   return { ok: findings.every((f) => f.ok), arbiterSkills, seatSkills, findings };
 }

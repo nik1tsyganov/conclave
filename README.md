@@ -35,9 +35,10 @@ Supply the external standing-rule pack explicitly:
 
 ```powershell
 $env:MAGI_RULES_ROOT = Join-Path $env:USERPROFILE '.cursor/magi-rules/v2'
+$env:MAGI_VAULT_ROOT = 'C:\src\ai-ops-vault'
 ```
 
-Use the matching STANDING v2 / R01–R22 pack. Credentials and availability evidence stay local to the executing host. Use normal binary discovery or the explicit `MAGI_CODEX_BIN`, `MAGI_CLAUDE_BIN`, and `MAGI_AGY_BIN` overrides. Invalid explicit binary paths fail.
+Use the matching STANDING v2 / R01–R22 pack. `MAGI_VAULT_ROOT` is the ai-ops-vault checkout: durable MAGI telemetry, lean seat-skill sync, and analysis. It is not the live rules path. Credentials and availability evidence stay local to the executing host. Use normal binary discovery or the explicit `MAGI_CODEX_BIN`, `MAGI_CLAUDE_BIN`, and `MAGI_AGY_BIN` overrides. Invalid explicit binary paths fail.
 
 ## Run a checked plan
 
@@ -59,6 +60,7 @@ node tools/model-availability.js --file C:/magi-runs/availability.json --probe C
 node tools/plan-seal.js --plan C:/magi-runs/draft-plan.json --run-dir C:/magi-runs/run-001 --availability C:/magi-runs/availability.json
 node tools/dispatch-run.js --plan C:/magi-runs/run-001/dispatch-plan.json --run-dir C:/magi-runs/run-001 --dispatch-id implement-1 --rules-root $env:MAGI_RULES_ROOT
 node tools/run-finalize.js --run-dir C:/magi-runs/run-001
+node tools/magi-vault-analyze.js
 node tools/panel-tally.js --run-dir C:/magi-runs/run-001 --unit-id api-1
 ```
 
