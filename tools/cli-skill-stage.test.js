@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { stageSeatSkills, verifySeatSkills } = require('./cli-skill-stage.js');
+const { bindSkillSource, stageSeatSkills, verifySeatSkills, verifySkillSource } = require('./cli-skill-stage.js');
 const { resolveRuntimePaths } = require('./runtime-paths.js');
 
 function temp(t) {
@@ -45,6 +45,19 @@ test('stages exactly allowed skills and verifies their original hashes', t => {
   const entry = staged.manifest.skills.implement.find(file => file.path === 'SKILL.md');
   assert.equal(entry.bytes, body.length);
   assert.equal(entry.sha256, crypto.createHash('sha256').update(body).digest('hex'));
+});
+
+test('source binding detects reference changes, additions and identical-content source substitution before staging', t => {
+  const f = fixture(t);
+  const binding = bindSkillSource({ sourceRoot: f.source, skills: f.skills });
+  assert.deepEqual(verifySkillSource(binding), binding);
+  const other = path.join(f.root, 'substitute'); fs.cpSync(f.source, other, { recursive: true });
+  assert.throws(() => verifySkillSource(binding, other), /sealed identity or content/);
+  assert.throws(() => stageSeatSkills({ sourceRoot: other, destinationRoot: f.out, skills: f.skills, sourceBinding: binding }), /sealed identity or content/);
+  put(path.join(f.source, 'implement', 'references', 'guide.md'), 'changed reference');
+  assert.throws(() => verifySkillSource(binding), /sealed identity or content/);
+  assert.throws(() => stageSeatSkills({ sourceRoot: f.source, destinationRoot: f.out, skills: f.skills, sourceBinding: binding }), /sealed identity or content/);
+  assert.equal(fs.existsSync(f.out), false);
 });
 
 test('default staging reads the runtime bundle', t => {

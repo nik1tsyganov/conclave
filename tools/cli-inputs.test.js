@@ -12,7 +12,7 @@ test('UTF-8 BOM plan and availability retain their byte identity through sealing
   const run = createSealedRun(t);
   for (const file of [run.planSource, run.availability]) fs.writeFileSync(file, '\uFEFF'+fs.readFileSync(file,'utf8'));
   const bytes = fs.readFileSync(run.planSource);
-  const sealed = sealPlan({plan:run.planSource,runDir:path.join(run.root,'bom-run'),availability:run.availability});
+  const sealed = sealPlan({plan:run.planSource,runDir:path.join(run.root,'bom-run'),availability:run.availability,skillSourceRoot:run.opts.skillSourceRoot});
   assert.equal(sealed.planHash,hashFile(run.planSource));
   assert.deepEqual(fs.readFileSync(sealed.planPath),bytes);
   assert.equal(readSealedRun(sealed.runDir).plan.planId,run.planObject.planId);
