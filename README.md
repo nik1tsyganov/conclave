@@ -110,7 +110,7 @@ A convened implementation run uses `min(3, implementation unit count)` distinct 
 ```powershell
 npm test
 node tools/release-check.js
-node tools/cross-repo-check.js --kit-root C:/src/magi-kit --vault-root C:/src/ai-ops-vault/projects/magi-cli-rules
+node tools/cross-repo-check.js --kit-root C:/src/magi-kit --vault-root $env:MAGI_RULES_ROOT
 ```
 
 `npm run check` combines the unit suite and release check. `npm run check:cross-repo` accepts `MAGI_KIT_ROOT` and `MAGI_RULES_ROOT`, or pass explicit roots to the tool.

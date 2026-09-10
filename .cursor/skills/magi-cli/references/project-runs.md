@@ -69,7 +69,7 @@ node tools/magi-cli-preflight.js --rules-root $magiRules
 
 The startup command checks the declared route against the installed matrix. It does not prove the actual Cursor picker.
 
-Use the installed runtime for project work. The old `C:/src/ai-ops-vault` checkout on this machine can carry an earlier rules pack. Do not substitute it for the installed v2 pack. Preflight must prove the STANDING v2 fingerprint and exactly R01–R22.
+Use the installed runtime for project work. Set `MAGI_RULES_ROOT` to the installed v2 pack (`~\.cursor\magi-rules\v2` on this machine). The git-tracked copy lives in `ai-ops-vault/projects/magi-cli-rules` and must stay aligned with that pack. Preflight must prove the STANDING v2 fingerprint and exactly R01–R22.
 
 Read the co-located [CLI command reference](cursor-cli.md), [dispatch matrix](dispatch-matrix.json), [seat profiles](seat-profiles.json), and [brief template](brief-rules-block.md). The command reference governs exact CLI arguments and plan fields. This handoff adds the trial boundary and failure-recording process.
 

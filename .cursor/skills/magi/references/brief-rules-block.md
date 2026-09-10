@@ -18,4 +18,4 @@ PLAN: R22 whole-plan binding and fresh native model/effort probes. Route or esca
 
 Production preflight is structural: `cli-brief-rules-check.js` verifies the staged rule and skill files against their manifests, SCOPE must be concrete, role permissions must match the generated seat profile, and vendor-specific requirements must hold. Marker text cannot prove that files exist. `dispatch-run.js` is the seat front door. Standalone `cli-launch.js` / `cli-smoke.js` dry runs are transport diagnostics and cannot activate production work.
 
-SoT: `ai-ops-vault/projects/magi-cli-rules/` plus the generated `SEAT-CONTRACT.md` / `skills-manifest.json` for that dispatch.
+SoT: the external `MAGI_RULES_ROOT` standing pack (v2 / R01–R22) plus the generated `SEAT-CONTRACT.md` / `skills-manifest.json` for that dispatch.

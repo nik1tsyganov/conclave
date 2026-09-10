@@ -198,7 +198,7 @@ From the MAGI source checkout:
 ```powershell
 npm test
 node tools/release-check.js
-node tools/cross-repo-check.js --kit-root C:/src/magi-kit --vault-root C:/src/ai-ops-vault/projects/magi-cli-rules
+node tools/cross-repo-check.js --kit-root C:/src/magi-kit --vault-root $env:MAGI_RULES_ROOT
 ```
 
 Cross-repository checks compare complete base/role/class/forbidden skill contracts, the bundled skill bytes, STANDING v2, the exact indexed R01–R22 inventory, and the leaf brief template. Run them against the intended local checkouts. Their success does not prove native authentication, model access, permission support, or complete tri-vendor operation.
