@@ -35,9 +35,12 @@ Supply the external standing-rule pack explicitly:
 
 ```powershell
 $env:MAGI_RULES_ROOT = Join-Path $env:USERPROFILE '.cursor/magi-rules/v2'
+$env:MAGI_VAULT_ROOT = 'C:\src\ai-ops-vault'
+$env:MAGI_FIELD_LIBRARY_ROOT = 'C:\src\field-library'
+$env:MAGI_VAULT_SKILLS_ROOT = 'C:\src\vault-skills'
 ```
 
-Use the matching STANDING v2 / R01–R22 pack. Credentials and availability evidence stay local to the executing host. Use normal binary discovery or the explicit `MAGI_CODEX_BIN`, `MAGI_CLAUDE_BIN`, and `MAGI_AGY_BIN` overrides. Invalid explicit binary paths fail.
+Use the matching STANDING v2 / R01–R22 pack. `MAGI_VAULT_ROOT` is the ai-ops-vault checkout: durable MAGI telemetry, lean seat-skill sync, and analysis. It is not the live rules path. Credentials and availability evidence stay local to the executing host. Use normal binary discovery or the explicit `MAGI_CODEX_BIN`, `MAGI_CLAUDE_BIN`, and `MAGI_AGY_BIN` overrides. Invalid explicit binary paths fail.
 
 ## Run a checked plan
 
@@ -59,6 +62,7 @@ node tools/model-availability.js --file C:/magi-runs/availability.json --probe C
 node tools/plan-seal.js --plan C:/magi-runs/draft-plan.json --run-dir C:/magi-runs/run-001 --availability C:/magi-runs/availability.json
 node tools/dispatch-run.js --plan C:/magi-runs/run-001/dispatch-plan.json --run-dir C:/magi-runs/run-001 --dispatch-id implement-1 --rules-root $env:MAGI_RULES_ROOT
 node tools/run-finalize.js --run-dir C:/magi-runs/run-001
+node tools/magi-vault-analyze.js
 node tools/panel-tally.js --run-dir C:/magi-runs/run-001 --unit-id api-1
 ```
 
@@ -70,7 +74,7 @@ The runner consumes route fields from the sealed entry. It rejects changed class
 
 ## Seat capabilities and scope
 
-[Seat profiles](.cursor/skills/magi-cli/references/seat-profiles.json) select the vendor card, role skills, and class extras. The runtime stages only those lean files and hashes them.
+[Seat profiles](.cursor/skills/magi-cli/references/seat-profiles.json) select the vendor card, role skills, and domain class extras. Long-run classes add no host loop or harness copies. The runtime stages only those lean files and hashes them.
 
 - `implement` permits product writes only within the declared relative paths.
 - `review`, `verify`, `plan`, and `research` are read-only roles.
@@ -110,7 +114,7 @@ A convened implementation run uses `min(3, implementation unit count)` distinct 
 ```powershell
 npm test
 node tools/release-check.js
-node tools/cross-repo-check.js --kit-root C:/src/magi-kit --vault-root C:/src/ai-ops-vault/projects/magi-cli-rules
+node tools/cross-repo-check.js --kit-root C:/src/magi-kit --vault-root $env:MAGI_RULES_ROOT
 ```
 
 `npm run check` combines the unit suite and release check. `npm run check:cross-repo` accepts `MAGI_KIT_ROOT` and `MAGI_RULES_ROOT`, or pass explicit roots to the tool.
@@ -125,4 +129,30 @@ The dependency-free visual explainer is in [site/](site/). Open [site/index.html
 
 ## Repository
 
-[nik1tsyganov/magi](https://github.com/nik1tsyganov/magi)
+[nik1tsyganov/magi](https://github.com/nik1tsyganov/magi) is the only MAGI product repository.
+
+`magi-probe` was an early working-together demo. `magi-kit` was a machine home-store snapshot. Both are archived. Do not clone them as MAGI.
+
+## Layout
+
+| Path | Role |
+|---|---|
+| `seat-skills/` | Lean leaf cards staged on dispatch |
+| `tools/` | Sealed-plan runtime |
+| `skill-sources.json` | Map of sibling skill repos; do not merge them |
+| `agents/` | Cursor Task hostMode only; CLI install omits this |
+| `commands/` / `claude-commands/` | Slash-command entry |
+| `telemetry/` | Local MAGI dispatch-row contract |
+| `projects/` | Product-run notes (`hearth`, `signal-sim`); not product source |
+| `site/` | Visual explainer |
+| `.cursor/skills/` | Arbiter MAGI / MAGI CLI skills shipped with this repo |
+
+CONCLAVE is a different product. Keep these git homes separate and index them instead of merging:
+
+- MAGI leaf cards: `seat-skills/`
+- MAGI data / analysis: [ai-ops-vault](https://github.com/nik1tsyganov/ai-ops-vault) `projects/magi/`
+- Host field modules (including `research-orchestration`): [field-library](https://github.com/nik1tsyganov/field-library)
+- Obsidian ingest methods: [vault-skills](https://github.com/nik1tsyganov/vault-skills)
+- Live host/arbiter store (`engineering-orchestrator`, bridges): `~/.claude/skills`
+
+Set `MAGI_VAULT_ROOT`, `MAGI_FIELD_LIBRARY_ROOT`, and `MAGI_VAULT_SKILLS_ROOT`, then run `node tools/magi-vault-sync.js --index`.

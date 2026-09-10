@@ -15,7 +15,7 @@ Grok 4.6 is the non-voting arbiter. It classifies, composes briefs and complete 
 
 ## Prepare
 
-1. Set `MAGI_RULES_ROOT` to the external STANDING v2 / R01–R22 pack.
+1. Set `MAGI_RULES_ROOT` to the external STANDING v2 / R01–R22 pack. Set `MAGI_VAULT_ROOT` to the ai-ops-vault checkout for telemetry, lean skill sync, and analysis.
 2. Run installed `tools/magi-cli-preflight.js`.
 3. Check Claude with `claude auth status`. Probe every intended exact model/effort using `model-probe.js --vendor --model --effort --evidence-dir`.
 4. Import each native `probe.json` with `model-availability.js --file <availability.json> --probe <probe.json>`.
@@ -67,7 +67,7 @@ Native observed model/effort evidence, brief acknowledgment, scope audit, receip
 
 Every Google probe and dispatch pins `--log-file` to `native-cli.log` in its unique evidence directory. Use that per-run source for proof collection; default second-resolution home logs can collide during parallel calls.
 
-Run `run-finalize.js --run-dir <run-dir>`. Execution PASS is separate from approval. Ordinary implementation approval requires foreign verification and review, with every review returning native APPROVE. Critical approval requires at least two native APPROVE votes after author recusal.
+Run `run-finalize.js --run-dir <run-dir>`. When `MAGI_VAULT_ROOT` is set, finalize links telemetry into the vault and writes analysis. Execution PASS is separate from approval. Ordinary implementation approval requires foreign verification and review, with every review returning native APPROVE. Critical approval requires at least two native APPROVE votes after author recusal.
 
 Run `panel-tally.js --run-dir <run-dir> --unit-id <unit>` for receipt-bound panel votes. Each eligible review response must end with exactly one `POSITION: APPROVE`, `POSITION: REJECT`, or `POSITION: ABSTAIN` line. Never handwrite ballots or waive deterministic failure.
 

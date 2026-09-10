@@ -90,7 +90,7 @@ function sourceFixture(t) {
   const installed = path.join(root, 'installed');
   const repo = path.resolve(__dirname, '..');
   const entries = ['.cursor/skills/magi-cli', '.cursor/rules', 'commands/magi-cli.md', 'seat-skills',
-    'tools/templates', 'tools/install-plugin.js', ...CLI_RUNTIME_TOOLS.map(name => `tools/${name}`)];
+    'skill-sources.json', 'tools/templates', 'tools/install-plugin.js', ...CLI_RUNTIME_TOOLS.map(name => `tools/${name}`)];
   for (const relative of entries) {
     const from = path.join(repo, relative);
     const to = path.join(source, relative);
@@ -294,7 +294,7 @@ test('installed runtime loads contracts, all entry-point dependencies, and bundl
   const evidence = JSON.parse(result.stdout);
   assert.strictEqual(evidence.layout, 'installed');
   assert.strictEqual(evidence.nativeCalls, 0);
-  assert.ok(evidence.skills >= 11);
+  assert.ok(evidence.skills >= 9);
   t.diagnostic(JSON.stringify(evidence));
 });
 

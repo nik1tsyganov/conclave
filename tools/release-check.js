@@ -35,6 +35,12 @@ const REQUIRED = [
   'tools/runtime-paths.js',
   'tools/dispatch-schema.js',
   'tools/magi-cli-preflight.js',
+  'tools/magi-vault.js',
+  'tools/magi-vault-link.js',
+  'tools/magi-vault-sync.js',
+  'tools/magi-vault-analyze.js',
+  'tools/magi-skill-web.js',
+  'skill-sources.json',
   'tools/model-availability.js',
   'tools/seat-policy.js',
   'tools/vendor-binaries.js',
@@ -63,13 +69,16 @@ function main(io = process) {
   }
   const profiles = loadProfiles();
   if (
-    profiles.schemaVersion < 4 ||
+    profiles.schemaVersion < 6 ||
     profiles.principles?.leafSeat !== true ||
     profiles.principles?.skillsAreAllowListed !== true ||
     profiles.principles?.bridgesAreArbiterOnly !== true ||
     profiles.principles?.proofMustDistinguishRequestedFromObserved !== true ||
     !profiles.roleSkills?.plan ||
     !profiles.roleSkills?.research ||
+    (profiles.classSkills?.['agentic-long-run'] || []).length !== 0 ||
+    (profiles.classSkills?.['extreme-end-to-end'] || []).length !== 0 ||
+    ['loop-engineering', 'harness-engineering'].some((name) => ['baseSkills', 'roleSkills', 'classSkills'].flatMap((key) => Object.values(profiles[key] || {}).flat()).includes(name)) ||
     !['sessionId', 'vendorSideTokens', 'modelObserved', 'effortObserved'].every((field) => profiles.vendors?.anthropic?.proof?.includes(field))
   ) {
     io.stderr.write('RELEASE_CHECK_FAIL seat profiles are stale or not fail-closed\n');

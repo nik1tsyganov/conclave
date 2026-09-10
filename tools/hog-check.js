@@ -32,7 +32,10 @@ if (implementRows.length === 0) { console.error('NO IMPLEMENT ROWS'); process.ex
 // otherwise manufacture a floor result without an additional seat actually running.
 const seen = new Set();
 for (const row of implementRows) {
-  if (!row.dispatchId || !row.unitId) continue; // legacy rows remain readable
+  if (typeof row.dispatchId !== 'string' || !row.dispatchId || typeof row.unitId !== 'string' || !row.unitId) {
+    console.error('IMPLEMENT ROW MISSING IDENTITY');
+    process.exit(1);
+  }
   const key = `${row.dispatchId}\u0000${row.unitId}\u0000${row.vendor}`;
   if (seen.has(key)) { console.error(`DUPLICATE IMPLEMENT ROW ${row.dispatchId}/${row.unitId}/${row.vendor}`); process.exit(1); }
   seen.add(key);

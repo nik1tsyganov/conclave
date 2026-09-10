@@ -10,8 +10,6 @@ const { loadProfiles, validateSeat } = require('./seat-policy.js');
 const { ROLES } = require('./dispatch-schema.js');
 const { canonicalPlainPath } = require('./runtime-paths.js');
 
-const STANDING_PATH = 'C:\\src\\ai-ops-vault\\projects\\magi-cli-rules\\STANDING.md';
-const RULES_DIR = 'C:\\src\\ai-ops-vault\\projects\\magi-cli-rules';
 const VENDOR_MD = 'VENDOR.md';
 const RULES_INDEX = 'RULES/INDEX.md';
 
@@ -168,4 +166,4 @@ function main(argv = process.argv.slice(2), io = process) {
 }
 
 if (require.main === module) process.exitCode = main();
-module.exports = { REQUIRED_MARKERS, STRICT_MARKERS, RULES_DIR, RULES_INDEX, STANDING_PATH, VENDOR_MD, checkBriefFile, checkBriefText, formatMissing, main, missingMarkers, parseArgs, usage, verifyStagedSeat };
+module.exports = { REQUIRED_MARKERS, STRICT_MARKERS, RULES_INDEX, VENDOR_MD, checkBriefFile, checkBriefText, formatMissing, main, missingMarkers, parseArgs, usage, verifyStagedSeat };

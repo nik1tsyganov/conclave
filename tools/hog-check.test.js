@@ -3,6 +3,8 @@
 const { spawnSync } = require('node:child_process');
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
 const node = process.execPath;
@@ -22,5 +24,15 @@ describe('hog-check', () => {
     const r = run(path.join(__dirname, 'dispatch-log.fail.jsonl'));
     assert.strictEqual(r.status, 1);
     assert.match(r.stderr, /FLOOR TRIPPED anthropic/);
+  });
+
+  it('rejects anonymous implement rows that would skip uniqueness', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-hog-'));
+    const file = path.join(dir, 'anon.jsonl');
+    fs.writeFileSync(file, '{"vendor":"openai","role":"implement"}\n{"vendor":"google","role":"implement"}\n{"vendor":"anthropic","role":"implement"}\n');
+    const r = run(file);
+    fs.rmSync(dir, { recursive: true, force: true });
+    assert.strictEqual(r.status, 1);
+    assert.match(r.stderr, /IMPLEMENT ROW MISSING IDENTITY/);
   });
 });

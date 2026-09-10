@@ -2,6 +2,7 @@
 'use strict';
 
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { readSealedRun } = require('./plan-seal.js');
 const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, assertPlainPath, compareWorkspace, hash, hashFile, inside, runtimeManifest, snapshotWorkspace, transactionKey, verifyArtifacts, verifyCommittedRow, writeJson } = require('./dispatch-evidence.js');
@@ -12,6 +13,8 @@ const { canonicalPlainPath, pathsOverlap } = require('./runtime-paths.js');
 const { INSTRUCTION_READ_PROTOCOL, verifyInstructionReadEvidence } = require('./instruction-read-evidence.js');
 const { buildSeatProfile, loadProfiles } = require('./seat-policy.js');
 const { validateEvidenceReadDirs, snapshotEvidenceReads, validateEvidenceReadLaunch } = require('./evidence-read-access.js');
+const { resolveVaultRoot } = require('./magi-vault.js');
+const { linkRunToVault } = require('./magi-vault-link.js');
 
 const SEQUENCE_PROTOCOL = 'magi-unit-sequence-v1';
 
@@ -340,6 +343,11 @@ function assessRun(run) {
   return { schemaVersion: 1, planId: run.plan.planId, planHash: run.seal.planHash, executionStatus, approvalStatus, ok: executionStatus === 'PASS' && approvalStatus !== 'FAIL', outcomes: run.outcomes, units, finalizedAt: new Date().toISOString() };
 }
 
+function shouldLinkVault(runDir, env = process.env) {
+  if (!env.MAGI_VAULT_ROOT || env.MAGI_VAULT_LINK === '0') return false;
+  return !inside(path.resolve(runDir), path.resolve(os.tmpdir()));
+}
+
 function finalizeRun(runDir) {
   const run = inspectRun(runDir);
   if (run.seal.instructionReadProtocol !== INSTRUCTION_READ_PROTOCOL) throw Object.assign(new Error('historical run has no native instruction-read assurance; current finalization cannot rewrite its projections'), { code: 'INSTRUCTION_READ_COMPATIBILITY_FAIL' });
@@ -365,8 +373,12 @@ function main(argv = process.argv.slice(2)) {
   try {
     if (argv.length !== 2 || argv[0] !== '--run-dir') throw new Error('Usage: run-finalize --run-dir <sealed run directory>');
     const result = finalizeRun(argv[1]);
+    if (shouldLinkVault(argv[1])) {
+      if (!resolveVaultRoot()) throw new Error('MAGI_VAULT_ROOT is set but is not an ai-ops-vault');
+      result.vault = linkRunToVault({ runDir: argv[1] });
+    }
     process.stdout.write(`${JSON.stringify(result)}\n`); return result.ok ? 0 : 1;
   } catch (error) { process.stderr.write(`RUN_FINALIZE_FAIL: ${error.message}\n`); return 1; }
 }
 if (require.main === module) process.exitCode = main();
-module.exports = { SEQUENCE_PROTOCOL, assessRun, finalizeRun, inspectRun, main, nativePosition, tallyUnit, validateLogDestinations, verifyCheckpoint, verifyExecution, verifyPrerequisites };
+module.exports = { SEQUENCE_PROTOCOL, assessRun, finalizeRun, inspectRun, main, nativePosition, shouldLinkVault, tallyUnit, validateLogDestinations, verifyCheckpoint, verifyExecution, verifyPrerequisites };

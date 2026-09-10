@@ -61,6 +61,8 @@ On YESSIR's machine, the installed runtime is:
 ```powershell
 $magiRuntime = Join-Path $env:USERPROFILE '.cursor/plugins/local/magi-cursor-cli'
 $magiRules = Join-Path $env:USERPROFILE '.cursor/magi-rules/v2'
+$env:MAGI_RULES_ROOT = $magiRules
+$env:MAGI_VAULT_ROOT = 'C:\src\ai-ops-vault'
 Set-Location -LiteralPath $magiRuntime
 node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6
 # Synara-hosted arbiter: also LEGAL with --mode synara
@@ -69,7 +71,11 @@ node tools/magi-cli-preflight.js --rules-root $magiRules
 
 The startup command checks the declared route against the installed matrix. It does not prove the actual Cursor picker.
 
-Use the installed runtime for project work. The old `C:/src/ai-ops-vault` checkout on this machine can carry an earlier rules pack. Do not substitute it for the installed v2 pack. Preflight must prove the STANDING v2 fingerprint and exactly R01–R22.
+Use the installed runtime for project work. Set `MAGI_RULES_ROOT` to the installed v2 pack (`~\.cursor\magi-rules\v2` on this machine). The git-tracked copy lives in `ai-ops-vault/projects/magi-cli-rules` and must stay aligned with that pack. Preflight must prove the STANDING v2 fingerprint and exactly R01–R22.
+
+Set `MAGI_VAULT_ROOT` to the ai-ops-vault checkout. Finalize links durable telemetry there and writes `projects/magi/analysis/latest.md`. That analysis is required later; do not leave MAGI rows only in a disposable run directory. Lean seat skills sync with `projects/magi/seat-skills/` (`magi-vault-sync.js --push` after a MAGI skill edit; `--pull-inbox` for new vault skills).
+
+Set `MAGI_FIELD_LIBRARY_ROOT` and `MAGI_VAULT_SKILLS_ROOT` and run `magi-vault-sync.js --index` after those repos change. The host store is not a seat source. Do not merge field-library or vault-skills into MAGI.
 
 Read the co-located [CLI command reference](cursor-cli.md), [dispatch matrix](dispatch-matrix.json), [seat profiles](seat-profiles.json), and [brief template](brief-rules-block.md). The command reference governs exact CLI arguments and plan fields. This handoff adds the trial boundary and failure-recording process.
 
@@ -125,6 +131,7 @@ On a successful attempt, run these tools in order, using the same sealed run dir
 
 ```powershell
 node tools/run-finalize.js --run-dir $magiRun
+node tools/magi-vault-analyze.js
 node tools/activation-check.js --run-dir $magiRun
 node tools/panel-tally.js --run-dir $magiRun --unit-id $magiUnit
 ```

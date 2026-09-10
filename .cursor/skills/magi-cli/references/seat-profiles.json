@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 5,
-  "updated": "2026-09-05",
+  "schemaVersion": 6,
+  "updated": "2026-09-10",
   "principles": {
     "leafSeat": true,
     "subdispatchForbidden": true,
@@ -43,12 +43,12 @@
     "bulk-mechanical": ["code-minimalism"],
     "debug-mystery": ["context-engineering"],
     "long-context-analysis": [],
-    "agentic-long-run": ["loop-engineering", "harness-engineering"],
+    "agentic-long-run": [],
     "security-sensitive": ["auth-security"],
     "review-adversarial": [],
     "test-verification": [],
     "research-synthesis": [],
-    "extreme-end-to-end": ["loop-engineering", "harness-engineering"]
+    "extreme-end-to-end": []
   },
   "forbiddenSeatSkills": [
     "engineering-orchestrator",

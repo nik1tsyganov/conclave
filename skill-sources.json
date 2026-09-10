@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "updated": "2026-09-10",
+  "decision": "keep-separate",
+  "reason": "field-library, vault-skills, ai-ops-vault, and MAGI have different write targets. Merging them mixes Obsidian ingest, MAGI telemetry, and host field modules.",
+  "sources": [
+    {
+      "id": "magi-seats",
+      "role": "leaf-runtime",
+      "stageToSeats": true,
+      "git": "nik1tsyganov/magi",
+      "path": "seat-skills",
+      "job": "Lean leaf cards staged by dispatch-run. Executable MAGI skill source."
+    },
+    {
+      "id": "ai-ops-vault",
+      "role": "magi-data",
+      "stageToSeats": false,
+      "env": "MAGI_VAULT_ROOT",
+      "git": "nik1tsyganov/ai-ops-vault",
+      "path": "projects/magi",
+      "job": "Durable MAGI telemetry, lean skill mirror, inbox, analysis, and the skill-web catalog."
+    },
+    {
+      "id": "ai-ops-methods",
+      "role": "ai-ops-ingest",
+      "stageToSeats": false,
+      "under": "ai-ops-vault/skills",
+      "job": "Ingest/classify/index/breakthrough for ai-ops-vault only. Never writes Obsidian C:\\src\\vault."
+    },
+    {
+      "id": "field-library",
+      "role": "host-field",
+      "stageToSeats": false,
+      "env": "MAGI_FIELD_LIBRARY_ROOT",
+      "git": "nik1tsyganov/field-library",
+      "path": "modules",
+      "job": "Host field modules (study, writing, stats, tutoring, research-orchestration). Mirror to ~/.claude and ~/.codex. Not MAGI leaf cards."
+    },
+    {
+      "id": "vault-skills",
+      "role": "obsidian-ingest-methods",
+      "stageToSeats": false,
+      "env": "MAGI_VAULT_SKILLS_ROOT",
+      "git": "nik1tsyganov/vault-skills",
+      "path": "skills",
+      "job": "Technique for ingesting into the personal Obsidian vault. Not MAGI data and not ai-ops-ingest."
+    },
+    {
+      "id": "host-store",
+      "role": "arbiter-live",
+      "stageToSeats": false,
+      "env": "MAGI_HOST_SKILLS_ROOT",
+      "path": "~/.claude/skills",
+      "job": "Live host/arbiter store: engineering-orchestrator, MAGI/CONCLAVE bridges, and mirrored field modules. Do not stage this tree onto leaf seats."
+    }
+  ],
+  "relatedNames": {
+    "breakthrough-capture": ["vault-skills", "ai-ops-methods", "host-store"],
+    "vault-ingest": ["vault-skills", "host-store"],
+    "research-orchestration": ["field-library", "host-store"],
+    "creative-writing": ["field-library", "host-store"],
+    "essay-writing": ["field-library", "host-store"],
+    "mathematical-writing": ["field-library", "host-store"],
+    "statistics": ["field-library", "host-store"],
+    "study-efficiency": ["field-library", "host-store"],
+    "verified-tutoring": ["field-library", "host-store"],
+    "implement": ["magi-seats", "host-store"],
+    "testing": ["magi-seats", "host-store"],
+    "code-minimalism": ["magi-seats", "host-store"],
+    "evaluation-engineering": ["magi-seats", "host-store"],
+    "context-engineering": ["magi-seats", "host-store"],
+    "auth-security": ["magi-seats", "host-store"]
+  },
+  "neverStageToSeats": ["field-library", "vault-skills", "ai-ops-methods", "host-store"]
+}

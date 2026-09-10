@@ -179,6 +179,7 @@ function inspectJoinManifest(file) {
 
 function waitForDispatches({ runDir, dispatchIds, timeoutMs, pollMs }) {
   if (!runDir) throw new Error('--run-dir is required');
+  if (!Array.isArray(dispatchIds) || !dispatchIds.length) throw new Error('--wait requires --dispatch-id');
   const root = path.resolve(runDir);
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) throw new Error('run directory must exist');
   const started = Date.now();
@@ -283,6 +284,7 @@ function parseArgs(argv) {
     throw new Error('Usage: magi-synara-watch --run-roots <dir> [--hooks <hooks.json>...] | --wait --run-dir <sealed-run> [--dispatch-id <id>...] | --record-join --run-dir <sealed-run> [--dispatch-id <id>...]');
   }
   if ((opts.mode === 'wait' || opts.mode === 'record-join') && !opts.runDir) throw new Error('--run-dir is required');
+  if (opts.mode === 'wait' && !opts.dispatchIds.length) throw new Error('--wait requires --dispatch-id');
   if (opts.mode === 'wait' && (!Number.isSafeInteger(opts.timeoutMs) || opts.timeoutMs < 1)) throw new Error('--timeout-ms must be a positive integer');
   if (opts.mode === 'wait' && (!Number.isSafeInteger(opts.pollMs) || opts.pollMs < 1)) throw new Error('--poll-ms must be a positive integer');
   if (opts.parentPid !== null && (!Number.isInteger(opts.parentPid) || opts.parentPid <= 0)) throw new Error('--parent-pid must be a positive integer');
@@ -301,8 +303,9 @@ function main(argv = process.argv.slice(2)) {
       process.stdout.write(`${JSON.stringify(result)}\n`);
       return result.joined && !result.notify ? 0 : 1;
     }
-    process.stdout.write(`${JSON.stringify(watch(opts))}\n`);
-    return 0;
+    const result = watch(opts);
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    return result.notify ? 1 : 0;
   } catch (error) {
     process.stderr.write(`MAGI_SYNARA_WATCH_FAIL: ${error.message}\n`);
     return 2;
