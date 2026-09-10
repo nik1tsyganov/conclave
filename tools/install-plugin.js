@@ -140,7 +140,8 @@ function installMagiCursorCli({ destination = MAGI_CLI_DEST, sourceRoot = ROOT }
   const prepared = prepareInstall(sourceRoot, destination, magiCliManifest(), [
     ['.cursor/skills/magi-cli', 'skills/magi-cli'], ['.cursor/rules', 'rules'],
     ['commands/magi-cli.md', 'commands/magi-cli.md'], ['tools/templates', 'tools/templates'],
-    ['seat-skills', 'seat-skills'], ...CLI_RUNTIME_TOOLS.map(tool => [`tools/${tool}`, `tools/${tool}`]),
+    ['seat-skills', 'seat-skills'], ['skill-sources.json', 'skill-sources.json'],
+    ...CLI_RUNTIME_TOOLS.map(tool => [`tools/${tool}`, `tools/${tool}`]),
   ], validateCliFiles);
   return writeInstall(prepared);
 }
@@ -178,6 +179,7 @@ function checkMagiCli(destination = MAGI_CLI_DEST) {
     'rules/magi-arbiter.mdc',
     'commands/magi-cli.md',
     ...CLI_RUNTIME_TOOLS.map((name) => `tools/${name}`),
+    'skill-sources.json',
   ];
   const missing = required.filter((rel) => !files.has(path.join(paths.root, rel)));
   if (missing.length) throw new Error(`magi-cursor-cli missing: ${missing.join(', ')}`);

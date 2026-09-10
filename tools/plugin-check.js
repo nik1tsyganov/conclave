@@ -83,6 +83,9 @@ function check() {
     'tools/magi-vault-sync.js',
     'tools/magi-vault-analyze.js',
     'tools/magi-vault.test.js',
+    'tools/magi-skill-web.js',
+    'tools/magi-skill-web.test.js',
+    'skill-sources.json',
     'tools/validate-telemetry.js',
     'tools/validate-telemetry.test.js',
     'telemetry/schema.json',
@@ -253,7 +256,7 @@ function check() {
       'cursor-cli', 'synara', 'join-manifest', 'dispatch-run.js', '--plan', '--run-dir', '--dispatch-id',
       'dispatch-matrix', 'seat-profiles', 'SEAT-CONTRACT.md', 'skills-manifest.json',
       'rules-manifest.json', 'cli-brief-rules-check.js', 'cli-proof',
-      'MAGI_RULES_ROOT', 'MAGI_VAULT_ROOT', 'RULES/INDEX.md', 'casper_via=agy',
+      'MAGI_RULES_ROOT', 'MAGI_VAULT_ROOT', 'MAGI_FIELD_LIBRARY_ROOT', 'RULES/INDEX.md', 'casper_via=agy',
     ]) {
       if (!ref.includes(s)) {
         console.error(`cursor-cli.md missing required string: ${s}`);

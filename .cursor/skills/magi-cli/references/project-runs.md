@@ -73,7 +73,9 @@ The startup command checks the declared route against the installed matrix. It d
 
 Use the installed runtime for project work. Set `MAGI_RULES_ROOT` to the installed v2 pack (`~\.cursor\magi-rules\v2` on this machine). The git-tracked copy lives in `ai-ops-vault/projects/magi-cli-rules` and must stay aligned with that pack. Preflight must prove the STANDING v2 fingerprint and exactly R01–R22.
 
-Set `MAGI_VAULT_ROOT` to the ai-ops-vault checkout. Finalize links durable telemetry there and writes `projects/magi/analysis/latest.md`. That analysis is required later; do not leave MAGI rows only in a disposable run directory. Lean seat skills sync with `projects/magi/seat-skills/` (`magi-vault-sync.js --push` after a MAGI skill edit; `--pull-inbox` for new vault skills). The host store is not a seat source.
+Set `MAGI_VAULT_ROOT` to the ai-ops-vault checkout. Finalize links durable telemetry there and writes `projects/magi/analysis/latest.md`. That analysis is required later; do not leave MAGI rows only in a disposable run directory. Lean seat skills sync with `projects/magi/seat-skills/` (`magi-vault-sync.js --push` after a MAGI skill edit; `--pull-inbox` for new vault skills).
+
+Set `MAGI_FIELD_LIBRARY_ROOT` and `MAGI_VAULT_SKILLS_ROOT` and run `magi-vault-sync.js --index` after those repos change. The host store is not a seat source. Do not merge field-library or vault-skills into MAGI.
 
 Read the co-located [CLI command reference](cursor-cli.md), [dispatch matrix](dispatch-matrix.json), [seat profiles](seat-profiles.json), and [brief template](brief-rules-block.md). The command reference governs exact CLI arguments and plan fields. This handoff adds the trial boundary and failure-recording process.
 

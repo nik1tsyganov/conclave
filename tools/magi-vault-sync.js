@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const { FORBIDDEN_ARBITER_SKILLS, copySkill, regularFiles } = require('./cli-skill-stage.js');
 const { resolveRuntimePaths } = require('./runtime-paths.js');
 const { ensureVaultHome, looksSecret, requireVaultRoot, vaultError } = require('./magi-vault.js');
+const { indexSkillWeb } = require('./magi-skill-web.js');
 
 function digest(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -127,13 +128,14 @@ function pullInbox(options = {}) {
 function main(argv = process.argv.slice(2), io = process) {
   try {
     const command = argv[0];
-    if (argv.length !== 1 || !['--status', '--push', '--pull', '--pull-inbox'].includes(command)) {
-      throw vaultError('Usage: magi-vault-sync.js --status|--push|--pull|--pull-inbox');
+    if (argv.length !== 1 || !['--status', '--push', '--pull', '--pull-inbox', '--index'].includes(command)) {
+      throw vaultError('Usage: magi-vault-sync.js --status|--push|--pull|--pull-inbox|--index');
     }
     const result = command === '--status' ? syncStatus()
       : command === '--push' ? pushSkillsToVault()
         : command === '--pull' ? pullSkillsFromVault()
-          : pullInbox();
+          : command === '--pull-inbox' ? pullInbox()
+            : indexSkillWeb();
     io.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return result.ok === false ? 1 : 0;
   } catch (error) {

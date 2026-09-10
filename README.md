@@ -36,6 +36,8 @@ Supply the external standing-rule pack explicitly:
 ```powershell
 $env:MAGI_RULES_ROOT = Join-Path $env:USERPROFILE '.cursor/magi-rules/v2'
 $env:MAGI_VAULT_ROOT = 'C:\src\ai-ops-vault'
+$env:MAGI_FIELD_LIBRARY_ROOT = 'C:\src\field-library'
+$env:MAGI_VAULT_SKILLS_ROOT = 'C:\src\vault-skills'
 ```
 
 Use the matching STANDING v2 / R01–R22 pack. `MAGI_VAULT_ROOT` is the ai-ops-vault checkout: durable MAGI telemetry, lean seat-skill sync, and analysis. It is not the live rules path. Credentials and availability evidence stay local to the executing host. Use normal binary discovery or the explicit `MAGI_CODEX_BIN`, `MAGI_CLAUDE_BIN`, and `MAGI_AGY_BIN` overrides. Invalid explicit binary paths fail.
@@ -131,4 +133,26 @@ The dependency-free visual explainer is in [site/](site/). Open [site/index.html
 
 `magi-probe` was an early working-together demo. `magi-kit` was a machine home-store snapshot. Both are archived. Do not clone them as MAGI.
 
-CONCLAVE is a different product. Host/arbiter skills live in `~/.claude/skills`. Vault ingest methods live in [vault-skills](https://github.com/nik1tsyganov/vault-skills). Field modules live in [field-library](https://github.com/nik1tsyganov/field-library). MAGI leaf cards live in this repo under `seat-skills/`.
+## Layout
+
+| Path | Role |
+|---|---|
+| `seat-skills/` | Lean leaf cards staged on dispatch |
+| `tools/` | Sealed-plan runtime |
+| `skill-sources.json` | Map of sibling skill repos; do not merge them |
+| `agents/` | Cursor Task hostMode only; CLI install omits this |
+| `commands/` / `claude-commands/` | Slash-command entry |
+| `telemetry/` | Local MAGI dispatch-row contract |
+| `projects/` | Product-run notes (`hearth`, `signal-sim`); not product source |
+| `site/` | Visual explainer |
+| `.cursor/skills/` | Arbiter MAGI / MAGI CLI skills shipped with this repo |
+
+CONCLAVE is a different product. Keep these git homes separate and index them instead of merging:
+
+- MAGI leaf cards: `seat-skills/`
+- MAGI data / analysis: [ai-ops-vault](https://github.com/nik1tsyganov/ai-ops-vault) `projects/magi/`
+- Host field modules (including `research-orchestration`): [field-library](https://github.com/nik1tsyganov/field-library)
+- Obsidian ingest methods: [vault-skills](https://github.com/nik1tsyganov/vault-skills)
+- Live host/arbiter store (`engineering-orchestrator`, bridges): `~/.claude/skills`
+
+Set `MAGI_VAULT_ROOT`, `MAGI_FIELD_LIBRARY_ROOT`, and `MAGI_VAULT_SKILLS_ROOT`, then run `node tools/magi-vault-sync.js --index`.

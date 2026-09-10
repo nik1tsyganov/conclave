@@ -89,6 +89,18 @@ test('explicit environment rules root is supported', t => {
   assert.equal(check(f).ok, true);
 });
 
+test('unset field-library and vault-skills roots are informational; a bad field-library fails', t => {
+  const f = fixture(t);
+  const unset = check(f);
+  assert.equal(unset.ok, true);
+  assert.equal(unset.findings.find(row => row.check === 'skill-web:field-library').value, null);
+  assert.equal(unset.findings.find(row => row.check === 'skill-web:vault-skills').value, null);
+  f.env.MAGI_FIELD_LIBRARY_ROOT = f.root;
+  const bad = check(f);
+  assert.equal(bad.ok, false);
+  assert.match(bad.findings.find(row => row.check === 'skill-web:field-library').error, /not a field-library/);
+});
+
 test('unset MAGI_VAULT_ROOT is informational; a bad vault root fails', t => {
   const f = fixture(t);
   const unset = check(f);

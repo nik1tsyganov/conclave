@@ -60,6 +60,8 @@ function vaultLayout(root) {
     seatProfiles: path.join(home, 'seat-profiles.json'),
     inbox: path.join(home, 'seat-skills-inbox'),
     runsDir: path.join(home, 'runs'),
+    skillWebJson: path.join(home, 'skill-web.json'),
+    skillWebMd: path.join(home, 'skill-web.md'),
   };
 }
 

@@ -39,6 +39,8 @@ const REQUIRED = [
   'tools/magi-vault-link.js',
   'tools/magi-vault-sync.js',
   'tools/magi-vault-analyze.js',
+  'tools/magi-skill-web.js',
+  'skill-sources.json',
   'tools/model-availability.js',
   'tools/seat-policy.js',
   'tools/vendor-binaries.js',

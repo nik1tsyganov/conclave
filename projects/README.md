@@ -1,8 +1,12 @@
-# Product work tracking
+# Product-run notes
 
-Product repositories such as Hearth and Signal Sim do not mention MAGI. Slice
-graphs, distribution-floor notes, telemetry obligations, and
-`magi-dispatch-log.jsonl` for product work live under `projects/<slug>/`.
+These folders are MAGI notes about other products. They are not those
+products' source trees and they are not skill repos.
 
-The bench-001 vault harness is retired. Do not prepare `cli-full` cells from
-`ai-ops-vault/projects/bench-001`.
+| Slug | Product | What lives here |
+|---|---|---|
+| `hearth` | `C:\src\discord-clone` | Slice graph (`SLICES.md`) and the gitignored Hearth dispatch log |
+| `signal-sim` | `C:\src\signal-sim` | Product pointer only |
+
+Durable MAGI telemetry and the skill-web catalog live in ai-ops-vault
+`projects/magi/`, not here. The bench-001 vault harness is retired.

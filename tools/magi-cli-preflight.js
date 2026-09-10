@@ -122,6 +122,20 @@ function check(options = {}) {
     if (!raw) return { value: null, note: 'set MAGI_VAULT_ROOT to ai-ops-vault for MAGI telemetry, skill sync, and analysis' };
     return { value: resolveVaultRoot({ vaultRoot: raw, env: options.env !== undefined ? options.env : process.env }) };
   });
+  const env = options.env !== undefined ? options.env : process.env;
+  record('skill-web:field-library', () => {
+    const raw = env.MAGI_FIELD_LIBRARY_ROOT;
+    if (!raw) return { value: null, note: 'set MAGI_FIELD_LIBRARY_ROOT to index host field modules' };
+    const index = path.join(raw, 'INDEX.md');
+    if (!fs.existsSync(index) || !fs.existsSync(path.join(raw, 'modules'))) throw new Error('MAGI_FIELD_LIBRARY_ROOT is not a field-library checkout');
+    return { value: path.resolve(raw) };
+  });
+  record('skill-web:vault-skills', () => {
+    const raw = env.MAGI_VAULT_SKILLS_ROOT;
+    if (!raw) return { value: null, note: 'set MAGI_VAULT_SKILLS_ROOT to index Obsidian ingest methods' };
+    if (!fs.existsSync(path.join(raw, 'skills', 'vault-ingest', 'SKILL.md'))) throw new Error('MAGI_VAULT_SKILLS_ROOT is not a vault-skills checkout');
+    return { value: path.resolve(raw) };
+  });
 
   return { ok: findings.every((f) => f.ok), arbiterSkills, seatSkills, findings };
 }

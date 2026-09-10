@@ -15,12 +15,16 @@ Set the external rule-pack path explicitly:
 ```powershell
 $env:MAGI_RULES_ROOT = Join-Path $env:USERPROFILE '.cursor/magi-rules/v2'
 $env:MAGI_VAULT_ROOT = 'C:\src\ai-ops-vault'
+$env:MAGI_FIELD_LIBRARY_ROOT = 'C:\src\field-library'
+$env:MAGI_VAULT_SKILLS_ROOT = 'C:\src\vault-skills'
 node tools/magi-cli-preflight.js --rules-root $env:MAGI_RULES_ROOT
 ```
 
 The active pack is STANDING v2 with `RULES/INDEX.md`, `VENDOR.md`, and exactly R01–R22. Missing or extra rules fail. Required rule files and each bundled `SKILL.md` must contain non-whitespace text. Preflight also checks the required runtime tool files. Native CLI authentication remains local to the machine. `claude auth status` is the Claude login check; the native model probe also verifies its subscription authentication. Never copy credentials from the kit.
 
-`MAGI_VAULT_ROOT` is the ai-ops-vault checkout. It is MAGI's durable data home: telemetry, lean seat-skill mirrors, inbox skills, and analysis. It is not the live rules pack. `run-finalize.js` links `telemetry.jsonl` into the vault when this env is set and the run directory is not a temp test path. After a MAGI skill edit, run `magi-vault-sync.js --push`. New vault skills land in `projects/magi/seat-skills-inbox/`; `magi-vault-sync.js --pull-inbox` copies them into MAGI `seat-skills/`. Do not stage the host store, vault-skills methods, or field-library modules onto leaf seats.
+`MAGI_VAULT_ROOT` is the ai-ops-vault checkout. It is MAGI's durable data home: telemetry, lean seat-skill mirrors, inbox skills, analysis, and the skill-web catalog. It is not the live rules pack. `run-finalize.js` links `telemetry.jsonl` into the vault when this env is set and the run directory is not a temp test path. After a MAGI skill edit, run `magi-vault-sync.js --push`. New vault skills land in `projects/magi/seat-skills-inbox/`; `magi-vault-sync.js --pull-inbox` copies them into MAGI `seat-skills/`.
+
+Set `MAGI_FIELD_LIBRARY_ROOT` and `MAGI_VAULT_SKILLS_ROOT` so `magi-vault-sync.js --index` can catalog those sibling repos. Do not merge them into MAGI or the vault. Do not stage the host store, vault-skills methods, or field-library modules onto leaf seats. The map is `skill-sources.json`.
 
 The example uses YESSIR's installed external pack. On another machine, supply its actual verified v2 pack. For bounded real-project attempts and failure recording, follow [the project handoff](../../magi-cli/references/project-runs.md).
 
@@ -171,6 +175,7 @@ After the planned dependencies and checks complete:
 node tools/run-finalize.js --run-dir C:/src/magi-runs/run-001
 node tools/magi-vault-analyze.js
 node tools/magi-vault-sync.js --status
+node tools/magi-vault-sync.js --index
 node tools/panel-tally.js --run-dir C:/src/magi-runs/run-001 --unit-id api-1
 ```
 
