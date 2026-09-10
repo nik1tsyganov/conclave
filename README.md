@@ -125,4 +125,8 @@ The dependency-free visual explainer is in [site/](site/). Open [site/index.html
 
 ## Repository
 
-[nik1tsyganov/magi](https://github.com/nik1tsyganov/magi)
+[nik1tsyganov/magi](https://github.com/nik1tsyganov/magi) is the only MAGI product repository.
+
+`magi-probe` was an early working-together demo. `magi-kit` was a machine home-store snapshot. Both are archived. Do not clone them as MAGI.
+
+CONCLAVE is a different product. Host/arbiter skills live in `~/.claude/skills`. Vault ingest methods live in [vault-skills](https://github.com/nik1tsyganov/vault-skills). Field modules live in [field-library](https://github.com/nik1tsyganov/field-library). MAGI leaf cards live in this repo under `seat-skills/`.
