@@ -15,8 +15,10 @@ const { loadProfiles, buildSeatProfile } = require('./seat-policy.js');
 const { prepareSeatSkills, stageSeatSkills, verifySeatSkills } = require('./cli-skill-stage.js');
 const { DEFAULT_PROFILES } = require('./seat-policy.js');
 const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, appendUniqueRow, assertPlainPath, compareWorkspace, hashFile, inside, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, writeJson: atomicJson } = require('./dispatch-evidence.js');
-const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, nativeLog, validateClaudeResponseLaunch } = require('./vendor-native.js');
+const { CLAUDE_RESPONSE_PROTOCOL, codexSessionTranscript, googleSessionTranscript, finalResponse, nativeLog, validateClaudeResponseLaunch } = require('./vendor-native.js');
+const { INSTRUCTION_READ_PROTOCOL, verifyInstructionReadEvidence } = require('./instruction-read-evidence.js');
 const { readSealedRun } = require('./plan-seal.js');
+const { validateEvidenceReadDirs, snapshotEvidenceReads, validateEvidenceReadLaunch } = require('./evidence-read-access.js');
 const { launchOverlay, loadCatalog } = require('./synara-catalog.js');
 const { resolveRulesRoot, resolveRuntimePaths } = require('./runtime-paths.js');
 const { SEQUENCE_PROTOCOL, validateLogDestinations, verifyCheckpoint, verifyExecution, verifyPrerequisites } = require('./run-finalize.js');
@@ -73,6 +75,11 @@ function required(opts) {
 }
 
 function seatContractText(opts, seatProfile, skillStage, ruleStage) {
+  const contractPath = path.join(opts.evidenceDir || path.dirname(skillStage.root), 'SEAT-CONTRACT.md');
+  const instructionFiles = [path.join(ruleStage.briefDir, 'BRIEF.md'), contractPath,
+    ruleStage.manifestPath, ...ruleStage.manifest.files.map(file => path.join(ruleStage.briefDir, file.path)),
+    skillStage.manifestPath, ...seatProfile.skills.map(skill => path.join(skillStage.root, skill, 'SKILL.md'))];
+  const openaiReadRecipe = file => `const r = await tools.exec_command(${JSON.stringify({ cmd: `Get-Content -Raw -LiteralPath '${file.replaceAll("'", "''")}' -Encoding UTF8`, workdir: opts.cwd, max_output_tokens: 10000 })}); text(r.output);`;
   return [
     '# MAGI CLI seat contract',
     '',
@@ -90,10 +97,10 @@ function seatContractText(opts, seatProfile, skillStage, ruleStage) {
     'This is a leaf seat. Do not dispatch, delegate, spawn, or ask another model/agent to perform work.',
     'This seat is not the arbiter. Do not change routing, model choice, panel membership, or deterministic gate outcomes.',
     opts.role === 'implement' ? `Writes are limited to these relative paths in the assigned worktree: ${opts.writeScope.join(', ')}.` : 'Read-only role: do not modify product files.',
-    ...(Array.isArray(opts.evidenceReadDirs) && opts.evidenceReadDirs.length
-      ? [`Additional host-helper read directories (not MAGI votes, never a POSITION): ${opts.evidenceReadDirs.join(', ')}.`]
-      : []),
     'Do not stage or commit changes. Do not modify any evidence, rules, contracts, or skill files.',
+    ...(Array.isArray(opts.evidenceReadDirs) && opts.evidenceReadDirs.length
+      ? ['Additional host-helper read directories (not MAGI votes, never a POSITION):', ...opts.evidenceReadDirs.map(dir => `- ${dir}`), 'These evidence directories are frozen inputs. Do not change, create or delete their contents.']
+      : []),
     '',
     'Required staged instructions: read these files in full before task work:',
     `- STANDING.md: ${path.join(ruleStage.briefDir, 'STANDING.md')}`,
@@ -113,7 +120,20 @@ function seatContractText(opts, seatProfile, skillStage, ruleStage) {
     'Allowed staged skills:',
     ...seatProfile.skills.map((skill) => `- ${skill}: ${path.join(skillStage.root, skill, 'SKILL.md')}`),
     '',
+    ...(opts.vendor === 'openai' ? [
+      'Native instruction-read evidence is mandatory before task tools or product work.',
+      'The first tool call reads this contract with the exact code-mode recipe from the pointer. That read counts; do not repeat it.',
+      'Then use ONE functions.exec invocation per code block below, in order. Do not batch calls, add code, change tools, or read global skills before coverage is complete.',
+      'A failed or truncated read is a blocker. The runtime checks returned native bytes and model-facing output, not your ACK or claimed read list.',
+      ...instructionFiles.filter(file => file !== contractPath).flatMap(file => [file, '```javascript', openaiReadRecipe(file), '```', '']),
+    ] : [
+      'Complete all required reads with native file-read tools before any other task tool, source read, or product work. Do not inspect global skills or list directories first.',
+      'Native full-file content and successful tool results are required. A claimed read list or ACK alone cannot pass.',
+    ]),
     `Required proof fields: ${seatProfile.proofFields.join(', ')}`,
+    ...(['verify', 'review'].includes(opts.role) ? ['',
+      'End your response with exactly one final POSITION: APPROVE, POSITION: REJECT, or POSITION: ABSTAIN line.',
+      'Do not include any other POSITION line. State the evidence and blockers before the final POSITION line.'] : []),
     '',
   ].join('\n');
 }
@@ -218,6 +238,7 @@ async function runDispatch(opts, dependencies = {}) {
   if (opts.runDir && fs.realpathSync(opts.runDir) !== runDir) throw policyError('--run-dir does not contain the sealed plan');
   const sealed = readSealedRun(runDir);
   const { seal } = sealed;
+  if (seal.instructionReadProtocol !== INSTRUCTION_READ_PROTOCOL) throw Object.assign(new Error('historical run has no native instruction-read assurance; inspect its original evidence with the matching runtime or seal a new run'), { code: 'INSTRUCTION_READ_COMPATIBILITY_FAIL' });
   if (planPath !== sealed.planPath) throw policyError('dispatch plan must be the sealed run plan');
   const planEntry = sealed.plan.dispatches.find((row) => row.dispatchId === opts.dispatchId);
   if (!planEntry) throw policyError('dispatchId absent from sealed plan');
@@ -286,6 +307,10 @@ async function runDispatch(opts, dependencies = {}) {
   }
   const prerequisites = fs.existsSync(transactionPath) ? null : verifyPrerequisites(sealed, binding.entry,
     ['review', 'verify'].includes(opts.role) ? snapshotWorkspace(cwd) : undefined, new Date().toISOString());
+  const evidenceReadDirs = validateEvidenceReadDirs(binding.entry, { plan: sealed.plan, runDir,
+    requireExisting: !savedState, forbiddenRoots: [opts.rulesRoot, opts.skillSourceRoot].filter(Boolean) });
+  if (!savedState) snapshotEvidenceReads(evidenceReadDirs);
+  opts = { ...opts, evidenceReadDirs };
   const transaction = reserveTransaction(binding, evidenceDir, postRun ? ATTESTATION_PROTOCOL : undefined);
   const responseProtocol = opts.vendor === 'anthropic' ? CLAUDE_RESPONSE_PROTOCOL : undefined;
   if (transaction.pending) {
@@ -334,15 +359,18 @@ async function runDispatch(opts, dependencies = {}) {
   const pidFile = path.join(evidenceDir, 'child.pid');
   for (const file of [capturePath, stdoutPath, stderrPath]) fs.rmSync(file, { force: true });
 
+  const evidenceReadsBefore = snapshotEvidenceReads(evidenceReadDirs);
   const launch = (dependencies.buildLaunch || buildLaunch)({
     vendor: opts.vendor, role: opts.role, briefPath: brief, cwd: opts.cwd, model: opts.model,
     effort: opts.vendor === 'google' ? undefined : opts.effort,
     capturePath, skillRoot: skillStage.root, seatContractPath,
+    dispatchId: opts.dispatchId,
     reviewPermissionMode: opts.reviewPermissionMode,
     responseProtocol,
-    evidenceReadDirs: opts.evidenceReadDirs,
+    ...(evidenceReadDirs.length ? { evidenceReadDirs } : {}),
   });
   if (responseProtocol) validateClaudeResponseLaunch(launch);
+  validateEvidenceReadLaunch(launch, binding.entry, evidenceReadDirs, { cwd, briefPath: brief, skillRoot: skillStage.root, seatContractPath });
   if (launch.nativeLogPath) {
     if (!inside(launch.nativeLogPath, evidenceDir)) throw new Error('native log must stay inside dispatch evidence');
     assertPlainPath(launch.nativeLogPath);
@@ -361,8 +389,9 @@ async function runDispatch(opts, dependencies = {}) {
     planId: opts.planId, planHash: opts.planHash, planEntry: binding.entry, escalation: opts.escalation === true, escalationReason: opts.escalationReason || null,
     binary: launch.binary, args: launch.args, cwd: launch.cwd, nativeLogPath: launch.nativeLogPath,
     responseProtocol,
+    instructionReadProtocol: INSTRUCTION_READ_PROTOCOL,
     ...(Object.keys(synaraOverlay).length ? synaraOverlay : {}),
-    ...(Array.isArray(opts.evidenceReadDirs) && opts.evidenceReadDirs.length ? { evidenceReadDirs: opts.evidenceReadDirs } : {}),
+    ...(evidenceReadDirs.length ? { evidenceReadDirs, evidenceReadsSha256: hashText(JSON.stringify(evidenceReadsBefore)) } : {}),
     ...(postRun ? { attestationProtocol: ATTESTATION_PROTOCOL, logDestinations: { telemetryLog, activationLog } } : {}),
     sequenceProtocol: SEQUENCE_PROTOCOL, startedAt: transaction.state.startedAt, prerequisites,
     matrixVersion: matrix.schemaVersion, seatProfileVersion: seatProfiles.schemaVersion,
@@ -383,6 +412,8 @@ async function runDispatch(opts, dependencies = {}) {
   const skillSources = () => Object.fromEntries(seatProfile.skills.map((skill) => [skill, snapshotWorkspace(path.join(skillStage.manifest.sourceRoot, skill))]));
   const skillsBefore = skillSources();
   atomicJson(path.join(evidenceDir, 'skills-source-before.json'), skillsBefore);
+  if (JSON.stringify(evidenceReadsBefore) !== JSON.stringify(snapshotEvidenceReads(evidenceReadDirs))) throw policyError('read-only evidence inputs changed before launch');
+  if (evidenceReadDirs.length) atomicJson(path.join(evidenceDir, 'evidence-reads-before.json'), evidenceReadsBefore);
   const result = await (dependencies.runLaunch || runLaunch)(launch, { pidFile, stdoutFile: stdoutPath, stderrFile: stderrPath, maxWallMs, signal: dependencies.signal });
   for (const file of [telemetryLog, activationLog, capturePath, path.join(evidenceDir, 'vendor.log'), transaction.file, path.join(runDir, '.magi-sessions'), ...(launch.nativeLogPath ? [launch.nativeLogPath] : [])]) assertPlainPath(file);
   const after = snapshotWorkspace(cwd);
@@ -397,6 +428,9 @@ async function runDispatch(opts, dependencies = {}) {
   atomicJson(path.join(evidenceDir, 'skills-source-after.json'), skillsAfter);
   const skillsAudit = Object.fromEntries(seatProfile.skills.map((skill) => [skill, compareWorkspace(skillsBefore[skill], skillsAfter[skill], [])]));
   atomicJson(path.join(evidenceDir, 'skills-source-audit.json'), skillsAudit);
+  const evidenceReadsAfter = snapshotEvidenceReads(evidenceReadDirs);
+  if (evidenceReadDirs.length) atomicJson(path.join(evidenceDir, 'evidence-reads-after.json'), evidenceReadsAfter);
+  if (JSON.stringify(evidenceReadsBefore) !== JSON.stringify(evidenceReadsAfter)) throw policyError('read-only evidence inputs changed during dispatch');
   if (opts.vendor !== 'openai') fs.writeFileSync(capturePath, result.stdout, 'utf8');
   let combinedLog = opts.vendor === 'openai' ? result.stderr : `${result.stderr}\n${result.stdout}`;
   if (result.ok && fs.existsSync(capturePath) && !dependencies.runLaunch) combinedLog = nativeLog(opts.vendor, fs.readFileSync(capturePath, 'utf8'), combinedLog, { cwd, nativeLogPath: launch.nativeLogPath });
@@ -413,6 +447,31 @@ async function runDispatch(opts, dependencies = {}) {
   if (!fs.existsSync(capturePath) || !fs.readFileSync(capturePath, 'utf8').trim()) throw Object.assign(new Error('vendor capture missing or empty'), { code: 'PROOF_FAIL' });
   const modelSpec = matrix.vendors[opts.vendor].models[opts.model];
   const proof = (postRun ? verifyNativeProof : verifyProof)({ vendor: opts.vendor, capture: capturePath, log: path.join(evidenceDir, 'vendor.log'), expectedModel: opts.model, expectedObservedModel: modelSpec.canonical || opts.model, expectedEffort: opts.effort, expectedSandbox: launch.requestedSandbox, onTopic: opts.onTopic, responseProtocol });
+  const sessionId = proof.sessionId || proof.conversationId;
+  const captureText = fs.readFileSync(capturePath, 'utf8');
+  const transcript = opts.vendor === 'anthropic' ? { path: capturePath, text: captureText } :
+    (opts.vendor === 'openai' ? (dependencies.codexSessionTranscript || codexSessionTranscript) : (dependencies.googleSessionTranscript || googleSessionTranscript))
+      (sessionId, { cwd, briefPath: brief, seatContractPath });
+  if (!transcript || typeof transcript.text !== 'string' || !path.isAbsolute(transcript.path || '')) throw Object.assign(new Error('native instruction transcript collector returned invalid evidence'), { code: 'INSTRUCTION_READ_FAIL' });
+  const transcriptBinding = { protocol: INSTRUCTION_READ_PROTOCOL, vendor: opts.vendor, sessionId, sourcePath: transcript.path, sha256: hashText(transcript.text) };
+  for (const name of ['native-instructions.jsonl', 'instruction-transcript.json', 'instruction-reads.json']) {
+    const file = path.join(evidenceDir, name); assertPlainPath(file);
+    if (fs.existsSync(file)) throw policyError('native child wrote runner-owned instruction evidence: ' + name);
+  }
+  fs.writeFileSync(path.join(evidenceDir, 'native-instructions.jsonl'), transcript.text, 'utf8');
+  writeJson(path.join(evidenceDir, 'instruction-transcript.json'), transcriptBinding);
+  let instructionReads;
+  try {
+    instructionReads = verifyInstructionReadEvidence({ vendor: opts.vendor, sessionId, captureText,
+      transcriptText: transcript.text, googleTranscriptBinding: { conversationId: sessionId, sha256: transcriptBinding.sha256 },
+      briefPath: brief, seatContractPath, skillRoot: skillStage.root, seatProfile,
+      rulesManifest: staged.manifest, skillsManifest: skillStage.manifest });
+  } catch (error) {
+    writeJson(path.join(evidenceDir, 'instruction-reads.json'), { protocol: INSTRUCTION_READ_PROTOCOL, status: 'FAIL', code: error.code || 'INSTRUCTION_READ_FAIL', error: error.message });
+    throw error;
+  }
+  writeJson(path.join(evidenceDir, 'instruction-reads.json'), instructionReads);
+  proof.instructionReads = { protocol: INSTRUCTION_READ_PROTOCOL, requiredSetSha256: instructionReads.requiredSetSha256, evidenceSha256: instructionReads.evidenceSha256 };
   const response = finalResponse(opts.vendor, fs.readFileSync(capturePath, 'utf8'), { responseProtocol });
   const firstLine = fs.readFileSync(brief, 'utf8').split(/\r?\n/, 1)[0];
   if (response.split(/\r?\n/, 1)[0] !== firstLine) throw Object.assign(new Error('final response does not acknowledge the bound brief first line'), { code: 'PROOF_FAIL' });
@@ -449,6 +508,8 @@ async function runDispatch(opts, dependencies = {}) {
     schemaVersion: 2, status: 'PASS', dispatchId: opts.dispatchId, unitId: opts.unitId, class: opts.class, vendor: opts.vendor, role: opts.role,
     model: opts.model, effort: opts.effort, proofId, matrixVersion: matrix.schemaVersion, seatProfileVersion: seatProfiles.schemaVersion,
     seatSkills: seatProfile.skills, permissionProfile: seatProfile.permissionProfile,
+    instructionReadProtocol: INSTRUCTION_READ_PROTOCOL,
+    instructionReadEvidenceSha256: hashFile(path.join(evidenceDir, 'instruction-reads.json')),
     planId: opts.planId, planHash: opts.planHash, planEntry: binding.entry, transactionPath: transaction.file,
     modelRequested: opts.model, modelObserved: proof.modelObserved, escalation: opts.escalation === true, escalationReason: opts.escalationReason || null,
     changedFiles: scopeAudit.changedFiles, scopeCoverage: scopeAudit.coverage, runtimeSha256,
@@ -464,6 +525,8 @@ async function runDispatch(opts, dependencies = {}) {
   writeJson(path.join(evidenceDir, 'handoff-envelope.json'), { ...receipt, telemetryLog });
   const artifacts = ['capture.txt', 'vendor.log', 'proof.json', 'receipt-ack.json', 'handoff-envelope.json', 'scope-audit.json', 'plan-binding.json', 'launch.json', 'workspace-before.json', 'workspace-after.json', 'runtime-manifest.json', 'rules-source-before.json', 'rules-source-after.json', 'rules-source-audit.json', 'skills-source-before.json', 'skills-source-after.json', 'skills-source-audit.json']
     .map((file) => ({ path: path.join(evidenceDir, file), sha256: hashFile(path.join(evidenceDir, file)) }));
+  artifacts.push(...['native-instructions.jsonl', 'instruction-transcript.json', 'instruction-reads.json'].map(name => ({ path: path.join(evidenceDir, name), sha256: hashFile(path.join(evidenceDir, name)) })));
+  if (evidenceReadDirs.length) artifacts.push(...['evidence-reads-before.json', 'evidence-reads-after.json'].map(name => ({ path: path.join(evidenceDir, name), sha256: hashFile(path.join(evidenceDir, name)) })));
   artifacts.push(...protectedHashes.filter(file => !artifacts.some(item => item.path === file.path)));
   if (launch.nativeLogPath && fs.existsSync(launch.nativeLogPath)) artifacts.push({ path: launch.nativeLogPath, sha256: hashFile(launch.nativeLogPath) });
   const logs = [...new Set([telemetryLog, activationLog])];

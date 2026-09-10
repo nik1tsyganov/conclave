@@ -9,6 +9,9 @@ const { verifyNativeProof, verifyProof } = require('./cli-proof.js');
 const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, validateClaudeResponseLaunch } = require('./vendor-native.js');
 const { tally } = require('./position-tally.js');
 const { canonicalPlainPath, pathsOverlap } = require('./runtime-paths.js');
+const { INSTRUCTION_READ_PROTOCOL, verifyInstructionReadEvidence } = require('./instruction-read-evidence.js');
+const { buildSeatProfile, loadProfiles } = require('./seat-policy.js');
+const { validateEvidenceReadDirs, snapshotEvidenceReads, validateEvidenceReadLaunch } = require('./evidence-read-access.js');
 
 const SEQUENCE_PROTOCOL = 'magi-unit-sequence-v1';
 
@@ -43,12 +46,13 @@ function validateLogDestinations(run, logs, evidenceDir, protectedPaths = []) {
 function verifyPrerequisites(run, entry, before, startedAt) {
   if (!['review', 'verify'].includes(entry.role)) return [];
   const author = run.plan.dispatches.find(row => row.unitId === entry.unitId && row.role === 'implement');
-  if (!author) return [];
-  const verifiers = entry.role === 'review' ? run.plan.dispatches.filter(row => row.unitId === entry.unitId && row.role === 'verify') : [];
+  const verifiers = entry.role === 'review' ? run.plan.dispatches.filter(row => row.unitId === entry.unitId && row.role === 'verify' &&
+    (author || entry.evidenceReadDirs?.some(dir => path.relative(canonicalPlainPath(dir), canonicalPlainPath(path.join(run.root, 'out', row.dispatchId))) === ''))) : [];
+  if (!author && !verifiers.length) return [];
   if (entry.role === 'review' && !verifiers.length) throw new Error('planned verification is required before review');
   const start = Date.parse(startedAt);
   if (!Number.isFinite(start)) throw new Error('sequence start time is missing or invalid');
-  return [author, ...verifiers].map(dependency => {
+  return [...(author ? [author] : []), ...verifiers].map(dependency => {
     const file = path.join(run.root, '.magi-dispatches', `${transactionKey(dependency)}.json`);
     const unfinished = dependency.role === 'implement' ? 'implementation must finish before its review or verification' : 'verification must finish before review';
     assertPlainPath(file);
@@ -70,11 +74,13 @@ function verifyPrerequisites(run, entry, before, startedAt) {
 }
 
 function verifyExecution(run, entry, state) {
+  if (run.seal.instructionReadProtocol !== INSTRUCTION_READ_PROTOCOL) throw Object.assign(new Error('historical run has no native instruction-read assurance; use its matching runtime for historical inspection'), { code: 'INSTRUCTION_READ_COMPATIBILITY_FAIL' });
   if (state.status !== 'PASS') throw new Error('execution has no committed PASS transaction');
   return verifySavedExecution(run, entry, state, false);
 }
 
 function verifyCheckpoint(run, entry, state, { current = false, allowReceiptProjections = false } = {}) {
+  if (run.seal.instructionReadProtocol !== INSTRUCTION_READ_PROTOCOL) throw Object.assign(new Error('historical checkpoint has no native instruction-read assurance; use its matching runtime for historical inspection'), { code: 'INSTRUCTION_READ_COMPATIBILITY_FAIL' });
   if (state.status !== AWAITING_ATTESTATION || entry.vendor !== 'anthropic') throw new Error('dispatch is not awaiting Claude attestation');
   const execution = verifySavedExecution(run, entry, state, true, allowReceiptProjections);
   if (current) {
@@ -120,6 +126,21 @@ function verifySavedExecution(run, entry, state, pending, allowReceiptProjection
     if (!state.artifacts.some((item) => item.path === artifact(name) && item.sha256 === (projections.has(item.path) ? hash(`${JSON.stringify(projections.get(item.path), null, 2)}\n`) : hashFile(artifact(name))))) throw new Error(`missing committed artifact: ${name}`);
   }
   const launch = readJson(artifact('launch.json'));
+  if (entry.evidenceReadDirs?.length) {
+    const dirs = validateEvidenceReadDirs(entry, { plan: run.plan, runDir: run.root, requireExisting: true,
+      forbiddenRoots: [readJson(artifact('rules-source-before.json')).root].filter(Boolean) });
+    validateEvidenceReadLaunch(launch, entry, dirs, { cwd: entry.cwd, briefPath: artifact('brief/BRIEF.md'), skillRoot: artifact('skills'), seatContractPath: artifact('SEAT-CONTRACT.md') });
+    for (const name of ['evidence-reads-before.json', 'evidence-reads-after.json']) {
+      if (!state.artifacts.some(item => item.path === artifact(name) && item.sha256 === hashFile(artifact(name)))) throw new Error(`missing committed evidence input artifact: ${name}`);
+    }
+    same(readJson(artifact('evidence-reads-before.json')), readJson(artifact('evidence-reads-after.json')), 'read-only evidence inputs');
+    if (launch.evidenceReadsSha256 !== hash(JSON.stringify(readJson(artifact('evidence-reads-before.json'))))) throw new Error('evidence input hashes differ from launch binding');
+    same(snapshotEvidenceReads(dirs), readJson(artifact('evidence-reads-after.json')), 'current evidence inputs');
+  } else if (launch.evidenceReadDirs?.length) throw new Error('unbound evidence read directories in launch');
+  if (launch.instructionReadProtocol !== INSTRUCTION_READ_PROTOCOL || state.receipt.instructionReadProtocol !== INSTRUCTION_READ_PROTOCOL) throw new Error('missing or unsupported native instruction-read protocol');
+  for (const name of ['native-instructions.jsonl', 'instruction-transcript.json', 'instruction-reads.json']) {
+    if (!state.artifacts.some(item => item.path === artifact(name) && item.sha256 === hashFile(artifact(name)))) throw new Error(`missing committed instruction artifact: ${name}`);
+  }
   const postRun = entry.vendor === 'anthropic' && Boolean(run.seal.attestationProtocol || state.attestationProtocol || launch.attestationProtocol || state.receipt.attestationProtocol);
   if (pending && !postRun) throw new Error('checkpoint is missing its attestation protocol');
   if (postRun && [state.attestationProtocol, launch.attestationProtocol, state.receipt.attestationProtocol].some(value => value !== ATTESTATION_PROTOCOL)) throw new Error('missing or unsupported attestation protocol');
@@ -149,6 +170,25 @@ function verifySavedExecution(run, entry, state, pending, allowReceiptProjection
   }
   const spec = run.matrix.vendors[entry.vendor].models[entry.model];
   const proof = (postRun ? verifyNativeProof : verifyProof)({ vendor: entry.vendor, capture: artifact('capture.txt'), log: artifact('vendor.log'), expectedModel: entry.model, expectedObservedModel: spec.canonical || entry.model, expectedEffort: entry.effort, expectedSandbox: entry.vendor === 'openai' ? (entry.role === 'implement' ? 'workspace-write' : 'read-only') : undefined, onTopic: true, responseProtocol });
+  const response = finalResponse(entry.vendor, fs.readFileSync(artifact('capture.txt'), 'utf8'), { responseProtocol });
+  if (response.split(/\r?\n/, 1)[0] !== fs.readFileSync(entry.brief, 'utf8').split(/\r?\n/, 1)[0]) throw new Error('native response has wrong brief acknowledgement');
+  const sessionId = proof.sessionId || proof.conversationId;
+  const transcriptText = fs.readFileSync(artifact('native-instructions.jsonl'), 'utf8');
+  const transcriptBinding = readJson(artifact('instruction-transcript.json'));
+  if (typeof transcriptBinding.sourcePath !== 'string' || !path.isAbsolute(transcriptBinding.sourcePath)) throw new Error('native instruction transcript source is missing');
+  same(transcriptBinding, { protocol: INSTRUCTION_READ_PROTOCOL, vendor: entry.vendor, sessionId,
+    sourcePath: transcriptBinding.sourcePath, sha256: hash(transcriptText) }, 'instruction transcript binding');
+  const captureText = fs.readFileSync(artifact('capture.txt'), 'utf8');
+  if (entry.vendor === 'anthropic' && (transcriptText !== captureText || transcriptBinding.sourcePath !== artifact('capture.txt'))) throw new Error('Claude instruction transcript differs from its native capture');
+  const seatProfile = buildSeatProfile(loadProfiles(), entry);
+  same(readJson(artifact('seat-profile.json')), seatProfile, 'instruction seat profile');
+  const instructionReads = verifyInstructionReadEvidence({ vendor: entry.vendor, sessionId, captureText, transcriptText,
+    googleTranscriptBinding: { conversationId: sessionId, sha256: transcriptBinding.sha256 },
+    briefPath: artifact('brief/BRIEF.md'), seatContractPath: artifact('SEAT-CONTRACT.md'), skillRoot: artifact('skills'), seatProfile,
+    rulesManifest: readJson(artifact('brief/rules-manifest.json')), skillsManifest: readJson(artifact('skills/skills-manifest.json')) });
+  same(readJson(artifact('instruction-reads.json')), instructionReads, 'native instruction reads');
+  if (state.receipt.instructionReadEvidenceSha256 !== hashFile(artifact('instruction-reads.json'))) throw new Error('receipt instruction evidence hash mismatch');
+  proof.instructionReads = { protocol: INSTRUCTION_READ_PROTOCOL, requiredSetSha256: instructionReads.requiredSetSha256, evidenceSha256: instructionReads.evidenceSha256 };
   if (postRun) proof.attestationProtocol = ATTESTATION_PROTOCOL;
   Object.assign(proof, { planId: run.plan.planId, planHash: run.seal.planHash, escalation: entry.escalation === true, escalationReason: entry.escalationReason || null });
   const proofId = hash(JSON.stringify(proof));
@@ -175,8 +215,6 @@ function verifySavedExecution(run, entry, state, pending, allowReceiptProjection
   const skillsAudit = Object.fromEntries(Object.keys(skillsBefore).map((skill) => [skill, compareWorkspace(skillsBefore[skill], skillsAfter[skill], [])]));
   same(readJson(artifact('skills-source-audit.json')), skillsAudit, 'skills source audit');
   if (Object.values(skillsAudit).some((audit) => !audit.ok)) throw new Error('skill source changed during execution');
-  const response = finalResponse(entry.vendor, fs.readFileSync(artifact('capture.txt'), 'utf8'), { responseProtocol });
-  if (response.split(/\r?\n/, 1)[0] !== fs.readFileSync(entry.brief, 'utf8').split(/\r?\n/, 1)[0]) throw new Error('native response has wrong brief acknowledgement');
   if (postRun) {
     const started = Date.parse(state.startedAt);
     const finished = Date.parse(state.receipt.completedAt);
@@ -304,6 +342,7 @@ function assessRun(run) {
 
 function finalizeRun(runDir) {
   const run = inspectRun(runDir);
+  if (run.seal.instructionReadProtocol !== INSTRUCTION_READ_PROTOCOL) throw Object.assign(new Error('historical run has no native instruction-read assurance; current finalization cannot rewrite its projections'), { code: 'INSTRUCTION_READ_COMPATIBILITY_FAIL' });
   const result = assessRun(run);
   const rows = run.executions.map(({ state }) => state.telemetry);
   const terminalRows = run.outcomes.map((outcome) => rows.find((row) => row.dispatchId === outcome.dispatchId) || outcome);

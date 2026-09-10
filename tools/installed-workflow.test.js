@@ -25,7 +25,7 @@ test('installed CLI completes Claude checkpoint, foreign checks, activation, tal
   require(path.join(tools,'cli-runner.js')).runLaunch=async launch=>{
     const result=await native.runLaunch(launch);
     if(launch.vendor==='anthropic') {
-      const id=JSON.parse(result.stdout).session_id;
+      const id=result.stdout.split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line)).find(row=>row.type==='result').session_id;
       const project=path.join(providerHome,'.claude','projects',launch.cwd.replace(/[^a-zA-Z0-9]/g,'-'));
       fs.mkdirSync(project,{recursive:true});fs.writeFileSync(path.join(project,id+'.jsonl'),result.stderr);
     }
@@ -35,6 +35,8 @@ test('installed CLI completes Claude checkpoint, foreign checks, activation, tal
   const collector=require(path.join(tools,'vendor-native.js'));
   const nativeLog=collector.nativeLog;
   collector.nativeLog=(vendor,capture,baseLog,opts)=>nativeLog(vendor,capture,baseLog,{...opts,home:providerHome});
+  collector.codexSessionTranscript=native.codexSessionTranscript;
+  collector.googleSessionTranscript=native.googleSessionTranscript;
   const {main}=require(path.join(tools,'dispatch-run.js'));
   const common=['--plan',run.sealed.planPath,'--rules-root',run.opts.rulesRoot];
   async function dispatch(id,extra=[]) {

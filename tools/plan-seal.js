@@ -9,6 +9,8 @@ const { ATTESTATION_PROTOCOL, hashFile, writeJson } = require('./dispatch-eviden
 const { readJsonFile } = require('./json-file.js');
 const { canonicalPlainPath, pathsOverlap, DEFAULT_ROOT } = require('./runtime-paths.js');
 const { loadCatalog, narrowMatrix } = require('./synara-catalog.js');
+const { INSTRUCTION_READ_PROTOCOL } = require('./instruction-read-evidence.js');
+const { validateEvidenceReadDirs } = require('./evidence-read-access.js');
 
 function matrixForPlan(plan, catalog) {
   const matrix = loadMatrix();
@@ -36,10 +38,7 @@ function sealPlan({ plan, runDir, availability, synaraCatalog }) {
     const cwd = canonicalPlainPath(entry.cwd);
     if (!fs.statSync(cwd).isDirectory()) throw new Error(`cwd must be a directory: ${entry.dispatchId}`);
     if (pathsOverlap(canonicalRoot, cwd)) throw new Error(`run directory and product worktree overlap: ${entry.dispatchId}`);
-    for (const dir of entry.evidenceReadDirs || []) {
-      const extra = canonicalPlainPath(dir);
-      if (!fs.statSync(extra).isDirectory()) throw new Error(`evidenceReadDirs must be a directory: ${entry.dispatchId}`);
-    }
+    validateEvidenceReadDirs(entry, { plan: validated.plan, runDir: root });
   }
   const sourcePlan = canonicalPlainPath(validated.planPath);
   const sourceIsOutput = sourcePlan === canonicalPlainPath(planPath);
@@ -57,6 +56,7 @@ function sealPlan({ plan, runDir, availability, synaraCatalog }) {
     matrixSha256: hashFile(DEFAULT_MATRIX), profilesSha256: hashFile(DEFAULT_PROFILES),
     availabilitySha256: hashFile(availablePath), sealedAt: new Date().toISOString(),
     attestationProtocol: ATTESTATION_PROTOCOL,
+    instructionReadProtocol: INSTRUCTION_READ_PROTOCOL,
     ...(catalog ? { synaraCatalogSha256: hashFile(catalogPath) } : {}),
   };
   writeJson(sealPath, seal);
@@ -68,6 +68,7 @@ function readSealedRun(runDir) {
   const seal = JSON.parse(fs.readFileSync(sealPath, 'utf8'));
   const planPath = path.join(root, 'dispatch-plan.json');
   const availablePath = path.join(root, 'availability.json');
+  if (seal.instructionReadProtocol !== undefined && seal.instructionReadProtocol !== INSTRUCTION_READ_PROTOCOL) throw new Error('unsupported instruction read protocol');
   if (seal.planHash !== hashFile(planPath) || seal.matrixSha256 !== hashFile(DEFAULT_MATRIX) || seal.profilesSha256 !== hashFile(DEFAULT_PROFILES) || seal.availabilitySha256 !== hashFile(availablePath)) throw new Error('sealed run inputs changed');
   const plan = readJsonFile(planPath);
   if (plan.planId !== seal.planId || !Number.isFinite(Date.parse(seal.sealedAt))) throw new Error('invalid run seal');

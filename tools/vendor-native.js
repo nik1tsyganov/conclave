@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { canonicalPlainPath } = require('./runtime-paths.js');
 const GOOGLE_IDENTITY_LINE = /Print mode: starting.*model=|Print mode: conversation=|Created conversation /;
 const CLAUDE_RESPONSE_PROTOCOL = 'claude-structured-response-v1';
 const CLAUDE_RESPONSE_SCHEMA = Object.freeze({
@@ -61,6 +62,64 @@ function jsonRecords(text) {
   try { return [JSON.parse(text)]; } catch {}
   return String(text).split(/\r?\n/).flatMap((line) => { try { return [JSON.parse(line)]; } catch { return []; } });
 }
+function plainNativePath(file, regularFile = false) {
+  try {
+    const stat = fs.lstatSync(canonicalPlainPath(file));
+    if (regularFile ? (!stat.isFile() || stat.nlink !== 1) : !stat.isDirectory()) throw new Error('expected a directory or single-link regular file');
+  } catch (error) { throw responseError('native transcript path must be plain: ' + error.message); }
+}
+function codexSessionTranscript(sessionId, { home = os.homedir(), codexHome = process.env.CODEX_HOME || path.join(home, '.codex'), cwd } = {}) {
+  if (typeof sessionId !== 'string' || !/^[0-9a-f-]{36}$/i.test(sessionId)) throw responseError('invalid Codex transcript session identity');
+  const root = path.join(codexHome, 'sessions');
+  plainNativePath(root);
+  const matches = [];
+  function visit(directory) {
+    for (const item of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (item.isSymbolicLink()) continue;
+      const file = path.join(directory, item.name);
+      if (item.isDirectory()) visit(file);
+      else if (item.isFile() && item.name.endsWith(`-${sessionId}.jsonl`)) matches.push(file);
+    }
+  }
+  visit(root);
+  if (matches.length !== 1) throw responseError('exact Codex native session transcript is missing or ambiguous');
+  plainNativePath(matches[0], true);
+  const text = fs.readFileSync(matches[0], 'utf8');
+  let rows;
+  try { rows = text.split(/\r?\n/).filter(line => line.trim()).map(line => JSON.parse(line)); }
+  catch { throw responseError('Codex native session transcript is incomplete or malformed'); }
+  const sessions = rows.filter(row => row.type === 'session_meta');
+  if (sessions.length !== 1 || sessions[0].payload?.id !== sessionId ||
+      !cwd || path.win32.resolve(sessions[0].payload.cwd || '').toLowerCase() !== path.win32.resolve(cwd).toLowerCase()) {
+    throw responseError('Codex transcript session or workspace does not match the dispatch');
+  }
+  return { path: matches[0], text };
+}
+function googleSessionTranscript(sessionId, { home = os.homedir(), briefPath, seatContractPath } = {}) {
+  if (typeof sessionId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId)) {
+    throw responseError('invalid Google transcript conversation identity');
+  }
+  const root = path.join(home, '.gemini', 'antigravity-cli', 'brain');
+  const file = path.join(root, sessionId, '.system_generated', 'logs', 'transcript_full.jsonl');
+  // The compact transcript explicitly truncates content. Only the native full
+  // transcript under the exact proven conversation directory is admissible.
+  plainNativePath(file, true);
+  const text = fs.readFileSync(file, 'utf8');
+  let rows;
+  try { rows = text.split(/\r?\n/).filter(line => line.trim()).map(line => JSON.parse(line)); }
+  catch { throw responseError('Google full native transcript is incomplete or malformed'); }
+  const inputs = rows.filter(row => row.type === 'USER_INPUT');
+  const prompt = inputs[0]?.content;
+  if (inputs.length !== 1 || inputs[0].step_index !== 0 || inputs[0].source !== 'USER_EXPLICIT' ||
+      inputs[0].status !== 'DONE' || typeof prompt !== 'string' ||
+      typeof briefPath !== 'string' || !path.isAbsolute(briefPath) ||
+      typeof seatContractPath !== 'string' || !path.isAbsolute(seatContractPath) ||
+      !prompt.includes(briefPath) || !prompt.includes(seatContractPath) ||
+      rows.some(row => Array.isArray(row.truncated_fields) && row.truncated_fields.length)) {
+    throw responseError('Google full transcript does not bind the dispatch instruction pointers or contains truncation');
+  }
+  return { path: file, text };
+}
 function finalResponse(vendor, capture, options = {}) {
   if (options.responseProtocol !== undefined) {
     requireClaudeResponseProtocol(options.responseProtocol);
@@ -117,4 +176,4 @@ function nativeLog(vendor, capture, baseLog, { home = os.homedir(), cwd, nativeL
   }
   throw new Error('matching Claude native session evidence missing');
 }
-module.exports = { CLAUDE_RESPONSE_PROTOCOL, CLAUDE_RESPONSE_SCHEMA, finalResponse, jsonRecords, nativeLog, requireClaudeResponseProtocol, validateClaudeResponseLaunch, validateClaudeStructuredResponse };
+module.exports = { CLAUDE_RESPONSE_PROTOCOL, CLAUDE_RESPONSE_SCHEMA, codexSessionTranscript, googleSessionTranscript, finalResponse, jsonRecords, nativeLog, requireClaudeResponseProtocol, validateClaudeResponseLaunch, validateClaudeStructuredResponse };

@@ -6,6 +6,7 @@ const path = require('node:path');
 const { inspectBrief, pointerText } = require('./cli-pointer.js');
 const { resolveVendorBinary } = require('./vendor-binaries.js');
 const { CLAUDE_RESPONSE_PROTOCOL, CLAUDE_RESPONSE_SCHEMA } = require('./vendor-native.js');
+const { validateEvidenceReadDirs } = require('./evidence-read-access.js');
 
 const DEFAULTS = Object.freeze({
   openai: { model: 'gpt-5.6-sol', effort: 'high' },
@@ -20,10 +21,10 @@ function roleSandbox(role) {
   throw new Error(`invalid role: ${role}`);
 }
 
-function extraReadDirs(opts, env) {
+function extraReadDirs(opts) {
   if (opts.evidenceReadDirs === undefined) return [];
   if (!Array.isArray(opts.evidenceReadDirs)) throw new Error('evidenceReadDirs must be an array');
-  return opts.evidenceReadDirs.map((dir) => allowedWorkspace(dir, env));
+  return validateEvidenceReadDirs(opts);
 }
 
 function windowsUnder(candidate, root) {
@@ -32,11 +33,16 @@ function windowsUnder(candidate, root) {
   return c === r || c.startsWith(`${r}\\`);
 }
 
+function hostResolve(file) {
+  if (process.platform === 'win32' || /^[A-Za-z]:[\\/]/.test(file) || file.startsWith('\\\\')) return path.win32.resolve(file);
+  return path.resolve(file);
+}
+
 function allowedWorkspace(cwd, env = process.env) {
   const devRoot = env.MAGI_DEV_ROOT || 'C:\\src';
   const roots = [devRoot, ...(env.MAGI_ALLOWED_WORKSPACE_ROOTS || '').split(';').filter(Boolean)];
-  const resolved = path.win32.resolve(cwd);
-  if (!roots.some((root) => windowsUnder(resolved, root))) {
+  const resolved = hostResolve(cwd);
+  if (!roots.some((root) => windowsUnder(cwd, root) || windowsUnder(resolved, root))) {
     const error = new Error(`workspace ${resolved} is outside MAGI allowed roots: ${roots.join(', ')}`);
     error.code = 'WORKSPACE_FORBIDDEN';
     throw error;
@@ -53,12 +59,14 @@ function base(opts) {
   const brief = inspectBrief(opts.briefPath);
   return {
     brief,
+    vendor: opts.vendor,
     cwd: allowedWorkspace(opts.cwd, opts.env || process.env),
     model: opts.model || DEFAULTS[opts.vendor].model,
     effort: opts.effort || DEFAULTS[opts.vendor].effort,
     role: opts.role,
     seatContractPath: path.resolve(opts.seatContractPath),
     skillRoot: path.resolve(opts.skillRoot),
+    evidenceReadDirs: extraReadDirs(opts),
   };
 }
 
@@ -69,11 +77,15 @@ function subscriptionEnv(source = process.env) {
 }
 
 function seatContextText(ctx) {
-  return `Read ${ctx.seatContractPath} in full before doing any task work. Complete every required instruction read in that contract before product work. If any required instruction is missing or unreadable, stop and report a blocker. Use only the MAGI-authorized staged skills listed there. The user delegated the task and report format to this bound brief and contract. Native permissions still apply. Your FINAL response must start with the brief's exact first line. Read that line from the bound brief. Do not put a status sentence, introduction, Markdown decoration or confirmation request before that line. Then follow the brief's response format.`;
+  return `Read ${ctx.seatContractPath} in full before doing any task work. Complete every required instruction read in that contract before product work. Do not read global skills or use other tools before that coverage. If any required instruction is missing or unreadable, stop and report a blocker. Use only the MAGI-authorized staged skills listed there. Native permissions still apply. Your FINAL response must start with the brief's exact first line, with nothing before it. Then follow the brief's response format.`;
 }
 
 function seatPointerText(ctx) {
-  const text = `${pointerText(ctx.brief).trim()} ${seatContextText(ctx)}`;
+  const command = { cmd: `Get-Content -Raw -LiteralPath '${ctx.seatContractPath.replaceAll("'", "''")}' -Encoding UTF8`, workdir: ctx.cwd, max_output_tokens: 10000 };
+  const recipe = ctx.vendor === 'openai'
+    ? `FIRST use the exec code tool with exactly this JavaScript: const r = await tools.exec_command(${JSON.stringify(command)}); text(r.output); Then use the exact one-file read recipes in that contract. `
+    : '';
+  const text = `${recipe}${pointerText(ctx.brief).trim()} ${seatContextText(ctx)}`;
   if (text.length + 1 > 2000) throw Object.assign(new Error('seat pointer exceeds the 2000-character delivery limit'), { code: 'POINTER_FAIL' });
   return text;
 }
@@ -99,6 +111,7 @@ function openaiLaunch(opts) {
     ],
     cwd: ctx.cwd, env: subscriptionEnv(opts.env), stdinFile: pointerFile, stdio: ['pipe', 'pipe', 'pipe'],
     pointerFile, requestedSandbox: roleSandbox(ctx.role), skillRoot: ctx.skillRoot, seatContractPath: ctx.seatContractPath,
+    ...(ctx.evidenceReadDirs.length ? { evidenceReadDirs: ctx.evidenceReadDirs } : {}),
   };
 }
 
@@ -107,9 +120,9 @@ function googleLaunch(opts) {
   const env = { ...subscriptionEnv(opts.env), AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
   for (const key of ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENAI_USE_VERTEXAI', 'GOOGLE_APPLICATION_CREDENTIALS', 'CLAUDECODE', 'SYNARA_ANTIGRAVITY_EVENTS', 'SYNARA_ANTIGRAVITY_HOOK_DECISION']) delete env[key];
   const nativeLogPath = path.join(path.dirname(opts.capturePath || ctx.seatContractPath), 'native-cli.log');
-  const args = ['--model', ctx.model, '--output-format', 'json', '--print-timeout', '20m', '--log-file', nativeLogPath];
+  const args = ['--model', ctx.model, '--disable-slash-commands', '--output-format', 'json', '--print-timeout', '20m', '--log-file', nativeLogPath];
   if (ctx.role === 'implement') args.push('--dangerously-skip-permissions'); else args.push('--sandbox');
-  const addDirs = [ctx.cwd, path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath), ...extraReadDirs(opts, opts.env || process.env)];
+  const addDirs = [ctx.cwd, path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath), ...ctx.evidenceReadDirs];
   if (opts.rulesRoot) addDirs.push(opts.rulesRoot);
   for (const dir of [...new Set(addDirs)]) args.push('--add-dir', dir);
   args.push('-p', seatPointerText(ctx));
@@ -117,6 +130,7 @@ function googleLaunch(opts) {
     vendor: 'google', role: ctx.role, model: ctx.model, effort: null,
     binary: resolveVendorBinary('google', { env: opts.env, home: opts.home, mustExist: opts.mustExistBinary !== false }),
     args, env, cwd: ctx.cwd, stdio: ['ignore', 'pipe', 'pipe'], nativeLogPath, skillRoot: ctx.skillRoot, seatContractPath: ctx.seatContractPath,
+    ...(ctx.evidenceReadDirs.length ? { evidenceReadDirs: ctx.evidenceReadDirs } : {}),
   };
 }
 
@@ -134,7 +148,7 @@ function anthropicLaunch(opts) {
   // Append to the native system prompt; never replace its permission controls.
   args.push('--append-system-prompt', seatContextText(ctx));
   if (ctx.role !== 'implement') args.push('--tools', 'Read,Glob,Grep', '--allowedTools', 'Read,Glob,Grep');
-  const addDirs = [path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath), ...extraReadDirs(opts, opts.env || process.env)];
+  const addDirs = [path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath), ...ctx.evidenceReadDirs];
   if (opts.rulesRoot) addDirs.push(opts.rulesRoot);
   for (const dir of [...new Set(addDirs)]) {
     if (path.win32.resolve(dir).toLowerCase() !== ctx.cwd.toLowerCase()) args.push('--add-dir', dir);
@@ -145,6 +159,7 @@ function anthropicLaunch(opts) {
     binary: resolveVendorBinary('anthropic', { env: opts.env, home: opts.home, mustExist: opts.mustExistBinary !== false }),
     args, cwd: ctx.cwd, env: subscriptionEnv(opts.env), stdinFile: pointerFile, stdio: ['pipe', 'pipe', 'pipe'], permissionMode,
     skillRoot: ctx.skillRoot, seatContractPath: ctx.seatContractPath,
+    ...(ctx.evidenceReadDirs.length ? { evidenceReadDirs: ctx.evidenceReadDirs } : {}),
   };
 }
 
