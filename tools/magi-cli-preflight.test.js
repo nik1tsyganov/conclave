@@ -314,7 +314,8 @@ test('Windows state uses CODEX_HOME instead of the default home', t => {
   const before = snapshot(f.root);
   const result = check(f);
   assert.equal(result.ok, true);
-  assert.equal(result.findings.find(row => row.check === 'sandbox:openai-state').value, overrideFile);
+  assert.equal(result.findings.find(row => row.check === 'sandbox:openai-state').value,
+    path.join(fs.realpathSync.native(f.env.CODEX_HOME), '.sandbox', 'deny_read_acl_state.json'));
   assert.deepEqual(snapshot(f.root), before);
   put(defaultFile, '{}');
   put(overrideFile, Buffer.alloc(22));
