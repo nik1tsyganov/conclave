@@ -32,6 +32,12 @@ test('workspace authorization is project-root based rather than magi-repo based'
   assert.throws(() => allowedWorkspace('D:\\private', fakeBins), /outside MAGI allowed roots/);
 });
 
+test('workspace authorization keeps host-native POSIX paths', { skip: process.platform === 'win32' }, (t) => {
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'magi-posix-ws-')));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  assert.strictEqual(allowedWorkspace(root, { MAGI_DEV_ROOT: root }), path.resolve(root));
+});
+
 test('OpenAI non-implement roles are read-only while implementer is workspace-write', (t) => {
   const f = fixture(t);
   const common = {

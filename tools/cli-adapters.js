@@ -33,11 +33,16 @@ function windowsUnder(candidate, root) {
   return c === r || c.startsWith(`${r}\\`);
 }
 
+function hostResolve(file) {
+  if (process.platform === 'win32' || /^[A-Za-z]:[\\/]/.test(file) || file.startsWith('\\\\')) return path.win32.resolve(file);
+  return path.resolve(file);
+}
+
 function allowedWorkspace(cwd, env = process.env) {
   const devRoot = env.MAGI_DEV_ROOT || 'C:\\src';
   const roots = [devRoot, ...(env.MAGI_ALLOWED_WORKSPACE_ROOTS || '').split(';').filter(Boolean)];
-  const resolved = path.win32.resolve(cwd);
-  if (!roots.some((root) => windowsUnder(resolved, root))) {
+  const resolved = hostResolve(cwd);
+  if (!roots.some((root) => windowsUnder(cwd, root) || windowsUnder(resolved, root))) {
     const error = new Error(`workspace ${resolved} is outside MAGI allowed roots: ${roots.join(', ')}`);
     error.code = 'WORKSPACE_FORBIDDEN';
     throw error;

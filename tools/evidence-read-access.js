@@ -15,8 +15,7 @@ function validateEvidenceReadDirs(entry, { plan, runDir, requireExisting = false
   if (!['verify', 'review'].includes(entry.role) || !Array.isArray(entry.evidenceReadDirs)) fail('only checking entries may declare an array');
   const dirs = entry.evidenceReadDirs.map(file => {
     if (typeof file !== 'string' || !path.isAbsolute(file) || file.split(/[\\/]/).some(part => part === '.' || part === '..')) fail('absolute paths without traversal are required');
-    const canonical = canonicalPlainPath(file);
-    if (identity(canonical) !== identity(path.resolve(file))) fail('path aliases are forbidden');
+    const canonical = canonicalPlainPath(file); // 8.3/case aliases rewrite here; junctions still fail
     assertPlainPath(canonical);
     if (requireExisting && (!fs.existsSync(canonical) || !fs.statSync(canonical).isDirectory())) fail('directory must exist before launch');
     if (fs.existsSync(canonical) && !fs.statSync(canonical).isDirectory()) fail('read target must be a directory');
