@@ -107,6 +107,33 @@ test('valid launch records scope and native evidence; retry returns the same tra
   await assert.rejects(runDispatch(opts, native), /committed evidence changed/);
 });
 
+test('Google native usage total survives committed telemetry, replay, finalization and vault linking', async t => {
+  const run = createSealedRun(t, [{ vendor: 'google', model: 'gemini-3.8-flash-medium', effort: 'fused-medium' }]);
+  const native = fakeVendor();
+  const opts = { ...run.opts, dispatchId: 'd1' };
+  const result = await runDispatch(opts, native);
+  const proof = JSON.parse(fs.readFileSync(path.join(run.runDir, 'out/d1/proof.json')));
+  assert.equal(result.telemetry.totalTokens, proof.usage.total_tokens);
+  assert.equal(result.telemetry.vendorSideTokens, null);
+  assert.deepEqual((await runDispatch(opts, native)).telemetry, result.telemetry);
+  const state = require('./dispatch-evidence.js').verifyCommittedRow(result.telemetry);
+  assert.equal(state.telemetry.totalTokens, 123);
+  assert.equal(inspectRun(run.runDir).executions.length, 1);
+  finalizeRun(run.runDir);
+  const projected = JSON.parse(fs.readFileSync(path.join(run.runDir, 'telemetry.jsonl'), 'utf8').trim());
+  assert.deepEqual(projected, result.telemetry);
+  const vaultRoot = path.join(run.root, 'vault');
+  fs.mkdirSync(path.join(vaultRoot, 'Wiki'), { recursive: true });
+  fs.writeFileSync(path.join(vaultRoot, 'Wiki/Index.md'), '# fixture\n');
+  fs.writeFileSync(path.join(vaultRoot, 'HOW-TO-ADD-DATA.md'), '# fixture\n');
+  const link = require('./magi-vault-link.js').linkRunToVault({ vaultRoot, runDir: run.runDir });
+  assert.deepEqual(JSON.parse(fs.readFileSync(link.telemetryLog, 'utf8').trim()), result.telemetry);
+  assert.equal(link.analysis.captureHealth.tokenPresent, 1);
+  assert.equal(link.analysis.needsAttention, false);
+  assert.equal(link.analysis.globalDistribution.status, 'unmeasured');
+  assert.equal(native.calls(), 1);
+});
+
 test('completed non-Claude replays use launch-time probes while unstarted work still needs fresh probes', async t => {
   for (const entry of [{}, { role: 'review', class: 'review-adversarial', vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', authorVendor: 'openai' }]) {
     const run = createSealedRun(t, [entry]); const unstarted = createSealedRun(t, [entry]);

@@ -614,6 +614,7 @@ async function runDispatch(opts, dependencies = {}) {
     schemaVersion: 2, status: 'PASS', date: now.toISOString().slice(0, 10), dispatchId: opts.dispatchId, unitId: opts.unitId,
     class: opts.class, vendor: opts.vendor, role: opts.role, hostMode: sealed.plan.hostMode, routedBy: 'arbiter', capturedBy: 'lead',
     model: opts.model, modelRequested: opts.model, modelObserved: proof.modelObserved, effort: opts.effort, proofId, vendorSideTokens: proof.vendorSideTokens ?? null,
+    ...(opts.vendor === 'google' ? { totalTokens: proof.usage.total_tokens } : {}),
     authorVendor: opts.authorVendor || null, planId: opts.planId, planHash: opts.planHash, escalation: opts.escalation === true, escalationReason: opts.escalationReason || null,
     transactionPath: transaction.file,
     note: `evidence=${evidenceDir};matrix=v${matrix.schemaVersion};seat-profile=v${seatProfiles.schemaVersion}`,
