@@ -284,6 +284,203 @@ async function interruptedReview(t, entries) {
   return { run, opts, deps, request, originalFile, transcriptPath };
 }
 
+async function failedRecovery(t, entries) {
+  const f = await interruptedReview(t, entries);
+  const prepared = await runDispatch({ ...f.opts, prepareRecovery: f.request }, f.deps);
+  const native = fakeVendor(() => {}, 'Cannot read instructions.');
+  native.buildLaunch = opts => ({ ...opts, ...require('./cli-adapters.js').openaiLaunch({ ...opts, env: { ...native.env, MAGI_CODEX_BIN: process.execPath } }) });
+  const collect = native.codexSessionTranscript;
+  native.codexSessionTranscript = id => {
+    const transcript = collect(id);
+    const rows = [{ type: 'session_meta', payload: { id, cwd: f.run.cwd } },
+      { type: 'response_item', payload: { type: 'message', role: 'assistant', phase: 'final', content: [{ type: 'output_text', text: 'Cannot read instructions.' }] } },
+      { type: 'event_msg', payload: { type: 'task_complete' } }];
+    transcript.text = rows.map(JSON.stringify).join('\n') + '\n';
+    fs.writeFileSync(transcript.path, transcript.text);
+    return transcript;
+  };
+  const launch = native.runLaunch;
+  native.runLaunch = async (spec, options) => { fs.writeFileSync(options.pidFile, '123456789\n'); return launch(spec, options); };
+  await assert.rejects(runDispatch({ ...f.opts, recoverInterrupted: f.request, recoverySha256: prepared.recoverySha256 },
+    { ...f.deps, ...native, assertInterruptedChildStopped: f.deps.assertInterruptedChildStopped }), /instruction|read/i);
+  f.first = require('./dispatch-evidence.js').recoveryPaths(f.run.runDir, f.run.dispatches.at(-1));
+  f.secondRequest = path.join(f.run.root, 'recovery-request-2.json');
+  f.firstRequestSha256 = prepared.recoverySha256;
+  const observed = require('./test-fixtures.js').probeRecord(path.join(f.run.root, 'retry-probes'), 'openai', 'gpt-5.6-sol', 'high');
+  f.opts.availability = path.join(f.run.root, 'retry-availability.json');
+  writeJson(f.opts.availability, { vendors: { openai: { models: { 'gpt-5.6-sol': { efforts: { high: observed } } } } } });
+  return f;
+}
+
+test('explicit second recovery prepares after a completed clean failed predecessor', async t => {
+  const f = await failedRecovery(t);
+  const prepared = await runDispatch({ ...f.opts, prepareRecovery: f.secondRequest, recoveryAttempt: '2' }, f.deps);
+  assert.equal(prepared.status, 'RECOVERY_PREPARED');
+  const manifest = JSON.parse(fs.readFileSync(f.secondRequest));
+  assert.equal(manifest.attempt, 2);
+  assert.equal(manifest.previousAttempt.failureCode, 'INSTRUCTION_READ_FAIL');
+  const evidence = require('./dispatch-evidence.js');
+  const original = fs.readFileSync(f.originalFile);
+  const first = evidence.snapshotWorkspace(f.first.root);
+  const native = fakeVendor();
+  const options = { ...f.opts, recoverInterrupted: f.secondRequest, recoverySha256: prepared.recoverySha256 };
+  const result = await runDispatch(options, { ...f.deps, ...native, assertInterruptedChildStopped: f.deps.assertInterruptedChildStopped });
+  assert.equal(result.ok, true); assert.equal(native.calls(), 1);
+  assert.deepEqual(fs.readFileSync(f.originalFile), original);
+  assert.deepEqual(evidence.snapshotWorkspace(f.first.root), first);
+  const inspected = inspectRun(f.run.runDir);
+  assert.equal(inspected.outcomes[0].status, 'PASS'); assert.equal(inspected.executions.length, 1);
+  assert.equal(inspected.outcomes[0].failedRecoveryAttempt.failureCode, 'INSTRUCTION_READ_FAIL');
+  await assert.rejects(runDispatch({ ...f.opts, recoverInterrupted: f.request, recoverySha256: f.firstRequestSha256 }, native), /do not relaunch/);
+  await assert.rejects(runDispatch({ ...f.run.opts, dispatchId: 'd1' }, native), /RUNNING/);
+  const now = Date.now;
+  Date.now = () => now() + 2 * 60 * 60 * 1000;
+  try { assert.equal((await runDispatch(options, native)).replayed, true); }
+  finally { Date.now = now; }
+  assert.equal(native.calls(), 1);
+});
+
+test('second recovery rejects ineligible predecessor states and incomplete native completion', async t => {
+  for (const fault of ['RUNNING', 'PASS', 'unknown', 'incomplete', 'bad-scope', 'no-terminal', 'no-final', 'no-native', 'bad-lineage', 'old-probe', 'wrong-route', 'live', 'unknown-child']) {
+    const f = await failedRecovery(t);
+    const state = JSON.parse(fs.readFileSync(f.first.transactionPath));
+    if (['RUNNING', 'PASS', 'unknown'].includes(fault)) state.status = fault;
+    if (fault === 'incomplete') state.scopeAudit.exitConfirmed = false;
+    if (fault === 'bad-scope') state.scopeAudit.ok = false;
+    if (fault === 'bad-lineage') state.recoverySha256 = '0'.repeat(64);
+    if (['RUNNING', 'PASS', 'unknown', 'incomplete', 'bad-scope', 'bad-lineage'].includes(fault)) writeJson(f.first.transactionPath, state);
+    if (fault.startsWith('no-')) {
+      const bindingPath = path.join(state.evidenceDir, 'instruction-transcript.json');
+      const binding = JSON.parse(fs.readFileSync(bindingPath));
+      if (fault === 'no-native') fs.unlinkSync(binding.sourcePath);
+      else {
+        const rows = fs.readFileSync(binding.sourcePath, 'utf8').trim().split('\n').map(JSON.parse)
+          .filter(row => fault === 'no-terminal' ? row.type !== 'event_msg' : row.type !== 'response_item');
+        const text = rows.map(JSON.stringify).join('\n') + '\n';
+        fs.writeFileSync(binding.sourcePath, text); fs.writeFileSync(path.join(state.evidenceDir, 'native-instructions.jsonl'), text);
+        binding.sha256 = require('./dispatch-evidence.js').hash(text); writeJson(bindingPath, binding);
+      }
+    }
+    if (fault === 'old-probe') f.opts.availability = f.run.availability;
+    if (fault === 'wrong-route') {
+      const observed = require('./test-fixtures.js').probeRecord(path.join(f.run.root, 'wrong-route'), 'openai', 'gpt-5.6-sol', 'medium');
+      writeJson(f.opts.availability, { vendors: { openai: { models: { 'gpt-5.6-sol': observed } } } });
+    }
+    if (fault === 'live' || fault === 'unknown-child') f.deps.assertInterruptedChildStopped = (_pid, _launch, dir) => {
+      if (dir === state.evidenceDir) throw new Error(fault);
+      return { pid: 123456789, status: 'ABSENT' };
+    };
+    await assert.rejects(runDispatch({ ...f.opts, prepareRecovery: f.secondRequest, recoveryAttempt: 2 }, f.deps), undefined, fault);
+    assert.equal(f.deps.calls(), 0, fault);
+  }
+});
+
+test('second recovery rechecks frozen lineage, process absence and probe before launch', async t => {
+  for (const fault of ['original', 'predecessor', 'first-manifest', 'first-native', 'product', 'instruction', 'request', 'probe', 'stale', 'live', 'unknown', 'late-live', 'staged-manifest', 'duplicate', 'extra-directory']) {
+    const f = await failedRecovery(t);
+    const prepared = await runDispatch({ ...f.opts, prepareRecovery: f.secondRequest, recoveryAttempt: 2 }, f.deps);
+    const manifest = JSON.parse(fs.readFileSync(f.secondRequest));
+    const files = { original: f.originalFile, predecessor: f.first.transactionPath, 'first-manifest': f.first.manifestPath,
+      'first-native': manifest.previousAttempt.native.path, product: path.join(f.run.cwd, 'drift.txt'), instruction: path.join(f.run.opts.rulesRoot, 'STANDING.md'), request: f.secondRequest, probe: f.opts.availability };
+    if (files[fault]) fs.appendFileSync(files[fault], '\n');
+    if (fault === 'live' || fault === 'unknown') f.deps.assertInterruptedChildStopped = (_pid, _launch, dir) => {
+      if (dir === manifest.previousAttempt.evidenceDir) throw new Error(fault);
+      return { pid: 123456789, status: 'ABSENT' };
+    };
+    if (fault === 'late-live') {
+      let checked = 0;
+      f.deps.assertInterruptedChildStopped = (_pid, _launch, dir) => {
+        if (dir === manifest.previousAttempt.evidenceDir && ++checked > 1) throw new Error('predecessor became live before launch');
+        return { pid: 123456789, status: 'ABSENT' };
+      };
+    }
+    if (fault === 'staged-manifest') {
+      const build = f.deps.buildLaunch;
+      f.deps.buildLaunch = spec => {
+        fs.appendFileSync(path.join(path.dirname(manifest.transactionPath), 'recovery.json'), '\n');
+        return build(spec);
+      };
+    }
+    if (fault === 'duplicate') fs.mkdirSync(path.dirname(manifest.transactionPath));
+    if (fault === 'extra-directory') fs.mkdirSync(f.first.root + '.3');
+    const now = Date.now;
+    if (fault === 'stale') Date.now = () => now() + 2 * 60 * 60 * 1000;
+    try { await assert.rejects(runDispatch({ ...f.opts, recoverInterrupted: f.secondRequest, recoverySha256: prepared.recoverySha256 }, f.deps), undefined, fault); }
+    finally { Date.now = now; }
+    assert.equal(f.deps.calls(), 0, fault);
+  }
+});
+
+test('recovery ordinal is explicit, bounded, and prepare-only', async t => {
+  const f = await interruptedReview(t);
+  const { recoveryPaths } = require('./dispatch-evidence.js');
+  for (const attempt of [0, 3, -1, '2']) assert.throws(() => recoveryPaths(f.run.runDir, f.run.dispatches[0], attempt));
+  for (const recoveryAttempt of ['0', '3', '2.0', 'bogus']) {
+    await assert.rejects(runDispatch({ ...f.opts, prepareRecovery: f.request, recoveryAttempt }, f.deps), /ordinal 1 or 2/);
+  }
+  await assert.rejects(runDispatch({ ...f.opts, recoveryAttempt: 2 }, f.deps), /requires prepare-recovery/);
+  await assert.rejects(runDispatch({ ...f.opts, prepareRecovery: f.request, recoveryAttempt: 2 }, f.deps), /valid first recovery lineage/);
+  assert.equal(f.deps.calls(), 0);
+});
+
+test('second recovery forbids both earlier native IDs and a concurrent second launch', async t => {
+  for (const previous of ['original', 'previousAttempt']) {
+    const f = await failedRecovery(t);
+    const prepared = await runDispatch({ ...f.opts, prepareRecovery: f.secondRequest, recoveryAttempt: 2 }, f.deps);
+    const manifest = JSON.parse(fs.readFileSync(f.secondRequest));
+    const native = fakeVendor(); const launch = native.runLaunch;
+    native.runLaunch = async spec => {
+      const result = await launch(spec);
+      result.stderr = result.stderr.replace(/^session id: .*$/m, `session id: ${manifest[previous].native.sessionId}`);
+      return result;
+    };
+    await assert.rejects(runDispatch({ ...f.opts, recoverInterrupted: f.secondRequest, recoverySha256: prepared.recoverySha256 },
+      { ...f.deps, ...native, assertInterruptedChildStopped: f.deps.assertInterruptedChildStopped }), /reused an earlier native session/);
+    assert.equal(native.calls(), 1);
+  }
+  const f = await failedRecovery(t);
+  const prepared = await runDispatch({ ...f.opts, prepareRecovery: f.secondRequest, recoveryAttempt: 2 }, f.deps);
+  const opts = { ...f.opts, recoverInterrupted: f.secondRequest, recoverySha256: prepared.recoverySha256 };
+  const native = fakeVendor(); const launch = native.runLaunch;
+  let entered, release;
+  const ready = new Promise(resolve => { entered = resolve; });
+  const pending = new Promise(resolve => { release = resolve; });
+  native.runLaunch = async spec => { entered(); await pending; return launch(spec); };
+  const running = runDispatch(opts, { ...f.deps, ...native, assertInterruptedChildStopped: f.deps.assertInterruptedChildStopped });
+  await ready;
+  await assert.rejects(runDispatch(opts, native), /do not relaunch/);
+  release(); assert.equal((await running).ok, true); assert.equal(native.calls(), 1);
+});
+
+test('second recovery finalization and activation retain six logical entries and reject missing lineage', async t => {
+  const f = await failedRecovery(t, [
+    ...Array.from({ length: 3 }, () => ({ role: 'plan', class: 'architecture-planning', model: 'gpt-5.6-sol', effort: 'high' })),
+    { unitId: 'product', vendor: 'google', model: 'gemini-3.8-flash-medium', effort: 'fused-medium' },
+    { unitId: 'product', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'sonnet', effort: 'medium', authorVendor: 'google' },
+    { unitId: 'product', role: 'review', class: 'review-adversarial', model: 'gpt-5.6-sol', effort: 'high', authorVendor: 'google' },
+  ]);
+  const evidence = require('./dispatch-evidence.js');
+  const originals = evidence.snapshotWorkspace(path.join(f.run.runDir, '.magi-dispatches'));
+  const originalOutput = evidence.snapshotWorkspace(path.join(f.run.runDir, 'out'));
+  const first = evidence.snapshotWorkspace(f.first.root);
+  const prepared = await runDispatch({ ...f.opts, prepareRecovery: f.secondRequest, recoveryAttempt: 2 }, f.deps);
+  await runDispatch({ ...f.opts, recoverInterrupted: f.secondRequest, recoverySha256: prepared.recoverySha256 },
+    { ...f.deps, ...fakeVendor(), assertInterruptedChildStopped: f.deps.assertInterruptedChildStopped });
+  const final = finalizeRun(f.run.runDir);
+  assert.equal(final.ok, true); assert.equal(final.outcomes.length, 6); assert.equal(inspectRun(f.run.runDir).executions.length, 6);
+  assert.deepEqual(evidence.snapshotWorkspace(path.join(f.run.runDir, '.magi-dispatches')), originals);
+  assert.deepEqual(evidence.snapshotWorkspace(path.join(f.run.runDir, 'out')), originalOutput);
+  assert.deepEqual(evidence.snapshotWorkspace(f.first.root), first);
+  const activation = () => require('node:child_process').spawnSync(process.execPath, [path.join(__dirname, 'activation-check.js'), path.join(f.run.runDir, 'magi-dispatch-log.jsonl')], { encoding: 'utf8', windowsHide: true });
+  assert.equal(activation().status, 0);
+  const saved = fs.readFileSync(f.first.manifestPath); fs.unlinkSync(f.first.manifestPath);
+  assert.equal(inspectRun(f.run.runDir).outcomes.at(-1).status, 'INVALID'); assert.notEqual(activation().status, 0);
+  fs.writeFileSync(f.first.manifestPath, saved);
+  const second = evidence.recoveryPaths(f.run.runDir, f.run.dispatches.at(-1), 2);
+  const state = JSON.parse(fs.readFileSync(second.transactionPath)); state.recoverySha256 = 'f'.repeat(64); writeJson(second.transactionPath, state);
+  assert.equal(inspectRun(f.run.runDir).outcomes.at(-1).status, 'INVALID'); assert.notEqual(activation().status, 0);
+});
+
 test('interrupted read-only recovery preserves the first attempt and credits one fresh replacement', async t => {
   const f = await interruptedReview(t);
   const original = fs.readFileSync(f.originalFile);

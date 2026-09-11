@@ -118,10 +118,11 @@ function interruptedSnapshot(run, entry, dependencies = {}) {
 }
 
 function verifyRecoveryManifest(run, entry, manifest, { nowMs, dependencies = {} } = {}) {
-  const paths = recoveryPaths(run.root, entry);
+  const second = manifest.schemaVersion === 2;
+  const paths = recoveryPaths(run.root, entry, second ? manifest.attempt : 1);
   const { schemaVersion, protocol, planId, planHash, entry: savedEntry, attemptRoot, transactionPath, preparedAt, original, availability, stopped } = manifest;
-  same(Object.keys(manifest).sort(), ['schemaVersion', 'protocol', 'planId', 'planHash', 'entry', 'attemptRoot', 'transactionPath', 'preparedAt', 'original', 'availability', 'stopped'].sort(), 'recovery manifest fields');
-  if (schemaVersion !== 1 || protocol !== RECOVERY_PROTOCOL || planId !== run.plan.planId || planHash !== run.seal.planHash || attemptRoot !== paths.attemptRoot || transactionPath !== paths.transactionPath || !Number.isFinite(Date.parse(preparedAt))) throw new Error('recovery manifest identity changed');
+  same(Object.keys(manifest).sort(), ['schemaVersion', 'protocol', 'planId', 'planHash', 'entry', 'attemptRoot', 'transactionPath', 'preparedAt', 'original', 'availability', 'stopped', ...(second ? ['attempt', 'previousAttempt', 'previousStopped'] : [])].sort(), 'recovery manifest fields');
+  if ((second ? manifest.attempt !== 2 : schemaVersion !== 1) || protocol !== RECOVERY_PROTOCOL || planId !== run.plan.planId || planHash !== run.seal.planHash || attemptRoot !== paths.attemptRoot || transactionPath !== paths.transactionPath || !Number.isFinite(Date.parse(preparedAt))) throw new Error('recovery manifest identity changed');
   same(savedEntry, entry, 'recovery plan entry');
   const originalNative = original?.native;
   if (!originalNative || !path.isAbsolute(originalNative.path || '')) throw new Error('recovery native transcript path is missing');
@@ -134,11 +135,19 @@ function verifyRecoveryManifest(run, entry, manifest, { nowMs, dependencies = {}
   assertPlainPath(availability.path);
   const route = routeAllowed(run.matrix, entry, loadAvailability(availability.path), nowMs ?? Date.parse(preparedAt));
   if (!route.ok) throw new Error(route.reason);
+  if (second) {
+    same(manifest.previousAttempt, failedRecoverySnapshot(run, entry), 'recovery frozen failed predecessor');
+    if (manifest.previousStopped?.status !== 'ABSENT' || manifest.previousStopped.pid !== manifest.previousAttempt.pid) throw new Error('recovery has no predecessor stopped-child evidence');
+    const model = loadAvailability(availability.path).vendors?.[entry.vendor]?.models?.[entry.model];
+    const observed = model?.efforts?.[entry.effort] || model;
+    if (!(Date.parse(observed?.observedAt) > Date.parse(manifest.previousAttempt.completedAt))) throw new Error('second recovery requires a probe after the failed predecessor');
+  }
   return paths;
 }
 
-function resolveRecovery(run, entry, original) {
-  const paths = recoveryPaths(run.root, entry);
+// Validate one record without selecting or recursively resolving another attempt.
+function recoveryRecord(run, entry, original, attempt) {
+  const paths = recoveryPaths(run.root, entry, attempt);
   if (!fs.existsSync(paths.root)) return null;
   assertPlainPath(paths.root);
   if (fs.readdirSync(paths.root).some(name => !['recovery.json', 'transaction.json', 'attempt'].includes(name))) throw new Error('unexpected or duplicate recovery attempt');
@@ -148,12 +157,84 @@ function resolveRecovery(run, entry, original) {
   if (!fs.existsSync(paths.manifestPath) || !fs.existsSync(paths.transactionPath)) throw new Error('recovery lineage is missing or incomplete');
   const manifest = readJson(paths.manifestPath);
   const state = readJson(paths.transactionPath);
+  same(state.entry, entry, 'replacement transaction entry');
+  if (state.planHash !== run.seal.planHash || state.planId !== run.plan.planId || state.requestHash !== hash(JSON.stringify({ planHash: run.seal.planHash, entry }))) throw new Error('replacement transaction identity changed');
+  if ((manifest.schemaVersion === 2 ? manifest.attempt : 1) !== attempt) throw new Error('recovery ordinal disagrees with location');
   verifyRecoveryManifest(run, entry, manifest, { nowMs: Date.parse(state.startedAt) });
   if (state.recoverySha256 !== hashFile(paths.manifestPath) || state.evidenceDir !== path.join(paths.attemptRoot, 'out', entry.dispatchId) ||
       !Number.isFinite(Date.parse(state.startedAt)) || Date.parse(state.startedAt) < Date.parse(manifest.preparedAt)) throw new Error('replacement transaction has missing or changed recovery lineage');
   if (!['RUNNING', 'PASS', 'FAIL'].includes(state.status)) throw new Error('unsupported replacement transaction status');
   if (state.receipt?.completedAt && Date.parse(state.receipt.completedAt) < Date.parse(state.startedAt)) throw new Error('replacement completion precedes launch');
   return { ...paths, manifest, state };
+}
+
+function failedRecoverySnapshot(run, entry) {
+  const original = readJson(path.join(run.root, '.magi-dispatches', `${transactionKey(entry)}.json`));
+  const first = recoveryRecord(run, entry, original, 1);
+  if (!first || first.manifest.schemaVersion !== 1) throw new Error('second recovery requires valid first recovery lineage');
+  const state = first.state;
+  if (state.status !== 'FAIL' || state.receipt || state.telemetry || !Number.isFinite(Date.parse(state.completedAt)) || Date.parse(state.completedAt) < Date.parse(state.startedAt) ||
+      !state.code || state.code === 'CHILD_EXIT_UNCONFIRMED' || state.scopeAudit?.ok !== true || state.scopeAudit.incomplete || state.scopeAudit.exitConfirmed === false || state.scopeAudit.gitChanged || state.scopeAudit.changedFiles?.length !== 0) throw new Error('second recovery requires a terminal clean failed predecessor');
+  const artifact = name => path.join(state.evidenceDir, name);
+  const launch = readJson(artifact('launch.json'));
+  same(launch.planEntry, entry, 'failed predecessor entry');
+  if (launch.startedAt !== state.startedAt || launch.recoverySha256 !== state.recoverySha256 || launch.planHash !== run.seal.planHash) throw new Error('failed predecessor launch identity changed');
+  same(readJson(artifact('plan-binding.json')), { planId: run.plan.planId, planHash: run.seal.planHash, entry }, 'failed predecessor plan binding');
+  if (hashFile(artifact('brief/BRIEF.md')) !== entry.briefSha256) throw new Error('failed predecessor brief changed');
+  verifyStagedRules(artifact('brief/BRIEF.md'));
+  const profile = buildSeatProfile(loadProfiles(), entry);
+  same(readJson(artifact('seat-profile.json')), profile, 'failed predecessor seat profile');
+  verifySeatSkills({ destinationRoot: artifact('skills'), skills: profile.skills, manifest: readJson(artifact('skills/skills-manifest.json')) });
+  same(readJson(artifact('receipt-ack.json')), state, 'failed predecessor receipt');
+  same(readJson(artifact('handoff-envelope.json')), state, 'failed predecessor handoff');
+  same(readJson(artifact('scope-audit.json')), state.scopeAudit, 'failed predecessor scope audit');
+  same(readJson(artifact('workspace-before.json')), first.manifest.original.workspace, 'failed predecessor workspace');
+  same(readJson(artifact('workspace-after.json')), first.manifest.original.workspace, 'failed predecessor unchanged workspace');
+  for (const prefix of ['rules', 'skills']) {
+    const before = readJson(artifact(`${prefix}-source-before.json`));
+    same(readJson(artifact(`${prefix}-source-after.json`)), before, 'failed predecessor instruction inventory');
+    for (const snapshot of prefix === 'rules' ? [before] : Object.values(before)) {
+      if (!compareWorkspace(snapshot, snapshotWorkspace(snapshot.root), []).ok) throw new Error('failed predecessor instruction source changed');
+    }
+  }
+  if (entry.evidenceReadDirs?.length) {
+    same(readJson(artifact('evidence-reads-before.json')), first.manifest.original.evidenceReads, 'failed predecessor evidence inputs');
+    same(readJson(artifact('evidence-reads-after.json')), first.manifest.original.evidenceReads, 'failed predecessor unchanged evidence inputs');
+  }
+  const capture = fs.readFileSync(artifact('capture.txt'), 'utf8');
+  if (!capture.trim()) throw new Error('failed predecessor has no completed native output');
+  const proof = verifyProof({ vendor: entry.vendor, capture: artifact('capture.txt'), log: artifact('vendor.log'), expectedModel: entry.model,
+    expectedEffort: entry.effort, expectedSandbox: Object.hasOwn(launch, 'scratchPermissions') ? 'custom permissions' : 'read-only', launch, runDir: first.attemptRoot, dispatchId: entry.dispatchId, expectedRole: entry.role, expectedCwd: entry.cwd });
+  const native = readJson(artifact('instruction-transcript.json'));
+  if (native.sessionId !== proof.sessionId || native.vendor !== 'openai' || !path.isAbsolute(native.sourcePath || '') || native.sessionId === first.manifest.original.native.sessionId) throw new Error('failed predecessor native identity changed');
+  assertPlainPath(native.sourcePath);
+  if (hashFile(native.sourcePath) !== native.sha256 || hashFile(artifact('native-instructions.jsonl')) !== native.sha256) throw new Error('failed predecessor native transcript changed');
+  const rows = fs.readFileSync(native.sourcePath, 'utf8').split(/\r?\n/).filter(Boolean).map(JSON.parse);
+  const sessions = rows.filter(row => row.type === 'session_meta');
+  const finals = rows.filter(row => row.type === 'response_item' && row.payload?.role === 'assistant' && ['final', 'final_answer'].includes(row.payload?.phase));
+  if (sessions.length !== 1 || sessions[0].payload?.id !== native.sessionId || path.resolve(sessions[0].payload.cwd || '') !== path.resolve(entry.cwd) ||
+      !rows.some(row => row.type === 'event_msg' && row.payload?.type === 'task_complete') ||
+      finals.length !== 1) throw new Error('failed predecessor native transcript has no completed terminal output');
+  const finalText = (finals[0].payload.content || []).map(item => item.text || '').join('');
+  if (!finalText.trim() || finalText.trim() !== capture.trim()) throw new Error('failed predecessor terminal output differs from capture');
+  const pidText = fs.readFileSync(artifact('child.pid'), 'utf8').trim();
+  const pid = Number(pidText);
+  if (!/^[1-9][0-9]*$/.test(pidText) || !Number.isSafeInteger(pid)) throw new Error('failed predecessor PID is invalid');
+  return { attempt: 1, manifestPath: first.manifestPath, manifestSha256: hashFile(first.manifestPath), transactionPath: first.transactionPath,
+    transactionSha256: hashFile(first.transactionPath), evidenceDir: state.evidenceDir, evidence: snapshotWorkspace(state.evidenceDir),
+    native: { sessionId: native.sessionId, path: native.sourcePath, sha256: native.sha256 }, pid, completedAt: state.completedAt, failureCode: state.code };
+}
+
+function resolveRecovery(run, entry, original) {
+  const directory = path.join(run.root, '.magi-recoveries');
+  if (!fs.existsSync(directory)) return null;
+  assertPlainPath(directory);
+  const allowed = new Set(run.plan.dispatches.flatMap(item => [transactionKey(item), `${transactionKey(item)}.2`]));
+  if (fs.readdirSync(directory).some(name => !allowed.has(name))) throw new Error('unexpected or duplicate recovery attempt directory');
+  const first = recoveryRecord(run, entry, original, 1);
+  const second = recoveryRecord(run, entry, original, 2);
+  if (second && !first) throw new Error('second recovery is missing first lineage');
+  return second || first;
 }
 
 function verifyPrerequisites(run, entry, before, startedAt) {
@@ -301,7 +382,7 @@ function verifySavedExecution(run, entry, state, pending, allowReceiptProjection
   const response = finalResponse(entry.vendor, fs.readFileSync(artifact('capture.txt'), 'utf8'), { responseProtocol });
   if (response.split(/\r?\n/, 1)[0] !== fs.readFileSync(entry.brief, 'utf8').split(/\r?\n/, 1)[0]) throw new Error('native response has wrong brief acknowledgement');
   const sessionId = proof.sessionId || proof.conversationId;
-  if (recovery && sessionId === recovery.manifest.original.native.sessionId) throw new Error('replacement reused the interrupted native session');
+  if (recovery && [recovery.manifest.original.native.sessionId, recovery.manifest.previousAttempt?.native.sessionId].includes(sessionId)) throw new Error('replacement reused an earlier native session');
   const transcriptText = fs.readFileSync(artifact('native-instructions.jsonl'), 'utf8');
   const transcriptBinding = readJson(artifact('instruction-transcript.json'));
   if (typeof transcriptBinding.sourcePath !== 'string' || !path.isAbsolute(transcriptBinding.sourcePath)) throw new Error('native instruction transcript source is missing');
@@ -402,6 +483,7 @@ function inspectRun(runDir) {
           outcome.interruptedAttempt = { status: state.status, transactionPath: file, evidenceDir: state.evidenceDir,
             nativeSessionId: recovery.manifest.original.native.sessionId };
           outcome.recoveryManifestPath = recovery.manifestPath;
+          if (recovery.manifest.previousAttempt) outcome.failedRecoveryAttempt = recovery.manifest.previousAttempt;
           state = recovery.state;
         }
         if (!['PASS', 'FAIL', 'RUNNING', AWAITING_ATTESTATION].includes(state.status)) throw new Error('unknown transaction status');
@@ -515,4 +597,4 @@ function main(argv = process.argv.slice(2)) {
   } catch (error) { process.stderr.write(`RUN_FINALIZE_FAIL: ${error.message}\n`); return 1; }
 }
 if (require.main === module) process.exitCode = main();
-module.exports = { SEQUENCE_PROTOCOL, assessRun, finalizeRun, inspectRun, interruptedSnapshot, main, nativePosition, resolveRecovery, shouldLinkVault, tallyUnit, validateLogDestinations, verifyCheckpoint, verifyExecution, verifyPrerequisites, verifyRecoveryManifest };
+module.exports = { SEQUENCE_PROTOCOL, assessRun, failedRecoverySnapshot, finalizeRun, inspectRun, interruptedSnapshot, main, nativePosition, resolveRecovery, shouldLinkVault, tallyUnit, validateLogDestinations, verifyCheckpoint, verifyExecution, verifyPrerequisites, verifyRecoveryManifest };

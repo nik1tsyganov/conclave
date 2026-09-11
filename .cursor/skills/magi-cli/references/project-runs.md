@@ -230,10 +230,32 @@ new native session and its own restricted scratch directory. Normal instruction,
 proof, scope, approval, and tally checks still apply.
 
 Missing or terminal original evidence, live or unknown children, drift, and
-incomplete or duplicate recovery lineage stop recovery. A failed or interrupted
-replacement cannot relaunch. A completed replacement can replay without another
-child. Finalization validates both attempts, credits the replacement once, and
-reports the original interruption separately. Preserve both evidence trees.
+incomplete or duplicate recovery lineage stop recovery. The original request
+cannot relaunch a failed or interrupted replacement. A completed replacement can
+replay without another child, including after its probe expires.
+
+One explicit second replacement is supported after a terminal first `FAIL`.
+The first replacement must have completed native final output, a confirmed clean
+scope audit, unchanged inputs, and an absent native child. Capture a new probe
+after that failure, then prepare a separate request:
+
+```powershell
+node tools/dispatch-run.js --plan "$magiRun/dispatch-plan.json" --dispatch-id r2 --prepare-recovery "$magiAttempt/recovery-request-2.json" --recovery-attempt 2 --availability "$magiAttempt/fresh-availability-2.json"
+```
+
+Inspect the new request and its returned SHA-256. It binds both earlier native
+IDs, both stopped-child checks, and the first failure's manifest, transaction,
+native transcript, and evidence hashes. Launch through `--recover-interrupted`
+with this second request and its inspected hash. Do not pass `--recovery-attempt`
+to the launch command. The second folder is `.magi-recoveries/<logical-key>.2/`.
+The first folder and original evidence remain byte-identical. A running,
+successful, incomplete, or unsafe first replacement cannot authorize attempt 2.
+There is no automatic retry or third attempt. The old failed request cannot
+credit the second result.
+
+Finalization validates all histories, credits one selected result per logical
+entry, and reports `interruptedAttempt` and `failedRecoveryAttempt` separately.
+Preserve all three evidence trees.
 
 ## Synara as the outer harness
 

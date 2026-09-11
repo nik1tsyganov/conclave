@@ -85,8 +85,9 @@ function compareWorkspace(before, after, scope = []) {
   return { ok: !gitChanged && changedFiles.every((file) => file.allowed), changedFiles, gitChanged, coverage: after.coverage };
 }
 function transactionKey(entry) { return hash(JSON.stringify([entry.dispatchId, entry.unitId, entry.role])); }
-function recoveryPaths(runRoot, entry) {
-  const root = path.join(runRoot, '.magi-recoveries', transactionKey(entry));
+function recoveryPaths(runRoot, entry, attempt = 1) {
+  if (![1, 2].includes(attempt)) throw evidenceError('recovery attempt must be 1 or 2');
+  const root = path.join(runRoot, '.magi-recoveries', transactionKey(entry) + (attempt === 2 ? '.2' : ''));
   return { root, manifestPath: path.join(root, 'recovery.json'), transactionPath: path.join(root, 'transaction.json'), attemptRoot: path.join(root, 'attempt') };
 }
 function assertInterruptedChildStopped(pid, launch, evidenceDir) {
@@ -148,7 +149,7 @@ function appendUniqueRow(file, row) {
 function committedRunRoot(row) {
   const directory = path.dirname(row.transactionPath);
   if (path.basename(directory) === '.magi-dispatches') return path.dirname(directory);
-  if (path.basename(row.transactionPath) === 'transaction.json' && path.basename(path.dirname(directory)) === '.magi-recoveries' && /^[a-f0-9]{64}$/.test(path.basename(directory))) return path.dirname(path.dirname(directory));
+  if (path.basename(row.transactionPath) === 'transaction.json' && path.basename(path.dirname(directory)) === '.magi-recoveries' && /^[a-f0-9]{64}(\.2)?$/.test(path.basename(directory))) return path.dirname(path.dirname(directory));
   throw evidenceError('committed transaction has an unrecognized run location');
 }
 function verifyCommittedRow(row, { checkLogs = true } = {}) {
