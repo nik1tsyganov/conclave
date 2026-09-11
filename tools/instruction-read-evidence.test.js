@@ -233,6 +233,49 @@ test('Google native view_file batches correlate full content by logical step eve
   assert.equal(reordered.applicationProven, undefined);
 });
 
+test('Google accepts gaps and asynchronous product events only after complete instruction coverage', t => {
+  const f = fixture(t);
+  const reads = googleRows(f);
+  const expected = verify(f, 'google', reads).files;
+  for (const gap of [0, 1, 8]) {
+    const rows = [...reads,
+      { step_index: reads.length + gap, type: 'PLANNER_RESPONSE', source: 'MODEL', status: 'DONE', tool_calls: [{ name: 'run_command', args: { CommandLine: 'node --test' } }] },
+      { step_index: reads.length + gap + 1, type: 'ASYNC_PRODUCT_EVENT', source: 'SYSTEM' },
+      { step_index: reads.length + gap + 3, type: 'GENERIC', source: 'MODEL', status: 'DONE', content: 'Product result' },
+    ];
+    const result = verify(f, 'google', rows);
+    assert.equal(result.status, 'PASS');
+    assert.deepEqual(result.files, expected);
+    assert.equal(verify(f, 'google', [...rows].reverse()).status, 'PASS');
+  }
+});
+
+test('Google rejects a logical gap before the final required read result', t => {
+  const f = fixture(t); const rows = googleRows(f);
+  rows.at(-1).step_index += 1;
+  assert.throws(() => verify(f, 'google', rows), { code: 'INSTRUCTION_READ_FAIL' });
+});
+
+test('Google retains integer and duplicate step safeguards after instruction coverage', t => {
+  const f = fixture(t); const rows = googleRows(f);
+  for (const step_index of [rows.length - 1, -1, 1.5, '100', Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(() => verify(f, 'google', [...rows, { step_index, type: 'GENERIC' }]), { code: 'INSTRUCTION_READ_FAIL' });
+  }
+});
+
+test('Google does not finish coverage while its final required result is missing or invalid', t => {
+  const f = fixture(t);
+  for (const kind of ['missing', 'altered', 'truncated', 'early product']) {
+    const rows = googleRows(f);
+    if (kind === 'missing') rows.pop();
+    if (kind === 'altered') rows.at(-1).content += 'changed';
+    if (kind === 'truncated') rows.at(-1).truncated_fields = ['content'];
+    if (kind === 'early product') rows[rows.length - 1] = { step_index: rows.length - 1, type: 'PLANNER_RESPONSE', tool_calls: [{ name: 'run_command', args: {} }] };
+    rows.push({ step_index: rows.length, type: 'GENERIC', source: 'MODEL', status: 'DONE', content: 'Product output' });
+    assert.throws(() => verify(f, 'google', rows), { code: 'INSTRUCTION_READ_FAIL' });
+  }
+});
+
 for (const [label, mutate] of Object.entries({
   'missing native result': rows => { rows.splice(2, 1); },
   'duplicate logical step': rows => { rows[2].step_index = rows[1].step_index; },

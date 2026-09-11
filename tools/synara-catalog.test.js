@@ -5,8 +5,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { sealPlan } = require('./plan-seal.js');
+const { readSealedRun, sealPlan } = require('./plan-seal.js');
 const { createSealedRun } = require('./test-fixtures.js');
+const { hashFile, writeJson } = require('./dispatch-evidence.js');
 const {
   catalogListsRoute,
   launchOverlay,
@@ -107,10 +108,65 @@ test('plan-seal requires a catalog for synara and rejects banana', (t) => {
     runDir: path.join(run.root, 'synara-run'),
     availability: run.availability,
     synaraCatalog: catalogFile,
+    skillSourceRoot: run.opts.skillSourceRoot,
   });
   assert.ok(sealed.synaraCatalogSha256);
   assert.ok(fs.existsSync(path.join(sealed.runDir, 'synara-catalog.json')));
   assert.equal(loadCatalog(path.join(sealed.runDir, 'synara-catalog.json')).vendorMap.google.provider, 'antigravity');
+});
+
+function astraPlan(t, hostMode) {
+  const run = createSealedRun(t, [{ class: 'debug-mystery', model: 'gpt-6-astra', effort: 'high',
+    escalation: true, escalationReason: 'prior frontier attempt failed the correctness gate' }]);
+  const plan = { ...run.planObject, hostMode };
+  writeJson(run.planSource, plan);
+  const catalog = path.join(run.root, 'capabilities.json');
+  writeJson(catalog, capabilitiesFixture());
+  return { ...run, plan, sealOptions: { plan: run.planSource, runDir: path.join(run.root, 'catalog-run'),
+    availability: run.availability, synaraCatalog: catalog, skillSourceRoot: run.opts.skillSourceRoot } };
+}
+
+test('CLI host catalogs keep native Astra routes and remain hash-bound diagnostics', t => {
+  for (const hostMode of ['synara', 'cursor-cli']) {
+    const run = astraPlan(t, hostMode);
+    const sealed = sealPlan(run.sealOptions);
+    const saved = readSealedRun(sealed.runDir);
+    assert.equal(saved.plan.dispatches[0].model, 'gpt-6-astra');
+    assert.ok(saved.matrix.classes['debug-mystery'].implement.some(route => route.model === 'gpt-6-astra'));
+    assert.equal(saved.seal.synaraCatalogPolicy, 'diagnostic-only-v1');
+    const catalog = path.join(sealed.runDir, 'synara-catalog.json');
+    assert.equal(saved.seal.synaraCatalogSha256, hashFile(catalog));
+    fs.appendFileSync(catalog, '\n');
+    assert.throws(() => readSealedRun(sealed.runDir), /sealed run inputs changed/);
+  }
+});
+
+test('Synara catalog cannot replace fresh matching native proof or Astra escalation', t => {
+  for (const mutation of ['missing', 'stale', 'mismatched', 'escalation']) {
+    const run = astraPlan(t, 'synara');
+    const proof = run.available.vendors.openai.models['gpt-6-astra'].efforts.high;
+    if (mutation === 'missing') delete run.available.vendors.openai.models['gpt-6-astra'];
+    if (mutation === 'stale') proof.observedAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    if (mutation === 'mismatched') proof.observedModel = 'gpt-5.6-sol';
+    if (mutation === 'escalation') delete run.plan.dispatches[0].escalation;
+    writeJson(run.availability, run.available);
+    writeJson(run.planSource, run.plan);
+    assert.throws(() => sealPlan(run.sealOptions), /fresh|proof|observed|available|stale|escalation/i);
+    assert.equal(fs.existsSync(run.sealOptions.runDir), false);
+  }
+});
+
+test('historical catalog seals retain route narrowing and reject unknown catalog policies', t => {
+  const run = astraPlan(t, 'synara');
+  const sealed = sealPlan(run.sealOptions);
+  const file = path.join(sealed.runDir, 'plan-seal.json');
+  const seal = JSON.parse(fs.readFileSync(file, 'utf8'));
+  delete seal.synaraCatalogPolicy;
+  writeJson(file, seal);
+  assert.throws(() => readSealedRun(sealed.runDir), /route not in matrix/);
+  seal.synaraCatalogPolicy = 'unknown-policy';
+  writeJson(file, seal);
+  assert.throws(() => readSealedRun(sealed.runDir), /catalog policy/);
 });
 
 test('synara-catalog CLI imports a capabilities snapshot', () => {

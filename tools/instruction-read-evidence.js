@@ -202,10 +202,15 @@ function googleReadResult(row, call, expected) {
 
 function googleReads(rows, required) {
   const ordered = rows.map((row, index) => ({ row, event: index + 1 })).sort((a, b) => a.row.step_index - b.row.step_index);
-  if (!ordered.length || ordered.some(({ row }, index) => !Number.isSafeInteger(row.step_index) || row.step_index !== index)) fail('Google native step sequence is incomplete or duplicated');
+  if (!ordered.length || ordered.some(({ row }, index) => !Number.isSafeInteger(row.step_index) || row.step_index < 0 ||
+      (index > 0 && row.step_index === ordered[index - 1].row.step_index))) fail('Google native step sequence is invalid or duplicated');
   if (ordered[0].row.type !== 'USER_INPUT' || ordered[0].row.source !== 'USER_EXPLICIT') fail('Google transcript is missing its initial native user input');
   const found = new Map(); let pending = [];
-  for (const { row, event } of ordered) {
+  for (const [index, { row, event }] of ordered.entries()) {
+    // Later product events may have asynchronous step gaps. The instruction
+    // phase must remain contiguous until every required result is delivered.
+    if (found.size === required.size && !pending.length) break;
+    if (row.step_index !== index) fail('Google native instruction step sequence is incomplete');
     if (row.type === 'USER_INPUT') {
       if (row.step_index !== 0 || pending.length) fail('unexpected Google user input during native read sequence');
     } else if (row.type === 'PLANNER_RESPONSE') {

@@ -6,12 +6,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { resolveVendorBinary } = require('./vendor-binaries.js');
-const { subscriptionEnv } = require('./cli-adapters.js');
+const { googleCaptureEnv, subscriptionEnv } = require('./cli-adapters.js');
 const { loadMatrix } = require('./dispatch-matrix.js');
 const { runLaunch } = require('./cli-runner.js');
 const { verifyProof } = require('./cli-proof.js');
 const { finalResponse, nativeLog } = require('./vendor-native.js');
-const { compareWorkspace, hashFile, inside, snapshotWorkspace, writeJson } = require('./dispatch-evidence.js');
+const { assertPlainPath, compareWorkspace, hashFile, inside, snapshotWorkspace, writeJson } = require('./dispatch-evidence.js');
 const { canonicalPlainPath, pathsOverlap, DEFAULT_ROOT } = require('./runtime-paths.js');
 const { challengeMatches } = require('./probe-evidence.js');
 
@@ -39,7 +39,8 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
   const capture = path.join(root, 'capture.txt');
   const log = path.join(root, 'vendor.log');
   const nativeLogPath = vendor === 'google' ? path.join(root, 'native-cli.log') : undefined;
-  const env = { ...subscriptionEnv(), AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
+  const captureIsolation = vendor === 'google' ? googleCaptureEnv(dependencies.env || process.env, root) : null;
+  const env = captureIsolation?.env || { ...subscriptionEnv(), AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
   if (vendor === 'anthropic') {
     const auth = JSON.parse(execFileSync(binary, ['auth', 'status'], { env, encoding: 'utf8', windowsHide: true, timeout: 15000 }));
     if (auth.loggedIn !== true || auth.authMethod !== 'claude.ai') throw new Error('Claude subscription authentication is not available');
@@ -49,12 +50,15 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
   if (vendor === 'openai') args = ['exec', '--skip-git-repo-check', '-s', 'read-only', '-m', model, '-c', `model_reasoning_effort=${effort}`, '-c', 'memories.use_memories=false', '-c', 'memories.generate_memories=false', '-C', work, '-o', capture, '-'];
   if (vendor === 'google') args = ['--model', model, '--sandbox', '--output-format', 'json', '--print-timeout', '2m', '--log-file', nativeLogPath, '--add-dir', work, '-p', prompt];
   if (vendor === 'anthropic') args = ['-p', '--safe-mode', '--model', model, '--effort', effort, '--permission-mode', 'dontAsk', '--tools', '', '--output-format', 'stream-json', '--verbose'];
-  const launch = { vendor, binary, args, env, cwd: work, stdinFile, stdio: vendor === 'google' ? ['ignore', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'] };
+  const captureMetadata = captureIsolation ? { synaraCaptureEventsPath: captureIsolation.eventsPath, synaraCaptureEventsTrust: captureIsolation.trust } : {};
+  const launch = { vendor, binary, args, env, cwd: work, stdinFile, stdio: vendor === 'google' ? ['ignore', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'], ...captureMetadata };
   const startedAt = new Date().toISOString();
-  writeJson(path.join(root, 'launch.json'), { vendor, model, effort, binary, args, cwd: work, startedAt });
+  writeJson(path.join(root, 'launch.json'), { vendor, model, effort, binary, args, cwd: work, startedAt, ...captureMetadata });
+  if (captureIsolation) assertPlainPath(captureIsolation.eventsPath);
   const before = snapshotWorkspace(work);
   try {
   const result = await (dependencies.runLaunch || runLaunch)(launch, { pidFile: path.join(root, 'child.pid'), stdoutFile: path.join(root, 'stdout.log'), stderrFile: path.join(root, 'stderr.log'), maxWallMs });
+  if (captureIsolation) assertPlainPath(captureIsolation.eventsPath);
   const completedAt = new Date().toISOString();
   writeJson(path.join(root, 'process-result.json'), { ...result, stdout: undefined, stderr: undefined, startedAt, completedAt });
   const audit = compareWorkspace(before, snapshotWorkspace(work), []);
@@ -71,6 +75,9 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
   const proof = verifyProof({ vendor, capture, log, expectedModel: model, expectedObservedModel: spec.canonical || model, expectedEffort: effort, expectedSandbox: vendor === 'openai' ? 'read-only' : undefined, onTopic: true });
   if (!challengeMatches(finalResponse(vendor, text), challenge)) throw new Error('probe challenge response mismatch');
   const record = { schemaVersion: 1, status: 'PASS', vendor, requestedModel: model, observedModel: proof.modelObserved, effort, startedAt, completedAt, challenge, capture, log, captureSha256: hashFile(capture), logSha256: hashFile(log), proof };
+  if (captureIsolation && fs.existsSync(captureIsolation.eventsPath)) record.synaraCaptureEvents = {
+    path: captureIsolation.eventsPath, sha256: hashFile(captureIsolation.eventsPath), trust: captureIsolation.trust,
+  };
   writeJson(path.join(root, 'probe.json'), record);
   return { ...record, probeFile: path.join(root, 'probe.json') };
   } catch (error) {

@@ -4,7 +4,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const { buildLaunch } = require('./cli-adapters.js');
+const { GOOGLE_CAPTURE_EVENTS, SYNARA_CAPTURE_TRUST, buildLaunch } = require('./cli-adapters.js');
 const { runLaunch } = require('./cli-runner.js');
 const { DEFAULT_RULES_ROOT, FINGERPRINT_V2, prepareRulesSource, stageRules, verifyStagedRules } = require('./cli-rules-stage.js');
 const { checkBriefFile } = require('./cli-brief-rules-check.js');
@@ -387,6 +387,17 @@ async function runDispatch(opts, dependencies = {}) {
     assertPlainPath(launch.nativeLogPath);
     fs.rmSync(launch.nativeLogPath, { force: true });
   }
+  if (launch.synaraCaptureEventsPath) {
+    const eventsPath = path.join(evidenceDir, GOOGLE_CAPTURE_EVENTS);
+    const captureKeys = Object.keys(launch.env || {}).filter(key => ['SYNARA_ANTIGRAVITY_EVENTS', 'SYNARA_ANTIGRAVITY_HOOK_DECISION'].includes(key.toUpperCase()));
+    if (launch.vendor !== 'google' || launch.synaraCaptureEventsPath !== eventsPath ||
+        launch.synaraCaptureEventsTrust !== SYNARA_CAPTURE_TRUST || captureKeys.length !== 2 ||
+        launch.env.SYNARA_ANTIGRAVITY_EVENTS !== eventsPath || launch.env.SYNARA_ANTIGRAVITY_HOOK_DECISION !== 'allow') {
+      throw new Error('Google capture must use its exact dispatch-local diagnostic path and child environment');
+    }
+    assertPlainPath(eventsPath);
+    fs.rmSync(eventsPath, { force: true });
+  }
   const runtimeFiles = runtimeManifest();
   const runtimeSha256 = hashText(JSON.stringify(runtimeFiles));
   atomicJson(path.join(evidenceDir, 'runtime-manifest.json'), runtimeFiles);
@@ -399,6 +410,8 @@ async function runDispatch(opts, dependencies = {}) {
     class: opts.class, vendor: launch.vendor, role: launch.role, model: opts.model, effort: opts.effort,
     planId: opts.planId, planHash: opts.planHash, planEntry: binding.entry, escalation: opts.escalation === true, escalationReason: opts.escalationReason || null,
     binary: launch.binary, args: launch.args, cwd: launch.cwd, nativeLogPath: launch.nativeLogPath,
+    ...(responseProtocol ? { stdio: launch.stdio, stdinFile: launch.stdinFile } : {}),
+    ...(launch.synaraCaptureEventsPath ? { synaraCaptureEventsPath: launch.synaraCaptureEventsPath, synaraCaptureEventsTrust: SYNARA_CAPTURE_TRUST } : {}),
     responseProtocol,
     instructionReadProtocol: INSTRUCTION_READ_PROTOCOL,
     ...(launch.scratchPermissions ? { scratchPermissions: launch.scratchPermissions, scratchEnv: launch.scratchEnv } : {}),
@@ -427,7 +440,7 @@ async function runDispatch(opts, dependencies = {}) {
   if (JSON.stringify(evidenceReadsBefore) !== JSON.stringify(snapshotEvidenceReads(evidenceReadDirs))) throw policyError('read-only evidence inputs changed before launch');
   if (evidenceReadDirs.length) atomicJson(path.join(evidenceDir, 'evidence-reads-before.json'), evidenceReadsBefore);
   const result = await (dependencies.runLaunch || runLaunch)(launch, { pidFile, stdoutFile: stdoutPath, stderrFile: stderrPath, maxWallMs, signal: dependencies.signal });
-  for (const file of [telemetryLog, activationLog, capturePath, path.join(evidenceDir, 'vendor.log'), transaction.file, path.join(runDir, '.magi-sessions'), ...(launch.nativeLogPath ? [launch.nativeLogPath] : [])]) assertPlainPath(file);
+  for (const file of [telemetryLog, activationLog, capturePath, path.join(evidenceDir, 'vendor.log'), transaction.file, path.join(runDir, '.magi-sessions'), ...(launch.nativeLogPath ? [launch.nativeLogPath] : []), ...(launch.synaraCaptureEventsPath ? [launch.synaraCaptureEventsPath] : [])]) assertPlainPath(file);
   const after = snapshotWorkspace(cwd);
   atomicJson(path.join(evidenceDir, 'workspace-after.json'), after);
   scopeAudit = compareWorkspace(before, after, opts.writeScope);
@@ -541,6 +554,9 @@ async function runDispatch(opts, dependencies = {}) {
   if (evidenceReadDirs.length) artifacts.push(...['evidence-reads-before.json', 'evidence-reads-after.json'].map(name => ({ path: path.join(evidenceDir, name), sha256: hashFile(path.join(evidenceDir, name)) })));
   artifacts.push(...protectedHashes.filter(file => !artifacts.some(item => item.path === file.path)));
   if (launch.nativeLogPath && fs.existsSync(launch.nativeLogPath)) artifacts.push({ path: launch.nativeLogPath, sha256: hashFile(launch.nativeLogPath) });
+  if (launch.synaraCaptureEventsPath && fs.existsSync(launch.synaraCaptureEventsPath)) artifacts.push({
+    path: launch.synaraCaptureEventsPath, sha256: hashFile(launch.synaraCaptureEventsPath), trust: SYNARA_CAPTURE_TRUST,
+  });
   const logs = [...new Set([telemetryLog, activationLog])];
   if (postRun) {
     fs.writeFileSync(path.join(evidenceDir, 'response.txt'), response, 'utf8');

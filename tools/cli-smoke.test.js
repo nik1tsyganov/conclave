@@ -7,7 +7,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { assertGooglePlan, assertNoBodyLeak, assertOpenaiPlan, googlePlanHasSkillsAddDir, main } = require('./cli-smoke.js');
+const { assertClaudePlan, assertGooglePlan, assertNoBodyLeak, assertOpenaiPlan, googlePlanHasSkillsAddDir, main } = require('./cli-smoke.js');
+const { anthropicLaunch } = require('./cli-adapters.js');
 const { buildSeatProfile, loadProfiles } = require('./seat-policy.js');
 const { stageSeatSkills } = require('./cli-skill-stage.js');
 
@@ -145,6 +146,25 @@ test('a modified staged skill fails the diagnostic', async (t) => {
 test('a plan argument carrying the brief body is a leak', () => {
   const body = uniqueBody();
   assert.throws(() => assertNoBodyLeak('google', { args: ['-p', body] }, body), /leaks the brief body into an argument/);
+});
+
+test('Claude smoke verifies positional pointer delivery with ignored stdin and native proof', (t) => {
+  const fixture = stagedBrief(t);
+  const body = fs.readFileSync(fixture.briefPath, 'utf8');
+  const plan = anthropicLaunch({ ...fixture, skillRoot: fixture.staged.root, cwd: fixture.root,
+    role: 'plan', env: { MAGI_DEV_ROOT: fixture.root }, mustExistBinary: false });
+  assertClaudePlan(plan, body);
+  for (const mutate of [
+    row => { row.stdinFile = fixture.briefPath; },
+    row => { row.stdio[0] = 'pipe'; },
+    row => { row.args.splice(-2, 1); },
+    row => { row.args[row.args.length - 1] = body; },
+    row => { row.args[row.args.indexOf('--output-format') + 1] = 'json'; },
+  ]) {
+    const changed = structuredClone(plan);
+    mutate(changed);
+    assert.throws(() => assertClaudePlan(changed, body), /Claude launch|brief body/);
+  }
 });
 
 test('stdin-file contents carrying the brief body are a leak', (t) => {

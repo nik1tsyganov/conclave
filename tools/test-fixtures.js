@@ -96,7 +96,8 @@ function fakeVendor(action = () => {}, response = 'ACK fixture\nPOSITION: APPROV
   let calls = 0;
   const transcripts = new Map();
   const buildLaunch = (opts) => ({ ...opts, vendor: opts.vendor, role: opts.role, binary: process.execPath,
-    args: opts.vendor === 'anthropic' ? ['--json-schema', JSON.stringify(require('./vendor-native.js').CLAUDE_RESPONSE_SCHEMA)] : [],
+    args: opts.vendor === 'anthropic' ? ['-p', '--safe-mode', '--output-format', 'stream-json', '--verbose', '--json-schema', JSON.stringify(require('./vendor-native.js').CLAUDE_RESPONSE_SCHEMA), '--', require('./cli-adapters.js').seatPointerText({ ...opts, brief: require('./cli-pointer.js').inspectBrief(opts.briefPath) })] : [],
+    ...(opts.vendor === 'anthropic' ? { stdio: ['ignore', 'pipe', 'pipe'] } : {}),
     requestedSandbox: opts.requestedSandbox || (opts.role === 'implement' ? 'workspace-write' : 'read-only') });
   const runLaunch = async (launch) => {
     calls++;

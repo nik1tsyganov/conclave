@@ -149,7 +149,7 @@ function verifySavedExecution(run, entry, state, pending, allowReceiptProjection
   if (postRun && [state.attestationProtocol, launch.attestationProtocol, state.receipt.attestationProtocol].some(value => value !== ATTESTATION_PROTOCOL)) throw new Error('missing or unsupported attestation protocol');
   if (postRun && run.seal.attestationProtocol !== undefined && run.seal.attestationProtocol !== ATTESTATION_PROTOCOL) throw new Error('unsupported sealed attestation protocol');
   const responseProtocol = entry.vendor === 'anthropic' ? CLAUDE_RESPONSE_PROTOCOL : undefined;
-  if (responseProtocol) validateClaudeResponseLaunch(launch);
+  if (responseProtocol) validateClaudeResponseLaunch(launch, { historical: true });
   const runtimeSha256 = hash(JSON.stringify(readJson(artifact('runtime-manifest.json'))));
   if (launch.runtimeSha256 !== runtimeSha256 || state.receipt.runtimeSha256 !== runtimeSha256) throw new Error('runtime identity mismatch');
   same(launch.planEntry, entry, 'launch');

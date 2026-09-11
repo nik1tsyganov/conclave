@@ -84,8 +84,13 @@ for (const vendor of ['openai', 'anthropic', 'google']) {
         capturePath: path.join(directory, 'capture.txt'),
         env: source, mustExistBinary: false,
       });
-      assert.equal(Object.keys(launch.env).some(key => prohibited.includes(key.toUpperCase())), false);
-      if (vendor === 'google') assert.equal(launch.args.filter(arg => arg === '--disable-slash-commands').length, 1);
+      const childProhibited = Object.keys(launch.env).filter(key => prohibited.includes(key.toUpperCase()));
+      if (vendor === 'google') {
+        assert.equal(launch.args.filter(arg => arg === '--disable-slash-commands').length, 1);
+        assert.deepEqual(childProhibited.sort(), ['SYNARA_ANTIGRAVITY_EVENTS', 'SYNARA_ANTIGRAVITY_HOOK_DECISION']);
+        assert.equal(launch.env.SYNARA_ANTIGRAVITY_EVENTS, path.join(directory, 'synara-capture-events.jsonl'));
+        assert.equal(launch.env.SYNARA_ANTIGRAVITY_HOOK_DECISION, 'allow');
+      } else assert.deepEqual(childProhibited, []);
       for (const [key, value] of Object.entries(allowed)) assert.equal(launch.env[key], value);
       assert.deepEqual(source, {
         ...allAliases, ...allowed,

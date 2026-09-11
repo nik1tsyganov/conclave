@@ -8,22 +8,43 @@ const GOOGLE_IDENTITY_LINE = /Print mode: starting.*model=|Print mode: conversat
 const CLAUDE_RESPONSE_PROTOCOL = 'claude-structured-response-v1';
 const CLAUDE_RESPONSE_SCHEMA = Object.freeze({
   type: 'object',
-  properties: Object.freeze({ response: Object.freeze({ type: 'string', description: 'The final report, starting with the exact first line of the bound brief.' }) }),
+  properties: Object.freeze({ response: Object.freeze({ type: 'string' }) }),
   required: Object.freeze(['response']),
   additionalProperties: false,
+});
+const LEGACY_CLAUDE_RESPONSE_SCHEMA = JSON.stringify({
+  ...CLAUDE_RESPONSE_SCHEMA,
+  properties: { response: { type: 'string', description: 'The final report, starting with the exact first line of the bound brief.' } },
 });
 
 function responseError(message) { return Object.assign(new Error(message), { code: 'PROOF_FAIL' }); }
 function requireClaudeResponseProtocol(protocol) {
   if (protocol !== CLAUDE_RESPONSE_PROTOCOL) throw responseError('Claude structured response protocol is missing or unsupported');
 }
-function validateClaudeResponseLaunch(launch) {
+function validateClaudeResponseLaunch(launch, { historical = false } = {}) {
   requireClaudeResponseProtocol(launch.responseProtocol);
   const args = launch.args || [];
   const schemaFlags = args.filter(arg => arg === '--json-schema' || String(arg).startsWith('--json-schema='));
+  const schema = args[args.indexOf('--json-schema') + 1];
+  const legacy = historical && schema === LEGACY_CLAUDE_RESPONSE_SCHEMA;
   if (launch.vendor !== 'anthropic' || schemaFlags.length !== 1 || schemaFlags[0] !== '--json-schema' ||
-      args[args.indexOf('--json-schema') + 1] !== JSON.stringify(CLAUDE_RESPONSE_SCHEMA)) {
+      (schema !== JSON.stringify(CLAUDE_RESPONSE_SCHEMA) && !legacy)) {
     throw responseError('Claude launch does not bind the required structured response schema');
+  }
+  // Historical v1 records bound only this exact schema. New launches must also
+  // bind the user prompt channel and native tool-event stream.
+  if (legacy) return;
+  const flags = args.slice(0, -2);
+  const count = name => flags.filter(arg => arg === name || String(arg).startsWith(`${name}=`)).length;
+  if (args.at(-2) !== '--' || args.filter(arg => arg === '--').length !== 1 ||
+      typeof args.at(-1) !== 'string' || !args.at(-1).trim() || args.at(-1).length + 1 > 2000 ||
+      launch.stdinFile !== undefined || !Array.isArray(launch.stdio) || launch.stdio[0] !== 'ignore' ||
+      count('-p') !== 1 || !flags.includes('-p') || count('--print') !== 0 ||
+      count('--safe-mode') !== 1 || !flags.includes('--safe-mode') ||
+      count('--verbose') !== 1 || !flags.includes('--verbose') ||
+      count('--output-format') !== 1 || flags[flags.indexOf('--output-format') + 1] !== 'stream-json' ||
+      ['--bare', '--system-prompt', '--system-prompt-file', '--append-system-prompt', '--append-system-prompt-file', '--input-format'].some(name => count(name))) {
+    throw responseError('Claude launch requires one positional pointer after --, ignored stdin, safe mode and native stream-json proof');
   }
 }
 

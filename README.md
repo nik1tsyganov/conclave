@@ -85,7 +85,9 @@ The generated `SEAT-CONTRACT.md` points to the staged skills. Structural checks 
 
 OpenAI non-implementation seats use read-only mode; agy uses sandbox mode. Claude uses the schema 5 `read-only-tools` profile: `--safe-mode --permission-mode dontAsk --tools Read,Glob,Grep --allowedTools Read,Glob,Grep`. These Claude seats inspect files and existing test evidence. They cannot run shell commands. Plan mode needs a separate approval turn and cannot reliably finish unattended leaf verification.
 
-Claude implementation uses `--safe-mode --permission-mode bypassPermissions`, with declared product scope and post-run auditing. Safe mode disables global customization and hooks while preserving subscription authentication and role permissions. The adapter appends the final-response contract with `--append-system-prompt`; it preserves the native system prompt and permissions. Do not use `--bare`; it disables OAuth. These controls do not sandbox vendor home directories or provide universal hostile-process isolation.
+Claude implementation uses `--safe-mode --permission-mode bypassPermissions`, with declared product scope and post-run auditing. Safe mode disables global customization and hooks while preserving subscription authentication and role permissions. The production adapter supplies the brief pointer as a positional print-mode query after `--`, ignores stdin, and leaves the native system prompt unchanged. `stream-json` retains native Read events; the JSON schema requires a string response. The verifier checks the exact brief acknowledgment separately. Do not use `--bare`; it disables OAuth. These controls do not sandbox vendor home directories or provide universal hostile-process isolation.
+
+Both `cursor-cli` and `synara` plans dispatch native vendor CLIs. New seals keep the Synara catalog as a hashed diagnostic snapshot, with `synaraCatalogPolicy: diagnostic-only-v1`. The catalog does not limit native CLI routes. MAGI's matrix, fresh native model/effort probes, and escalation checks still authorize each route. Historical seals without this policy marker retain their original catalog narrowing.
 
 ## Native evidence and completion
 
@@ -100,6 +102,8 @@ The runtime records requested and observed identity separately.
 Missing observation, substitution, artifact changes, or scope violations fail. Requested-only identity cannot qualify a production seat.
 
 Google probes and dispatches pin `--log-file` to `native-cli.log` in their own unique evidence directory. The collector uses that native file when building `vendor.log` for proof. Default second-resolution home logs can collide during parallel calls.
+
+Google child processes also receive a fixed `synara-capture-events.jsonl` destination and an `allow` hook response. This avoids the installed Synara hook's malformed fallback response without changing global hook configuration. The runtime hashes these events as `diagnostic-untrusted`; they never replace native identity, usage, or instruction-read evidence. Non-implementation calls retain `--sandbox`.
 
 A successful committed transaction binds the plan hash, exact entry, brief acknowledgment, native proof, scope audit, receipts, and idempotent telemetry. Duplicate logical dispatches cannot count twice. Failed evidence remains recorded.
 
