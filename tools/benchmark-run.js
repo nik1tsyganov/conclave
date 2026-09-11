@@ -194,16 +194,29 @@ async function runMode(mode, opts, dependencies = {}) {
       required(result.exitConfirmed === true, 'INCOMPLETE: command exit is unconfirmed');
       if (native) {
         const confirm = dependencies.confirmStopped || require(path.join(runtime.toolsDir, 'dispatch-evidence.js')).assertInterruptedChildStopped;
-        confirm(result.pid, launch, dir);
+        const processChecks = [confirm(result.pid, launch, dir, { label: 'wrapper', lifetime: result.lifetime })];
         const nativeDir = tool === 'model-probe' ? path.join(dir, 'native') : path.join(dir, 'run', 'evidence', read(path.join(dir, 'plan.json')).dispatches[0].dispatchId);
         // Discover the runtime-owned native launch through its transaction; do
         // not guess or kill a PID from an old completed capture.
-        let actualDir = nativeDir;
-        if (tool === 'dispatch-run') { const p = read(path.join(dir, 'plan.json')); const txFile = path.join(dir, 'run', '.magi-dispatches', transactionKey(p.dispatches[0]) + '.json'); if (fs.existsSync(txFile)) { const tx = read(txFile); actualDir = tx.evidenceDir; required(tx.scopeAudit?.incomplete !== true && tx.scopeAudit?.exitConfirmed !== false, 'INCOMPLETE: runtime reports uncertain native exit'); } }
+        let actualDir = nativeDir; let nativeResultBinding;
+        if (tool === 'dispatch-run') { const p = read(path.join(dir, 'plan.json')); const txFile = path.join(dir, 'run', '.magi-dispatches', transactionKey(p.dispatches[0]) + '.json'); if (fs.existsSync(txFile)) { const tx = read(txFile); actualDir = tx.evidenceDir; nativeResultBinding = tx.processResult; required(tx.scopeAudit?.incomplete !== true && tx.scopeAudit?.exitConfirmed !== false, 'INCOMPLETE: runtime reports uncertain native exit'); } }
         required(contained(dir, actualDir), 'Native evidence escaped its attempt');
-        if (tool === 'model-probe' && fs.existsSync(path.join(actualDir, 'probe.json'))) required(read(path.join(actualDir, 'probe.json')).exitConfirmed !== false, 'INCOMPLETE: probe reports uncertain native exit');
+        if (tool === 'model-probe' && fs.existsSync(path.join(actualDir, 'probe.json'))) { const probe = read(path.join(actualDir, 'probe.json')); nativeResultBinding = probe.processResult; required(probe.exitConfirmed !== false, 'INCOMPLETE: probe reports uncertain native exit'); }
         const childFile = path.join(actualDir, 'child.pid'); const launchFile = path.join(actualDir, 'launch.json');
-        if (fs.existsSync(childFile)) { required(fs.existsSync(launchFile), 'INCOMPLETE: native launch identity is missing'); confirm(Number(fs.readFileSync(childFile, 'utf8').trim()), read(launchFile), actualDir); }
+        if (fs.existsSync(childFile)) {
+          required(fs.existsSync(launchFile), 'INCOMPLETE: native launch identity is missing');
+          const childPid = Number(fs.readFileSync(childFile, 'utf8').trim()); let lifetime;
+          if (nativeResultBinding) {
+            const file = path.join(actualDir, 'process-result.json');
+            required(nativeResultBinding.path === file && hashFile(file) === nativeResultBinding.sha256, 'INCOMPLETE: native process result binding changed');
+            const nativeResult = read(file);
+            required(nativeResult.pid === childPid, 'INCOMPLETE: native process result PID changed');
+            required(nativeResult.exitConfirmed === true, 'INCOMPLETE: native exit is unconfirmed');
+            lifetime = nativeResult.lifetime;
+          }
+          processChecks.push(confirm(childPid, read(launchFile), actualDir, { label: 'native-child', lifetime }));
+          write(prefix + '.process-checks.json', processChecks);
+        }
         else throw new Error('INCOMPLETE: native command has no owned PID evidence; inspected recovery required');
       }
       safeToUnlock = true;
@@ -293,7 +306,7 @@ async function runMode(mode, opts, dependencies = {}) {
     checkHashes(binding); boundWrite(objectivePath, { result, binding, nativeProofId: proof.proofId, judgedAt: new Date().toISOString(), semanticStatus: 'NOT_EVALUATED' });
     return { status: 'JUDGED', result, nativeCalls: 0 };
   } catch (error) {
-    if (operationDir && fs.existsSync(operationDir)) write(path.join(operationDir, 'failure-' + crypto.randomUUID() + '.json'), { error: error.message, recordedAt: new Date().toISOString(), incomplete: !safeToUnlock });
+    if (operationDir && fs.existsSync(operationDir)) write(path.join(operationDir, 'failure-' + crypto.randomUUID() + '.json'), { error: error.message, ...(error.processCheck ? { processCheck: error.processCheck } : {}), recordedAt: new Date().toISOString(), incomplete: !safeToUnlock });
     throw error;
   } finally { if (safeToUnlock) release(lock); }
 }

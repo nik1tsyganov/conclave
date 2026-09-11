@@ -408,6 +408,7 @@ async function runDispatch(opts, dependencies = {}) {
     return { ok: true, replayed: true, proofId: transaction.state.telemetry.proofId, receipt: transaction.state.receipt, telemetry: transaction.state.telemetry };
   }
   let scopeAudit = null;
+  let processResult = null;
   let before = null;
   let evidenceCreated = false;
   try {
@@ -526,6 +527,9 @@ async function runDispatch(opts, dependencies = {}) {
       JSON.parse(fs.readFileSync(path.join(recovery.manifest.previousAttempt.evidenceDir, 'launch.json'), 'utf8')), recovery.manifest.previousAttempt.evidenceDir);
   }
   const result = await (dependencies.runLaunch || runLaunch)(launch, { pidFile, stdoutFile: stdoutPath, stderrFile: stderrPath, maxWallMs, signal: dependencies.signal });
+  const processResultPath = path.join(evidenceDir, 'process-result.json');
+  atomicJson(processResultPath, { ...result, stdout: undefined, stderr: undefined });
+  processResult = { path: processResultPath, sha256: hashFile(processResultPath) };
   for (const file of [telemetryLog, activationLog, capturePath, path.join(evidenceDir, 'vendor.log'), transaction.file, path.join(runDir, '.magi-sessions'), ...(launch.nativeLogPath ? [launch.nativeLogPath] : []), ...(launch.synaraCaptureEventsPath ? [launch.synaraCaptureEventsPath] : [])]) assertPlainPath(file);
   const after = snapshotWorkspace(cwd);
   atomicJson(path.join(evidenceDir, 'workspace-after.json'), after);
@@ -641,6 +645,7 @@ async function runDispatch(opts, dependencies = {}) {
   writeJson(path.join(evidenceDir, 'handoff-envelope.json'), { ...receipt, telemetryLog });
   const artifacts = ['capture.txt', 'vendor.log', 'proof.json', 'receipt-ack.json', 'handoff-envelope.json', 'scope-audit.json', 'plan-binding.json', 'launch.json', 'workspace-before.json', 'workspace-after.json', 'runtime-manifest.json', 'rules-source-before.json', 'rules-source-after.json', 'rules-source-audit.json', 'skills-source-before.json', 'skills-source-after.json', 'skills-source-audit.json']
     .map((file) => ({ path: path.join(evidenceDir, file), sha256: hashFile(path.join(evidenceDir, file)) }));
+  artifacts.push(processResult);
   artifacts.push(...['native-instructions.jsonl', 'instruction-transcript.json', 'instruction-reads.json'].map(name => ({ path: path.join(evidenceDir, name), sha256: hashFile(path.join(evidenceDir, name)) })));
   if (evidenceReadDirs.length) artifacts.push(...['evidence-reads-before.json', 'evidence-reads-after.json'].map(name => ({ path: path.join(evidenceDir, name), sha256: hashFile(path.join(evidenceDir, name)) })));
   artifacts.push(...protectedHashes.filter(file => !artifacts.some(item => item.path === file.path)));
@@ -656,13 +661,13 @@ async function runDispatch(opts, dependencies = {}) {
       captureSha256: receipt.captureSha256, responseSha256: hashText(response), completedAt: receipt.completedAt, logDestinations: receipt.logDestinations,
       protectedInputs: protectedHashes, recordedAt: new Date().toISOString() });
     for (const name of ['response.txt', 'checkpoint.json']) artifacts.push({ path: path.join(evidenceDir, name), sha256: hashFile(path.join(evidenceDir, name)) });
-    const state = { ...transaction.state, status: AWAITING_ATTESTATION, receipt, telemetry, artifacts, logs, completedAt: new Date().toISOString() };
+    const state = { ...transaction.state, status: AWAITING_ATTESTATION, receipt, telemetry, artifacts, logs, processResult, completedAt: new Date().toISOString() };
     atomicJson(transaction.file, state);
     return checkpointResult(state, false);
   }
   for (const log of logs) appendUniqueRow(log, telemetry);
   // This commit marker is written last. Consumers reject incomplete projections.
-  atomicJson(transaction.file, { ...transaction.state, status: 'PASS', receipt, telemetry, artifacts, logs, completedAt: new Date().toISOString() });
+  atomicJson(transaction.file, { ...transaction.state, status: 'PASS', receipt, telemetry, artifacts, logs, processResult, completedAt: new Date().toISOString() });
   return { ok: true, proofId, receipt, telemetry };
   } catch (error) {
     if (error.code === 'CHILD_EXIT_UNCONFIRMED' || error.exitConfirmed === false) {
@@ -672,7 +677,7 @@ async function runDispatch(opts, dependencies = {}) {
     if (before && !scopeAudit) {
       try { scopeAudit = compareWorkspace(before, snapshotWorkspace(cwd), opts.writeScope); } catch (auditError) { scopeAudit = { ok: false, error: auditError.message }; }
     }
-    const failure = { ...transaction.state, status: 'FAIL', code: error.code || 'DISPATCH_FAIL', error: error.message, scopeAudit, completedAt: new Date().toISOString() };
+    const failure = { ...transaction.state, status: 'FAIL', code: error.code || 'DISPATCH_FAIL', error: error.message, scopeAudit, processResult, completedAt: new Date().toISOString() };
     atomicJson(transaction.file, failure);
     // Failed records never qualify for activation or successful usage accounting.
     if (evidenceCreated) {

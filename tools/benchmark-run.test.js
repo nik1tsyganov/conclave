@@ -293,3 +293,89 @@ test('missing native PID evidence cannot unlock a failed native boundary', async
   await assert.rejects(runMode('probe', s.opts, s.dependencies), /no owned PID evidence/);
   assert.ok(fs.existsSync(path.join(s.root, 'runner.lock.json')));
 });
+
+test('lifecycle inventory distinguishes reused PIDs and stale parent links independently', t => {
+  t.mock.method(process, 'kill', () => {});
+  const { assertInterruptedChildStopped } = require('./dispatch-evidence');
+  const lifetime = { protocol: 'magi-process-lifetime-v1', pid: 42, startedAt: '2026-09-11T10:00:00.000Z', endedAt: '2026-09-11T10:00:10.000Z', elapsedMs: 10000, exitConfirmed: true, exitEvidence: 'child-close-event' };
+  const row = (pid, ppid, created) => ({ ProcessId: pid, ParentProcessId: ppid, CreationDate: created, Name: 'other.exe', ExecutablePath: 'C:/other.exe', CommandLine: 'other' });
+  const old = row(70, 42, '2026-09-11T09:59:59.0000000Z');
+  const reused = row(42, 1, '2026-09-11T10:00:11.0000000Z');
+  const settings = rows => ({ platform: 'win32', label: 'wrapper', lifetime, nowMs: Date.parse('2026-09-11T10:01:00Z'), kill: () => {}, inventory: () => rows });
+  const result = assertInterruptedChildStopped(42, { binary: 'native.exe' }, 'C:/attempt', settings([reused]));
+  assert.equal(result.status, 'ABSENT'); assert.equal(result.matches.length, 1);
+  assert.ok(result.matches.every(match => match.disposition === 'REUSED_PID_AFTER_CLOSE' && match.targetLabel === 'wrapper'));
+  assert.throws(() => assertInterruptedChildStopped(42, { binary: 'native.exe' }, 'C:/attempt', settings([old, reused])), error => error.processCheck.matches.some(match => match.pid === 70 && match.disposition === 'BLOCKED'));
+  const orphan = row(71, 42, '2026-09-11T10:00:05.0000000Z');
+  assert.throws(() => assertInterruptedChildStopped(42, { binary: 'native.exe' }, 'C:/attempt', settings([reused, orphan])), error => error.processCheck.matches.some(match => match.pid === 71 && match.disposition === 'BLOCKED'));
+  // ESRCH followed by a reused incarnation is also an identity-aware result.
+  assert.equal(assertInterruptedChildStopped(42, { binary: 'native.exe' }, 'C:/attempt', { ...settings([reused]), kill: () => { throw Object.assign(new Error('absent'), { code: 'ESRCH' }); } }).status, 'ABSENT');
+});
+
+test('lifecycle child and unknown close identities remain blocked regardless of timestamps', t => {
+  t.mock.method(process, 'kill', () => {});
+  const { assertInterruptedChildStopped } = require('./dispatch-evidence');
+  const lifetime = { protocol: 'magi-process-lifetime-v1', pid: 42, startedAt: '2026-09-11T10:00:00.000Z', endedAt: '2026-09-11T10:00:10.000Z', elapsedMs: 10000, exitConfirmed: true, exitEvidence: 'child-close-event' };
+  const check = (created, context = lifetime, directChild = false) => assertInterruptedChildStopped(42, { binary: 'native.exe' }, 'C:/attempt', { platform: 'win32', label: 'native-child', lifetime: context, nowMs: Date.parse('2026-09-11T10:01:00Z'), kill: () => {}, inventory: () => [{ ProcessId: directChild ? 70 : 42, ParentProcessId: directChild ? 42 : 1, CreationDate: created, Name: 'other.exe', CommandLine: 'other' }] });
+  for (const created of [undefined, 'invalid', '2026-09-11T10:00:00.000Z', '2026-09-11T10:00:10.000Z', '2026-09-11T10:00:10.001Z', '2026-09-11T10:00:05.000Z']) assert.throws(() => check(created, lifetime, true), /live|unknown/);
+  for (const context of [null, { ...lifetime, exitConfirmed: false }, { ...lifetime, pid: 99 }, { ...lifetime, pid: '42' }, { ...lifetime, exitEvidence: undefined }, { ...lifetime, exitEvidence: 'pid-file' }, { ...lifetime, protocol: 'unknown' }]) assert.throws(() => check('2026-09-11T10:00:11Z', context), /live|unknown/);
+  // A bound close event proves the original PID exited, independent of UTC.
+  assert.equal(check('invalid', { ...lifetime, endedAt: 'invalid', elapsedMs: 100 }).status, 'ABSENT');
+});
+
+test('reversed wall clock cannot exempt a still-live direct child', () => {
+  const { assertInterruptedChildStopped } = require('./dispatch-evidence');
+  // Parent starts at UTC 10:00, clock moves back, child starts, then clock
+  // returns before parent close. Endpoint monotonic agreement still holds.
+  const lifetime = { protocol: 'magi-process-lifetime-v1', pid: 42, startedAt: '2026-09-11T10:00:00.000Z', endedAt: '2026-09-11T10:00:10.000Z', elapsedMs: 10000, exitConfirmed: true, exitEvidence: 'child-close-event' };
+  for (const child of [{ pid: 70, created: '2026-09-11T09:59:00.0000000Z' }, { pid: 71, created: '2026-09-11T09:59:04.0000000Z' }]) assert.throws(() => assertInterruptedChildStopped(42, { binary: 'native.exe' }, 'C:/attempt', {
+    platform: 'win32', lifetime, nowMs: Date.parse('2026-09-11T10:01:00Z'),
+    kill: () => { throw Object.assign(new Error('parent exited'), { code: 'ESRCH' }); },
+    inventory: () => [{ ProcessId: child.pid, ParentProcessId: 42, CreationDate: child.created, Name: 'other.exe', CommandLine: 'other' }],
+  }), error => error.processCheck.matches.some(match => match.pid === child.pid && match.disposition === 'BLOCKED'));
+});
+
+test('lifecycle exemptions preserve the independent native command scan', t => {
+  t.mock.method(process, 'kill', () => {});
+  const { assertInterruptedChildStopped } = require('./dispatch-evidence');
+  const lifetime = { protocol: 'magi-process-lifetime-v1', pid: 42, startedAt: '2026-09-11T10:00:00.000Z', endedAt: '2026-09-11T10:00:10.000Z', elapsedMs: 10000, exitConfirmed: true, exitEvidence: 'child-close-event' };
+  for (const command of [null, 'native.exe C:/attempt/brief.md']) assert.throws(() => assertInterruptedChildStopped(42, { binary: 'native.exe' }, 'C:/attempt', { platform: 'win32', lifetime, nowMs: Date.parse('2026-09-11T10:01:00Z'), kill: () => {}, inventory: () => [{ ProcessId: 42, ParentProcessId: 1, CreationDate: '2026-09-11T10:00:11Z', Name: 'native.exe', CommandLine: command }] }), /native.*unknown|native attempt/);
+});
+
+test('native lifetime context is distinct, bound and retained in failure diagnostics', async t => {
+  const s = await setup(t); const original = s.dependencies.command; const contexts = [];
+  s.dependencies.command = async (launch, options) => {
+    const result = await original(launch, options);
+    if (launch.args[0].endsWith('model-probe.js')) {
+      const dir = launch.args[launch.args.indexOf('--evidence-dir') + 1]; const pid = Number(fs.readFileSync(path.join(dir, 'child.pid')));
+      const lifetime = { protocol: 'magi-process-lifetime-v1', pid, startedAt: '2026-09-11T10:00:00.000Z', endedAt: '2026-09-11T10:00:10.000Z', elapsedMs: 10000, exitConfirmed: true, exitEvidence: 'child-close-event' };
+      save(path.join(dir, 'process-result.json'), { pid, exitConfirmed: true, lifetime });
+      save(path.join(dir, 'probe.json'), { processResult: { path: path.join(dir, 'process-result.json'), sha256: hash(path.join(dir, 'process-result.json')) } });
+      result.lifetime = { ...lifetime, pid: result.pid };
+    }
+    return result;
+  };
+  s.dependencies.confirmStopped = (pid, launch, dir, context) => { contexts.push({ pid, context }); if (context?.label === 'native-child') throw Object.assign(new Error('native still live'), { processCheck: { targetLabel: context.label, targetPid: pid, matches: [{ pid, ppid: 1, creationDate: 'fixture', disposition: 'BLOCKED' }] } }); };
+  await assert.rejects(runMode('probe', s.opts, s.dependencies), /native still live/);
+  assert.deepEqual(contexts.map(item => item.context.label), ['wrapper', 'native-child']);
+  assert.ok(contexts.every(item => item.context.lifetime.pid === item.pid));
+  const dir = path.join(s.root, 'probes', 'luna-p-a1'); const failure = JSON.parse(fs.readFileSync(path.join(dir, fs.readdirSync(dir).find(name => name.startsWith('failure-')))));
+  assert.equal(failure.processCheck.targetLabel, 'native-child'); assert.equal(failure.incomplete, true);
+});
+
+test('tampered native lifetime binding and unconfirmed native results retain the lock', async t => {
+  for (const fault of ['hash', 'exit']) {
+    const s = await setup(t); const original = s.dependencies.command;
+    s.dependencies.command = async (launch, options) => {
+      const result = await original(launch, options);
+      if (launch.args[0].endsWith('model-probe.js')) {
+        const dir = launch.args[launch.args.indexOf('--evidence-dir') + 1]; const file = path.join(dir, 'process-result.json');
+        save(file, { pid: Number(fs.readFileSync(path.join(dir, 'child.pid'))), exitConfirmed: fault !== 'exit' });
+        save(path.join(dir, 'probe.json'), { processResult: { path: file, sha256: fault === 'hash' ? '0'.repeat(64) : hash(file) } });
+      }
+      return result;
+    };
+    await assert.rejects(runMode('probe', s.opts, s.dependencies), /native process result|native exit/i);
+    assert.ok(fs.existsSync(path.join(s.root, 'runner.lock.json')));
+  }
+});

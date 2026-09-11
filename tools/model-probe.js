@@ -58,11 +58,13 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
   writeJson(path.join(root, 'launch.json'), { vendor, model, effort, binary, args, cwd: canonicalWork, startedAt, ...captureMetadata });
   if (captureIsolation) assertPlainPath(captureIsolation.eventsPath);
   const before = snapshotWorkspace(canonicalWork);
+  let processResult = null;
   try {
   const result = await (dependencies.runLaunch || runLaunch)(launch, { pidFile: path.join(root, 'child.pid'), stdoutFile: path.join(root, 'stdout.log'), stderrFile: path.join(root, 'stderr.log'), maxWallMs });
   if (captureIsolation) assertPlainPath(captureIsolation.eventsPath);
   const completedAt = new Date().toISOString();
   writeJson(path.join(root, 'process-result.json'), { ...result, stdout: undefined, stderr: undefined, startedAt, completedAt });
+  processResult = { path: path.join(root, 'process-result.json'), sha256: hashFile(path.join(root, 'process-result.json')) };
   const audit = compareWorkspace(before, snapshotWorkspace(canonicalWork), []);
   writeJson(path.join(root, 'scope-audit.json'), audit);
   if (vendor !== 'openai') fs.writeFileSync(capture, result.stdout, 'utf8');
@@ -76,7 +78,7 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
   fs.writeFileSync(log, nativeLog(vendor, text, fs.readFileSync(log, 'utf8'), { cwd: canonicalWork, nativeLogPath }), 'utf8');
   const proof = verifyProof({ vendor, capture, log, expectedModel: model, expectedObservedModel: spec.canonical || model, expectedEffort: effort, expectedSandbox: vendor === 'openai' ? 'read-only' : undefined, onTopic: true });
   if (!challengeMatches(finalResponse(vendor, text), challenge)) throw new Error('probe challenge response mismatch');
-  const record = { schemaVersion: 1, status: 'PASS', vendor, requestedModel: model, observedModel: proof.modelObserved, effort, startedAt, completedAt, challenge, capture, log, captureSha256: hashFile(capture), logSha256: hashFile(log), proof };
+  const record = { schemaVersion: 1, status: 'PASS', vendor, requestedModel: model, observedModel: proof.modelObserved, effort, startedAt, completedAt, challenge, capture, log, captureSha256: hashFile(capture), logSha256: hashFile(log), proof, processResult };
   if (captureIsolation && fs.existsSync(captureIsolation.eventsPath)) record.synaraCaptureEvents = {
     path: captureIsolation.eventsPath, sha256: hashFile(captureIsolation.eventsPath), trust: captureIsolation.trust,
   };
@@ -85,7 +87,7 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
   } catch (error) {
     const cleanup = { errorCode: error.code || null, pid: error.pid ?? null, exitConfirmed: error.exitConfirmed ?? null };
     if (error.exitConfirmed === false) writeJson(path.join(root, 'scope-audit.json'), { ok: false, complete: false, reason: 'child exit is unconfirmed; no final workspace evidence', ...cleanup });
-    writeJson(path.join(root, 'probe.json'), { schemaVersion: 1, status: 'FAIL', vendor, requestedModel: model, effort, startedAt, completedAt: new Date().toISOString(), error: error.message, ...cleanup });
+    writeJson(path.join(root, 'probe.json'), { schemaVersion: 1, status: 'FAIL', vendor, requestedModel: model, effort, startedAt, completedAt: new Date().toISOString(), error: error.message, processResult, ...cleanup });
     throw error;
   }
 }

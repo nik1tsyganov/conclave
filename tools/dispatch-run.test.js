@@ -611,6 +611,19 @@ test('recovery refuses implementation and live processes without launch; termina
   assert.equal(native.calls(), 1); assert.equal(JSON.parse(fs.readFileSync(f.originalFile)).status, 'RUNNING');
 });
 
+test('native process result is bound into committed dispatch artifacts', async t => {
+  const f = createSealedRun(t); const native = fakeVendor();
+  const launch = native.runLaunch;
+  native.runLaunch = async (...args) => ({ ...await launch(...args), pid: 4123, exitConfirmed: true,
+    lifetime: { protocol: 'magi-process-lifetime-v1', pid: 4123, startedAt: '2026-09-11T10:00:00.000Z', endedAt: '2026-09-11T10:00:10.000Z', elapsedMs: 10000, exitConfirmed: true, exitEvidence: 'child-close-event' } });
+  await runDispatch({ ...f.opts, dispatchId: 'd1', availability: f.availability }, native);
+  const state = JSON.parse(fs.readFileSync(path.join(f.runDir, '.magi-dispatches', require('./dispatch-evidence.js').transactionKey(f.dispatches[0]) + '.json')));
+  assert.equal(state.processResult.sha256, hashFile(state.processResult.path));
+  assert.ok(state.artifacts.some(item => item.path === state.processResult.path && item.sha256 === state.processResult.sha256));
+  fs.appendFileSync(state.processResult.path, ' ');
+  await assert.rejects(runDispatch({ ...f.opts, dispatchId: 'd1', availability: f.availability }, native), /evidence changed/);
+});
+
 test('completed recovery rejects missing, tampered, duplicate or unbound lineage on finalization', async t => {
   const f = await interruptedReview(t);
   const prepared = await runDispatch({ ...f.opts, prepareRecovery: f.request }, f.deps);

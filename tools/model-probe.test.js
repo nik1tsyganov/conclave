@@ -33,6 +33,9 @@ test('probe applies workspace authorization before evidence or vendor launch',as
   assert.equal(f.calls(),0);assert.equal(fs.existsSync(f.opts.evidenceDir),false);
   const result=await probe({...f.opts,cwd},{runLaunch:f.runLaunch,env:f.env});
   assert.equal(result.status,'PASS');assert.equal(f.calls(),1);
+  const processResult=JSON.parse(fs.readFileSync(result.processResult.path));
+  assert.equal(processResult.exitConfirmed,true);
+  assert.equal(result.processResult.sha256,require('./dispatch-evidence.js').hashFile(result.processResult.path));
 });
 
 test('default probe workspace applies authorization before creating its evidence root',async t=>{

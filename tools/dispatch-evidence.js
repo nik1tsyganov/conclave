@@ -90,27 +90,49 @@ function recoveryPaths(runRoot, entry, attempt = 1) {
   const root = path.join(runRoot, '.magi-recoveries', transactionKey(entry) + (attempt === 2 ? '.2' : ''));
   return { root, manifestPath: path.join(root, 'recovery.json'), transactionPath: path.join(root, 'transaction.json'), attemptRoot: path.join(root, 'attempt') };
 }
-function assertInterruptedChildStopped(pid, launch, evidenceDir) {
+function assertInterruptedChildStopped(pid, launch, evidenceDir, options = {}) {
   if (!Number.isSafeInteger(pid) || pid < 1) throw evidenceError('interrupted child PID is missing or invalid');
-  try { process.kill(pid, 0); throw evidenceError('interrupted child is still live'); }
-  catch (error) { if (error.code !== 'ESRCH') throw evidenceError(`interrupted child liveness is live or unknown: ${error.message}`); }
+  const nowMs = options.nowMs ?? Date.now();
+  const report = { targetPid: pid, targetLabel: options.label || 'interrupted-child', checkedAt: new Date(nowMs).toISOString(), lifetime: options.lifetime || null, matches: [] };
+  const reject = message => { throw Object.assign(evidenceError(message), { processCheck: report }); };
+  let probe = 'LIVE';
+  try { (options.kill || process.kill)(pid, 0); }
+  catch (error) { probe = error.code === 'ESRCH' ? 'ABSENT' : 'UNKNOWN'; report.probeError = error.code || error.message; }
+  report.pidProbe = probe;
   // A dead parent PID does not establish that an orphan native child is gone.
   // Inspect the Windows process inventory without interpolating shell arguments.
-  if (process.platform !== 'win32') throw evidenceError('interrupted child process inventory is unsupported on this platform');
-  const raw = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-    'Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine | ConvertTo-Json -Compress'],
-  { encoding: 'utf8', timeout: 15000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-  const rows = JSON.parse(raw);
-  if (!Array.isArray(rows) || !rows.length) throw evidenceError('interrupted child process inventory is unknown');
+  if ((options.platform || process.platform) !== 'win32') reject('interrupted child liveness is unknown: process inventory is unsupported on this platform');
+  let rows;
+  try { rows = options.inventory ? options.inventory() : JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    "Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine,@{Name='CreationDate';Expression={$_.CreationDate.ToUniversalTime().ToString('o')}} | ConvertTo-Json -Compress"],
+  { encoding: 'utf8', timeout: 15000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })); }
+  catch (error) { report.inventoryError = error.message; reject('interrupted child process inventory is unknown'); }
+  if (!Array.isArray(rows) || !rows.length) reject('interrupted child process inventory is unknown');
+  if (rows.some(row => !row || !Number.isSafeInteger(row.ProcessId) || row.ProcessId < 0 || !Number.isSafeInteger(row.ParentProcessId) || row.ParentProcessId < 0)) reject('interrupted child process inventory identity is unknown');
+  const life = options.lifetime;
+  // Only the original child's explicit close event can clear a reused numeric
+  // PID. UTC ordering cannot establish direct-child ancestry across clock edits.
+  const closed = life?.protocol === 'magi-process-lifetime-v1' && life.pid === pid &&
+    life.exitConfirmed === true && life.exitEvidence === 'child-close-event';
+  report.originalChildCloseConfirmed = Boolean(closed);
   const exe = path.basename(launch.binary).toLowerCase();
   const needle = evidenceDir.replaceAll('\\', '/').toLowerCase();
   for (const row of rows) {
-    if (row.ProcessId === pid || row.ParentProcessId === pid) throw evidenceError('interrupted child or descendant is still live');
+    if (row.ProcessId === pid || row.ParentProcessId === pid) {
+      const directChild = row.ParentProcessId === pid;
+      const reusedPid = !directChild && row.ProcessId === pid && closed;
+      report.matches.push({ targetLabel: report.targetLabel, pid: row.ProcessId, ppid: row.ParentProcessId, creationDate: row.CreationDate ?? null,
+        name: row.Name ?? null, executablePath: row.ExecutablePath ?? null, relation: directChild ? 'DIRECT_CHILD' : 'PID',
+        disposition: reusedPid ? 'REUSED_PID_AFTER_CLOSE' : 'BLOCKED' });
+    }
+    // This scan is independent of PID/PPID exemptions, including reused PIDs.
     if (String(row.Name).toLowerCase() !== exe) continue;
-    if (typeof row.CommandLine !== 'string' || !row.CommandLine) throw evidenceError('native process command line is unknown');
-    if (row.CommandLine.replaceAll('\\', '/').toLowerCase().includes(needle)) throw evidenceError('interrupted native attempt is still live');
+    if (typeof row.CommandLine !== 'string' || !row.CommandLine) { report.nativeMatch = { pid: row.ProcessId, ppid: row.ParentProcessId, creationDate: row.CreationDate ?? null, reason: 'UNKNOWN_COMMAND' }; reject('native process command line is unknown'); }
+    if (row.CommandLine.replaceAll('\\', '/').toLowerCase().includes(needle)) { report.nativeMatch = { pid: row.ProcessId, ppid: row.ParentProcessId, creationDate: row.CreationDate ?? null, reason: 'ATTEMPT_COMMAND' }; reject('interrupted native attempt is still live'); }
   }
-  return { pid, status: 'ABSENT', checkedAt: new Date().toISOString(), method: 'pid-and-windows-process-inventory' };
+  if (report.matches.some(match => match.disposition === 'BLOCKED')) reject('interrupted child or descendant is still live or unknown');
+  if (probe === 'UNKNOWN' || (probe === 'LIVE' && !report.matches.some(match => match.relation === 'PID'))) reject('interrupted child liveness is live or unknown: PID probe and inventory disagree');
+  return { ...report, pid, status: 'ABSENT', method: 'pid-and-windows-process-inventory-with-close-receipt' };
 }
 function reserveTransaction(binding, evidenceDir, attestationProtocol) {
   const root = path.join(path.dirname(binding.planPath), '.magi-dispatches');
