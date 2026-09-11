@@ -5,9 +5,13 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { readSealedRun } = require('./plan-seal.js');
-const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, assertPlainPath, compareWorkspace, hash, hashFile, inside, runtimeManifest, snapshotWorkspace, transactionKey, verifyArtifacts, verifyCommittedRow, writeJson } = require('./dispatch-evidence.js');
+const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, RECOVERY_PROTOCOL, assertPlainPath, compareWorkspace, hash, hashFile, inside, recoveryPaths, runtimeManifest, snapshotWorkspace, transactionKey, verifyArtifacts, verifyCommittedRow, writeJson } = require('./dispatch-evidence.js');
 const { verifyNativeProof, verifyProof } = require('./cli-proof.js');
-const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, validateClaudeResponseLaunch } = require('./vendor-native.js');
+const { CLAUDE_RESPONSE_PROTOCOL, codexSessionTranscript, finalResponse, validateClaudeResponseLaunch } = require('./vendor-native.js');
+const { routeAllowed, loadAvailability } = require('./dispatch-matrix.js');
+const { verifyStagedRules } = require('./cli-rules-stage.js');
+const { verifySeatSkills } = require('./cli-skill-stage.js');
+const { validateOpenaiScratchLaunch } = require('./cli-adapters.js');
 const { tally } = require('./position-tally.js');
 const { canonicalPlainPath, pathsOverlap } = require('./runtime-paths.js');
 const { INSTRUCTION_READ_PROTOCOL, verifyInstructionReadEvidence } = require('./instruction-read-evidence.js');
@@ -22,7 +26,7 @@ function readJson(file) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
 function same(a, b, label) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${label} disagrees with committed evidence`); }
 function validateLogDestinations(run, logs, evidenceDir, protectedPaths = []) {
   const reserved = [evidenceDir, run.planPath, run.sealPath, run.availablePath,
-    ...['.magi-dispatches', '.magi-sessions', 'run-summary.json', 'telemetry.jsonl', 'implementation.jsonl'].map(name => path.join(run.root, name)),
+    ...['.magi-dispatches', '.magi-recoveries', '.magi-sessions', 'run-summary.json', 'telemetry.jsonl', 'implementation.jsonl'].map(name => path.join(run.root, name)),
     ...protectedPaths];
   for (const entry of run.plan.dispatches) {
     reserved.push(entry.brief, path.join(run.root, 'out', entry.dispatchId));
@@ -44,6 +48,112 @@ function validateLogDestinations(run, logs, evidenceDir, protectedPaths = []) {
     assertPlainPath(file);
     if (fs.existsSync(file) && !fs.statSync(file).isFile()) throw new Error('log destination is not a regular file');
   }
+}
+
+function interruptedSnapshot(run, entry, dependencies = {}) {
+  if (entry.vendor !== 'openai' || !['review', 'verify', 'plan'].includes(entry.role) || entry.writeScope?.length !== 0) throw new Error('recovery supports only OpenAI read-only review, verify or plan entries');
+  const originalFile = path.join(run.root, '.magi-dispatches', `${transactionKey(entry)}.json`);
+  assertPlainPath(originalFile);
+  const original = readJson(originalFile);
+  same(original.entry, entry, 'interrupted entry');
+  if (original.status !== 'RUNNING' || original.receipt || original.telemetry || original.completedAt || original.artifacts || original.planHash !== run.seal.planHash || original.planId !== run.plan.planId ||
+      original.requestHash !== hash(JSON.stringify({ planHash: run.seal.planHash, entry }))) throw new Error('recovery requires an uncompleted RUNNING original transaction');
+  const evidenceDir = path.join(run.root, 'out', entry.dispatchId);
+  if (original.evidenceDir !== evidenceDir) throw new Error('interrupted evidence directory is not canonical');
+  assertPlainPath(evidenceDir);
+  for (const name of ['capture.txt', 'vendor.log', 'proof.json', 'receipt-ack.json', 'handoff-envelope.json', 'checkpoint.json', 'workspace-after.json', 'scope-audit.json']) {
+    if (fs.existsSync(path.join(evidenceDir, name))) throw new Error(`interrupted attempt already has terminal or partial completion evidence: ${name}`);
+  }
+  const artifact = name => path.join(evidenceDir, name);
+  const launch = readJson(artifact('launch.json'));
+  same(launch.planEntry, entry, 'interrupted launch entry');
+  same(readJson(artifact('plan-binding.json')), { planId: run.plan.planId, planHash: run.seal.planHash, entry }, 'interrupted plan binding');
+  if (launch.startedAt !== original.startedAt || launch.planHash !== run.seal.planHash || launch.planId !== run.plan.planId || launch.model !== entry.model || launch.effort !== entry.effort || launch.cwd !== entry.cwd || launch.role !== entry.role || launch.vendor !== entry.vendor) throw new Error('interrupted launch identity changed');
+  if (!launch.scratchPermissions) throw new Error('recovery requires the original bound OpenAI read-only scratch profile');
+  validateOpenaiScratchLaunch(launch, { runDir: run.root, dispatchId: entry.dispatchId, role: entry.role, cwd: entry.cwd, model: entry.model, effort: entry.effort, capturePath: artifact('capture.txt') });
+  const runtime = readJson(artifact('runtime-manifest.json'));
+  if (hash(JSON.stringify(runtime)) !== launch.runtimeSha256) throw new Error('interrupted runtime manifest changed');
+  if (hashFile(entry.brief) !== entry.briefSha256 || hashFile(artifact('brief/BRIEF.md')) !== entry.briefSha256) throw new Error('interrupted brief changed');
+  verifyStagedRules(artifact('brief/BRIEF.md'));
+  const profile = buildSeatProfile(loadProfiles(), entry);
+  same(readJson(artifact('seat-profile.json')), profile, 'interrupted seat profile');
+  verifySeatSkills({ destinationRoot: artifact('skills'), skills: profile.skills, manifest: readJson(artifact('skills/skills-manifest.json')) });
+  const workspace = readJson(artifact('workspace-before.json'));
+  if (workspace.root !== fs.realpathSync(entry.cwd) || !compareWorkspace(workspace, snapshotWorkspace(entry.cwd), []).ok) throw new Error('frozen interrupted workspace changed');
+  const rules = readJson(artifact('rules-source-before.json'));
+  const skills = readJson(artifact('skills-source-before.json'));
+  for (const source of [rules, ...Object.values(skills)]) {
+    if (!compareWorkspace(source, snapshotWorkspace(source.root), []).ok) throw new Error('interrupted instruction source changed');
+  }
+  const evidenceReads = snapshotEvidenceReads(validateEvidenceReadDirs(entry, { plan: run.plan, runDir: run.root, requireExisting: true }));
+  if (entry.evidenceReadDirs?.length) {
+    same(readJson(artifact('evidence-reads-before.json')), evidenceReads, 'frozen interrupted evidence inputs');
+    if (launch.evidenceReadsSha256 !== hash(JSON.stringify(evidenceReads))) throw new Error('interrupted evidence-read binding changed');
+  }
+  const stderr = fs.readFileSync(artifact('stderr.log'), 'utf8');
+  const header = stderr.split(/^user\s*$/m, 1)[0];
+  const fields = regex => [...header.matchAll(regex)].map(match => match[1]);
+  const ids = fields(/^session id\s*:\s*(\S+)/gm);
+  if (ids.length !== 1 || !/^[a-f0-9-]{36}$/i.test(ids[0]) || fields(/^model\s*:\s*(\S+)/gm).join() !== entry.model || fields(/^reasoning effort\s*:\s*(\S+)/gm).join() !== entry.effort || /^tokens used\s*$/m.test(stderr)) throw new Error('interrupted native identity is missing, ambiguous or already complete');
+  const native = (dependencies.codexSessionTranscript || codexSessionTranscript)(ids[0], { cwd: entry.cwd });
+  assertPlainPath(native.path);
+  if (native.text !== fs.readFileSync(native.path, 'utf8')) throw new Error('interrupted native transcript differs from disk');
+  const rows = native.text.split(/\r?\n/).filter(Boolean).map(JSON.parse);
+  const sessions = rows.filter(row => row.type === 'session_meta');
+  if (sessions.length !== 1 || sessions[0].payload?.id !== ids[0] || path.resolve(sessions[0].payload.cwd || '') !== path.resolve(entry.cwd)) throw new Error('interrupted transcript has the wrong identity');
+  if (rows.some(row => ['task_complete', 'task_aborted', 'turn_aborted'].includes(row.payload?.type) ||
+      (row.type === 'response_item' && row.payload?.role === 'assistant' && ['final', 'final_answer'].includes(row.payload?.phase)))) throw new Error('interrupted native transcript already has a terminal response or event');
+  const pidText = fs.readFileSync(artifact('child.pid'), 'utf8').trim();
+  if (!/^[1-9][0-9]*$/.test(pidText) || !Number.isSafeInteger(Number(pidText))) throw new Error('interrupted child PID is missing or invalid');
+  const prerequisites = run.plan.dispatches.filter(row => row.dispatchId !== entry.dispatchId).map(dependency => {
+    const file = path.join(run.root, '.magi-dispatches', `${transactionKey(dependency)}.json`);
+    const state = readJson(file);
+    verifyExecution(run, dependency, state);
+    return { dispatchId: dependency.dispatchId, path: file, sha256: hashFile(file) };
+  });
+  same(launch.prerequisites, verifyPrerequisites(run, entry, workspace, launch.startedAt), 'interrupted sequence prerequisites');
+  return { originalFile, originalSha256: hashFile(originalFile), evidenceDir, evidence: snapshotWorkspace(evidenceDir),
+    native: { sessionId: ids[0], path: native.path, sha256: hashFile(native.path) }, pid: Number(pidText), workspace, evidenceReads,
+    inputs: [run.planPath, run.sealPath, run.availablePath, entry.brief].map(file => ({ path: file, sha256: hashFile(file) })), prerequisites };
+}
+
+function verifyRecoveryManifest(run, entry, manifest, { nowMs, dependencies = {} } = {}) {
+  const paths = recoveryPaths(run.root, entry);
+  const { schemaVersion, protocol, planId, planHash, entry: savedEntry, attemptRoot, transactionPath, preparedAt, original, availability, stopped } = manifest;
+  same(Object.keys(manifest).sort(), ['schemaVersion', 'protocol', 'planId', 'planHash', 'entry', 'attemptRoot', 'transactionPath', 'preparedAt', 'original', 'availability', 'stopped'].sort(), 'recovery manifest fields');
+  if (schemaVersion !== 1 || protocol !== RECOVERY_PROTOCOL || planId !== run.plan.planId || planHash !== run.seal.planHash || attemptRoot !== paths.attemptRoot || transactionPath !== paths.transactionPath || !Number.isFinite(Date.parse(preparedAt))) throw new Error('recovery manifest identity changed');
+  same(savedEntry, entry, 'recovery plan entry');
+  const originalNative = original?.native;
+  if (!originalNative || !path.isAbsolute(originalNative.path || '')) throw new Error('recovery native transcript path is missing');
+  same(original, interruptedSnapshot(run, entry, { ...dependencies, codexSessionTranscript: id => {
+    if (id !== originalNative.sessionId) throw new Error('interrupted native session changed');
+    return { path: originalNative.path, text: fs.readFileSync(originalNative.path, 'utf8') };
+  } }), 'recovery frozen original evidence');
+  if (stopped?.status !== 'ABSENT' || stopped.pid !== original.pid) throw new Error('recovery has no stopped-child evidence');
+  if (!availability || !path.isAbsolute(availability.path || '') || hashFile(availability.path) !== availability.sha256) throw new Error('recovery availability changed');
+  assertPlainPath(availability.path);
+  const route = routeAllowed(run.matrix, entry, loadAvailability(availability.path), nowMs ?? Date.parse(preparedAt));
+  if (!route.ok) throw new Error(route.reason);
+  return paths;
+}
+
+function resolveRecovery(run, entry, original) {
+  const paths = recoveryPaths(run.root, entry);
+  if (!fs.existsSync(paths.root)) return null;
+  assertPlainPath(paths.root);
+  if (fs.readdirSync(paths.root).some(name => !['recovery.json', 'transaction.json', 'attempt'].includes(name))) throw new Error('unexpected or duplicate recovery attempt');
+  if (fs.existsSync(paths.attemptRoot) && (fs.readdirSync(paths.attemptRoot).some(name => name !== 'out') ||
+      (fs.existsSync(path.join(paths.attemptRoot, 'out')) && fs.readdirSync(path.join(paths.attemptRoot, 'out')).some(name => name !== entry.dispatchId)))) throw new Error('unexpected physical recovery attempt');
+  if (original.status !== 'RUNNING') throw new Error('recovery conflicts with an original terminal attempt');
+  if (!fs.existsSync(paths.manifestPath) || !fs.existsSync(paths.transactionPath)) throw new Error('recovery lineage is missing or incomplete');
+  const manifest = readJson(paths.manifestPath);
+  const state = readJson(paths.transactionPath);
+  verifyRecoveryManifest(run, entry, manifest, { nowMs: Date.parse(state.startedAt) });
+  if (state.recoverySha256 !== hashFile(paths.manifestPath) || state.evidenceDir !== path.join(paths.attemptRoot, 'out', entry.dispatchId) ||
+      !Number.isFinite(Date.parse(state.startedAt)) || Date.parse(state.startedAt) < Date.parse(manifest.preparedAt)) throw new Error('replacement transaction has missing or changed recovery lineage');
+  if (!['RUNNING', 'PASS', 'FAIL'].includes(state.status)) throw new Error('unsupported replacement transaction status');
+  if (state.receipt?.completedAt && Date.parse(state.receipt.completedAt) < Date.parse(state.startedAt)) throw new Error('replacement completion precedes launch');
+  return { ...paths, manifest, state };
 }
 
 function verifyPrerequisites(run, entry, before, startedAt) {
@@ -102,7 +212,12 @@ function verifyCheckpoint(run, entry, state, { current = false, allowReceiptProj
 function verifySavedExecution(run, entry, state, pending, allowReceiptProjections = false) {
   same(state.entry, entry, 'plan entry');
   if (state.planHash !== run.seal.planHash || state.planId !== run.plan.planId || state.requestHash !== hash(JSON.stringify({ planHash: run.seal.planHash, entry }))) throw new Error('transaction belongs to a different plan');
-  const transactionPath = path.join(run.root, '.magi-dispatches', `${transactionKey(entry)}.json`);
+  const originalPath = path.join(run.root, '.magi-dispatches', `${transactionKey(entry)}.json`);
+  const recovery = state.recoverySha256 ? resolveRecovery(run, entry, readJson(originalPath)) : null;
+  if (recovery) same(recovery.state, state, 'replacement state');
+  else if (fs.existsSync(recoveryPaths(run.root, entry).root)) throw new Error('attempt is missing its recovery lineage');
+  const transactionPath = recovery ? recovery.transactionPath : originalPath;
+  const launchRunDir = recovery ? recovery.attemptRoot : run.root;
   if (state.telemetry?.transactionPath !== transactionPath || !inside(state.evidenceDir, run.root)) throw new Error('transaction evidence is outside its sealed run');
   const projections = new Map();
   if (pending && allowReceiptProjections) {
@@ -129,6 +244,7 @@ function verifySavedExecution(run, entry, state, pending, allowReceiptProjection
     if (!state.artifacts.some((item) => item.path === artifact(name) && item.sha256 === (projections.has(item.path) ? hash(`${JSON.stringify(projections.get(item.path), null, 2)}\n`) : hashFile(artifact(name))))) throw new Error(`missing committed artifact: ${name}`);
   }
   const launch = readJson(artifact('launch.json'));
+  if (recovery && launch.recoverySha256 !== state.recoverySha256) throw new Error('replacement launch has missing recovery lineage');
   if (entry.evidenceReadDirs?.length) {
     const dirs = validateEvidenceReadDirs(entry, { plan: run.plan, runDir: run.root, requireExisting: true,
       forbiddenRoots: [run.seal.skillSource?.sourceRoot, readJson(artifact('rules-source-before.json')).root].filter(Boolean) });
@@ -175,16 +291,17 @@ function verifySavedExecution(run, entry, state, pending, allowReceiptProjection
   const scratchLaunch = entry.vendor === 'openai' && Object.hasOwn(launch, 'scratchPermissions');
   if (scratchLaunch) {
     if (launch.model !== entry.model || launch.effort !== entry.effort) throw new Error('scratch launch model or effort differs from the sealed plan');
-    assertPlainPath(path.join(run.root, 'out', entry.dispatchId, 'scratch'));
+    assertPlainPath(path.join(launchRunDir, 'out', entry.dispatchId, 'scratch'));
   }
   const expectedSandbox = entry.vendor === 'openai'
     ? (scratchLaunch ? 'custom permissions' : entry.role === 'implement' ? 'workspace-write' : 'read-only') : undefined;
   const proof = (postRun ? verifyNativeProof : verifyProof)({ vendor: entry.vendor, capture: artifact('capture.txt'), log: artifact('vendor.log'), expectedModel: entry.model, expectedObservedModel: spec.canonical || entry.model, expectedEffort: entry.effort,
-    expectedSandbox, launch, runDir: run.root, dispatchId: entry.dispatchId, expectedRole: entry.role, expectedCwd: entry.cwd,
+    expectedSandbox, launch, runDir: launchRunDir, dispatchId: entry.dispatchId, expectedRole: entry.role, expectedCwd: entry.cwd,
     onTopic: true, responseProtocol });
   const response = finalResponse(entry.vendor, fs.readFileSync(artifact('capture.txt'), 'utf8'), { responseProtocol });
   if (response.split(/\r?\n/, 1)[0] !== fs.readFileSync(entry.brief, 'utf8').split(/\r?\n/, 1)[0]) throw new Error('native response has wrong brief acknowledgement');
   const sessionId = proof.sessionId || proof.conversationId;
+  if (recovery && sessionId === recovery.manifest.original.native.sessionId) throw new Error('replacement reused the interrupted native session');
   const transcriptText = fs.readFileSync(artifact('native-instructions.jsonl'), 'utf8');
   const transcriptBinding = readJson(artifact('instruction-transcript.json'));
   if (typeof transcriptBinding.sourcePath !== 'string' || !path.isAbsolute(transcriptBinding.sourcePath)) throw new Error('native instruction transcript source is missing');
@@ -210,6 +327,7 @@ function verifySavedExecution(run, entry, state, pending, allowReceiptProjection
   }
   if (state.telemetry.authorVendor !== (entry.authorVendor || null)) throw new Error('telemetry authorVendor mismatch');
   const before = readJson(artifact('workspace-before.json'));
+  if (recovery) same(before, recovery.manifest.original.workspace, 'replacement frozen workspace');
   const after = readJson(artifact('workspace-after.json'));
   if (before.root !== fs.realpathSync(entry.cwd) || after.root !== before.root) throw new Error('workspace snapshot has wrong root');
   const audit = compareWorkspace(before, after, entry.writeScope);
@@ -276,9 +394,16 @@ function inspectRun(runDir) {
     const outcome = { dispatchId: entry.dispatchId, unitId: entry.unitId, role: entry.role, vendor: entry.vendor, class: entry.class, planId: run.plan.planId, planHash: run.seal.planHash, status: 'NOT_RUN' };
     if (fs.existsSync(file)) {
       try {
-        const state = readJson(file);
+        let state = readJson(file);
         same(state.entry, entry, 'transaction entry');
         if (state.planHash !== run.seal.planHash) throw new Error('transaction plan hash mismatch');
+        const recovery = resolveRecovery(run, entry, state);
+        if (recovery) {
+          outcome.interruptedAttempt = { status: state.status, transactionPath: file, evidenceDir: state.evidenceDir,
+            nativeSessionId: recovery.manifest.original.native.sessionId };
+          outcome.recoveryManifestPath = recovery.manifestPath;
+          state = recovery.state;
+        }
         if (!['PASS', 'FAIL', 'RUNNING', AWAITING_ATTESTATION].includes(state.status)) throw new Error('unknown transaction status');
         outcome.status = state.status;
         if (state.status === 'PASS') {
@@ -390,4 +515,4 @@ function main(argv = process.argv.slice(2)) {
   } catch (error) { process.stderr.write(`RUN_FINALIZE_FAIL: ${error.message}\n`); return 1; }
 }
 if (require.main === module) process.exitCode = main();
-module.exports = { SEQUENCE_PROTOCOL, assessRun, finalizeRun, inspectRun, main, nativePosition, shouldLinkVault, tallyUnit, validateLogDestinations, verifyCheckpoint, verifyExecution, verifyPrerequisites };
+module.exports = { SEQUENCE_PROTOCOL, assessRun, finalizeRun, inspectRun, interruptedSnapshot, main, nativePosition, resolveRecovery, shouldLinkVault, tallyUnit, validateLogDestinations, verifyCheckpoint, verifyExecution, verifyPrerequisites, verifyRecoveryManifest };

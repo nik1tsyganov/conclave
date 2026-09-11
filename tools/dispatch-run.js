@@ -14,14 +14,14 @@ const { DEFAULT_MATRIX, bindDispatch, loadAvailability } = require('./dispatch-m
 const { loadProfiles, buildSeatProfile } = require('./seat-policy.js');
 const { prepareSeatSkills, stageSeatSkills, verifySeatSkills, verifySkillSource } = require('./cli-skill-stage.js');
 const { DEFAULT_PROFILES } = require('./seat-policy.js');
-const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, appendUniqueRow, assertPlainPath, compareWorkspace, hashFile, inside, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, writeJson: atomicJson } = require('./dispatch-evidence.js');
+const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, RECOVERY_PROTOCOL, appendUniqueRow, assertPlainPath, assertInterruptedChildStopped, compareWorkspace, hashFile, inside, recoveryPaths, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, writeJson: atomicJson } = require('./dispatch-evidence.js');
 const { CLAUDE_RESPONSE_PROTOCOL, codexSessionTranscript, googleSessionTranscript, finalResponse, nativeLog, validateClaudeResponseLaunch } = require('./vendor-native.js');
 const { INSTRUCTION_READ_PROTOCOL, verifyInstructionReadEvidence } = require('./instruction-read-evidence.js');
 const { readSealedRun } = require('./plan-seal.js');
 const { validateEvidenceReadDirs, snapshotEvidenceReads, validateEvidenceReadLaunch } = require('./evidence-read-access.js');
 const { launchOverlay, loadCatalog } = require('./synara-catalog.js');
 const { resolveRulesRoot } = require('./runtime-paths.js');
-const { SEQUENCE_PROTOCOL, validateLogDestinations, verifyCheckpoint, verifyExecution, verifyPrerequisites } = require('./run-finalize.js');
+const { SEQUENCE_PROTOCOL, interruptedSnapshot, resolveRecovery, validateLogDestinations, verifyCheckpoint, verifyExecution, verifyPrerequisites, verifyRecoveryManifest } = require('./run-finalize.js');
 
 function argError(message) { const e = new Error(message); e.code = 'ARGUMENT_ERROR'; return e; }
 function policyError(message) { const e = new Error(message); e.code = 'POLICY_FAIL'; return e; }
@@ -36,6 +36,7 @@ function parseArgs(argv) {
     '--vendor', '--role', '--class', '--brief', '--cwd', '--model', '--effort', '--dispatch-id', '--unit-id',
     '--evidence-dir', '--telemetry-log', '--activation-log', '--rules-root', '--review-permission-mode',
     '--matrix', '--availability', '--author-vendor', '--seat-profiles', '--skill-source-root', '--plan', '--plan-hash', '--run-dir', '--max-wall-ms', '--capture-sha256',
+    '--prepare-recovery', '--recover-interrupted', '--recovery-sha256',
   ]);
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
@@ -56,9 +57,12 @@ function usage() {
     'Usage: node tools/dispatch-run.js --plan <run-dir/dispatch-plan.json> --dispatch-id <id>',
     '  [--run-dir <dir>] [--availability <json>] [--max-wall-ms <milliseconds>]',
     '  [--rules-root <dir>] [--skill-source-root <dir>] [--on-topic --capture-sha256 <checkpoint hash>]',
+    '  [--prepare-recovery <new request.json> --availability <fresh probes.json>]',
+    '  [--recover-interrupted <request.json> --recovery-sha256 <inspected SHA-256>]',
     '',
     'Runs one fail-closed MAGI CLI seat transaction. Matrix, seat policy, staged skills, rules, proof, and telemetry are enforced in code.',
     'Claude first returns AWAITING_ATTESTATION (ok:false, exit 0). Inspect its response, then attest the same capture hash without relaunching.',
+    'Recovery preserves a stopped OpenAI read-only attempt and launches one replacement. It requires all other plan entries to be committed PASS.',
   ].join('\n');
 }
 
@@ -245,7 +249,50 @@ async function runDispatch(opts, dependencies = {}) {
   if (planPath !== sealed.planPath) throw policyError('dispatch plan must be the sealed run plan');
   const planEntry = sealed.plan.dispatches.find((row) => row.dispatchId === opts.dispatchId);
   if (!planEntry) throw policyError('dispatchId absent from sealed plan');
+  if (opts.prepareRecovery && opts.recoverInterrupted) throw argError('prepare-recovery and recover-interrupted are mutually exclusive');
+  if (opts.recoverySha256 && !opts.recoverInterrupted) throw argError('recovery-sha256 requires recover-interrupted');
+  const recoveryRequested = Boolean(opts.prepareRecovery || opts.recoverInterrupted);
+  let recovery = null;
+  if (recoveryRequested) {
+    if (opts.onTopic || opts.captureSha256 || opts.evidenceDir) throw argError('recovery cannot override evidence or attestation options');
+    bindDispatch({ ...planEntry, ...opts, planHash: seal.planHash }, sealed.matrix, loadAvailability(sealed.availablePath), Date.parse(seal.sealedAt));
+    allowedWorkspace(fs.realpathSync(planEntry.cwd), dependencies.env || process.env);
+    const paths = recoveryPaths(runDir, planEntry);
+    for (const file of [paths.root, paths.manifestPath, paths.transactionPath, paths.attemptRoot]) assertPlainPath(file);
+    if (opts.prepareRecovery) {
+      if (fs.existsSync(paths.root)) throw policyError('a recovery attempt already exists');
+      if (!opts.availability) throw argError('prepare-recovery requires current --availability');
+      const requestPath = path.resolve(opts.prepareRecovery);
+      assertPlainPath(requestPath);
+      if (inside(requestPath, runDir) || inside(requestPath, planEntry.cwd)) throw policyError('prepared recovery request must be outside the sealed run and product');
+      const original = interruptedSnapshot(sealed, planEntry, dependencies);
+      const launch = JSON.parse(fs.readFileSync(path.join(original.evidenceDir, 'launch.json'), 'utf8'));
+      const stopped = (dependencies.assertInterruptedChildStopped || assertInterruptedChildStopped)(original.pid, launch, original.evidenceDir);
+      const manifest = { schemaVersion: 1, protocol: RECOVERY_PROTOCOL, planId: sealed.plan.planId, planHash: seal.planHash, entry: planEntry,
+        attemptRoot: paths.attemptRoot, transactionPath: paths.transactionPath, preparedAt: new Date().toISOString(), original,
+        availability: { path: fs.realpathSync(opts.availability), sha256: hashFile(opts.availability) }, stopped };
+      verifyRecoveryManifest(sealed, planEntry, manifest, { nowMs: Date.now(), dependencies });
+      fs.writeFileSync(requestPath, `${JSON.stringify(manifest, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
+      return { ok: false, status: 'RECOVERY_PREPARED', requestPath, recoverySha256: hashFile(requestPath), nativeCalls: 0 };
+    }
+    if (!/^[a-f0-9]{64}$/.test(opts.recoverySha256 || '')) throw argError('recover-interrupted requires the inspected --recovery-sha256');
+    assertPlainPath(opts.recoverInterrupted);
+    if (hashFile(opts.recoverInterrupted) !== opts.recoverySha256) throw policyError('recovery request differs from its inspected hash');
+    const manifest = JSON.parse(fs.readFileSync(opts.recoverInterrupted, 'utf8'));
+    if (fs.existsSync(paths.root)) {
+      const original = JSON.parse(fs.readFileSync(path.join(runDir, '.magi-dispatches', `${transactionKey(planEntry)}.json`), 'utf8'));
+      const saved = resolveRecovery(sealed, planEntry, original);
+      if (!saved || hashFile(paths.manifestPath) !== opts.recoverySha256 || saved.state.status !== 'PASS') throw policyError('recovery already exists and has no committed PASS; do not relaunch');
+      verifyExecution(sealed, planEntry, saved.state);
+      return { ok: true, replayed: true, proofId: saved.state.telemetry.proofId, receipt: saved.state.receipt, telemetry: saved.state.telemetry };
+    }
+    verifyRecoveryManifest(sealed, planEntry, manifest, { nowMs: Date.now(), dependencies });
+    const oldLaunch = JSON.parse(fs.readFileSync(path.join(manifest.original.evidenceDir, 'launch.json'), 'utf8'));
+    (dependencies.assertInterruptedChildStopped || assertInterruptedChildStopped)(manifest.original.pid, oldLaunch, manifest.original.evidenceDir);
+    recovery = { ...paths, manifest, sha256: opts.recoverySha256, requestPath: path.resolve(opts.recoverInterrupted) };
+  }
   opts = { ...planEntry, planHash: seal.planHash, evidenceDir: path.join(runDir, 'out', opts.dispatchId), ...opts };
+  if (recovery) opts.evidenceDir = path.join(recovery.attemptRoot, 'out', opts.dispatchId);
   required(opts);
   const originalBrief = path.resolve(opts.brief);
   const evidenceDir = path.resolve(opts.evidenceDir);
@@ -258,14 +305,14 @@ async function runDispatch(opts, dependencies = {}) {
   for (const [supplied, canonical] of [[opts.matrix, DEFAULT_MATRIX], [opts.seatProfiles, DEFAULT_PROFILES]]) {
     if (supplied && hashFile(supplied) !== hashFile(canonical)) throw policyError('runtime policy override differs from installed contract');
   }
-  if (opts.availability && hashFile(opts.availability) !== seal.availabilitySha256) {
+  if (!recovery && opts.availability && hashFile(opts.availability) !== seal.availabilitySha256) {
     throw policyError('availability override differs from sealed evidence');
   }
   const matrix = sealed.matrix;
   const availability = loadAvailability(sealed.availablePath);
   const transactionPath = path.join(runDir, '.magi-dispatches', `${transactionKey(planEntry)}.json`);
   assertPlainPath(transactionPath);
-  const savedState = fs.existsSync(transactionPath) ? JSON.parse(fs.readFileSync(transactionPath, 'utf8')) : null;
+  const savedState = !recovery && fs.existsSync(transactionPath) ? JSON.parse(fs.readFileSync(transactionPath, 'utf8')) : null;
   const postRun = planEntry.vendor === 'anthropic';
   let legacyReplay = false;
   if (postRun && opts.onTopic === true && opts.captureSha256 === undefined && savedState?.status === 'PASS' &&
@@ -287,7 +334,9 @@ async function runDispatch(opts, dependencies = {}) {
   if (savedState?.status === 'PASS') verifyExecution(sealed, planEntry, savedState);
   const resumeAt = resuming ? Date.parse(savedState.startedAt) : undefined;
   if (resuming && !Number.isFinite(resumeAt)) throw policyError('completed dispatch is missing its launch time');
-  const binding = bindDispatch(opts, matrix, availability, resumeAt);
+  // The unchanged whole plan remains validated at its seal time. Only the new
+  // physical attempt needs a fresh exact-route probe, checked separately above.
+  const binding = bindDispatch(opts, matrix, availability, recovery ? Date.parse(seal.sealedAt) : resumeAt);
   if (inside(binding.planPath, cwd)) throw policyError('dispatch plan must be outside the product worktree');
   opts = { ...opts, ...binding.entry, cwd, planHash: binding.planHash, planId: binding.plan.planId };
   const telemetryLog = path.resolve(opts.telemetryLog || path.join(runDir, 'telemetry', 'dispatches.jsonl'));
@@ -296,7 +345,7 @@ async function runDispatch(opts, dependencies = {}) {
   for (const file of [telemetryLog, activationLog, evidenceDir]) assertPlainPath(file);
   if (!savedState) {
     if (opts.vendor === 'openai' && opts.role !== 'implement' &&
-        path.win32.resolve(evidenceDir).toLowerCase() !== path.win32.resolve(runDir, 'out', opts.dispatchId).toLowerCase()) {
+        path.win32.resolve(evidenceDir).toLowerCase() !== path.win32.resolve(recovery?.attemptRoot || runDir, 'out', opts.dispatchId).toLowerCase()) {
       throw policyError('OpenAI checking roles require the standard run/out/dispatch-id evidence directory for scoped scratch');
     }
     if (seal.schemaVersion !== 2 || !seal.skillSource) throw policyError('unbound historical seal cannot launch new work; seal a new run');
@@ -317,13 +366,26 @@ async function runDispatch(opts, dependencies = {}) {
     const stagedRules = path.join(evidenceDir, 'brief', 'RULES');
     if (inside(stagedRules, rules.root) || inside(rules.root, stagedRules)) throw policyError('rules source and staging directory must not overlap');
   }
-  const prerequisites = fs.existsSync(transactionPath) ? null : verifyPrerequisites(sealed, binding.entry,
+  const prerequisites = savedState ? null : verifyPrerequisites(sealed, binding.entry,
     ['review', 'verify'].includes(opts.role) ? snapshotWorkspace(cwd) : undefined, new Date().toISOString());
   const evidenceReadDirs = validateEvidenceReadDirs(binding.entry, { plan: sealed.plan, runDir,
     requireExisting: !savedState, forbiddenRoots: [opts.rulesRoot, seal.skillSource?.sourceRoot].filter(Boolean) });
   if (!savedState) snapshotEvidenceReads(evidenceReadDirs);
   opts = { ...opts, evidenceReadDirs };
-  const transaction = reserveTransaction(binding, evidenceDir, postRun ? ATTESTATION_PROTOCOL : undefined);
+  let transaction;
+  if (recovery) {
+    // Exclusive directory creation is the one-attempt reservation. A crash here
+    // leaves inspectable incomplete lineage and never permits an automatic retry.
+    fs.mkdirSync(path.dirname(recovery.root), { recursive: true });
+    fs.mkdirSync(recovery.root);
+    fs.copyFileSync(recovery.requestPath, recovery.manifestPath, fs.constants.COPYFILE_EXCL);
+    if (hashFile(recovery.manifestPath) !== recovery.sha256) throw policyError('recovery request changed during reservation');
+    const startedAt = new Date().toISOString();
+    verifyRecoveryManifest(sealed, binding.entry, recovery.manifest, { nowMs: Date.parse(startedAt), dependencies });
+    transaction = { file: recovery.transactionPath, state: { schemaVersion: 1, status: 'RUNNING', requestHash: hashText(JSON.stringify({ planHash: binding.planHash, entry: binding.entry })),
+      planHash: binding.planHash, planId: binding.plan.planId, entry: binding.entry, evidenceDir, startedAt, recoverySha256: recovery.sha256 }, replayed: false };
+    fs.writeFileSync(transaction.file, `${JSON.stringify(transaction.state)}\n`, { encoding: 'utf8', flag: 'wx' });
+  } else transaction = reserveTransaction(binding, evidenceDir, postRun ? ATTESTATION_PROTOCOL : undefined);
   const responseProtocol = opts.vendor === 'anthropic' ? CLAUDE_RESPONSE_PROTOCOL : undefined;
   if (transaction.pending) {
     if (attesting) return acceptCheckpoint(sealed, binding.entry, transaction, opts.captureSha256);
@@ -377,7 +439,7 @@ async function runDispatch(opts, dependencies = {}) {
     vendor: opts.vendor, role: opts.role, briefPath: brief, cwd: opts.cwd, model: opts.model,
     effort: opts.vendor === 'google' ? undefined : opts.effort,
     capturePath, skillRoot: skillStage.root, seatContractPath,
-    runDir, dispatchId: opts.dispatchId, readonlyScratch: opts.vendor === 'openai' && opts.role !== 'implement',
+    runDir: recovery?.attemptRoot || runDir, dispatchId: opts.dispatchId, readonlyScratch: opts.vendor === 'openai' && opts.role !== 'implement',
     reviewPermissionMode: opts.reviewPermissionMode,
     responseProtocol,
     env: policyEnv,
@@ -422,11 +484,13 @@ async function runDispatch(opts, dependencies = {}) {
     ...(evidenceReadDirs.length ? { evidenceReadDirs, evidenceReadsSha256: hashText(JSON.stringify(evidenceReadsBefore)) } : {}),
     ...(postRun ? { attestationProtocol: ATTESTATION_PROTOCOL, logDestinations: { telemetryLog, activationLog } } : {}),
     sequenceProtocol: SEQUENCE_PROTOCOL, startedAt: transaction.state.startedAt, prerequisites,
+    ...(recovery ? { recoverySha256: recovery.sha256 } : {}),
     matrixVersion: matrix.schemaVersion, seatProfileVersion: seatProfiles.schemaVersion,
     seatContractPath, skillManifestPath: skillStage.manifestPath, runtimeSha256,
   });
 
   const protectedPaths = [binding.planPath, sealed.sealPath, sealed.availablePath, originalBrief, DEFAULT_MATRIX, DEFAULT_PROFILES, brief, seatContractPath, staged.manifestPath, skillStage.manifestPath, path.join(evidenceDir, 'seat-profile.json'), launchPath,
+    ...(recovery ? [recovery.manifestPath, recovery.manifest.availability.path] : []),
     ...Object.entries(skillStage.manifest.skills).flatMap(([skill, files]) => files.map((file) => path.join(skillStage.root, skill, file.path))),
     ...staged.manifest.files.map((item) => path.join(path.dirname(brief), item.path))];
   const protectedHashes = protectedPaths.map((file) => ({ path: file, sha256: hashFile(file) }));
@@ -442,6 +506,11 @@ async function runDispatch(opts, dependencies = {}) {
   atomicJson(path.join(evidenceDir, 'skills-source-before.json'), skillsBefore);
   if (JSON.stringify(evidenceReadsBefore) !== JSON.stringify(snapshotEvidenceReads(evidenceReadDirs))) throw policyError('read-only evidence inputs changed before launch');
   if (evidenceReadDirs.length) atomicJson(path.join(evidenceDir, 'evidence-reads-before.json'), evidenceReadsBefore);
+  if (recovery) {
+    verifyRecoveryManifest(sealed, binding.entry, recovery.manifest, { nowMs: Date.now(), dependencies });
+    (dependencies.assertInterruptedChildStopped || assertInterruptedChildStopped)(recovery.manifest.original.pid,
+      JSON.parse(fs.readFileSync(path.join(recovery.manifest.original.evidenceDir, 'launch.json'), 'utf8')), recovery.manifest.original.evidenceDir);
+  }
   const result = await (dependencies.runLaunch || runLaunch)(launch, { pidFile, stdoutFile: stdoutPath, stderrFile: stderrPath, maxWallMs, signal: dependencies.signal });
   for (const file of [telemetryLog, activationLog, capturePath, path.join(evidenceDir, 'vendor.log'), transaction.file, path.join(runDir, '.magi-sessions'), ...(launch.nativeLogPath ? [launch.nativeLogPath] : []), ...(launch.synaraCaptureEventsPath ? [launch.synaraCaptureEventsPath] : [])]) assertPlainPath(file);
   const after = snapshotWorkspace(cwd);
@@ -474,8 +543,12 @@ async function runDispatch(opts, dependencies = {}) {
   verifySeatSkills({ destinationRoot: skillStage.root, skills: seatProfile.skills, manifest: skillStage.manifest });
   if (!fs.existsSync(capturePath) || !fs.readFileSync(capturePath, 'utf8').trim()) throw Object.assign(new Error('vendor capture missing or empty'), { code: 'PROOF_FAIL' });
   const modelSpec = matrix.vendors[opts.vendor].models[opts.model];
-  const proof = (postRun ? verifyNativeProof : verifyProof)({ vendor: opts.vendor, capture: capturePath, log: path.join(evidenceDir, 'vendor.log'), expectedModel: opts.model, expectedObservedModel: modelSpec.canonical || opts.model, expectedEffort: opts.effort, expectedSandbox: launch.requestedSandbox, launch, runDir, dispatchId: opts.dispatchId, expectedRole: opts.role, expectedCwd: cwd, onTopic: opts.onTopic, responseProtocol });
+  const proof = (postRun ? verifyNativeProof : verifyProof)({ vendor: opts.vendor, capture: capturePath, log: path.join(evidenceDir, 'vendor.log'), expectedModel: opts.model, expectedObservedModel: modelSpec.canonical || opts.model, expectedEffort: opts.effort, expectedSandbox: launch.requestedSandbox, launch, runDir: recovery?.attemptRoot || runDir, dispatchId: opts.dispatchId, expectedRole: opts.role, expectedCwd: cwd, onTopic: opts.onTopic, responseProtocol });
   const sessionId = proof.sessionId || proof.conversationId;
+  if (recovery) {
+    verifyRecoveryManifest(sealed, binding.entry, recovery.manifest, { nowMs: Date.parse(transaction.state.startedAt), dependencies });
+    if (sessionId === recovery.manifest.original.native.sessionId) throw policyError('replacement reused the interrupted native session');
+  }
   const captureText = fs.readFileSync(capturePath, 'utf8');
   const transcript = opts.vendor === 'anthropic' ? { path: capturePath, text: captureText } :
     (opts.vendor === 'openai' ? (dependencies.codexSessionTranscript || codexSessionTranscript) : (dependencies.googleSessionTranscript || googleSessionTranscript))

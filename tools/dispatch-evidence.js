@@ -7,6 +7,7 @@ const { execFileSync, spawnSync } = require('node:child_process');
 
 const ATTESTATION_PROTOCOL = 'magi-claude-post-run-attestation-v1';
 const AWAITING_ATTESTATION = 'AWAITING_ATTESTATION';
+const RECOVERY_PROTOCOL = 'magi-interrupted-readonly-v1';
 
 function evidenceError(message, code = 'EVIDENCE_FAIL') { return Object.assign(new Error(message), { code }); }
 function hash(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
@@ -84,6 +85,32 @@ function compareWorkspace(before, after, scope = []) {
   return { ok: !gitChanged && changedFiles.every((file) => file.allowed), changedFiles, gitChanged, coverage: after.coverage };
 }
 function transactionKey(entry) { return hash(JSON.stringify([entry.dispatchId, entry.unitId, entry.role])); }
+function recoveryPaths(runRoot, entry) {
+  const root = path.join(runRoot, '.magi-recoveries', transactionKey(entry));
+  return { root, manifestPath: path.join(root, 'recovery.json'), transactionPath: path.join(root, 'transaction.json'), attemptRoot: path.join(root, 'attempt') };
+}
+function assertInterruptedChildStopped(pid, launch, evidenceDir) {
+  if (!Number.isSafeInteger(pid) || pid < 1) throw evidenceError('interrupted child PID is missing or invalid');
+  try { process.kill(pid, 0); throw evidenceError('interrupted child is still live'); }
+  catch (error) { if (error.code !== 'ESRCH') throw evidenceError(`interrupted child liveness is live or unknown: ${error.message}`); }
+  // A dead parent PID does not establish that an orphan native child is gone.
+  // Inspect the Windows process inventory without interpolating shell arguments.
+  if (process.platform !== 'win32') throw evidenceError('interrupted child process inventory is unsupported on this platform');
+  const raw = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    'Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine | ConvertTo-Json -Compress'],
+  { encoding: 'utf8', timeout: 15000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  const rows = JSON.parse(raw);
+  if (!Array.isArray(rows) || !rows.length) throw evidenceError('interrupted child process inventory is unknown');
+  const exe = path.basename(launch.binary).toLowerCase();
+  const needle = evidenceDir.replaceAll('\\', '/').toLowerCase();
+  for (const row of rows) {
+    if (row.ProcessId === pid || row.ParentProcessId === pid) throw evidenceError('interrupted child or descendant is still live');
+    if (String(row.Name).toLowerCase() !== exe) continue;
+    if (typeof row.CommandLine !== 'string' || !row.CommandLine) throw evidenceError('native process command line is unknown');
+    if (row.CommandLine.replaceAll('\\', '/').toLowerCase().includes(needle)) throw evidenceError('interrupted native attempt is still live');
+  }
+  return { pid, status: 'ABSENT', checkedAt: new Date().toISOString(), method: 'pid-and-windows-process-inventory' };
+}
 function reserveTransaction(binding, evidenceDir, attestationProtocol) {
   const root = path.join(path.dirname(binding.planPath), '.magi-dispatches');
   assertPlainPath(root);
@@ -118,11 +145,28 @@ function appendUniqueRow(file, row) {
   fs.appendFileSync(file, `${JSON.stringify(row)}\n`, 'utf8');
   return true;
 }
+function committedRunRoot(row) {
+  const directory = path.dirname(row.transactionPath);
+  if (path.basename(directory) === '.magi-dispatches') return path.dirname(directory);
+  if (path.basename(row.transactionPath) === 'transaction.json' && path.basename(path.dirname(directory)) === '.magi-recoveries' && /^[a-f0-9]{64}$/.test(path.basename(directory))) return path.dirname(path.dirname(directory));
+  throw evidenceError('committed transaction has an unrecognized run location');
+}
 function verifyCommittedRow(row, { checkLogs = true } = {}) {
   if (row.schemaVersion !== 2 || row.status !== 'PASS' || !row.transactionPath) throw evidenceError('activation requires a committed dispatch transaction');
   const state = JSON.parse(fs.readFileSync(row.transactionPath, 'utf8'));
   if (state.status !== 'PASS' || JSON.stringify(state.telemetry) !== JSON.stringify(row)) throw evidenceError('telemetry and committed transaction disagree');
   verifyArtifacts(state);
+  const root = committedRunRoot(row);
+  if (path.basename(path.dirname(row.transactionPath)) !== '.magi-dispatches') {
+    const { readSealedRun } = require('./plan-seal.js');
+    const { resolveRecovery } = require('./run-finalize.js');
+    const run = readSealedRun(root);
+    const entry = run.plan.dispatches.find(item => item.dispatchId === row.dispatchId);
+    if (!entry || !state.recoverySha256) throw evidenceError('committed replacement is missing recovery lineage');
+    const original = JSON.parse(fs.readFileSync(path.join(root, '.magi-dispatches', `${transactionKey(entry)}.json`), 'utf8'));
+    const recovery = resolveRecovery(run, entry, original);
+    if (!recovery || recovery.transactionPath !== row.transactionPath || JSON.stringify(recovery.state) !== JSON.stringify(state)) throw evidenceError('committed replacement lineage changed');
+  }
   for (const log of checkLogs ? state.logs || [] : []) {
     const matches = fs.readFileSync(log, 'utf8').split(/\r?\n/).filter(Boolean).map(JSON.parse).filter((item) => item.dispatchId === row.dispatchId && item.unitId === row.unitId && item.role === row.role);
     if (matches.length !== 1 || JSON.stringify(matches[0]) !== JSON.stringify(row)) throw evidenceError('dispatch log and committed transaction disagree');
@@ -138,4 +182,4 @@ function verifyArtifacts(state) {
   }
 }
 
-module.exports = { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, appendUniqueRow, assertPlainPath, compareWorkspace, hash, hashFile, inside, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, verifyArtifacts, verifyCommittedRow, writeJson };
+module.exports = { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, RECOVERY_PROTOCOL, appendUniqueRow, assertPlainPath, assertInterruptedChildStopped, committedRunRoot, compareWorkspace, hash, hashFile, inside, recoveryPaths, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, verifyArtifacts, verifyCommittedRow, writeJson };

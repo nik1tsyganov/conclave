@@ -3,7 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { finalizeRun } = require('./run-finalize.js');
-const { verifyCommittedRow } = require('./dispatch-evidence.js');
+const { committedRunRoot, verifyCommittedRow } = require('./dispatch-evidence.js');
 
 function main(argv = process.argv.slice(2)) {
   try {
@@ -19,7 +19,7 @@ function main(argv = process.argv.slice(2)) {
       const rows = text.split(/\r?\n/).filter(Boolean).map(JSON.parse);
       if (!rows.length) throw new Error('empty dispatch log');
       const roots = new Set();
-      for (const row of rows) { verifyCommittedRow(row); roots.add(path.dirname(path.dirname(row.transactionPath))); }
+      for (const row of rows) { verifyCommittedRow(row); roots.add(committedRunRoot(row)); }
       if (roots.size !== 1) throw new Error('activation log contains multiple runs');
       runDir = [...roots][0];
     } else throw new Error('Usage: activation-check --run-dir <sealed run> | <committed dispatch log>');

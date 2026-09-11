@@ -197,6 +197,44 @@ The issues directory is the durable queue. Link recurring symptoms to earlier re
 
 Give the next repair session the report directory and original run directory. Reproduce first. Fix only the proven cause. Add a relevant regression test, obtain independent verification and review, then run the same project acceptance checks in a fresh attempt. Keep the old failure. Close its TRIAGE entry by linking the passing correction; do not replace its generated report.
 
+## Recover a host-interrupted read-only attempt
+
+A host crash can leave a `RUNNING` transaction after its native child stops. Do
+not delete that transaction, change its status, or resume its native session.
+The explicit recovery command supports OpenAI `review`, `verify`, and `plan`
+entries with empty write scope and the existing bound read-only scratch profile.
+All other entries in the sealed plan must already have committed PASS evidence.
+Implementation and other vendor recovery are unsupported.
+
+First capture a fresh native availability probe for the exact interrupted
+model/effort. The new availability file needs only that route. The original sealed
+availability remains unchanged. Prepare an external request file:
+
+```powershell
+node tools/dispatch-run.js --plan "$magiRun/dispatch-plan.json" --dispatch-id r2 --prepare-recovery "$magiAttempt/recovery-request.json" --availability "$magiAttempt/fresh-availability.json"
+```
+
+Preparation launches no child. Inspect the returned request, original native ID,
+stopped-child evidence, frozen file inventories, prerequisite hashes, and the
+returned `recoverySha256`. Then use that exact hash:
+
+```powershell
+node tools/dispatch-run.js --plan "$magiRun/dispatch-plan.json" --dispatch-id r2 --recover-interrupted "$magiAttempt/recovery-request.json" --recovery-sha256 <inspected-sha256>
+```
+
+Supply the normal configured rules and skill sources for the new launch. The
+runtime rechecks process liveness, frozen inputs, and current route availability.
+It writes one exclusive replacement below `.magi-recoveries/<logical-key>/`.
+The original transaction and `out/r2` remain unchanged. The replacement uses a
+new native session and its own restricted scratch directory. Normal instruction,
+proof, scope, approval, and tally checks still apply.
+
+Missing or terminal original evidence, live or unknown children, drift, and
+incomplete or duplicate recovery lineage stop recovery. A failed or interrupted
+replacement cannot relaunch. A completed replacement can replay without another
+child. Finalization validates both attempts, credits the replacement once, and
+reports the original interruption separately. Preserve both evidence trees.
+
 ## Synara as the outer harness
 
 Preflight and the watchdog share one file-only hook inspector. The known Windows
