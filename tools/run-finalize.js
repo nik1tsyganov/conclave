@@ -596,5 +596,5 @@ function main(argv = process.argv.slice(2)) {
     process.stdout.write(`${JSON.stringify(result)}\n`); return result.ok ? 0 : 1;
   } catch (error) { process.stderr.write(`RUN_FINALIZE_FAIL: ${error.message}\n`); return 1; }
 }
-if (require.main === module) process.exitCode = main();
 module.exports = { SEQUENCE_PROTOCOL, assessRun, failedRecoverySnapshot, finalizeRun, inspectRun, interruptedSnapshot, main, nativePosition, resolveRecovery, shouldLinkVault, tallyUnit, validateLogDestinations, verifyCheckpoint, verifyExecution, verifyPrerequisites, verifyRecoveryManifest };
+if (require.main === module) process.exitCode = main();

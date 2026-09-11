@@ -452,7 +452,7 @@ test('second recovery forbids both earlier native IDs and a concurrent second la
   release(); assert.equal((await running).ok, true); assert.equal(native.calls(), 1);
 });
 
-test('second recovery finalization and activation retain six logical entries and reject missing lineage', async t => {
+test('second recovery direct CLI finalization and activation retain six logical entries and reject missing lineage', async t => {
   const f = await failedRecovery(t, [
     ...Array.from({ length: 3 }, () => ({ role: 'plan', class: 'architecture-planning', model: 'gpt-5.6-sol', effort: 'high' })),
     { unitId: 'product', vendor: 'google', model: 'gemini-3.8-flash-medium', effort: 'fused-medium' },
@@ -466,7 +466,12 @@ test('second recovery finalization and activation retain six logical entries and
   const prepared = await runDispatch({ ...f.opts, prepareRecovery: f.secondRequest, recoveryAttempt: 2 }, f.deps);
   await runDispatch({ ...f.opts, recoverInterrupted: f.secondRequest, recoverySha256: prepared.recoverySha256 },
     { ...f.deps, ...fakeVendor(), assertInterruptedChildStopped: f.deps.assertInterruptedChildStopped });
-  const final = finalizeRun(f.run.runDir);
+  const cli = require('node:child_process').spawnSync(process.execPath,
+    [path.join(__dirname, 'run-finalize.js'), '--run-dir', f.run.runDir],
+    { encoding: 'utf8', windowsHide: true, env: { ...process.env, MAGI_VAULT_LINK: '0' } });
+  assert.equal(cli.status, 0, `${cli.stderr}\n${cli.stdout}`);
+  assert.equal(cli.stderr, '');
+  const final = JSON.parse(cli.stdout);
   assert.equal(final.ok, true); assert.equal(final.outcomes.length, 6); assert.equal(inspectRun(f.run.runDir).executions.length, 6);
   assert.deepEqual(evidence.snapshotWorkspace(path.join(f.run.runDir, '.magi-dispatches')), originals);
   assert.deepEqual(evidence.snapshotWorkspace(path.join(f.run.runDir, 'out')), originalOutput);
