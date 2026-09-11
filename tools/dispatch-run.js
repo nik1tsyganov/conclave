@@ -83,7 +83,7 @@ function seatContractText(opts, seatProfile, skillStage, ruleStage) {
   const instructionFiles = [path.join(ruleStage.briefDir, 'BRIEF.md'), contractPath,
     ruleStage.manifestPath, ...ruleStage.manifest.files.map(file => path.join(ruleStage.briefDir, file.path)),
     skillStage.manifestPath, ...seatProfile.skills.map(skill => path.join(skillStage.root, skill, 'SKILL.md'))];
-  const openaiReadRecipe = file => `const r = await tools.exec_command(${JSON.stringify({ cmd: `Get-Content -Raw -LiteralPath '${file.replaceAll('\\', '/').replaceAll("'", "''")}' -Encoding UTF8`, workdir: opts.cwd.replaceAll('\\', '/'), max_output_tokens: 10000 })}); text(r.output);`;
+  const openaiReadRecipe = file => `const r = await tools.exec_command(${JSON.stringify({ cmd: `Get-Content -Raw -LiteralPath '${file.replaceAll('\\', '/').replaceAll("'", "''")}' -Encoding UTF8`, max_output_tokens: 10000 })}); text(r.output);`;
   return [
     '# MAGI CLI seat contract',
     '',
@@ -577,7 +577,7 @@ async function runDispatch(opts, dependencies = {}) {
   writeJson(path.join(evidenceDir, 'instruction-transcript.json'), transcriptBinding);
   let instructionReads;
   try {
-    instructionReads = verifyInstructionReadEvidence({ vendor: opts.vendor, sessionId, captureText,
+    instructionReads = verifyInstructionReadEvidence({ vendor: opts.vendor, sessionId, captureText, expectedCwd: cwd,
       transcriptText: transcript.text, googleTranscriptBinding: { conversationId: sessionId, sha256: transcriptBinding.sha256 },
       briefPath: brief, seatContractPath, skillRoot: skillStage.root, seatProfile,
       rulesManifest: staged.manifest, skillsManifest: skillStage.manifest });

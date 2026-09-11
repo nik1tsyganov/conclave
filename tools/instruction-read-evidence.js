@@ -122,19 +122,21 @@ function codexReadCall(item) {
   if (!match) return null;
   let args;
   try { args = JSON.parse(match[2]); } catch { return null; }
-  if (!args || JSON.stringify(Object.keys(args).sort()) !== JSON.stringify(['cmd', 'max_output_tokens', 'workdir']) ||
-    typeof args.cmd !== 'string' || typeof args.workdir !== 'string' || !Number.isSafeInteger(args.max_output_tokens) ||
+  const keys = args && Object.keys(args).sort().join(',');
+  if (!['cmd,max_output_tokens', 'cmd,max_output_tokens,workdir'].includes(keys) ||
+    typeof args.cmd !== 'string' || (Object.hasOwn(args, 'workdir') && typeof args.workdir !== 'string') || !Number.isSafeInteger(args.max_output_tokens) ||
     args.max_output_tokens < 1 || args.max_output_tokens > 20000) return null;
   const command = args.cmd.match(/^Get-Content -Raw -LiteralPath '((?:[^']|'')+)' -Encoding UTF8$/);
   if (!command) return null;
   return { args, file: command[1].replaceAll("''", "'") };
 }
 
-function codexReads(rows, sessionId, required) {
+function codexReads(rows, sessionId, required, expectedCwd) {
   const metadata = rows.filter(row => row.type === 'session_meta');
   if (metadata.length !== 1 || metadata[0].payload?.id !== sessionId ||
     (metadata[0].payload.session_id !== undefined && metadata[0].payload.session_id !== sessionId)) fail('Codex transcript session mismatch');
   const cwd = plainPath(metadata[0].payload.cwd);
+  if (cwd !== plainPath(expectedCwd)) fail('Codex transcript cwd does not match the expected dispatch cwd');
   const found = new Map(); const seen = new Set(); const executions = new Set(); let pending = null;
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index]; const item = row.payload;
@@ -147,7 +149,9 @@ function codexReads(rows, sessionId, required) {
       }
       const key = plainPath(read.file);
       if (!required.has(key)) { requireComplete(found, required); continue; }
-      if (!item.call_id || seen.has(item.call_id) || plainPath(read.args.workdir) !== cwd) fail('Codex read call identity or cwd mismatch');
+      // An omitted workdir uses the native turn cwd; the command execution below
+      // must still prove that exact cwd, independent of the supplied arguments.
+      if (!item.call_id || seen.has(item.call_id) || (Object.hasOwn(read.args, 'workdir') && plainPath(read.args.workdir) !== cwd)) fail('Codex read call identity or cwd mismatch');
       seen.add(item.call_id);
       pending = { ...read, key, callId: item.call_id, requestEvent: index + 1 };
     } else if (row.type === 'event_msg' && item?.type === 'item_completed' && item.item?.type === 'CommandExecution') {
@@ -253,7 +257,7 @@ function verifyInstructionReadEvidence(options) {
     const nativeText = options.vendor === 'anthropic' ? options.captureText : options.transcriptText;
     const nativeRows = records(nativeText);
     const found = options.vendor === 'google' ? googleReads(nativeRows, required) :
-      (options.vendor === 'anthropic' ? claudeReads : codexReads)(nativeRows, options.sessionId, required);
+      (options.vendor === 'anthropic' ? claudeReads : codexReads)(nativeRows, options.sessionId, required, options.expectedCwd);
     return { protocol: INSTRUCTION_READ_PROTOCOL, status: 'PASS', vendor: options.vendor, sessionId: options.sessionId,
       requiredSetSha256: collected.requiredSetSha256, evidenceSha256: hash(nativeText),
       files: collected.files.map(file => ({ path: file.path, sha256: file.sha256, ...found.get(plainPath(file.path)) })) };

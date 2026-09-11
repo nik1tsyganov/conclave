@@ -93,11 +93,29 @@ test('generated OpenAI contract carries exact unbatched reads for every staged f
     const contract = fs.readFileSync(launch.seatContractPath, 'utf8');
     const commands = [...contract.matchAll(/const r = await tools\.exec_command\((\{[^\n]+\})\); text\(r.output\);/g)].map(match => JSON.parse(match[1]));
     assert.equal(commands.length, 31); // The bootstrap contract read is the 32nd required file.
-    assert.ok(commands.every(command => command.workdir === launch.cwd.replaceAll('\\', '/') && !command.cmd.includes('\\') && /^Get-Content -Raw -LiteralPath '.+' -Encoding UTF8$/.test(command.cmd)));
+    assert.ok(commands.every(command => !Object.hasOwn(command, 'workdir') && !command.cmd.includes('\\') && /^Get-Content -Raw -LiteralPath '.+' -Encoding UTF8$/.test(command.cmd)));
     assert.match(contract, /ONE functions.exec invocation per code block/);
     assert.ok(commands.every(command => !command.cmd.includes(launch.seatContractPath.replaceAll('\\', '/'))));
   });
   assert.equal((await runDispatch({ ...run.opts, dispatchId: 'd1' }, native)).ok, true);
+});
+
+test('OpenAI omitted-workdir native reads pass dispatch, replay and finalization', async t => {
+  const run = createSealedRun(t, routes), native = fakeVendor(), collect = native.codexSessionTranscript;
+  native.codexSessionTranscript = (...args) => {
+    const result = collect(...args), events = rows(result.text);
+    for (const event of events) if (event.type === 'response_item' && event.payload?.type === 'custom_tool_call') {
+      const command = JSON.parse(event.payload.input.match(/tools\.exec_command\((\{[^\n]+\})\)/)[1]);
+      delete command.workdir;
+      event.payload.input = `const r = await tools.exec_command(${JSON.stringify(command)}); text(r.output);`;
+    }
+    return { ...result, text: encode(events) };
+  };
+  for (const entry of run.dispatches) assert.equal((await completeSyntheticDispatch({ ...run.opts, dispatchId: entry.dispatchId }, native)).ok, true);
+  native.codexSessionTranscript = () => { throw Error('replay must use the committed native transcript'); };
+  assert.equal((await runDispatch({ ...run.opts, dispatchId: run.dispatches[1].dispatchId }, native)).replayed, true);
+  assert.equal(finalizeRun(run.runDir).ok, true);
+  assert.equal(native.calls(), 3);
 });
 
 test('OpenAI native read proof accepts equivalent forward paths without changing canonical metadata', async t => {

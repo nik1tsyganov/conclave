@@ -123,12 +123,12 @@ test('OpenAI first-read recipe uses forward paths and reads an apostrophe path o
   const pointer = fs.readFileSync(launch.stdinFile, 'utf8');
   const match = pointer.match(/const r = await tools\.exec_command\((\{[^\n]+\})\); text\(r.output\);/);
   assert.ok(match); const args = JSON.parse(match[1]);
-  assert.strictEqual(args.workdir, cwd.replaceAll('\\', '/')); assert.ok(!args.cmd.includes('\\'));
+  assert.strictEqual(Object.hasOwn(args, 'workdir'), false); assert.ok(!args.cmd.includes('\\'));
   assert.ok(args.cmd.includes("O''Brien [read]")); assert.ok(args.cmd.includes("SEAT''S-CONTRACT.md"));
   assert.strictEqual(launch.cwd, cwd, 'native launch cwd retains its original canonical form');
-  assert.deepStrictEqual(Object.keys(args).sort(), ['cmd', 'max_output_tokens', 'workdir']);
+  assert.deepStrictEqual(Object.keys(args).sort(), ['cmd', 'max_output_tokens']);
   const output = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', args.cmd],
-    { cwd: args.workdir, encoding: 'utf8', windowsHide: true, timeout: 10000 });
+    { cwd: launch.cwd, encoding: 'utf8', windowsHide: true, timeout: 10000 });
   assert.strictEqual(output.trimEnd(), content);
 });
 

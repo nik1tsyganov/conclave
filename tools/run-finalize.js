@@ -392,7 +392,7 @@ function verifySavedExecution(run, entry, state, pending, allowReceiptProjection
   if (entry.vendor === 'anthropic' && (transcriptText !== captureText || transcriptBinding.sourcePath !== artifact('capture.txt'))) throw new Error('Claude instruction transcript differs from its native capture');
   const seatProfile = buildSeatProfile(loadProfiles(), entry);
   same(readJson(artifact('seat-profile.json')), seatProfile, 'instruction seat profile');
-  const instructionReads = verifyInstructionReadEvidence({ vendor: entry.vendor, sessionId, captureText, transcriptText,
+  const instructionReads = verifyInstructionReadEvidence({ vendor: entry.vendor, sessionId, captureText, transcriptText, expectedCwd: entry.cwd,
     googleTranscriptBinding: { conversationId: sessionId, sha256: transcriptBinding.sha256 },
     briefPath: artifact('brief/BRIEF.md'), seatContractPath: artifact('SEAT-CONTRACT.md'), skillRoot: artifact('skills'), seatProfile,
     rulesManifest: readJson(artifact('brief/rules-manifest.json')), skillsManifest: readJson(artifact('skills/skills-manifest.json')) });
