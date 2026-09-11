@@ -19,6 +19,9 @@ const READ_ONLY_ROLES = new Set(['review', 'verify', 'plan', 'research']);
 const OPENAI_SCRATCH_PROTOCOL = 'magi-openai-readonly-scratch-v1';
 const GOOGLE_CAPTURE_EVENTS = 'synara-capture-events.jsonl';
 const SYNARA_CAPTURE_TRUST = 'diagnostic-untrusted';
+// Session-only settings keep exact-model dispatches within their admitted seat.
+// A classifier refusal remains a refusal; no safety classifier is disabled.
+const CLAUDE_EXACT_MODEL_SETTINGS = JSON.stringify({ switchModelsOnFlag: false, fallbackModel: [] });
 
 function roleSandbox(role) {
   if (role === 'implement') return 'workspace-write';
@@ -247,7 +250,7 @@ function anthropicLaunch(opts) {
     : 'dontAsk';
   // Keep authenticated native tools and permissions, but exclude global hooks,
   // plugins and instruction discovery. Leaf context is read from staged files.
-  const args = ['-p', '--safe-mode', '--model', ctx.model, '--effort', ctx.effort, '--permission-mode', permissionMode, '--add-dir', ctx.cwd];
+  const args = ['-p', '--safe-mode', '--settings', CLAUDE_EXACT_MODEL_SETTINGS, '--model', ctx.model, '--effort', ctx.effort, '--permission-mode', permissionMode, '--add-dir', ctx.cwd];
   if (ctx.role !== 'implement') args.push('--tools', 'Read,Glob,Grep', '--allowedTools', 'Read,Glob,Grep');
   const addDirs = [path.dirname(ctx.brief.briefPath), ctx.skillRoot, path.dirname(ctx.seatContractPath), ...ctx.evidenceReadDirs];
   if (opts.rulesRoot) addDirs.push(opts.rulesRoot);
@@ -271,4 +274,4 @@ function buildLaunch(opts) {
   throw new Error(`unsupported vendor: ${opts.vendor}`);
 }
 
-module.exports = { DEFAULTS, READ_ONLY_ROLES, OPENAI_SCRATCH_PROTOCOL, GOOGLE_CAPTURE_EVENTS, SYNARA_CAPTURE_TRUST, allowedWorkspace, anthropicLaunch, buildLaunch, googleCaptureEnv, googleLaunch, openaiLaunch, openaiScratchPolicy, validateOpenaiScratchLaunch, roleSandbox, seatPointerFile, seatPointerText, subscriptionEnv };
+module.exports = { DEFAULTS, READ_ONLY_ROLES, OPENAI_SCRATCH_PROTOCOL, GOOGLE_CAPTURE_EVENTS, SYNARA_CAPTURE_TRUST, CLAUDE_EXACT_MODEL_SETTINGS, allowedWorkspace, anthropicLaunch, buildLaunch, googleCaptureEnv, googleLaunch, openaiLaunch, openaiScratchPolicy, validateOpenaiScratchLaunch, roleSandbox, seatPointerFile, seatPointerText, subscriptionEnv };

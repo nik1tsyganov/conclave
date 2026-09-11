@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { resolveVendorBinary } = require('./vendor-binaries.js');
-const { allowedWorkspace, googleCaptureEnv, subscriptionEnv } = require('./cli-adapters.js');
+const { allowedWorkspace, googleCaptureEnv, subscriptionEnv, CLAUDE_EXACT_MODEL_SETTINGS } = require('./cli-adapters.js');
 const { loadMatrix } = require('./dispatch-matrix.js');
 const { runLaunch } = require('./cli-runner.js');
 const { verifyProof } = require('./cli-proof.js');
@@ -51,7 +51,7 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
   let args;
   if (vendor === 'openai') args = ['exec', '--skip-git-repo-check', '-s', 'read-only', '-m', model, '-c', `model_reasoning_effort=${effort}`, '-c', 'memories.use_memories=false', '-c', 'memories.generate_memories=false', '-C', canonicalWork, '-o', capture, '-'];
   if (vendor === 'google') args = ['--model', model, '--sandbox', '--output-format', 'json', '--print-timeout', '2m', '--log-file', nativeLogPath, '--add-dir', canonicalWork, '-p', prompt];
-  if (vendor === 'anthropic') args = ['-p', '--safe-mode', '--model', model, '--effort', effort, '--permission-mode', 'dontAsk', '--tools', '', '--output-format', 'stream-json', '--verbose'];
+  if (vendor === 'anthropic') args = ['-p', '--safe-mode', '--settings', CLAUDE_EXACT_MODEL_SETTINGS, '--model', model, '--effort', effort, '--permission-mode', 'dontAsk', '--tools', '', '--output-format', 'stream-json', '--verbose'];
   const captureMetadata = captureIsolation ? { synaraCaptureEventsPath: captureIsolation.eventsPath, synaraCaptureEventsTrust: captureIsolation.trust } : {};
   const launch = { vendor, binary, args, env, cwd: canonicalWork, stdinFile, stdio: vendor === 'google' ? ['ignore', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'], ...captureMetadata };
   const startedAt = new Date().toISOString();

@@ -76,6 +76,7 @@ test('Claude non-implement roles do not inherit implement bypassPermissions', (t
     assert.ok(!JSON.stringify(CLAUDE_RESPONSE_SCHEMA).includes('minLength'));
     assert.strictEqual(launch.permissionMode, role === 'implement' ? 'bypassPermissions' : 'dontAsk');
     assert.ok(launch.args.includes('--safe-mode'), 'global hooks and skills must not override a leaf contract');
+    assert.deepStrictEqual(JSON.parse(launch.args[launch.args.indexOf('--settings') + 1]), { switchModelsOnFlag: false, fallbackModel: [] }, 'exact-model runs must preserve refusals and never switch to an unadmitted model');
     assert.ok(!launch.args.includes('--bare'), 'bare mode disables subscription OAuth');
     assert.ok(!launch.args.includes('--system-prompt'), 'native system controls must remain in place');
     assert.ok(!launch.args.includes('--append-system-prompt'));
