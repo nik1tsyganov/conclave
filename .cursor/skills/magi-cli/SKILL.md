@@ -73,4 +73,4 @@ The runtime commits a transaction only after plan binding, acknowledgment, proof
 
 Review responses end with exactly one `POSITION: APPROVE`, `POSITION: REJECT`, or `POSITION: ABSTAIN` line. `panel-tally.js` extracts votes from verified native responses. Grok never writes ballots or votes. No model can waive deterministic failure.
 
-`cli-launch.js` and standalone `cli-smoke.js` are transport diagnostics, not production activation paths. Use `npm run check` and the explicit-root `cross-repo-check.js` for offline validation. Native acceptance remains a separate target-machine check.
+`cli-launch.js` and standalone `cli-smoke.js` are transport diagnostics, not production activation paths. Use `npm run check` for offline validation. `cross-repo-check.js` tests archived-kit compatibility; see the repository README for current source/mirror checks and historical limits. Native acceptance remains a separate target-machine check.

@@ -3,7 +3,9 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { writeJson } = require('./dispatch-evidence.js');
+const { inspectSynaraCaptureHooks } = require('./magi-cli-preflight.js');
 
 const SKIP_DIRS = new Set(['node_modules', '.git', '.hg', '.svn']);
 const TERMINAL = new Set(['PASS', 'FAIL', 'AWAITING_ATTESTATION']);
@@ -99,13 +101,14 @@ function inspectTransaction(file) {
   };
 }
 
-function inspectHooks(file) {
+function inspectHooks(file, options = {}) {
   if (!fs.existsSync(file) || !fs.lstatSync(file).isFile()) {
     return { kind: 'hooks-missing', path: file, note: 'synara-capture hooks.json is missing; MAGI Google isolation cannot be confirmed.' };
   }
-  const text = fs.readFileSync(file, 'utf8');
-  if (/"decision"\s*:\s*"ask"/.test(text) || /\\"decision\\":\\"ask\\"/.test(text)) {
-    return { kind: 'hooks-ask', path: file, note: 'synara-capture PreToolUse emits ask; MAGI Google instruction reads will fail.' };
+  try {
+    inspectSynaraCaptureHooks(options.home || os.homedir(), { ...options, files: [file] });
+  } catch (error) {
+    return { kind: /emits ask/.test(error.message) ? 'hooks-ask' : 'hooks-invalid', path: file, note: error.message };
   }
   return null;
 }

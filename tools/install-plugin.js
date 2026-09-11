@@ -113,12 +113,17 @@ function readInstalledManifest(dest) {
   catch (error) { return { ok: false, error: `invalid .cursor-plugin/plugin.json: ${error.message}` }; }
 }
 
-function installMagiCursor() {
-  return writeInstall(prepareInstall(ROOT, MAGI_DEST, magiCursorManifest(), [
+function installMagiCursor({ destination = MAGI_DEST, sourceRoot = ROOT } = {}) {
+  const prepared = prepareInstall(sourceRoot, destination, magiCursorManifest(), [
     ['.cursor/skills', 'skills'], ['.cursor/rules', 'rules'], ['agents', 'agents'],
-    ['tools', 'tools'], ['seat-skills', 'seat-skills'],
+    ['tools', 'tools'], ['seat-skills', 'seat-skills'], ['skill-sources.json', 'skill-sources.json'],
     ['commands/magi.md', 'commands/magi.md'], ['commands/magi-cli.md', 'commands/magi-cli.md'],
-  ]));
+  ]);
+  // Validate legacy installed tests against source before dropping them from the new bundle.
+  for (const file of prepared.files.keys()) {
+    if (file.startsWith('tools/') && (file.endsWith('.test.js') || path.posix.basename(file) === 'test-fixtures.js')) prepared.files.delete(file);
+  }
+  return writeInstall(prepared);
 }
 
 function validateCliFiles(files) {
@@ -239,6 +244,7 @@ module.exports = {
   readInstalledManifest,
   checkMagi,
   checkMagiCli,
+  installMagiCursor,
   installMagiCursorCli,
   main,
 };

@@ -123,7 +123,9 @@ function fakeVendor(action = () => {}, response = 'ACK fixture\nPOSITION: APPROV
     if (!transcripts.has(id)) throw new Error('missing synthetic native read transcript');
     return transcripts.get(id);
   };
-  return { buildLaunch, runLaunch, codexSessionTranscript: collect, googleSessionTranscript: collect, calls: () => calls };
+  // Synthetic dispatches authorize only their temporary-filesystem root.
+  return { buildLaunch, runLaunch, codexSessionTranscript: collect, googleSessionTranscript: collect,
+    calls: () => calls, env: { ...process.env, MAGI_ALLOWED_WORKSPACE_ROOTS: os.tmpdir() } };
 }
 
 // Test-only native event fixtures. Production acceptance always runs the same strict validator.

@@ -111,7 +111,8 @@ test('Google probe isolates parent capture state and records diagnostic hashes w
   const original = process.env.MAGI_AGY_BIN;
   process.env.MAGI_AGY_BIN = process.execPath;
   t.after(() => { if (original === undefined) delete process.env.MAGI_AGY_BIN; else process.env.MAGI_AGY_BIN = original; });
-  const parent = Object.freeze({ SYNARA_ANTIGRAVITY_EVENTS: path.join(root, 'parent.jsonl'), SYNARA_ANTIGRAVITY_HOOK_DECISION: 'ask' });
+  const parent = Object.freeze({ MAGI_ALLOWED_WORKSPACE_ROOTS: root, MAGI_AGY_BIN: process.execPath,
+    SYNARA_ANTIGRAVITY_EVENTS: path.join(root, 'parent.jsonl'), SYNARA_ANTIGRAVITY_HOOK_DECISION: 'ask' });
   for (const wrongModel of [false, true]) {
     const evidenceDir = path.join(root, wrongModel ? 'wrong' : 'valid');
     const pending = probe({ vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', evidenceDir }, {

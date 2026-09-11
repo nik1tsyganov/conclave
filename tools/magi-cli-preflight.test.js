@@ -10,6 +10,104 @@ const { check, main } = require('./magi-cli-preflight.js');
 const { FINGERPRINT, FINGERPRINT_V2 } = require('./cli-rules-stage.js');
 const { CLI_RUNTIME_TOOLS } = require('./runtime-paths.js');
 
+// Exact installed helper reviewed for the conditional capture preflight exception.
+const CAPTURE_HELPER = String.raw`const fs = require("node:fs");
+const event = process.argv[2] || "unknown";
+let payload = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => { payload += chunk; });
+process.stdin.on("end", () => {
+  const target = process.env.SYNARA_ANTIGRAVITY_EVENTS;
+  if (!target) {
+    // Mirrors the shell wrapper's inactive fallback: PreToolUse must carry a
+    // decision or Antigravity denies the tool call with an empty reason, and
+    // PreInvocation must carry "allow" or the subagent launch it gates is
+    // denied and the parent CLI exits with code 1.
+    process.stdout.write(
+      (event === "pre-tool"
+        ? '{"decision":"ask"}'
+        : event === "pre-invocation"
+          ? '{"decision":"allow"}'
+          : "{}") + "\n",
+    );
+    return;
+  }
+  let capturedPayload = payload.trim();
+  try {
+    const input = JSON.parse(capturedPayload);
+    const sanitized = {};
+    for (const key of ["conversationId", "transcriptPath", "modelName"]) {
+      if (typeof input[key] === "string" && input[key].trim()) sanitized[key] = input[key];
+    }
+    if (Number.isInteger(input.stepIdx) && input.stepIdx >= 0) sanitized.stepIdx = input.stepIdx;
+    if (event === "pre-tool") {
+      const name = input.toolCall && typeof input.toolCall.name === "string"
+        ? input.toolCall.name.trim()
+        : "";
+      if (name) {
+        sanitized.toolCall = {
+          name,
+          ...(input.toolCall.args && typeof input.toolCall.args === "object"
+            ? { args: input.toolCall.args }
+            : {}),
+        };
+      }
+    } else if (event === "post-tool") {
+      const name = input.toolCall && typeof input.toolCall.name === "string"
+        ? input.toolCall.name.trim()
+        : "";
+      if (name) {
+        sanitized.toolCall = {
+          name,
+          ...(input.toolCall.args && typeof input.toolCall.args === "object"
+            ? { args: input.toolCall.args }
+            : {}),
+        };
+      }
+      sanitized.failed = typeof input.error === "string" && input.error.trim().length > 0;
+      if (typeof input.error === "string" && input.error.trim()) sanitized.error = input.error;
+      if (input.toolOutput !== undefined) sanitized.toolOutput = input.toolOutput;
+      if (input.result !== undefined) sanitized.result = input.result;
+    }
+    capturedPayload = JSON.stringify(sanitized);
+  } catch {
+    capturedPayload = "{}";
+  }
+  fs.appendFileSync(target, event + "\t" + capturedPayload + "\n");
+  if (event === "pre-tool") {
+    const decision = process.env.SYNARA_ANTIGRAVITY_HOOK_DECISION === "allow" ? "allow" : "ask";
+    process.stdout.write(JSON.stringify({ decision }) + "\n");
+  } else if (event === "pre-invocation") {
+    // PreInvocation vetoes the upcoming LLM invocation; Synara-managed
+    // sessions run subagents deliberately, so never block them here. An
+    // empty object would deny the launch and the parent CLI exits 1.
+    process.stdout.write('{"decision":"allow"}\n');
+  } else {
+    // Stop and other non-tool hooks: empty object allows the agent to exit.
+    // Do not emit decision:"stop" — it is not a recognized stop decision and
+    // can hang the print process after the reply is already visible (#465).
+    process.stdout.write("{}\n");
+  }
+});
+`;
+
+function conditionalCapture(f) {
+  const binary = path.join(f.home, 'AppData', 'Local', 'Programs', 'synara-desktop', 'Synara.exe');
+  const helper = path.join(f.home, '.gemini', 'antigravity-cli', 'plugins', 'synara-capture', 'capture.cjs');
+  put(binary, 'file-only discovery');
+  put(helper, CAPTURE_HELPER);
+  const hooks = { 'synara-capture': {} };
+  for (const [event, argument] of Object.entries({ PreToolUse: 'pre-tool', PostToolUse: 'post-tool', PreInvocation: 'pre-invocation', PostInvocation: 'post-invocation', Stop: 'stop' })) {
+    const fallback = event === 'PreToolUse' ? '{"decision":"ask"}' : event === 'PreInvocation' ? '{"decision":"allow"}' : '{}';
+    const command = 'if not defined SYNARA_ANTIGRAVITY_EVENTS (more >nul 2>nul & echo ' + fallback + ') else (set ELECTRON_RUN_AS_NODE=1&& ' + binary + ' ' + helper + ' ' + argument + ')';
+    hooks['synara-capture'][event] = event.endsWith('ToolUse') ? [{ matcher: '*', hooks: [{ type: 'command', command }] }] : [{ type: 'command', command }];
+  }
+  const file = path.join(path.dirname(helper), 'hooks.json');
+  put(file, JSON.stringify(hooks));
+  f.platform = 'win32';
+  return { hooks, file, helper };
+}
+
 function put(file, body = 'fixture\n') {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   if (Buffer.isBuffer(body)) fs.writeFileSync(file, body);
@@ -244,6 +342,61 @@ test('synara-capture PreToolUse allow passes Google preflight', t => {
   put(path.join(f.home, '.gemini', 'antigravity-cli', 'plugins', 'synara-capture', 'hooks.json'),
     '{"synara-capture":{"PreToolUse":[{"hooks":[{"command":"echo {\\"decision\\":\\"allow\\"}"}]}]}}');
   assert.equal(check(f).ok, true);
+});
+
+test('known conditional capture uses the adapter allow branch without writes or native calls', t => {
+  const f = fixture(t);
+  const { file } = conditionalCapture(f);
+  f.env.SYNARA_ANTIGRAVITY_HOOK_DECISION = 'ask';
+  const before = snapshot(f.root);
+  for (const name of ['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork']) t.mock.method(child, name, () => { throw new Error('no native calls'); });
+  const result = check(f);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const row = result.findings.find(row => row.check === 'google:synara-capture');
+  assert.equal(row.status, 'adapter-isolated');
+  assert.equal(require('./magi-synara-watch.js').inspectHooks(file, f), null);
+  assert.match(row.scope, /diagnostics.*not native proof/i);
+  assert.match(row.scope, /runtime.*untested/i);
+  assert.equal(f.env.SYNARA_ANTIGRAVITY_HOOK_DECISION, 'ask');
+  assert.deepEqual(snapshot(f.root), before);
+});
+
+test('malformed capture JSON and hook shapes fail without writes', t => {
+  const f = fixture(t);
+  const file = path.join(f.home, '.gemini', 'config', 'plugins', 'synara-capture', 'hooks.json');
+  for (const body of ['{broken', 'null', '{}', '{"synara-capture":{"PreToolUse":"bad"}}', '{"synara-capture":{"PreToolUse":[{"hooks":[{}]}]}}']) {
+    put(file, body);
+    const before = snapshot(f.root);
+    assert.equal(check(f).findings.find(row => row.check === 'google:synara-capture').ok, false, body);
+    assert.equal(require('./magi-synara-watch.js').inspectHooks(file, f).kind, 'hooks-invalid');
+    assert.deepEqual(snapshot(f.root), before);
+  }
+});
+
+test('conditional capture rejects modified active branches and helpers', t => {
+  const f = fixture(t);
+  const { hooks, file, helper } = conditionalCapture(f);
+  const command = hooks['synara-capture'].PreToolUse[0].hooks[0].command;
+  for (const changed of [command.replace('if not defined', 'if defined'), command.replace(' pre-tool)', ' pre-tool & echo {"decision":"ask"})'), command.replace('SYNARA_ANTIGRAVITY_EVENTS', 'OTHER_EVENTS')]) {
+    hooks['synara-capture'].PreToolUse[0].hooks[0].command = changed;
+    put(file, JSON.stringify(hooks));
+    assert.equal(check(f).findings.find(row => row.check === 'google:synara-capture').ok, false);
+  }
+  hooks['synara-capture'].PreToolUse[0].hooks[0].command = command;
+  put(file, JSON.stringify(hooks));
+  put(helper, CAPTURE_HELPER.replace('=== "allow"', '=== "deny"'));
+  assert.equal(check(f).findings.find(row => row.check === 'google:synara-capture').ok, false);
+});
+
+test('conditional capture cannot waive an extra ask command or a non-Windows shell', t => {
+  const f = fixture(t);
+  const { hooks, file } = conditionalCapture(f);
+  f.platform = 'linux';
+  assert.equal(check(f).findings.find(row => row.check === 'google:synara-capture').ok, false);
+  f.platform = 'win32';
+  hooks['synara-capture'].PreToolUse[0].hooks.push({ type: 'command', command: 'echo {"decision":"ask"}' });
+  put(file, JSON.stringify(hooks));
+  assert.equal(check(f).findings.find(row => row.check === 'google:synara-capture').ok, false);
 });
 
 test('Windows preflight rejects the 22-NUL native sandbox regression without writes', t => {

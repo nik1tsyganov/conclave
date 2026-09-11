@@ -14,6 +14,7 @@ const {
   writeManifest,
   readInstalledManifest,
   CLI_RUNTIME_TOOLS,
+  installMagiCursor,
   installMagiCursorCli,
   checkMagiCli,
 } = require('./install-plugin.js');
@@ -84,13 +85,15 @@ function put(file, body) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, body, 'utf8');
 }
-function sourceFixture(t) {
+function sourceFixture(t, broad = false) {
   const root = disposable(t);
   const source = path.join(root, 'source');
   const installed = path.join(root, 'installed');
   const repo = path.resolve(__dirname, '..');
-  const entries = ['.cursor/skills/magi-cli', '.cursor/rules', 'commands/magi-cli.md', 'seat-skills',
-    'skill-sources.json', 'tools/templates', 'tools/install-plugin.js', ...CLI_RUNTIME_TOOLS.map(name => `tools/${name}`)];
+  const entries = broad
+    ? ['.cursor/skills', '.cursor/rules', 'commands', 'agents', 'seat-skills', 'skill-sources.json', 'tools']
+    : ['.cursor/skills/magi-cli', '.cursor/rules', 'commands/magi-cli.md', 'seat-skills',
+      'skill-sources.json', 'tools/templates', 'tools/install-plugin.js', ...CLI_RUNTIME_TOOLS.map(name => `tools/${name}`)];
   for (const relative of entries) {
     const from = path.join(repo, relative);
     const to = path.join(source, relative);
@@ -243,9 +246,35 @@ test('--destination install and --check affect only the requested plugin directo
   }
 });
 
-test('installed runtime loads contracts, all entry-point dependencies, and bundled skills without source', t => {
-  const f = sourceFixture(t);
-  install(f);
+test('broad Cursor installation excludes tests while retaining every other tool byte', t => {
+  const f = sourceFixture(t, true);
+  put(path.join(f.source, 'tools', 'nested', 'future-helper.js'), 'module.exports = 42;\n');
+  put(path.join(f.source, 'tools', 'nested', 'future-helper.test.js'), 'throw new Error("test must not ship");\n');
+  const run = () => installMagiCursor({ sourceRoot: f.source, destination: f.installed });
+  run();
+  const sourceFiles = snapshot(path.join(f.source, 'tools')).filter(([, body]) => body !== 'dir');
+  const expected = sourceFiles.filter(([name]) => !name.endsWith('.test.js') && path.posix.basename(name) !== 'test-fixtures.js');
+  const actual = snapshot(path.join(f.installed, 'tools')).filter(([, body]) => body !== 'dir');
+  assert.deepStrictEqual(actual.map(([name]) => name), expected.map(([name]) => name));
+  for (let index = 0; index < expected.length; index++) assert.ok(actual[index][1] === expected[index][1], `changed tool bytes: ${expected[index][0]}`);
+  // A previous broad install included these known source files. Reinstall removes them.
+  const legacy = sourceFiles.find(([name]) => name.endsWith('.test.js'))[0];
+  fs.copyFileSync(path.join(f.source, 'tools', legacy), path.join(f.installed, 'tools', legacy));
+  run();
+  assert.strictEqual(fs.existsSync(path.join(f.installed, 'tools', legacy)), false);
+  // A test-like filename alone does not authorize deleting unrelated user content.
+  put(path.join(f.installed, 'tools', 'owner-notes.test.js'), 'keep');
+  const before = snapshot(f.installed);
+  assert.throws(run, /unrelated destination file/);
+  assert.deepStrictEqual(snapshot(f.installed), before);
+  const size = rows => rows.reduce((sum, [, body]) => sum + Buffer.from(body, 'base64').length, 0);
+  t.diagnostic(JSON.stringify({ beforeTools: sourceFiles.length, beforeBytes: size(sourceFiles), afterTools: expected.length, afterBytes: size(expected) }));
+});
+
+for (const broad of [false, true]) test(`${broad ? 'broad Cursor' : 'CLI'} installed runtime loads contracts, all entry-point dependencies, and bundled skills without source`, t => {
+  const f = sourceFixture(t, broad);
+  if (broad) installMagiCursor({ sourceRoot: f.source, destination: f.installed });
+  else install(f);
   const moved = path.join(f.root, 'source-unavailable');
   assert.strictEqual(path.dirname(f.source), f.root);
   assert.strictEqual(path.dirname(moved), f.root);
@@ -275,6 +304,7 @@ test('installed runtime loads contracts, all entry-point dependencies, and bundl
     const runtime = require('./tools/runtime-paths.js').resolveRuntimePaths();
     assert.equal(runtime.layout, 'installed');
     const matrix = require('./tools/dispatch-matrix.js').loadMatrix();
+    assert.equal(require('./tools/magi-skill-web.js').loadSourceContract().decision, 'keep-separate');
     const profiles = require('./tools/seat-policy.js').loadProfiles();
     assert.ok(matrix.classes && profiles.baseSkills);
     const skills = [...new Set(['baseSkills', 'roleSkills', 'classSkills'].flatMap(key => Object.values(profiles[key]).flat()))];

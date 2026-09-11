@@ -4,7 +4,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const { GOOGLE_CAPTURE_EVENTS, SYNARA_CAPTURE_TRUST, buildLaunch } = require('./cli-adapters.js');
+const { GOOGLE_CAPTURE_EVENTS, SYNARA_CAPTURE_TRUST, allowedWorkspace, buildLaunch } = require('./cli-adapters.js');
 const { runLaunch } = require('./cli-runner.js');
 const { DEFAULT_RULES_ROOT, FINGERPRINT_V2, prepareRulesSource, stageRules, verifyStagedRules } = require('./cli-rules-stage.js');
 const { checkBriefFile } = require('./cli-brief-rules-check.js');
@@ -250,6 +250,8 @@ async function runDispatch(opts, dependencies = {}) {
   const originalBrief = path.resolve(opts.brief);
   const evidenceDir = path.resolve(opts.evidenceDir);
   const cwd = fs.realpathSync(opts.cwd);
+  const policyEnv = dependencies.env || process.env;
+  allowedWorkspace(cwd, policyEnv);
   if (!inside(evidenceDir, runDir)) throw policyError('evidence directory must be inside its sealed run directory');
   if (inside(evidenceDir, cwd)) throw policyError('evidence directory must be outside the product worktree');
   // Overrides may relocate an identical contract; they cannot weaken runtime policy.
@@ -378,6 +380,7 @@ async function runDispatch(opts, dependencies = {}) {
     runDir, dispatchId: opts.dispatchId, readonlyScratch: opts.vendor === 'openai' && opts.role !== 'implement',
     reviewPermissionMode: opts.reviewPermissionMode,
     responseProtocol,
+    env: policyEnv,
     ...(evidenceReadDirs.length ? { evidenceReadDirs } : {}),
   });
   if (responseProtocol) validateClaudeResponseLaunch(launch);

@@ -118,12 +118,11 @@ A convened implementation run uses `min(3, implementation unit count)` distinct 
 ```powershell
 npm test
 node tools/release-check.js
-node tools/cross-repo-check.js --kit-root C:/src/magi-kit --vault-root $env:MAGI_RULES_ROOT
 ```
 
-`npm run check` combines the unit suite and release check. `npm run check:cross-repo` accepts `MAGI_KIT_ROOT` and `MAGI_RULES_ROOT`, or pass explicit roots to the tool.
+`npm run check` combines the unit suite and release check. Current source ownership is in `skill-sources.json`; use `magi-vault-sync.js --status` for the leaf mirror and `--index` for the separate skill catalog. These commands may create directories or write catalog files. See the [project guide](.cursor/skills/magi-cli/references/project-runs.md) for their repository roots.
 
-Cross-repository checks compare all skill maps, forbidden skills, bundled file hashes, the v2 fingerprint, exact R01–R22 inventory, index links, and leaf template semantics. Offline success does not establish native authentication, model availability, or full tri-vendor acceptance.
+`npm run check:cross-repo` is archived-kit compatibility validation. It still accepts `MAGI_KIT_ROOT` and `MAGI_RULES_ROOT`, or explicit `--kit-root` and `--vault-root` paths. Its historical skill maps can differ from current MAGI. Preserve and report those failures; do not restore archived skills to make them pass. It also checks v2 rules and leaf template semantics. Current mirror/catalog checks do not replace every historical invariant. Offline success does not establish native authentication, model availability, or full tri-vendor acceptance.
 
 Standalone `cli-smoke.js` checks transport plans using staged inputs. It never invokes a vendor and returns `activationEligible: false`. Production launches use the sealed-plan transaction.
 

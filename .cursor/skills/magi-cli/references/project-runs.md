@@ -22,9 +22,10 @@ to the assigned native vendor seats. Do not use Cursor Task agents as vendors.
 
 Start with one implementation unit, one foreign verifier, and one foreign
 reviewer. Choose legal model/effort pairs from the installed matrix after
-checking included capacity. For an ordinary feature, prefer Sonnet/medium
-implementation, Terra/medium test verification, and Gemini Pro/high review,
-only if those exact routes remain legal and fresh native probes pass.
+checking included capacity and the distribution breaker. For an ordinary
+feature, select the implementation vendor from currently eligible routes.
+Select foreign verification and review routes from their own matrix classes.
+Require fresh exact native probes for every chosen model and effort.
 For another class, follow its matrix and panel requirements. Do not downgrade it.
 
 Use a new attempt directory outside the product. Preserve existing user changes.
@@ -41,7 +42,8 @@ This completion must reuse the saved call. Never pre-attest unseen output.
 Budget: at most three fresh exact-pair probes and three task dispatches for this
 one-unit attempt. Reuse valid unexpired probes where possible. No automatic
 fallback, repair loop, repeated battery, extra billing, or framework edits.
-If the task cannot fit that bound, narrow it to a useful unit before spending calls.
+If the complete task cannot fit that bound, stop and prepare a larger complete
+plan before spending calls. Do not split known units to evade distribution rules.
 
 At every stop, export project-run-report.js, including the failed command output
 when applicable. Record a short TRIAGE.md with expected behavior, actual behavior,
@@ -79,12 +81,14 @@ Set `MAGI_FIELD_LIBRARY_ROOT` and `MAGI_VAULT_SKILLS_ROOT` and run `magi-vault-s
 
 Read the co-located [CLI command reference](cursor-cli.md), [dispatch matrix](dispatch-matrix.json), [seat profiles](seat-profiles.json), and [brief template](brief-rules-block.md). The command reference governs exact CLI arguments and plan fields. This handoff adds the trial boundary and failure-recording process.
 
-Read `C:/Users/YESSIR/.claude/docs/capacity-state.json` before probes. An exhausted bucket stays blocked until fresh evidence clears it. Do not infer capacity from an old successful call. Do not use API keys, paid credits, or overage. The recorded Opus block also affects any standing Fable-to-Opus fallback. Authentication success alone does not prove included headroom.
+Read `C:/Users/YESSIR/.claude/docs/capacity-state.json` before probes. Block exhausted buckets unless their recorded reset time has passed. After that reset, capacity becomes unknown, never automatically available. Follow `mix-mode` before probing shared or known-separate unknown buckets. Do not infer capacity from an old successful call. Do not use API keys, paid credits, or overage. The recorded Opus block also affects any standing Fable-to-Opus fallback. Authentication success alone does not prove included headroom.
+
+The host must also apply the current `mix-mode` distribution policy before sealing. The matrix validator does not read the machine's rolling breaker. While it is tripped, do not assign eligible implementation to Claude. Preserve the complete-plan distinct-vendor requirement and 60% cap. If the project has no legal complete split, report `PAUSE` and leave uncovered units `NOT_RUN`. Do not relabel units, toggle `magiConvened`, or count probes and earlier slices as implementation. Only the canonical telemetry writer can change the breaker from qualifying evidence.
 
 Suggested external layout:
 
 ```text
-C:/src/magi-project-runs/<project>/<attempt-id>/
+C:/Users/YESSIR/.local/scratch/magi-project-runs/<project>/<attempt-id>/
   context.md              objective, project root, starting revision, dirty paths
   commands/               exact arguments, exit codes, UTF-8 stdout and stderr
   probes/                 fresh native exact-pair evidence
@@ -93,7 +97,7 @@ C:/src/magi-project-runs/<project>/<attempt-id>/
   draft-plan.json
   run/                    created by plan-seal.js; runtime-owned evidence
 
-C:/src/magi-project-issues/<project>-<attempt-id>/
+C:/Users/YESSIR/.local/scratch/magi-project-issues/<project>-<attempt-id>/
   report.json             generated diagnostic snapshot
   REPORT.md               generated readable findings
   TRIAGE.md               Cursor's evidence-backed classification and next step
@@ -184,6 +188,13 @@ The issues directory is the durable queue. Link recurring symptoms to earlier re
 Give the next repair session the report directory and original run directory. Reproduce first. Fix only the proven cause. Add a relevant regression test, obtain independent verification and review, then run the same project acceptance checks in a fresh attempt. Keep the old failure. Close its TRIAGE entry by linking the passing correction; do not replace its generated report.
 
 ## Synara as the outer harness
+
+Preflight and the watchdog share one file-only hook inspector. The known Windows
+Synara capture wrapper passes only with reviewed helper bytes and the Google
+adapter's fixed child environment. An unknown or changed helper stops that check;
+review the new helper before updating its fingerprint. This is not a provider
+outage, a native permission test, or proof from hook events. Keep native receipts
+and instruction-read checks as the acceptance authority.
 
 When this Grok arbiter is hosted in Synara, use `hostMode: synara` and snapshot `synara_capabilities` with `synara-catalog.js` before sealing. Map MAGI vendor names to Synara providers only for catalog checks (`openai`/`codex`, `anthropic`/`claudeAgent`, `google`/`antigravity`). Launch remains `dispatch-run.js`.
 

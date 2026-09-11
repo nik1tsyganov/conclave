@@ -5,6 +5,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { TextDecoder } = require('node:util');
+const { createHash } = require('node:crypto');
+const { googleCaptureEnv } = require('./cli-adapters.js');
 const { resolveVendorBinary } = require('./vendor-binaries.js');
 const { FINGERPRINT_V2, listRuleFiles } = require('./cli-rules-stage.js');
 const { FORBIDDEN_ARBITER_SKILLS, regularFiles } = require('./cli-skill-stage.js');
@@ -21,16 +23,57 @@ function synaraCaptureHookPaths(home) {
   ];
 }
 
-function inspectSynaraCaptureHooks(home) {
-  const files = synaraCaptureHookPaths(home).filter((file) => fs.existsSync(file));
+// Reviewed installed helper. Any upstream change needs another static review.
+const SYNARA_CAPTURE_HELPER_SHA256 = '26bd4ed0a0d9a33b05fadcb66f87a5fa351e82e5aed6def69251921e9a72c203';
+
+function inspectSynaraCaptureHooks(home, options = {}) {
+  const files = options.files || synaraCaptureHookPaths(home).filter((file) => fs.existsSync(file));
+  const events = { PreToolUse: 'pre-tool', PostToolUse: 'post-tool', PreInvocation: 'pre-invocation', PostInvocation: 'post-invocation', Stop: 'stop' };
+  const object = value => value && typeof value === 'object' && !Array.isArray(value);
+  let isolated = false;
   for (const file of files) {
+    canonicalPlainPath(file);
     if (!fs.lstatSync(file).isFile()) throw new Error(`synara-capture hooks path is not a regular file: ${file}`);
-    const text = fs.readFileSync(file, 'utf8');
-    if (/"decision"\s*:\s*"ask"/.test(text) || /\\"decision\\":\\"ask\\"/.test(text)) {
-      throw new Error(`inactive synara-capture PreToolUse emits ask (${file}); MAGI Google instruction reads will fail`);
+    let parsed;
+    try { parsed = JSON.parse(fs.readFileSync(file, 'utf8')); }
+    catch { throw new Error(`malformed synara-capture hooks JSON: ${file}`); }
+    const hooks = parsed?.['synara-capture'];
+    if (!object(parsed) || Object.keys(parsed).join() !== 'synara-capture' || !object(hooks) || !Object.keys(hooks).length) throw new Error(`unsupported synara-capture hook shape: ${file}`);
+    for (const [event, entries] of Object.entries(hooks)) {
+      if (!Object.hasOwn(events, event) || !Array.isArray(entries) || !entries.length) throw new Error(`unsupported synara-capture hook event: ${file}`);
+      for (const entry of entries) {
+        if (!object(entry)) throw new Error(`malformed synara-capture hook entry: ${file}`);
+        const grouped = Object.hasOwn(entry, 'hooks');
+        if (grouped && (Object.keys(entry).some(key => !['matcher', 'hooks'].includes(key)) || (entry.matcher !== undefined && typeof entry.matcher !== 'string') || !Array.isArray(entry.hooks) || !entry.hooks.length)) throw new Error(`malformed synara-capture hook group: ${file}`);
+        for (const hook of grouped ? entry.hooks : [entry]) {
+          if (!object(hook) || Object.keys(hook).some(key => !['type', 'command'].includes(key)) || (hook.type !== undefined && hook.type !== 'command') || typeof hook.command !== 'string') throw new Error(`malformed synara-capture command: ${file}`);
+          const fallback = event === 'PreToolUse' ? '{"decision":"ask"}' : event === 'PreInvocation' ? '{"decision":"allow"}' : '{}';
+          const safeEcho = event === 'PreToolUse' || event === 'PreInvocation' ? 'echo {"decision":"allow"}' : 'echo {}';
+          if (hook.command === safeEcho) continue;
+          if (hook.command === 'echo {"decision":"ask"}') throw new Error(`synara-capture ${event} emits ask: ${file}`);
+          const binary = path.join(home, 'AppData', 'Local', 'Programs', 'synara-desktop', 'Synara.exe');
+          const helper = path.join(home, '.gemini', 'antigravity-cli', 'plugins', 'synara-capture', 'capture.cjs');
+          const expected = `if not defined SYNARA_ANTIGRAVITY_EVENTS (more >nul 2>nul & echo ${fallback}) else (set ELECTRON_RUN_AS_NODE=1&& ${binary} ${helper} ${events[event]})`;
+          if ((options.platform || process.platform) !== 'win32' || hook.command !== expected || /[\s&|<>^%!?"()]/.test(binary + helper)) throw new Error(`unsupported synara-capture active command: ${file}`);
+          for (const target of [binary, helper]) {
+            canonicalPlainPath(target);
+            if (!fs.lstatSync(target).isFile()) throw new Error(`synara-capture target is not a regular file: ${target}`);
+          }
+          const digest = createHash('sha256').update(fs.readFileSync(helper)).digest('hex');
+          if (digest !== SYNARA_CAPTURE_HELPER_SHA256) throw new Error(`unreviewed synara-capture helper: ${helper}`);
+          const capture = googleCaptureEnv(options.env || {}, path.join(home, '.magi-preflight-capture'));
+          if (!capture.eventsPath || capture.env.SYNARA_ANTIGRAVITY_EVENTS !== capture.eventsPath || capture.env.SYNARA_ANTIGRAVITY_HOOK_DECISION !== 'allow') throw new Error('Google adapter does not guarantee the reviewed capture allow branch');
+          isolated = true;
+        }
+      }
     }
   }
-  return { value: files.length ? files : 'absent' };
+  return { value: files.length ? files : 'absent', ...(isolated ? {
+    status: 'adapter-isolated',
+    helperSha256: SYNARA_CAPTURE_HELPER_SHA256,
+    inactiveParentBranch: 'ask; bypassed by the Google dispatch/probe child environment',
+    scope: 'Known Windows conditional hook and adapter environment only; hook events are diagnostics, not native proof; runtime execution and event-file access remain untested',
+  } : {}) };
 }
 
 function requiredSeatSkills(profiles) {
@@ -170,7 +213,7 @@ function check(options = {}) {
     });
   }
 
-  record('google:synara-capture', () => inspectSynaraCaptureHooks(home));
+  record('google:synara-capture', () => inspectSynaraCaptureHooks(home, options));
   record('vault:root', () => {
     const raw = (options.env !== undefined ? options.env : process.env).MAGI_VAULT_ROOT;
     if (!raw) return { value: null, note: 'set MAGI_VAULT_ROOT to ai-ops-vault for MAGI telemetry, skill sync, and analysis' };

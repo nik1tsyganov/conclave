@@ -59,6 +59,17 @@ test('naked route and ad hoc escalation cannot launch', async () => {
   assert.throws(() => parseArgs(['--escalation', 'true']), /unknown option/);
 });
 
+test('workspace denial precedes transaction reservation and an explicit root permits the untouched run', async (t) => {
+  const run = createSealedRun(t); const native = fakeVendor(); const opts = { ...run.opts, dispatchId: 'd1' };
+  const denied = { ...process.env, MAGI_DEV_ROOT: path.join(run.root, 'different-root'), MAGI_ALLOWED_WORKSPACE_ROOTS: '' };
+  await assert.rejects(runDispatch(opts, { ...native, env: denied }), { code: 'WORKSPACE_FORBIDDEN' });
+  assert.equal(native.calls(), 0);
+  assert.equal(fs.existsSync(path.join(run.runDir, 'out', 'd1')), false);
+  assert.equal(fs.existsSync(path.join(run.runDir, '.magi-dispatches')), false);
+  const result = await runDispatch(opts, { ...native, env: { ...denied, MAGI_ALLOWED_WORKSPACE_ROOTS: run.root } });
+  assert.equal(result.ok, true); assert.equal(native.calls(), 1);
+});
+
 test('sealed launch binds route and rejects every changed identity before spawn', async (t) => {
   const run = createSealedRun(t);
   const native = fakeVendor();

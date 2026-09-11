@@ -208,6 +208,7 @@ From the MAGI source checkout:
 ```powershell
 npm test
 node tools/release-check.js
+# Optional archived-kit compatibility check; see README validation limits:
 node tools/cross-repo-check.js --kit-root C:/src/magi-kit --vault-root $env:MAGI_RULES_ROOT
 ```
 
