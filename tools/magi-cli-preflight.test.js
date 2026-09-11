@@ -19,16 +19,12 @@ process.stdin.on("data", (chunk) => { payload += chunk; });
 process.stdin.on("end", () => {
   const target = process.env.SYNARA_ANTIGRAVITY_EVENTS;
   if (!target) {
-    // Mirrors the shell wrapper's inactive fallback: PreToolUse must carry a
-    // decision or Antigravity denies the tool call with an empty reason, and
-    // PreInvocation must carry "allow" or the subagent launch it gates is
-    // denied and the parent CLI exits with code 1.
+    // Match the installed permission policy for inactive PreToolUse hooks.
+    // PreInvocation has no injected steps and must not emit a decision.
     process.stdout.write(
       (event === "pre-tool"
         ? '{"decision":"ask"}'
-        : event === "pre-invocation"
-          ? '{"decision":"allow"}'
-          : "{}") + "\n",
+        : "{}") + "\n",
     );
     return;
   }
@@ -78,10 +74,8 @@ process.stdin.on("end", () => {
     const decision = process.env.SYNARA_ANTIGRAVITY_HOOK_DECISION === "allow" ? "allow" : "ask";
     process.stdout.write(JSON.stringify({ decision }) + "\n");
   } else if (event === "pre-invocation") {
-    // PreInvocation vetoes the upcoming LLM invocation; Synara-managed
-    // sessions run subagents deliberately, so never block them here. An
-    // empty object would deny the launch and the parent CLI exits 1.
-    process.stdout.write('{"decision":"allow"}\n');
+    // PreInvocation accepts optional injectSteps, not a permission decision.
+    process.stdout.write("{}\n");
   } else {
     // Stop and other non-tool hooks: empty object allows the agent to exit.
     // Do not emit decision:"stop" — it is not a recognized stop decision and
@@ -98,7 +92,7 @@ function conditionalCapture(f) {
   put(helper, CAPTURE_HELPER);
   const hooks = { 'synara-capture': {} };
   for (const [event, argument] of Object.entries({ PreToolUse: 'pre-tool', PostToolUse: 'post-tool', PreInvocation: 'pre-invocation', PostInvocation: 'post-invocation', Stop: 'stop' })) {
-    const fallback = event === 'PreToolUse' ? '{"decision":"ask"}' : event === 'PreInvocation' ? '{"decision":"allow"}' : '{}';
+    const fallback = event === 'PreToolUse' ? '{"decision":"ask"}' : '{}';
     const command = 'if not defined SYNARA_ANTIGRAVITY_EVENTS (more >nul 2>nul & echo ' + fallback + ') else (set ELECTRON_RUN_AS_NODE=1&& ' + binary + ' ' + helper + ' ' + argument + ')';
     hooks['synara-capture'][event] = event.endsWith('ToolUse') ? [{ matcher: '*', hooks: [{ type: 'command', command }] }] : [{ type: 'command', command }];
   }
@@ -593,4 +587,21 @@ test('MAGI rejects Windows drive-root-relative CODEX_HOME even when the director
     assert.match(result.findings.find(row => row.check === 'sandbox:openai-state').error, /fully qualified CODEX_HOME/);
     assert.deepEqual(snapshot(f.root), before);
   }
+});
+
+test('PreInvocation accepts neutral output and rejects permission decisions', t => {
+  const f = fixture(t);
+  const file = path.join(f.home, '.gemini', 'antigravity-cli', 'plugins', 'synara-capture', 'hooks.json');
+  for (const [command, expected] of [['echo {}', true], ['echo {"decision":"allow"}', false], ['echo {"decision":"ask"}', false]]) {
+    put(file, JSON.stringify({'synara-capture': {PreInvocation: [{type: 'command', command}]}}));
+    assert.equal(check(f).findings.find(row => row.check === 'google:synara-capture').ok, expected, command);
+  }
+});
+
+test('conditional PreInvocation rejects the previous invalid decision fallback', t => {
+  const f = fixture(t);
+  const { hooks, file } = conditionalCapture(f);
+  hooks['synara-capture'].PreInvocation[0].command = hooks['synara-capture'].PreInvocation[0].command.replace('echo {}', 'echo {"decision":"allow"}');
+  put(file, JSON.stringify(hooks));
+  assert.equal(check(f).findings.find(row => row.check === 'google:synara-capture').ok, false);
 });

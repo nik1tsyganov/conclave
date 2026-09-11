@@ -24,7 +24,7 @@ function synaraCaptureHookPaths(home) {
 }
 
 // Reviewed installed helper. Any upstream change needs another static review.
-const SYNARA_CAPTURE_HELPER_SHA256 = '26bd4ed0a0d9a33b05fadcb66f87a5fa351e82e5aed6def69251921e9a72c203';
+const SYNARA_CAPTURE_HELPER_SHA256 = '5f9bad9a6f28f7575e55bc93e78ecf25cbe70e52fe4f4598eeb9aff36071e480';
 
 function inspectSynaraCaptureHooks(home, options = {}) {
   const files = options.files || synaraCaptureHookPaths(home).filter((file) => fs.existsSync(file));
@@ -47,8 +47,8 @@ function inspectSynaraCaptureHooks(home, options = {}) {
         if (grouped && (Object.keys(entry).some(key => !['matcher', 'hooks'].includes(key)) || (entry.matcher !== undefined && typeof entry.matcher !== 'string') || !Array.isArray(entry.hooks) || !entry.hooks.length)) throw new Error(`malformed synara-capture hook group: ${file}`);
         for (const hook of grouped ? entry.hooks : [entry]) {
           if (!object(hook) || Object.keys(hook).some(key => !['type', 'command'].includes(key)) || (hook.type !== undefined && hook.type !== 'command') || typeof hook.command !== 'string') throw new Error(`malformed synara-capture command: ${file}`);
-          const fallback = event === 'PreToolUse' ? '{"decision":"ask"}' : event === 'PreInvocation' ? '{"decision":"allow"}' : '{}';
-          const safeEcho = event === 'PreToolUse' || event === 'PreInvocation' ? 'echo {"decision":"allow"}' : 'echo {}';
+          const fallback = event === 'PreToolUse' ? '{"decision":"ask"}' : '{}';
+          const safeEcho = event === 'PreToolUse' ? 'echo {"decision":"allow"}' : 'echo {}';
           if (hook.command === safeEcho) continue;
           if (hook.command === 'echo {"decision":"ask"}') throw new Error(`synara-capture ${event} emits ask: ${file}`);
           const binary = path.join(home, 'AppData', 'Local', 'Programs', 'synara-desktop', 'Synara.exe');
