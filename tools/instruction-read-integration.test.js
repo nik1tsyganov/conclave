@@ -93,9 +93,29 @@ test('generated OpenAI contract carries exact unbatched reads for every staged f
     const contract = fs.readFileSync(launch.seatContractPath, 'utf8');
     const commands = [...contract.matchAll(/const r = await tools\.exec_command\((\{[^\n]+\})\); text\(r.output\);/g)].map(match => JSON.parse(match[1]));
     assert.equal(commands.length, 31); // The bootstrap contract read is the 32nd required file.
-    assert.ok(commands.every(command => command.workdir === launch.cwd && /^Get-Content -Raw -LiteralPath '.+' -Encoding UTF8$/.test(command.cmd)));
+    assert.ok(commands.every(command => command.workdir === launch.cwd.replaceAll('\\', '/') && !command.cmd.includes('\\') && /^Get-Content -Raw -LiteralPath '.+' -Encoding UTF8$/.test(command.cmd)));
     assert.match(contract, /ONE functions.exec invocation per code block/);
-    assert.ok(commands.every(command => !command.cmd.includes(launch.seatContractPath)));
+    assert.ok(commands.every(command => !command.cmd.includes(launch.seatContractPath.replaceAll('\\', '/'))));
   });
   assert.equal((await runDispatch({ ...run.opts, dispatchId: 'd1' }, native)).ok, true);
+});
+
+test('OpenAI native read proof accepts equivalent forward paths without changing canonical metadata', async t => {
+  const run = createSealedRun(t, [routes[1]]); const native = fakeVendor(); const collect = native.codexSessionTranscript;
+  native.codexSessionTranscript = (...args) => {
+    const result = collect(...args); const events = rows(result.text);
+    for (const event of events) {
+      if (event.type === 'response_item' && event.payload?.type === 'custom_tool_call') {
+        const match = event.payload.input.match(/tools\.exec_command\((\{[^\n]+\})\)/); assert.ok(match);
+        const command = JSON.parse(match[1]); command.cmd = command.cmd.replaceAll('\\', '/'); command.workdir = command.workdir.replaceAll('\\', '/');
+        event.payload.input = `const r = await tools.exec_command(${JSON.stringify(command)}); text(r.output);`;
+      } else if (event.payload?.item?.type === 'CommandExecution') {
+        const execution = event.payload.item; execution.command = execution.command.map(arg => arg.replaceAll('\\', '/')); execution.cwd = execution.cwd.replaceAll('\\', '/');
+      }
+    }
+    return { ...result, text: encode(events) };
+  };
+  const result = await runDispatch({ ...run.opts, dispatchId: 'd1' }, native);
+  assert.equal(result.ok, true); assert.equal(result.receipt.instructionReadProtocol, INSTRUCTION_READ_PROTOCOL);
+  assert.equal((await runDispatch({ ...run.opts, dispatchId: 'd1' }, native)).replayed, true); assert.equal(native.calls(), 1);
 });

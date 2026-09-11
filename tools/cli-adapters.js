@@ -170,7 +170,7 @@ function seatContextText(ctx) {
 }
 
 function seatPointerText(ctx) {
-  const command = { cmd: `Get-Content -Raw -LiteralPath '${ctx.seatContractPath.replaceAll("'", "''")}' -Encoding UTF8`, workdir: ctx.cwd, max_output_tokens: 10000 };
+  const command = { cmd: `Get-Content -Raw -LiteralPath '${ctx.seatContractPath.replaceAll('\\', '/').replaceAll("'", "''")}' -Encoding UTF8`, workdir: ctx.cwd.replaceAll('\\', '/'), max_output_tokens: 10000 };
   let recipe = '';
   if (ctx.vendor === 'openai') {
     recipe = `FIRST use the exec code tool with exactly this JavaScript: const r = await tools.exec_command(${JSON.stringify(command)}); text(r.output); Then use the exact one-file read recipes in that contract. `;

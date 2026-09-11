@@ -83,7 +83,7 @@ function seatContractText(opts, seatProfile, skillStage, ruleStage) {
   const instructionFiles = [path.join(ruleStage.briefDir, 'BRIEF.md'), contractPath,
     ruleStage.manifestPath, ...ruleStage.manifest.files.map(file => path.join(ruleStage.briefDir, file.path)),
     skillStage.manifestPath, ...seatProfile.skills.map(skill => path.join(skillStage.root, skill, 'SKILL.md'))];
-  const openaiReadRecipe = file => `const r = await tools.exec_command(${JSON.stringify({ cmd: `Get-Content -Raw -LiteralPath '${file.replaceAll("'", "''")}' -Encoding UTF8`, workdir: opts.cwd, max_output_tokens: 10000 })}); text(r.output);`;
+  const openaiReadRecipe = file => `const r = await tools.exec_command(${JSON.stringify({ cmd: `Get-Content -Raw -LiteralPath '${file.replaceAll('\\', '/').replaceAll("'", "''")}' -Encoding UTF8`, workdir: opts.cwd.replaceAll('\\', '/'), max_output_tokens: 10000 })}); text(r.output);`;
   return [
     '# MAGI CLI seat contract',
     '',

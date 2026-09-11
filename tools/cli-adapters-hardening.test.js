@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const { execFileSync } = require('node:child_process');
 const { allowedWorkspace, anthropicLaunch, googleLaunch, openaiLaunch } = require('./cli-adapters.js');
 const { CLAUDE_RESPONSE_PROTOCOL, CLAUDE_RESPONSE_SCHEMA, validateClaudeResponseLaunch } = require('./vendor-native.js');
 
@@ -111,6 +112,24 @@ test('every adapter keeps even a single-line brief body out of launch arguments 
     assert.ok(!launch.args.some(arg => String(arg).includes(body)));
     if (launch.stdinFile) assert.ok(!fs.readFileSync(launch.stdinFile, 'utf8').includes(body));
   }
+});
+
+test('OpenAI first-read recipe uses forward paths and reads an apostrophe path on Windows', { skip: process.platform !== 'win32' }, t => {
+  const f = fixture(t); const cwd = path.join(f.dir, '.local', "O'Brien [read]"); fs.mkdirSync(cwd, { recursive: true });
+  const contract = path.join(cwd, "SEAT'S-CONTRACT.md"); const content = 'exact forward-path read sentinel'; fs.writeFileSync(contract, content);
+  const launch = openaiLaunch({ briefPath: f.briefPath, seatContractPath: contract, skillRoot: f.skillRoot, cwd,
+    role: 'verify', model: 'gpt-5.6-luna', effort: 'medium', capturePath: path.join(f.dir, 'capture.txt'),
+    env: { ...fakeBins, MAGI_ALLOWED_WORKSPACE_ROOTS: f.dir }, mustExistBinary: false });
+  const pointer = fs.readFileSync(launch.stdinFile, 'utf8');
+  const match = pointer.match(/const r = await tools\.exec_command\((\{[^\n]+\})\); text\(r.output\);/);
+  assert.ok(match); const args = JSON.parse(match[1]);
+  assert.strictEqual(args.workdir, cwd.replaceAll('\\', '/')); assert.ok(!args.cmd.includes('\\'));
+  assert.ok(args.cmd.includes("O''Brien [read]")); assert.ok(args.cmd.includes("SEAT''S-CONTRACT.md"));
+  assert.strictEqual(launch.cwd, cwd, 'native launch cwd retains its original canonical form');
+  assert.deepStrictEqual(Object.keys(args).sort(), ['cmd', 'max_output_tokens', 'workdir']);
+  const output = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', args.cmd],
+    { cwd: args.workdir, encoding: 'utf8', windowsHide: true, timeout: 10000 });
+  assert.strictEqual(output.trimEnd(), content);
 });
 
 test('Claude launch validation rejects changed prompt transport and lost native proof flags', (t) => {
