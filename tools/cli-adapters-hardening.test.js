@@ -106,6 +106,23 @@ test('every adapter keeps even a single-line brief body out of launch arguments 
   }
 });
 
+test('Claude pointer and system prompt require a FIRST native Read of the seat contract, not Bash cat', (t) => {
+  const f = fixture(t);
+  const launch = anthropicLaunch({
+    briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
+    cwd: 'C:\\src\\product-a', model: 'fable', effort: 'xhigh', role: 'implement',
+    env: fakeBins, mustExistBinary: false,
+  });
+  const pointer = fs.readFileSync(launch.stdinFile, 'utf8');
+  const system = launch.args[launch.args.indexOf('--append-system-prompt') + 1];
+  assert.match(pointer, /FIRST use the Read tool/);
+  assert.ok(pointer.includes(f.seatContractPath));
+  assert.match(pointer, /Do not cat or Bash instruction files/);
+  assert.match(system, /Use the Read tool/);
+  assert.match(system, /Do not use Bash or cat for instruction files/);
+  assert.ok(pointer.length <= 2000);
+});
+
 test('every adapter requires contract-listed reads before product work and treats missing instructions as blockers', (t) => {
   const f = fixture(t);
   for (const build of [openaiLaunch, googleLaunch, anthropicLaunch]) {

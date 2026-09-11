@@ -146,14 +146,20 @@ function subscriptionEnv(source = process.env) {
 }
 
 function seatContextText(ctx) {
-  return `Read ${ctx.seatContractPath} in full before doing any task work. Complete every required instruction read in that contract before product work. Do not read global skills or use other tools before that coverage. If any required instruction is missing or unreadable, stop and report a blocker. Use only the MAGI-authorized staged skills listed there. Native permissions still apply. Your FINAL response must start with the brief's exact first line, with nothing before it. Then follow the brief's response format.`;
+  const open = ctx.vendor === 'anthropic'
+    ? `Use the Read tool on ${ctx.seatContractPath} in full before doing any task work. Do not use Bash or cat for instruction files.`
+    : `Read ${ctx.seatContractPath} in full before doing any task work.`;
+  return `${open} Complete every required instruction read in that contract before product work. Do not read global skills or use other tools before that coverage. If any required instruction is missing or unreadable, stop and report a blocker. Use only the MAGI-authorized staged skills listed there. Native permissions still apply. Your FINAL response must start with the brief's exact first line, with nothing before it. Then follow the brief's response format.`;
 }
 
 function seatPointerText(ctx) {
   const command = { cmd: `Get-Content -Raw -LiteralPath '${ctx.seatContractPath.replaceAll("'", "''")}' -Encoding UTF8`, workdir: ctx.cwd, max_output_tokens: 10000 };
-  const recipe = ctx.vendor === 'openai'
-    ? `FIRST use the exec code tool with exactly this JavaScript: const r = await tools.exec_command(${JSON.stringify(command)}); text(r.output); Then use the exact one-file read recipes in that contract. `
-    : '';
+  let recipe = '';
+  if (ctx.vendor === 'openai') {
+    recipe = `FIRST use the exec code tool with exactly this JavaScript: const r = await tools.exec_command(${JSON.stringify(command)}); text(r.output); Then use the exact one-file read recipes in that contract. `;
+  } else if (ctx.vendor === 'anthropic') {
+    recipe = `FIRST use the Read tool with file_path exactly ${ctx.seatContractPath} and no other tool. Then use that contract's exact one-file Read recipes. Do not cat or Bash instruction files. `;
+  }
   const text = `${recipe}${pointerText(ctx.brief).trim()} ${seatContextText(ctx)}`;
   if (text.length + 1 > 2000) throw Object.assign(new Error('seat pointer exceeds the 2000-character delivery limit'), { code: 'POINTER_FAIL' });
   return text;
