@@ -115,15 +115,25 @@ Choose one concrete behavior and its acceptance checks. Examples include a repro
 
 Prepare all briefs before sealing. Each brief must contain the literal required template blocks, actual rule paths, the correct role/vendor/host values, a unique first-line ACK, and the exact read/write boundary. Hash the finished bytes. Checker entries bind the implementer's vendor, unit, and worktree.
 
-For ordinary feature trials, the three suggested entries are:
+For ordinary feature trials, choose all three entries from currently eligible routes:
 
 | Order | Role / class | Candidate route | Required behavior |
 |---|---|---|---|
-| 1 | implement / standard-feature | anthropic / sonnet / medium | Make the scoped change and run appropriate checks. |
-| 2 | verify / test-verification | openai / gpt-5.6-terra / medium | Independently run suitable non-mutating checks; inspect the resulting files. |
-| 3 | review / review-adversarial | google / gemini-3.1-pro-high / fused-high | Read files and captured tests; challenge defects and missing cases. |
+| 1 | implement / standard-feature | Eligible implementation pair | Make the scoped change and run appropriate checks. |
+| 2 | verify / test-verification | Eligible pair from a foreign vendor | Inspect source and meaningful test evidence; run checks only when the role's tools permit them. |
+| 3 | review / review-adversarial | Eligible pair from another foreign vendor | Read files and captured tests; challenge defects and missing cases. |
 
 The matrix and fresh probes govern actual eligibility. This table does not override them. Google review briefs must request file-read tools and existing test evidence. Do not require RunCommand in its sandbox. Claude read-only seats can use Read/Glob/Grep; they cannot execute test commands. Select checker roles that can perform the required check.
+
+OpenAI may need shell commands to read local files. Permit read-only file reads,
+searches, and directory listings inside declared roots. Do not combine required
+file inspection with a blanket shell or subprocess ban. For a review of saved
+tests, prohibit product execution, test execution, installs, network requests,
+delegation, and file-write commands. Preserve the contract's automatic runtime
+temporary-file exception for its exact restricted scratch directory. Keep product,
+evidence, instruction, and global files immutable. Place SCOPE before the single
+final POSITION line. Check the generated contract and finished brief for conflicts
+before sealing; prose must match the selected vendor's actual read tools.
 
 Each generated seat contract names the staged rules and required role skills by absolute path. Before accepting a seat, inspect its report and available native read evidence. Missing or unread required instructions are a blocker, even if the task answer is topical. Preserve that evidence and export the stopped trial; do not let the seat declare those instructions optional.
 

@@ -172,7 +172,16 @@ function verifySavedExecution(run, entry, state, pending, allowReceiptProjection
     if (telemetryLog !== destinations.telemetryLog) throw new Error('handoff log destination changed');
   }
   const spec = run.matrix.vendors[entry.vendor].models[entry.model];
-  const proof = (postRun ? verifyNativeProof : verifyProof)({ vendor: entry.vendor, capture: artifact('capture.txt'), log: artifact('vendor.log'), expectedModel: entry.model, expectedObservedModel: spec.canonical || entry.model, expectedEffort: entry.effort, expectedSandbox: entry.vendor === 'openai' ? (entry.role === 'implement' ? 'workspace-write' : 'read-only') : undefined, onTopic: true, responseProtocol });
+  const scratchLaunch = entry.vendor === 'openai' && Object.hasOwn(launch, 'scratchPermissions');
+  if (scratchLaunch) {
+    if (launch.model !== entry.model || launch.effort !== entry.effort) throw new Error('scratch launch model or effort differs from the sealed plan');
+    assertPlainPath(path.join(run.root, 'out', entry.dispatchId, 'scratch'));
+  }
+  const expectedSandbox = entry.vendor === 'openai'
+    ? (scratchLaunch ? 'custom permissions' : entry.role === 'implement' ? 'workspace-write' : 'read-only') : undefined;
+  const proof = (postRun ? verifyNativeProof : verifyProof)({ vendor: entry.vendor, capture: artifact('capture.txt'), log: artifact('vendor.log'), expectedModel: entry.model, expectedObservedModel: spec.canonical || entry.model, expectedEffort: entry.effort,
+    expectedSandbox, launch, runDir: run.root, dispatchId: entry.dispatchId, expectedRole: entry.role, expectedCwd: entry.cwd,
+    onTopic: true, responseProtocol });
   const response = finalResponse(entry.vendor, fs.readFileSync(artifact('capture.txt'), 'utf8'), { responseProtocol });
   if (response.split(/\r?\n/, 1)[0] !== fs.readFileSync(entry.brief, 'utf8').split(/\r?\n/, 1)[0]) throw new Error('native response has wrong brief acknowledgement');
   const sessionId = proof.sessionId || proof.conversationId;
