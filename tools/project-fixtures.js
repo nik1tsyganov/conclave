@@ -163,6 +163,7 @@ State has exactly {version:1,capacity:positive safe integer,bookings:[{id,person
 IDs and people are nonempty trimmed strings. IDs are unique. Status is confirmed/waiting.
 Confirmed count must not exceed capacity. No waiting booking may exist while a seat is free.
 Array order records arrival order. Removing a booking preserves relative order of the survivors.
+Confirmed bookings must precede waiting bookings in that order. A confirmed booking after any waiting booking is invalid.
 applyCommand(state,{type:'join',id,person}) joins confirmed if space exists, otherwise waiting.
 Repeating the same ID/person is idempotent. Reusing an ID for another person throws 'booking conflict'.
 applyCommand(state,{type:'cancel',id}) removes that booking and promotes the earliest waiting booking if space opens.
@@ -174,7 +175,7 @@ Only src/roster.cjs and src/repository.cjs may change. CLI, contracts, examples,
 `,
     units: [
       { id: 'roster', failures: ['roster repeats identical joins without consuming seats', 'roster promotes the earliest waiting booking'] },
-      { id: 'repository', failures: ['repository rejects malformed JSON', 'repository preserves previous bytes on publication failure', 'repository preserves previous bytes on write failure'] },
+      { id: 'repository', failures: ['repository rejects malformed JSON', 'repository preserves previous bytes on publication failure', 'repository preserves previous bytes on write failure', 'repository rejects confirmed bookings after waiting before any write'] },
     ],
     integrationFailures: ['CLI survives restart with idempotent joins and FIFO promotion', 'CLI refuses corrupted persisted data'],
     exampleName: 'roster.json', example: '{"version":1,"capacity":1,"bookings":[{"id":"booking-03","person":"Alex Kim","status":"confirmed"}]}\n',
@@ -296,6 +297,21 @@ test('repository validates persisted shapes and occupancy', t => {
   }
 });
 test('repository validates before writing', t => { const { file, text } = setup(t); assert.throws(() => saveRoster(file, { ...empty, capacity: 0 }), /invalid roster/); assert.equal(fs.readFileSync(file, 'utf8'), text); });
+test('repository rejects confirmed bookings after waiting before any write', t => {
+  const invalid = { ...empty, bookings: [{ ...booking, status: 'waiting' }, { ...booking, id: 'B' }] };
+  const source = setup(t, JSON.stringify(invalid) + '\n'); const destination = setup(t);
+  const rejection = fn => { try { fn(); return null; } catch (error) { return error.message; } };
+  const loadError = rejection(() => loadRoster(source.file));
+  let writes = 0; const original = fs.writeFileSync;
+  fs.writeFileSync = () => { writes++; throw new Error('unexpected write'); };
+  let saveError;
+  try { saveError = rejection(() => saveRoster(destination.file, invalid)); }
+  finally { fs.writeFileSync = original; }
+  assert.deepEqual({ loadError, saveError, writes }, { loadError: 'invalid roster', saveError: 'invalid roster', writes: 0 });
+  for (const { root, file, text } of [source, destination]) {
+    assert.equal(fs.readFileSync(file, 'utf8'), text); assert.deepEqual(fs.readdirSync(root), ['roster.json']);
+  }
+});
 `],
     integration: String.raw`'use strict';
 const test = require('node:test');
