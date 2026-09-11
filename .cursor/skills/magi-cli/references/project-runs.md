@@ -274,6 +274,50 @@ Do not create MAGI seats as Synara threads. Do not substitute Cursor Task electo
 
 ## Scope of this handoff
 
+### Domain benchmark subjects
+
+The `benchmark-software/implement`, `benchmark-writing/research`, and
+`benchmark-planning/plan` routes admit owner-requested measurements. They do not
+promote a model into a production lane. Production routes remain unchanged.
+
+Each subject plan must declare `purpose: "benchmark"`, `magiConvened: false`,
+and exactly one dispatch. Set `plan.benchmark` to exactly
+`{ "version": "domain-benchmark-v1", "taskId": "software-s", "packetSha256": "<64 lowercase hex characters>" }`.
+The fixed packet is `benchmark.json` in the dispatch's absolute `cwd`.
+Its hash, version, task ID, domain, size, and write scope must match the plan.
+Paths must resolve without symlinks or junctions. No arbitrary packet path is
+accepted. Seal, dispatch binding, and replay repeat this validation.
+
+Allowed task IDs are `software-s/m/l`, `writing-s/m/l`, and `planning-s/m/l`
+(expand each slash notation into three separate IDs). Software S permits only
+`src/import.cjs`; M permits `src/import.cjs` and `src/digest.cjs`; L permits
+`src/roster.cjs` and `src/repository.cjs`. Writing and planning permit no product
+writes. The packet, tests, and other files remain outside the write scope.
+Keep the normal native write audit and protected-input checks.
+
+Each domain admits the same eleven requested model/effort pairs. Fresh exact
+native proof, required instruction reads, approval policy, and scope checks
+still apply. Astra also requires `escalation: true` and a meaningful reason.
+Fable/high is a separate diagnostic alternative; its result cannot replace an
+xhigh condition. Priority values enumerate candidates, not quality rankings.
+Select the intended condition explicitly; do not substitute the next candidate
+when a bucket is unavailable.
+
+Keep fixture generators, judges, and reference answers outside the staged leaf
+runtime. The runtime uses only small admission metadata and the frozen packet.
+The packet's content is owner-authored input, bound by its hash. The software
+class adds `code-minimalism`; the other classes add no skills. Existing role and
+vendor cards still apply.
+
+Nine tasks across eleven pairs yield 99 possible subject observations. With one
+observation per cell, report case findings only. Short/medium/long describe task
+complexity, not endurance. Native validity and independent task quality are
+separate verdicts. A valid session can fail the task. An unavailable or invalid
+session cannot establish model quality. Preserve failed records and all exact
+conditions. Do not infer rankings, routing promotion, or a successful MAGI
+product run from this benchmark. Grok named in plan metadata alone is not proof
+that Grok led a run.
+
 Start fresh attempts after this update. Implementation-based checker receipts now bind `magi-unit-sequence-v1` prerequisite evidence. Older checker receipts lack that contract and will fail the updated validator. Preserve those historical runs with their original runtime; do not rewrite their receipts or present them as new acceptance.
 
 This guide exercises the installed Cursor CLI runtime. Claude's older engineering-gate bus integration and legacy battery/bus binding work remain separate backlog items. The CLI uses native safe mode and its own sealed-plan, proof, scope, and approval checks. A passing project trial does not close those older systems' issues.

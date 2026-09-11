@@ -1,6 +1,6 @@
 {
   "schemaVersion": 6,
-  "updated": "2026-09-10",
+  "updated": "2026-09-11",
   "principles": {
     "leafSeat": true,
     "subdispatchForbidden": true,
@@ -38,6 +38,9 @@
     "research": ["context-engineering"]
   },
   "classSkills": {
+    "benchmark-software": ["code-minimalism"],
+    "benchmark-writing": [],
+    "benchmark-planning": [],
     "architecture-planning": [],
     "standard-feature": [],
     "bulk-mechanical": ["code-minimalism"],

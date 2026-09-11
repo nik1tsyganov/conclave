@@ -7,6 +7,8 @@ const path = require('node:path');
 const test = require('node:test');
 const { loadMatrix, routeAllowed, validatePlan: strictPlan } = require('./dispatch-matrix.js');
 const { allAvailability, probeRecord } = require('./test-fixtures.js');
+const { buildSeatProfile, loadProfiles } = require('./seat-policy.js');
+const { sha256, readValidatedPlan, chooseRoute } = require('./dispatch-matrix.js');
 
 const matrix = loadMatrix();
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-matrix-evidence-'));
@@ -191,4 +193,169 @@ test('duplicate implementation units cannot fabricate distribution', () => {
 });
 test('ordinary routes also require fresh native proof for their exact effort', () => {
   assert.match(routeAllowed(matrix, { class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' }).reason, /probe-required/);
+});
+
+const benchmarkPairs = [
+  ['openai', 'gpt-5.6-luna', 'medium'], ['openai', 'gpt-5.6-terra', 'medium'],
+  ['openai', 'gpt-5.6-sol', 'high'], ['openai', 'gpt-6-astra', 'high'],
+  ['anthropic', 'sonnet', 'medium'], ['anthropic', 'opus', 'high'], ['anthropic', 'fable', 'xhigh'],
+  ['google', 'gemini-3.1-pro-high', 'fused-high'], ['google', 'gemini-3.8-flash-high', 'fused-high'],
+  ['google', 'gemini-3.8-flash-medium', 'fused-medium'], ['google', 'gemini-3.8-flash-low', 'fused-low'],
+];
+const benchmarkScopes = {
+  'software-s': ['src/import.cjs'], 'software-m': ['src/import.cjs', 'src/digest.cjs'],
+  'software-l': ['src/roster.cjs', 'src/repository.cjs'],
+};
+function benchmarkPlan(taskId = 'software-s', pair = benchmarkPairs[0]) {
+  const [domain, size] = taskId.split('-');
+  const cwd = fs.mkdtempSync(path.join(root, 'benchmark-'));
+  const packet = { version: 'domain-benchmark-v1', taskId, domain, size, writeScope: benchmarkScopes[taskId] || [] };
+  const bytes = JSON.stringify(packet) + '\n';
+  fs.writeFileSync(path.join(cwd, 'benchmark.json'), bytes);
+  return {
+    planId: 'benchmark-test', purpose: 'benchmark', hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: false,
+    benchmark: { version: packet.version, taskId, packetSha256: sha256(bytes) },
+    dispatches: [{ dispatchId: 'subject', unitId: taskId, class: `benchmark-${domain}`,
+      role: { software: 'implement', writing: 'research', planning: 'plan' }[domain],
+      vendor: pair[0], model: pair[1], effort: pair[2], cwd, briefSha256: 'a'.repeat(64),
+      writeScope: benchmarkScopes[taskId] || [],
+      ...(pair[1] === 'gpt-6-astra' ? { escalation: true, escalationReason: 'owner requested bounded benchmark measurement' } : {}),
+    }],
+  };
+}
+
+test('benchmark admits all 99 exact pair/task conditions with fresh native fixtures and known profiles', () => {
+  const profiles = loadProfiles();
+  let admissions = 0;
+  for (const domain of ['software', 'writing', 'planning']) for (const size of ['s', 'm', 'l']) for (const pair of benchmarkPairs) {
+    const plan = benchmarkPlan(`${domain}-${size}`, pair);
+    const route = plan.dispatches[0];
+    assert.equal(matrix.classes[route.class]?.benchmarkOnly, true);
+    assert.equal(strictPlan(plan, matrix, evidence).ok, true);
+    const profile = buildSeatProfile(profiles, route);
+    assert.deepEqual(profiles.classSkills[route.class], domain === 'software' ? ['code-minimalism'] : []);
+    assert.ok(profile.skills.includes(domain === 'software' ? 'code-minimalism' : 'context-engineering'));
+    admissions += 1;
+  }
+  assert.equal(admissions, 99);
+});
+
+test('benchmark-only purpose rejects ordinary, mixed, multiple, unknown and convened plans', () => {
+  for (const mutate of [
+    plan => { delete plan.purpose; },
+    plan => { plan.purpose = 'product'; },
+    plan => { plan.purpose = 'unknown'; },
+    plan => { plan.magiConvened = true; },
+    plan => { delete plan.magiConvened; },
+    plan => { plan.dispatches.push({ ...plan.dispatches[0], dispatchId: 'second', unitId: 'second' }); },
+    plan => { Object.assign(plan.dispatches[0], { class: 'bulk-mechanical' }); },
+    plan => { plan.dispatches[0].class = 'benchmark-writing'; },
+    plan => { plan.dispatches[0].role = 'research'; },
+  ]) {
+    const plan = benchmarkPlan(); mutate(plan);
+    assert.throws(() => strictPlan(plan, matrix, evidence), /benchmark|purpose/);
+  }
+  const ordinary = benchmarkPlan();
+  delete ordinary.purpose;
+  ordinary.dispatches[0].class = 'bulk-mechanical';
+  assert.throws(() => strictPlan(ordinary, matrix, evidence), /benchmark|purpose/);
+  delete ordinary.benchmark;
+  ordinary.purpose = 'product';
+  assert.equal(strictPlan(ordinary, matrix, evidence).ok, true);
+  ordinary.purpose = 'unknown';
+  assert.throws(() => strictPlan(ordinary, matrix, evidence), /purpose/);
+});
+
+test('benchmark packet requires exact hash, task, version, domain, size and fixed plain file', () => {
+  for (const mutate of [
+    plan => { delete plan.benchmark; },
+    plan => { plan.benchmark.packetSha256 = '0'.repeat(64); },
+    plan => { plan.benchmark.taskId = 'software-xl'; },
+    plan => { plan.benchmark.taskId = ['software-s']; },
+    plan => { plan.benchmark.version = 'future'; },
+    plan => { plan.benchmark.packetPath = '/another/packet.json'; },
+    plan => { plan.benchmark.packetSha256 = 'A'.repeat(64); },
+    plan => { fs.unlinkSync(path.join(plan.dispatches[0].cwd, 'benchmark.json')); },
+    plan => { fs.appendFileSync(path.join(plan.dispatches[0].cwd, 'benchmark.json'), ' '); },
+    plan => { plan.dispatches[0].cwd = 'https://example.test/fixture'; },
+  ]) {
+    const plan = benchmarkPlan(); mutate(plan);
+    assert.throws(() => strictPlan(plan, matrix, evidence), /benchmark|cwd/);
+  }
+  for (const [field, value] of [['version', 'future'], ['taskId', 'software-m'], ['domain', 'writing'], ['size', 'm']]) {
+    const plan = benchmarkPlan();
+    const file = path.join(plan.dispatches[0].cwd, 'benchmark.json');
+    const packet = JSON.parse(fs.readFileSync(file, 'utf8')); packet[field] = value;
+    fs.writeFileSync(file, JSON.stringify(packet));
+    plan.benchmark.packetSha256 = sha256(fs.readFileSync(file));
+    assert.throws(() => strictPlan(plan, matrix, evidence), /benchmark/);
+  }
+});
+
+test('benchmark packet refuses junctions and directory packets', () => {
+  const plan = benchmarkPlan();
+  const link = path.join(root, 'benchmark-junction');
+  fs.symlinkSync(plan.dispatches[0].cwd, link, process.platform === 'win32' ? 'junction' : 'dir');
+  plan.dispatches[0].cwd = link;
+  assert.throws(() => strictPlan(plan, matrix, evidence), /benchmark.*junction|benchmark.*symlink/);
+  const directoryPlan = benchmarkPlan();
+  const packetFile = path.join(directoryPlan.dispatches[0].cwd, 'benchmark.json');
+  fs.unlinkSync(packetFile); fs.mkdirSync(packetFile);
+  assert.throws(() => strictPlan(directoryPlan, matrix, evidence), /benchmark/);
+});
+
+test('benchmark write scopes are exact and non-software remains read-only', () => {
+  for (const taskId of ['software-s', 'software-m', 'software-l', 'writing-s', 'planning-l']) {
+    for (const writeScope of [['.'], ['src'], ['benchmark.json'], ['src/import.cjs', 'benchmark.json'], ['src/import.cjs', 'src/import.cjs']]) {
+      const plan = benchmarkPlan(taskId); plan.dispatches[0].writeScope = writeScope;
+      assert.throws(() => strictPlan(plan, matrix, evidence), /benchmark|writeScope|read-only/);
+    }
+  }
+  const missing = benchmarkPlan(); missing.dispatches[0].writeScope = [];
+  assert.throws(() => strictPlan(missing, matrix, evidence), /benchmark|writeScope/);
+});
+
+test('benchmark keeps fresh exact native proof and Astra escalation gates', () => {
+  const plan = benchmarkPlan();
+  assert.throws(() => strictPlan(plan, matrix, {}), /probe-required/);
+  const stale = structuredClone(evidence);
+  stale.vendors.openai.models['gpt-5.6-luna'].efforts.medium.observedAt = new Date(Date.now() - 7200000).toISOString();
+  assert.throws(() => strictPlan(plan, matrix, stale), /stale/);
+  const astra = benchmarkPlan('planning-m', benchmarkPairs[3]);
+  delete astra.dispatches[0].escalation;
+  assert.throws(() => strictPlan(astra, matrix, evidence), /escalation-only/);
+});
+
+test('benchmark Fable high is a separate diagnostic route, never an xhigh proof substitution', () => {
+  const plan = benchmarkPlan('writing-m', ['anthropic', 'fable', 'high']);
+  assert.equal(strictPlan(plan, matrix, evidence).ok, true);
+  const available = structuredClone(evidence);
+  available.vendors.anthropic.models.fable.efforts.high = available.vendors.anthropic.models.fable.efforts.xhigh;
+  assert.throws(() => strictPlan(plan, matrix, available), /probe-required/);
+  assert.throws(() => chooseRoute(matrix, { className: 'benchmark-writing', role: 'research', availability: evidence }), /explicit subject pair/);
+});
+
+test('validated benchmark plan replay rejects packet drift with unchanged plan bytes', () => {
+  const plan = benchmarkPlan('writing-s');
+  const planFile = path.join(root, 'benchmark-replay-plan.json');
+  fs.writeFileSync(planFile, JSON.stringify(plan));
+  const first = readValidatedPlan(planFile, undefined, matrix, evidence);
+  fs.appendFileSync(path.join(plan.dispatches[0].cwd, 'benchmark.json'), '\n');
+  assert.throws(() => readValidatedPlan(planFile, first.planHash, matrix, evidence), /benchmark/);
+});
+
+test('generated packets pass policy and native workspace audit protects packet and other non-scoped files', () => {
+  const { BENCHMARK_CATALOG, generateBenchmark } = require('./benchmark-fixtures.js');
+  const { snapshotWorkspace, compareWorkspace } = require('./dispatch-evidence.js');
+  for (const task of BENCHMARK_CATALOG) {
+    const plan = benchmarkPlan(task.taskId);
+    const fixture = generateBenchmark(task.taskId, path.join(root, `generated-${task.taskId}`));
+    Object.assign(plan.benchmark, { version: fixture.version, packetSha256: fixture.packetSha256 });
+    Object.assign(plan.dispatches[0], { cwd: fixture.cwd, writeScope: fixture.writeScope });
+    assert.equal(strictPlan(plan, matrix, evidence).ok, true);
+    const before = snapshotWorkspace(fixture.cwd);
+    fs.appendFileSync(path.join(fixture.cwd, 'benchmark.json'), '\n');
+    assert.equal(compareWorkspace(before, snapshotWorkspace(fixture.cwd), fixture.writeScope).ok, false);
+    assert.throws(() => strictPlan(plan, matrix, evidence), /benchmark/);
+  }
 });

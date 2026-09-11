@@ -1,6 +1,6 @@
 {
   "schemaVersion": 3,
-  "updated": "2026-09-05",
+  "updated": "2026-09-11",
   "principles": {
     "arbiterVendor": "xai",
     "arbiterModel": "grok-4.6",
@@ -48,6 +48,60 @@
     }
   },
   "classes": {
+    "benchmark-software": {
+      "benchmarkOnly": true,
+      "provenance": "Owner-requested domain-benchmark-v1 measurement; admission is not routing promotion. Fable/high is a separate diagnostic condition.",
+      "implement": [
+        { "vendor": "openai", "model": "gpt-5.6-luna", "effort": "medium", "priority": 1 },
+        { "vendor": "openai", "model": "gpt-5.6-terra", "effort": "medium", "priority": 2 },
+        { "vendor": "openai", "model": "gpt-5.6-sol", "effort": "high", "priority": 3 },
+        { "vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 4, "requiresProbe": true, "escalationOnly": true },
+        { "vendor": "anthropic", "model": "sonnet", "effort": "medium", "priority": 5 },
+        { "vendor": "anthropic", "model": "opus", "effort": "high", "priority": 6 },
+        { "vendor": "anthropic", "model": "fable", "effort": "xhigh", "priority": 7 },
+        { "vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 8 },
+        { "vendor": "google", "model": "gemini-3.8-flash-high", "effort": "fused-high", "priority": 9 },
+        { "vendor": "google", "model": "gemini-3.8-flash-medium", "effort": "fused-medium", "priority": 10 },
+        { "vendor": "google", "model": "gemini-3.8-flash-low", "effort": "fused-low", "priority": 11 },
+        { "vendor": "anthropic", "model": "fable", "effort": "high", "priority": 12, "diagnosticOnly": true }
+      ]
+    },
+    "benchmark-writing": {
+      "benchmarkOnly": true,
+      "provenance": "Owner-requested domain-benchmark-v1 measurement; admission is not routing promotion. Fable/high is a separate diagnostic condition.",
+      "research": [
+        { "vendor": "openai", "model": "gpt-5.6-luna", "effort": "medium", "priority": 1 },
+        { "vendor": "openai", "model": "gpt-5.6-terra", "effort": "medium", "priority": 2 },
+        { "vendor": "openai", "model": "gpt-5.6-sol", "effort": "high", "priority": 3 },
+        { "vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 4, "requiresProbe": true, "escalationOnly": true },
+        { "vendor": "anthropic", "model": "sonnet", "effort": "medium", "priority": 5 },
+        { "vendor": "anthropic", "model": "opus", "effort": "high", "priority": 6 },
+        { "vendor": "anthropic", "model": "fable", "effort": "xhigh", "priority": 7 },
+        { "vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 8 },
+        { "vendor": "google", "model": "gemini-3.8-flash-high", "effort": "fused-high", "priority": 9 },
+        { "vendor": "google", "model": "gemini-3.8-flash-medium", "effort": "fused-medium", "priority": 10 },
+        { "vendor": "google", "model": "gemini-3.8-flash-low", "effort": "fused-low", "priority": 11 },
+        { "vendor": "anthropic", "model": "fable", "effort": "high", "priority": 12, "diagnosticOnly": true }
+      ]
+    },
+    "benchmark-planning": {
+      "benchmarkOnly": true,
+      "provenance": "Owner-requested domain-benchmark-v1 measurement; admission is not routing promotion. Fable/high is a separate diagnostic condition.",
+      "plan": [
+        { "vendor": "openai", "model": "gpt-5.6-luna", "effort": "medium", "priority": 1 },
+        { "vendor": "openai", "model": "gpt-5.6-terra", "effort": "medium", "priority": 2 },
+        { "vendor": "openai", "model": "gpt-5.6-sol", "effort": "high", "priority": 3 },
+        { "vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 4, "requiresProbe": true, "escalationOnly": true },
+        { "vendor": "anthropic", "model": "sonnet", "effort": "medium", "priority": 5 },
+        { "vendor": "anthropic", "model": "opus", "effort": "high", "priority": 6 },
+        { "vendor": "anthropic", "model": "fable", "effort": "xhigh", "priority": 7 },
+        { "vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 8 },
+        { "vendor": "google", "model": "gemini-3.8-flash-high", "effort": "fused-high", "priority": 9 },
+        { "vendor": "google", "model": "gemini-3.8-flash-medium", "effort": "fused-medium", "priority": 10 },
+        { "vendor": "google", "model": "gemini-3.8-flash-low", "effort": "fused-low", "priority": 11 },
+        { "vendor": "anthropic", "model": "fable", "effort": "high", "priority": 12, "diagnosticOnly": true }
+      ]
+    },
     "architecture-planning": {
       "plan": [
         { "vendor": "anthropic", "model": "opus", "effort": "high", "priority": 1 },
