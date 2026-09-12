@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { analyzeRows, analyzeVaultTelemetry } = require('./magi-vault-analyze.js');
+const { analyzeRows, analyzeVaultTelemetry, renderAnalysisMarkdown } = require('./magi-vault-analyze.js');
 const { linkRunToVault } = require('./magi-vault-link.js');
 const { looksSecret, resolveVaultRoot, vaultLayout } = require('./magi-vault.js');
 const { pullInbox, pushSkillsToVault, syncStatus } = require('./magi-vault-sync.js');
@@ -174,4 +174,35 @@ test('telemetry capture health counts existing totalTokens but leaves absent Goo
   ];
   assert.equal(analyzeRows(rows).captureHealth.tokenPresent, 3);
   assert.equal(rows[3].totalTokens, undefined);
+});
+
+test('terminal NOT_RUN reviewer stays planned, without false native share or lost capture', () => {
+  // Exact terminal-outcome shape exported by the rejected large-w trial.
+  const notRun = { dispatchId: 'review', unitId: 'writing', role: 'review', vendor: 'anthropic',
+    class: 'review-adversarial', planId: 'large-w', planHash: '497689ef0283366919fbcab1a36a527503d7e09345108485634cf41f98f307e3', status: 'NOT_RUN' };
+  const captured = { role: 'verify', vendor: 'openai', status: 'PASS', capturedBy: 'lead', proofId: 'proof', totalTokens: 123 };
+  const rows = [captured, notRun, { ...notRun, dispatchId: 'later-review' }];
+  const before = JSON.stringify(rows);
+  const report = analyzeRows(rows);
+  assert.equal(report.rowCount, 3);
+  assert.equal(report.activityRowCount, 1);
+  assert.equal(report.plannedNotRun.rowCount, 2);
+  assert.deepEqual(report.plannedNotRun.vendorShare.review, { anthropic: 2 });
+  assert.deepEqual(report.vendorShare.review, {});
+  assert.equal(report.captureHealth.missingCapturedBy, 0);
+  assert.equal(report.findings.some(f => ['capture:missing-capturedBy', 'proof:low', 'tokens:null-rate'].includes(f.id)), false);
+  assert.match(renderAnalysisMarkdown(report), /Planned NOT_RUN rows: 2/);
+  assert.equal(JSON.stringify(rows), before);
+});
+
+test('failed, invalid, running, and contradictory NOT_RUN rows retain missing native evidence visibility', () => {
+  const rows = ['FAIL', 'INVALID', 'RUNNING', 'AWAITING_ATTESTATION'].map(status => ({ status, role: 'review', vendor: 'google' }));
+  rows.push({ dispatchId: 'review', unitId: 'writing', role: 'review', vendor: 'anthropic', class: 'review-adversarial', planId: 'p', planHash: 'a'.repeat(64), status: 'NOT_RUN', proofId: 'contradiction' });
+  const report = analyzeRows(rows);
+  assert.equal(report.activityRowCount, 5);
+  assert.equal(report.plannedNotRun.rowCount, 0);
+  assert.equal(report.captureHealth.missingCapturedBy, 5);
+  assert.deepEqual(report.vendorShare.review, { google: 4, anthropic: 1 });
+  assert.ok(report.findings.some(f => f.id === 'proof:low'));
+  assert.ok(report.findings.some(f => f.id === 'tokens:null-rate'));
 });

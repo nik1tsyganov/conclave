@@ -70,12 +70,24 @@ function hogFindings(rows) {
 
 function analyzeRows(rows) {
   const vendorByRole = { implement: {}, verify: {}, review: {} };
+  const plannedNotRun = { rowCount: 0, vendorShare: { implement: {}, verify: {}, review: {} } };
+  const outcomeKeys = ['dispatchId', 'unitId', 'role', 'vendor', 'class', 'planId', 'planHash', 'status'];
   const hostModes = {};
   let capturedByLead = 0;
   let missingCapturedBy = 0;
   let proofPresent = 0;
   let tokenPresent = 0;
   for (const row of rows) {
+    // Only the exact non-call outcome shape emitted by inspectRun is exempt.
+    // A NOT_RUN label with capture/proof/other fields remains visible for checks.
+    if (row.status === 'NOT_RUN' && Object.keys(row).length === outcomeKeys.length
+        && outcomeKeys.every(key => typeof row[key] === 'string' && row[key].trim())
+        && /^[a-f0-9]{64}$/.test(row.planHash)) {
+      plannedNotRun.rowCount += 1;
+      const share = plannedNotRun.vendorShare[row.role];
+      if (share) share[row.vendor] = (share[row.vendor] || 0) + 1;
+      continue;
+    }
     if (row.capturedBy === 'lead') capturedByLead += 1;
     else if (!row.capturedBy) missingCapturedBy += 1;
     if (row.role && vendorByRole[row.role] && row.vendor) {
@@ -85,14 +97,15 @@ function analyzeRows(rows) {
     if (row.proofId) proofPresent += 1;
     if (typeof row.vendorSideTokens === 'number' || typeof row.totalTokens === 'number') tokenPresent += 1;
   }
+  const activityRowCount = rows.length - plannedNotRun.rowCount;
   const findings = [];
   if (!rows.length) findings.push({ id: 'capture:zero-rows', severity: 'attention', detail: 'vault telemetry is empty; later MAGI analysis has nothing to score' });
   if (missingCapturedBy > 0) findings.push({ id: 'capture:missing-capturedBy', severity: 'attention', detail: `${missingCapturedBy} rows missing capturedBy` });
-  if (rows.length && proofPresent / rows.length < 0.5) {
-    findings.push({ id: 'proof:low', severity: 'attention', detail: `proofPresent ${proofPresent}/${rows.length}` });
+  if (activityRowCount && proofPresent / activityRowCount < 0.5) {
+    findings.push({ id: 'proof:low', severity: 'attention', detail: `proofPresent ${proofPresent}/${activityRowCount}` });
   }
-  if (rows.length && tokenPresent / rows.length < 0.5) {
-    findings.push({ id: 'tokens:null-rate', severity: 'attention', detail: `token fields present on ${tokenPresent}/${rows.length} rows` });
+  if (activityRowCount && tokenPresent / activityRowCount < 0.5) {
+    findings.push({ id: 'tokens:null-rate', severity: 'attention', detail: `token fields present on ${tokenPresent}/${activityRowCount} rows` });
   }
   findings.push(...hogFindings(rows));
   const needsAttention = findings.some((item) => item.severity !== 'ok');
@@ -100,6 +113,8 @@ function analyzeRows(rows) {
     schemaVersion: 1,
     analyzedAt: new Date().toISOString(),
     rowCount: rows.length,
+    activityRowCount,
+    plannedNotRun,
     captureHealth: { capturedByLead, missingCapturedBy, proofPresent, tokenPresent },
     vendorShare: vendorByRole,
     hostMode: hostModes,
@@ -115,6 +130,8 @@ function renderAnalysisMarkdown(report) {
     '',
     `Analyzed at: ${report.analyzedAt}`,
     `Rows: ${report.rowCount}`,
+    `Planned NOT_RUN rows: ${report.plannedNotRun.rowCount}`,
+    `Rows requiring capture checks: ${report.activityRowCount} (not a count of proven native calls)`,
     `Needs attention: ${report.needsAttention ? 'yes' : 'no'}`,
     '',
     '## Findings',
