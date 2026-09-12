@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { createHash } = require('node:crypto');
 const { BENCHMARK_CATALOG, generateBenchmark, judgeBenchmark } = require('./benchmark-fixtures');
 
 function fixture(t, taskId) {
@@ -14,6 +15,40 @@ function fixture(t, taskId) {
   const packet = JSON.parse(fs.readFileSync(path.join(manifest.cwd, 'benchmark.json'), 'utf8'));
   return { manifest, packet, cwd: manifest.cwd, judge: response => judgeBenchmark(taskId, manifest.cwd, { manifest, response }) };
 }
+
+test('writing-v2 does not relabel a synthetic historical v1 packet or an unbound v2 packet', t => {
+  const f = fixture(t, 'writing-l');
+  const answer = writingAnswer(f.packet);
+  delete f.packet.contractVersion;
+  delete f.packet.acceptance.metricDefinitions;
+  const bytes = JSON.stringify(f.packet, null, 2) + '\n';
+  fs.writeFileSync(path.join(f.cwd, 'benchmark.json'), bytes);
+  delete f.manifest.contractVersion;
+  f.manifest.packetSha256 = createHash('sha256').update(bytes).digest('hex');
+  for (const file of [...f.manifest.files, ...f.manifest.protectedHashes]) {
+    if (file.path === 'benchmark.json') { file.sha256 = f.manifest.packetSha256; file.bytes = Buffer.byteLength(bytes); }
+  }
+  const historical = f.judge(answer);
+  assert.equal(historical.deterministicPass, false);
+  assert.equal(historical.contractVersion, undefined);
+  const current = fixture(t, 'writing-l');
+  fs.appendFileSync(path.join(current.cwd, 'benchmark.json'), '\n');
+  const tampered = current.judge(writingAnswer(current.packet));
+  assert.equal(tampered.deterministicPass, false);
+  assert.equal(tampered.contractVersion, undefined);
+});
+
+test('writing-v2 version is writing-specific, including the short packet', t => {
+  const short = fixture(t, 'writing-s');
+  assert.equal(short.packet.contractVersion, 'writing-contract-v2');
+  assert.equal(short.manifest.contractVersion, 'writing-contract-v2');
+  assert.equal(short.packet.acceptance.metricDefinitions, undefined);
+  for (const task of ['software-s', 'planning-s']) {
+    const f = fixture(t, task);
+    assert.equal(f.packet.contractVersion, undefined);
+    assert.equal(f.manifest.contractVersion, undefined);
+  }
+});
 
 // Independent good implementations are test-only. Never part of a subject packet.
 function goodImport(text) {
@@ -312,3 +347,31 @@ test('judge imposes no unpublished maximum on valid claims or risks', t => {
     assert.equal(planning.judge(answer).deterministicPass, true);
   }
 });
+
+for (const size of ['m', 'l']) {
+  test('writing-v2 ' + size + ' publishes metric meaning and preserves the strict satisfaction oracle', t => {
+    const f = fixture(t, 'writing-' + size);
+    assert.equal(f.packet.contractVersion, 'writing-contract-v2');
+    assert.equal(f.manifest.contractVersion, f.packet.contractVersion);
+    const definitions = f.packet.acceptance.metricDefinitions;
+    const answer = writingAnswer(f.packet);
+    assert.deepEqual(Object.keys(definitions).sort(), Object.keys(answer.metrics).sort());
+    assert.deepEqual(definitions.surveyRespondentPercent, {
+      meaning: 'Satisfied survey respondents as a percentage of all survey respondents; not the survey response rate among invited households.',
+      calculation: '24 / 30 * 100', sourceIds: ['F04'], unit: 'percent',
+    });
+    const values = { completionAttemptPercent: 60 / 80 * 100, completionInvitedPercent: 60 / 120 * 100,
+      surveyRespondentPercent: 24 / 30 * 100, totalCost: 50 * 30 + 400, budgetHeadroom: 2000 - (50 * 30 + 400), missingShifts: 10 * 2 - 18 };
+    for (const [key, value] of Object.entries(values)) {
+      assert.equal(answer.metrics[key], value);
+      assert.ok(definitions[key].meaning && definitions[key].calculation && definitions[key].unit);
+      assert.ok(definitions[key].sourceIds.every(id => f.packet.sources.some(row => row.id === id)));
+    }
+    const good = f.judge(answer);
+    assert.equal(good.deterministicPass, true);
+    assert.equal(good.contractVersion, 'writing-contract-v2');
+    answer.metrics.surveyRespondentPercent = 30 / 120 * 100;
+    const wrong = f.judge(answer);
+    assert.deepEqual(wrong.failures.map(row => row.id), ['writing.metrics.surveyRespondentPercent']);
+  });
+}
