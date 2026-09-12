@@ -9,6 +9,7 @@ const { inspectBrief, pointerText } = require('./cli-pointer.js');
 const { resolveVendorBinary } = require('./vendor-binaries.js');
 const { CLAUDE_RESPONSE_PROTOCOL, CLAUDE_RESPONSE_SCHEMA } = require('./vendor-native.js');
 const { validateEvidenceReadDirs } = require('./evidence-read-access.js');
+const { canonicalPlainPath } = require('./runtime-paths.js');
 
 const DEFAULTS = Object.freeze({
   openai: { model: 'gpt-5.6-sol', effort: 'high' },
@@ -108,7 +109,12 @@ function allowedWorkspace(cwd, env = process.env) {
   const devRoot = env.MAGI_DEV_ROOT || 'C:\\src';
   const roots = [devRoot, ...(env.MAGI_ALLOWED_WORKSPACE_ROOTS || '').split(';').filter(Boolean)];
   const resolved = hostResolve(cwd);
-  if (!roots.some((root) => windowsUnder(cwd, root) || windowsUnder(resolved, root))) {
+  // Compare native Windows aliases without accepting junctions or changing launch spelling.
+  const canonical = process.platform === 'win32' ? canonicalPlainPath : hostResolve;
+  let candidate;
+  try { candidate = canonical(resolved); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (!candidate || !roots.some((root) => windowsUnder(candidate, canonical(root)))) {
     const error = new Error(`workspace ${resolved} is outside MAGI allowed roots: ${roots.join(', ')}`);
     error.code = 'WORKSPACE_FORBIDDEN';
     throw error;

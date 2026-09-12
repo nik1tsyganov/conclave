@@ -39,6 +39,30 @@ test('workspace authorization keeps host-native POSIX paths', { skip: process.pl
   assert.strictEqual(allowedWorkspace(root, { MAGI_DEV_ROOT: root }), path.resolve(root));
 });
 
+test('Windows workspace authorization compares native short and long path aliases', { skip: process.platform !== 'win32' }, t => {
+  const longRoot = fs.realpathSync.native(process.env.ProgramFiles);
+  const shortRoot = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    '(New-Object -ComObject Scripting.FileSystemObject).GetFolder($env:ProgramFiles).ShortPath'],
+  { encoding: 'utf8', windowsHide: true, timeout: 10000 }).trim();
+  if (shortRoot.toLowerCase() === longRoot.toLowerCase()) return t.skip('Program Files has no native short path alias');
+  for (const [cwdRoot, allowedRoot] of [[longRoot, shortRoot], [shortRoot, longRoot]]) {
+    const env = { MAGI_DEV_ROOT: allowedRoot };
+    assert.strictEqual(allowedWorkspace(cwdRoot, env), cwdRoot);
+    const missing = path.join(cwdRoot, 'magi-authorization-fixture', 'workspace');
+    assert.strictEqual(allowedWorkspace(missing, env), missing);
+    assert.throws(() => allowedWorkspace(`${cwdRoot}-sibling`, env), { code: 'WORKSPACE_FORBIDDEN' });
+  }
+});
+
+test('Windows workspace authorization rejects junction candidates and allowed roots', { skip: process.platform !== 'win32' }, t => {
+  const f = fixture(t); const allowed = path.join(f.dir, 'allowed'); const outside = path.join(f.dir, 'outside');
+  fs.mkdirSync(allowed); fs.mkdirSync(outside);
+  const link = path.join(allowed, 'alias'); fs.symlinkSync(outside, link, 'junction');
+  assert.throws(() => allowedWorkspace(path.join(link, 'missing'), { MAGI_DEV_ROOT: allowed }), /symlink|junction/);
+  assert.throws(() => allowedWorkspace(outside, { MAGI_DEV_ROOT: link }), /symlink|junction/);
+  assert.deepStrictEqual(fs.readdirSync(outside), []);
+});
+
 test('OpenAI non-implement roles are read-only while implementer is workspace-write', (t) => {
   const f = fixture(t);
   const common = {

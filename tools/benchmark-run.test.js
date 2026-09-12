@@ -237,7 +237,7 @@ test('probe and run admit capacity separately, retain frames, and never rerun co
   const run = await runMode('run', s.opts, s.dependencies); assert.equal(run.status, 'PASS');
   assert.equal(s.calls.filter(call => call.tool === 'magi-cli-preflight').length, 2);
   const native = s.calls.find(call => call.tool === 'dispatch-run'); assert.equal(native.args[native.args.indexOf('--max-wall-ms') + 1], '180000'); assert.equal(native.options.maxWallMs, 225000);
-  assert.equal(native.env.AGY_CLI_DISABLE_AUTO_UPDATE, 'true'); assert.equal(native.env.MAGI_ALLOWED_WORKSPACE_ROOTS, s.root);
+  assert.equal(native.env.AGY_CLI_DISABLE_AUTO_UPDATE, 'true'); assert.equal(native.env.MAGI_ALLOWED_WORKSPACE_ROOTS, fs.realpathSync.native(s.root));
   const total = s.calls.length; await assert.rejects(runMode('run', s.opts, s.dependencies), /already started/); assert.equal(s.calls.length, total);
   const judged = await runMode('judge', s.opts, s.dependencies); assert.equal(judged.nativeCalls, 0); assert.equal(judged.result.qualityAccepted, null);
   assert.equal((await runMode('judge', s.opts, s.dependencies)).replayed, true); assert.equal(s.calls.length, total);
