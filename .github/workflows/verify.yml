@@ -6,16 +6,23 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      scope:
+        description: Verification scope (pull requests always run the full suite)
+        type: choice
+        default: all
+        options: [all, dashboard]
 
 permissions:
   contents: read
 
 concurrency:
-  group: magi-check-${{ github.workflow }}-${{ github.ref }}
+  group: magi-check-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && inputs.scope == 'dashboard' && 'dashboard' || 'full' }}
   cancel-in-progress: true
 
 jobs:
   contracts:
+    name: ${{ github.event_name == 'workflow_dispatch' && inputs.scope == 'dashboard' && 'dashboard' || 'contracts' }} (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -33,7 +40,14 @@ jobs:
         if: runner.os == 'Linux'
         run: git archive --format=zip --output=source-snapshot.zip HEAD
       - name: Repository tests and release checks (no vendor invocation)
+        if: github.event_name != 'workflow_dispatch' || inputs.scope != 'dashboard'
         run: npm run check
+      - name: Dashboard and installer tests (no vendor invocation)
+        if: github.event_name == 'workflow_dispatch' && inputs.scope == 'dashboard'
+        run: node --test tools/magi-dashboard.test.js tools/install-plugin.test.js
+      - name: Dashboard release check
+        if: github.event_name == 'workflow_dispatch' && inputs.scope == 'dashboard'
+        run: node tools/release-check.js
       - name: Preserve private source snapshot for reproducible verification
         if: always() && runner.os == 'Linux'
         uses: actions/upload-artifact@v4

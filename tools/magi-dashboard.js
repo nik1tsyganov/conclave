@@ -114,7 +114,13 @@ function createSnapshot(runDir, { nowMs = Date.now() } = {}) {
     const startedAt = timestamp(state.startedAt), completedAt = timestamp(state.completedAt);
     const identity = bound && state.schemaVersion === 1 && state.planId === plan.planId && state.planHash === seal.planHash && isDeepStrictEqual(state.entry, entry) && state.requestHash === digest(JSON.stringify({ planHash: seal.planHash, entry }));
     const expectedDir = path.join(read.root, evidenceRelative);
-    const allowedEvidence = typeof state.evidenceDir === 'string' && path.isAbsolute(state.evidenceDir) && !state.evidenceDir.split(/[\\/]/).some(part => part === '.' || part === '..') && path.resolve(state.evidenceDir) === expectedDir;
+    let allowedEvidence = false;
+    // Reject network/device paths before lookup. Compare plain identities because
+    // Windows producers can retain case or 8.3 aliases that native realpath expands.
+    if (typeof state.evidenceDir === 'string' && !/^[\\/]{2}/.test(state.evidenceDir) && path.isAbsolute(state.evidenceDir) && !state.evidenceDir.split(/[\\/]/).some(part => part === '.' || part === '..')) {
+      try { allowedEvidence = canonicalPlainPath(state.evidenceDir) === canonicalPlainPath(expectedDir); }
+      catch { /* Nonplain or unreadable evidence paths remain untrusted. */ }
+    }
     let status = identity && allowedEvidence && startedAt && STATES.has(state.status) ? state.status : 'UNKNOWN';
     let issue = !identity ? 'UNBOUND_TRANSACTION' : !allowedEvidence ? 'UNTRUSTED_EVIDENCE_PATH' : status === 'UNKNOWN' ? 'INCOMPLETE_TRANSACTION' : null;
     const receipt = object(state.receipt) ? state.receipt : null;
