@@ -28,6 +28,37 @@ test('missing required source instruction fails before sealing creates output', 
   assert.equal(fs.existsSync(runDir), false);
 });
 
+test('new seals reject missing lesson schema before creating output', t => {
+  const run = createSealedRun(t);
+  const profiles = JSON.parse(readSealedRun(run.runDir).seal.profilesText);
+  delete profiles.schemaVersion;
+  const runtime = path.join(run.root, 'runtime');
+  require('./install-plugin.js').installMagiCursorCli({ destination: runtime });
+  const profilesFile = path.join(runtime, 'skills/magi-cli/references/seat-profiles.json');
+  writeJson(profilesFile, profiles);
+  const runDir = path.join(run.root, 'invalid-policy-run');
+  const child = require('node:child_process').spawnSync(process.execPath,
+    [path.join(runtime, 'tools/plan-seal.js'), '--plan', run.planSource, '--run-dir', runDir,
+      '--availability', run.availability, '--skill-source-root', run.opts.skillSourceRoot], { encoding: 'utf8' });
+  assert.equal(child.status, 1);
+  assert.match(child.stderr, /operational lessons/);
+  assert.equal(fs.existsSync(runDir), false);
+});
+
+test('schema 6 lesson-free historical snapshot stays readable without rewriting it', t => {
+  const run = createSealedRun(t);
+  const file = path.join(run.runDir, 'plan-seal.json');
+  const seal = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const profiles = JSON.parse(seal.profilesText);
+  profiles.schemaVersion = 6; delete profiles.operationalLessons;
+  seal.profilesText = JSON.stringify(profiles);
+  seal.profilesSha256 = require('./dispatch-matrix.js').sha256(seal.profilesText);
+  writeJson(file, seal);
+  const original = hashFile(file);
+  assert.equal(JSON.parse(readSealedRun(run.runDir).seal.profilesText).schemaVersion, 6);
+  assert.equal(hashFile(file), original);
+});
+
 test('saved seal remains readable and completed replay immutable after source skill changes', async t => {
   const run = createSealedRun(t); const native = fakeVendor(); const opts = { ...run.opts, dispatchId: 'd1' };
   const first = await runDispatch(opts, native);

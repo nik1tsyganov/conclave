@@ -8,7 +8,7 @@ const { googleCaptureEnv } = require('./cli-adapters.js');
 const { runDispatch } = require('./dispatch-run.js');
 const { probe } = require('./model-probe.js');
 const { hashFile } = require('./dispatch-evidence.js');
-const { createSealedRun, fakeVendor, nativeCapture, temporary } = require('./test-fixtures.js');
+const { capacityFixture, createSealedRun, fakeVendor, nativeCapture, temporary } = require('./test-fixtures.js');
 
 test('Google capture helper preserves POSIX paths and explicit Windows paths on a POSIX host', () => {
   const filename = path.join(__dirname, 'cli-adapters.js');
@@ -108,6 +108,12 @@ test('Google diagnostic output cannot replace native model proof or escape throu
 
 test('Google probe isolates parent capture state and records diagnostic hashes without trusting identity', async t => {
   const root = temporary(t, 'magi-google-probe-');
+  const capacity = capacityFixture(root);
+  // Native-state inspection uses an isolated, valid synthetic provider home.
+  const home = path.join(root, 'provider-home');
+  const hooks = path.join(home, '.gemini', 'antigravity-cli', 'plugins', 'synara-capture', 'hooks.json');
+  fs.mkdirSync(path.dirname(hooks), { recursive: true });
+  fs.writeFileSync(hooks, JSON.stringify({ 'synara-capture': { PreInvocation: [{ command: 'echo {}' }] } }));
   const original = process.env.MAGI_AGY_BIN;
   process.env.MAGI_AGY_BIN = process.execPath;
   t.after(() => { if (original === undefined) delete process.env.MAGI_AGY_BIN; else process.env.MAGI_AGY_BIN = original; });
@@ -115,8 +121,8 @@ test('Google probe isolates parent capture state and records diagnostic hashes w
     SYNARA_ANTIGRAVITY_EVENTS: path.join(root, 'parent.jsonl'), SYNARA_ANTIGRAVITY_HOOK_DECISION: 'ask' });
   for (const wrongModel of [false, true]) {
     const evidenceDir = path.join(root, wrongModel ? 'wrong' : 'valid');
-    const pending = probe({ vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', evidenceDir }, {
-      env: parent,
+    const pending = probe({ vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', evidenceDir, ...capacity }, {
+      env: parent, home,
       runLaunch: async launch => {
         assert.equal(launch.env.SYNARA_ANTIGRAVITY_EVENTS, path.join(evidenceDir, 'synara-capture-events.jsonl'));
         assert.equal(launch.env.SYNARA_ANTIGRAVITY_HOOK_DECISION, 'allow');

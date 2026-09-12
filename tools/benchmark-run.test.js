@@ -117,6 +117,61 @@ test('prepare uses canonical template, exact packet binding and exclusive attemp
   assert.equal(s.calls.filter(call => call.tool === 'dispatch-run').length, 0);
 });
 
+test('prepare budget rejects invalid values and every other mode before filesystem or command effects', async t => {
+  const s = await setup(t);
+  for (const method of ['mkdirSync', 'writeFileSync', 'unlinkSync']) {
+    t.mock.method(fs, method, () => { throw new Error('Unexpected filesystem effect: ' + method); });
+  }
+  for (const maxWallMs of [0, -1, 1.5, 1200001, Number.MAX_SAFE_INTEGER + 1, NaN, Infinity, null, true, '', 'invalid']) {
+    await assert.rejects(runMode('prepare', { ...s.opts, maxWallMs }, s.dependencies), /max-wall-ms.*integer.*1200000/);
+  }
+  for (const mode of ['init', 'probe', 'run', 'attest', 'judge', 'status']) {
+    await assert.rejects(runMode(mode, { ...s.opts, maxWallMs: 600000 }, s.dependencies), /max-wall-ms.*only.*prepare/);
+  }
+  assert.equal(s.calls.length, 0);
+});
+
+test('prepare budget is bound before dispatch without changing short packets or default budgets', async t => {
+  const s = await setup(t); const original = await runMode('prepare', s.opts, s.dependencies);
+  const originalFixture = path.join(original.dir, 'fixture.json'); const originalHash = hash(originalFixture);
+  assert.equal(JSON.parse(fs.readFileSync(originalFixture)).maxWallMs, 180000);
+  const parsed = parseArgs(['prepare', '--root', s.root, '--subject', s.opts.subject, '--task', s.opts.task, '--attempt', '2', '--max-wall-ms', '600000']);
+  const p = await runMode(parsed.mode, parsed.opts, s.dependencies);
+  const fixtureFile = path.join(p.dir, 'fixture.json'); const fixture = JSON.parse(fs.readFileSync(fixtureFile));
+  const preparedFile = path.join(p.dir, 'prepared.json'); const prepared = JSON.parse(fs.readFileSync(preparedFile));
+  assert.equal(fixture.maxWallMs, 600000);
+  assert.equal(prepared.bindings.find(row => row.path === fixtureFile).sha256, hash(fixtureFile));
+  assert.equal(fs.readFileSync(preparedFile + '.sha256', 'utf8').trim(), hash(preparedFile));
+  assert.equal(hash(path.join(p.dir, 'product', 'benchmark.json')), hash(path.join(original.dir, 'product', 'benchmark.json')));
+  assert.equal(hash(originalFixture), originalHash);
+  const receipt = JSON.parse(fs.readFileSync(s.capacityFile));
+  receipt.observations[0].expiresAt = new Date(Date.now() + 1200000).toISOString(); save(s.capacityFile, receipt);
+  await runMode('probe', s.opts, s.dependencies);
+  await runMode('run', { ...s.opts, attempt: 2 }, s.dependencies);
+  const native = s.calls.find(call => call.tool === 'dispatch-run');
+  assert.equal(native.args[native.args.indexOf('--max-wall-ms') + 1], '600000');
+  assert.equal(native.options.maxWallMs, 645000);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(p.dir, 'started.json'))).maxWallMs, 600000);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(p.dir, 'capacity-admission.json'))).maxWallMs, 600000);
+});
+
+test('prepare budget accepts both inclusive operation limits', async t => {
+  const s = await setup(t);
+  for (const [index, maxWallMs] of [1, 1200000].entries()) {
+    const p = await runMode('prepare', { ...s.opts, attempt: index + 1, maxWallMs }, s.dependencies);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(p.dir, 'fixture.json'))).maxWallMs, maxWallMs);
+  }
+});
+
+test('changing a prepared fixture budget blocks run, attestation and judgment before commands', async t => {
+  const s = await setup(t); const p = await runMode('prepare', { ...s.opts, maxWallMs: 600000 }, s.dependencies);
+  const file = path.join(p.dir, 'fixture.json'); const fixture = JSON.parse(fs.readFileSync(file));
+  fixture.maxWallMs = 600001; save(file, fixture);
+  const count = s.calls.length;
+  for (const mode of ['run', 'attest', 'judge']) await assert.rejects(runMode(mode, s.opts, s.dependencies), /Frozen file changed.*fixture.json/);
+  assert.equal(s.calls.length, count);
+});
+
 test('Gemini shared capacity includes every legacy Gemini bucket and cannot erase newer exhaustion', async t => {
   const s = await setup(t, SUBJECTS.find(pair => pair.id === 'flashm'));
   const { receipt } = capacity(s.dir, SUBJECTS.find(pair => pair.id === 'flashm'));

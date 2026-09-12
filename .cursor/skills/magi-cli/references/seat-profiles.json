@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "updated": "2026-09-11",
   "principles": {
     "leafSeat": true,
@@ -83,5 +83,216 @@
       "writePermission": { "implement": "dangerously-skip-permissions", "review": "sandbox", "verify": "sandbox", "plan": "sandbox", "research": "sandbox" },
       "proof": ["conversationId", "usage", "modelObserved", "responseBytes"]
     }
+  },
+  "operationalLessons": {
+    "schemaVersion": 1,
+    "entries": [
+      {
+        "id": "native-state-preflight",
+        "procedure": "Run the actual CLI preflight before dispatch. Reject NUL-corrupted state and preserve its bytes. Report absent sandbox state as uninitialized; do not label absence as corruption.",
+        "fields": ["dispatch", "workflow"], "severity": "high", "delivery": ["arbiter", "maintainer"],
+        "enforcement": {"mode": "prevention", "code": ["tools/magi-cli-preflight.js", "tools/model-probe.js", "tools/dispatch-run.js"], "tests": ["tools/magi-cli-preflight.test.js", "tools/subscription-capacity.test.js"]},
+        "limit": "Probe and dispatch automatically check the selected vendor before native launch. OpenAI checks state syntax; Google checks capture hooks. This does not prove native shell/read/write capability or identify a corrupting writer."
+      },
+      {
+        "id": "freeze-complete-inputs",
+        "procedure": "Freeze complete inventories and recheck before each admission. Use a new attempt for changed source; never refresh an old receipt to accept drift.",
+        "fields": ["dispatch", "workflow"], "severity": "high", "delivery": ["arbiter", "maintainer"],
+        "enforcement": {"mode": "prevention", "code": ["tools/benchmark-run.js"], "tests": ["tools/benchmark-run.test.js"]},
+        "limit": "Complete inventory admission belongs to the packaged benchmark runner. Ordinary dispatch checks its sealed inputs and later runtime/scope evidence. Hash checks do not lock out concurrent same-user writers."
+      },
+      {
+        "id": "probe-task-separation",
+        "procedure": "Admit probe and task independently, retain every terminal outcome, and never automatically rerun completed cells.",
+        "fields": ["dispatch", "research"], "severity": "high", "delivery": ["arbiter", "maintainer"],
+        "enforcement": {"mode": "prevention", "code": ["tools/benchmark-run.js"], "tests": ["tools/benchmark-run.test.js"]},
+        "limit": "The packaged benchmark runner separates probe, task and judge outcomes. Installed dispatch replays completed transactions. Explicit new attempts remain possible; probe success never establishes task quality."
+      },
+      {
+        "id": "native-proof-not-wrapper-claims",
+        "procedure": "Bind observed identity, effort, session, usage, terminal exit, instruction evidence and topical response. Reject substitutions and inconsistent sessions.",
+        "fields": ["dispatch"], "severity": "critical", "delivery": ["seat", "arbiter", "maintainer"],
+        "roles": ["review", "verify"],
+        "enforcement": {"mode": "acceptance", "code": ["tools/cli-proof.js", "tools/dispatch-run.js"], "tests": ["tools/cli-proof.test.js", "tools/google-capture-isolation.test.js"]},
+        "limit": "Parsing and bound artifact acceptance do not prevent a failed launch. Claude topicality needs a separate attestation; semantic truth is not established by parsing."
+      },
+      {
+        "id": "instruction-read-order-and-cwd",
+        "procedure": "Require complete native instruction reads before product access and verify the actual launch cwd. Compare exact launch bytes before blaming Windows path limits.",
+        "fields": ["dispatch", "powershell", "shell-escaping"], "severity": "high", "delivery": ["seat", "arbiter", "maintainer"],
+        "enforcement": {"mode": "acceptance", "code": ["tools/instruction-read-evidence.js", "tools/cli-adapters.js"], "tests": ["tools/instruction-read-evidence.test.js", "tools/instruction-read-integration.test.js"]},
+        "limit": "CODE_PREVENTION is misleading for early product access. The gate prevents acceptance, not the native action. Complete read bytes do not prove comprehension; error-267 cause attribution is manual."
+      },
+      {
+        "id": "diagnostics-native-path-semantics",
+        "procedure": "Use platform-aware path handling and retain native proof independently from diagnostic captures.",
+        "fields": ["dispatch", "powershell"], "severity": "high", "delivery": ["maintainer"],
+        "enforcement": {"mode": "prevention", "code": ["tools/cli-adapters.js"], "tests": ["tools/google-capture-isolation.test.js", "tools/cli-adapters-hardening.test.js"]},
+        "limit": "Host-native POSIX workspace test is skipped on Windows. VM path regression exists; it does not prove native execution on a POSIX host."
+      },
+      {
+        "id": "actual-entrypoint-recovery",
+        "procedure": "Test direct CLI finalization, second recovery and activation with required lineage.",
+        "fields": ["dispatch", "workflow"], "severity": "high", "delivery": ["arbiter", "maintainer"],
+        "enforcement": {"mode": "prevention", "code": ["tools/run-finalize.js"], "tests": ["tools/dispatch-run.test.js"]},
+        "limit": "Applies to explicit supported read-only recovery. Direct entrypoint coverage is evidence for these paths, not every CLI command."
+      },
+      {
+        "id": "workspace-admission-before-side-effects",
+        "procedure": "Check workspace and junction boundaries before reservation. Verify the installed checkpoint-to-export flow.",
+        "fields": ["dispatch", "workflow"], "severity": "critical", "delivery": ["arbiter", "maintainer"],
+        "enforcement": {"mode": "prevention", "code": ["tools/dispatch-run.js"], "tests": ["tools/dispatch-run.test.js", "tools/install-plugin.test.js", "tools/installed-workflow.test.js"]},
+        "limit": "Pre-admission path checks protect runner actions; later scope audits detect child writes. This is not an OS-level write sandbox for every provider."
+      },
+      {
+        "id": "native-lifecycle-and-pid-reuse",
+        "procedure": "Bind close receipts to native proof. Retain locks for unknown direct or descendant lifetimes. Exempt only proved PID reuse.",
+        "fields": ["dispatch", "powershell"], "severity": "high", "delivery": ["arbiter", "maintainer"],
+        "enforcement": {"mode": "prevention", "code": ["tools/dispatch-evidence.js", "tools/benchmark-run.js"], "tests": ["tools/benchmark-run.test.js"]},
+        "limit": "Windows inventory required; unknown state fails closed. MAGI helper uses explicit child-close evidence for PID reuse, not a universal creation-time identity matcher. Original crash/PPID causes remain unknown."
+      },
+      {
+        "id": "quality-failure-versus-incomplete-execution",
+        "procedure": "Record ordinary quality failures and release only after confirmed completion. Preserve locks after timeout, abnormal exit or unknown descendants.",
+        "fields": ["dispatch", "workflow"], "severity": "high", "delivery": ["arbiter", "maintainer"],
+        "enforcement": {"mode": "acceptance", "code": ["tools/benchmark-run.js", "tools/run-finalize.js"], "tests": ["tools/benchmark-run.test.js", "tools/run-finalize.test.js"]},
+        "limit": "Ordinary quality failure is a result, not a retry trigger. Existing persistent lock requires explicit inspected recovery."
+      },
+      {
+        "id": "deterministic-judge-and-published-rubric",
+        "procedure": "Check arithmetic, dependencies, calendars, costs and actual product test counts in code. Apply only published constraints.",
+        "fields": ["research"], "severity": "high", "delivery": ["seat", "arbiter", "maintainer"],
+        "roles": ["plan", "research", "verify"],
+        "enforcement": {"mode": "acceptance", "code": ["tools/benchmark-fixtures.js"], "tests": ["tools/benchmark-fixtures.test.js"]},
+        "limit": "Packaged fixture judges apply only to their published benchmark packets. They do not establish prose accuracy, usefulness, general ability or calibrated semantics."
+      },
+      {
+        "id": "included-capacity-and-exact-buckets",
+        "procedure": "Use verified native OAuth read endpoints, admit exact model/effort pairs against fresh receipts, retain shared buckets, and reject stale, future, paid or forged capacity. Strip API-key routes.",
+        "fields": ["dispatch"], "severity": "critical", "delivery": ["arbiter", "maintainer"],
+        "enforcement": {"mode": "prevention", "code": ["tools/subscription-capacity.js", "tools/model-probe.js", "tools/dispatch-run.js", "tools/benchmark-run.js", "tools/cli-adapters.js", "source-only:trial/grok-arbiter/launcher.py", "source-only:trial/research/quota-recovery-extended/refresh-usage.py"], "tests": ["tools/subscription-capacity.test.js", "tools/benchmark-run.test.js", "tools/subscription-env.test.js", "source-only:trial/grok-arbiter/test_launcher.py"]},
+        "limit": "Shared fresh receipt admission runs before ordinary probe/dispatch launch and rechecks before native execution. It checks structure, exact pair, source hash and expiry, including the allowed owner-report source. It cannot authenticate provider accounting or prevent delayed charges; counter comparisons remain observations."
+      },
+      {
+        "id": "provider-hook-schema",
+        "procedure": "Emit neutral PreInvocation output, retain PreToolUse behavior, and reject outdated installed helper bytes at MAGI preflight.",
+        "fields": ["hooks", "electron"], "severity": "high", "delivery": ["maintainer"],
+        "enforcement": {"mode": "prevention", "code": ["tools/magi-cli-preflight.js", "tools/model-probe.js", "tools/dispatch-run.js", "source-only:synara/apps/server/src/provider/Layers/AntigravityAdapter.ts"], "tests": ["tools/magi-cli-preflight.test.js", "source-only:synara/apps/server/src/provider/Layers/AntigravityAdapter.test.ts"]},
+        "limit": "Selected Google probe/dispatch admission automatically rejects outdated installed helper behavior. The Synara generator reference is a separate source tree. Later isolated startup and broad checks exist; existing-default database recovery, visual UI and full gateway fan-out remain unmeasured."
+      },
+      {
+        "id": "release-matching-install",
+        "procedure": "Patch the actual installed release, preserve the lockfile, test shipped native modules in Electron, and hash every installed file against the tested candidate.",
+        "fields": ["electron", "workflow"], "severity": "high", "delivery": ["maintainer"],
+        "enforcement": {"mode": "source-only", "code": [], "tests": []},
+        "limit": "Choosing the release and approving deployment remain operator work. Historical Synara focused verification hashes differ from current source; do not call that old run a current-source test. Later isolated startup is separate evidence."
+      },
+      {
+        "id": "arbiter-first-read-and-final-order",
+        "procedure": "Require a paired complete brief read before other tool starts, unique causal tool IDs and a final assistant answer after the last completed tool.",
+        "fields": ["dispatch"], "severity": "high", "delivery": ["arbiter", "maintainer"],
+        "enforcement": {"mode": "source-only", "code": ["source-only:trial/grok-arbiter/launcher.py"], "tests": ["source-only:trial/grok-arbiter/test_launcher.py"]},
+        "limit": "Does not stop the first out-of-order read before access. Non-attestation broker actions do not enforce first-brief order themselves."
+      },
+      {
+        "id": "arbiter-live-stop",
+        "procedure": "Stop on emitted Shell results without foreground exit zero. Bind cleanup to creation identity and preserve malformed native streams without reparsing them during cleanup.",
+        "fields": ["dispatch", "powershell"], "severity": "high", "delivery": ["arbiter", "maintainer"],
+        "enforcement": {"mode": "source-only", "code": ["source-only:trial/grok-arbiter/launcher.py"], "tests": ["source-only:trial/grok-arbiter/test_launcher.py"]},
+        "limit": "Acts after a completed event is emitted. Cannot prevent earlier effects; missing original creation identity leaves cleanup unconfirmed."
+      },
+      {
+        "id": "arbiter-read-policy-limit",
+        "procedure": "Keep explicit measured deny patterns and reject successful out-of-workspace reads during audit. Treat these as tool policy, not an OS sandbox.",
+        "fields": ["dispatch"], "severity": "normal", "delivery": ["arbiter", "maintainer"],
+        "enforcement": {"mode": "external-limit", "code": ["source-only:trial/grok-arbiter/launcher.py"], "tests": ["source-only:trial/grok-arbiter/test_launcher.py"]},
+        "limit": "Read allow propagation limitation remains. Tool policy is not OS sandboxing; a fresh candidate native permitted/denied-read test is required for adoption."
+      },
+      {
+        "id": "arbiter-checkpoint-and-command-gate",
+        "procedure": "Expose exact sealed action IDs through a broker. Before attestation, require completed native checkpoint, capture and response reads bound to the current files. Refuse before creating a downstream process.",
+        "fields": ["dispatch"], "severity": "high", "delivery": ["arbiter", "maintainer"],
+        "enforcement": {"mode": "source-only", "code": ["source-only:trial/grok-arbiter/launcher.py"], "tests": ["source-only:trial/grok-arbiter/test_launcher.py"]},
+        "limit": "Non-attestation broker actions omit active native Shell/read prerequisites and rely on later audit. Exact content exposure does not prove topical understanding. Same-user file tampering is outside the tool policy boundary."
+      },
+      {
+        "id": "skill-import-duplicates",
+        "procedure": "Inventory exact files and aliases, quarantine only matched duplicates reversibly, pause the importer, and verify a fresh native skills catalog plus protected store hashes.",
+        "fields": ["workflow"], "severity": "normal", "delivery": ["maintainer"],
+        "enforcement": {"mode": "external-limit", "code": ["source-only:trial/skill-quarantine/cleanup_evidence.py"], "tests": []},
+        "limit": "Future updater behavior and cached catalogs remain outside this receipt. No quarantine or fresh native catalog was rerun in this audit."
+      },
+      {
+        "id": "sqlite-inspection-is-not-side-effect-free",
+        "procedure": "Copy a bounded stable database family, including nonempty WAL, to owned temporary storage before SQLite opens it. Compare original names, hashes and mtimes around inspection. Exclude SHM/empty WAL from packaging.",
+        "fields": ["workflow"], "severity": "high", "delivery": ["maintainer"],
+        "enforcement": {"mode": "source-only", "code": ["source-only:trial/checks/final-archive-builder.py"], "tests": ["source-only:trial/checks/test_final_archive_builder.py"]},
+        "limit": "Does not lock a live writer or provide atomic concurrent snapshots. This audit opened no database with SQLite."
+      },
+      {
+        "id": "immutable-archive-and-manifest",
+        "procedure": "Reject existing outputs before source inspection and use exclusive creation. Verify unique members, exact payload coverage, decompressed hashes, totals and manifest sidecar.",
+        "fields": ["workflow"], "severity": "high", "delivery": ["maintainer"],
+        "enforcement": {"mode": "source-only", "code": ["source-only:trial/checks/final-archive-builder.py"], "tests": ["source-only:trial/checks/test_final_archive_builder.py"]},
+        "limit": "A failed new assembly can leave a partial output. A privileged/same-user external writer is not prevented by these checks."
+      },
+      {
+        "id": "retired-checkpoint-writer",
+        "procedure": "Refuse execution before any filesystem operation. Prove the old write attempt with a fake filesystem, then prove direct CLI and import refusals with protected document hashes.",
+        "fields": ["docs", "workflow"], "severity": "high", "delivery": ["maintainer"],
+        "enforcement": {"mode": "source-only", "code": ["source-only:trial/checkpoint-current.cjs"], "tests": ["source-only:trial/rule-hardening/retired-writer.test.cjs"]},
+        "limit": "Stops this exact retired entrypoint, not copies of its historical source or arbitrary report writers."
+      },
+      {
+        "id": "native-artifact-freshness-baseline",
+        "procedure": "Capture a complete native session-ID inventory before any future batch, then bind new IDs and artifact hashes after it. Never reconstruct an absent before-image from a final state.",
+        "fields": ["dispatch", "research"], "severity": "normal", "delivery": ["arbiter", "maintainer"],
+        "enforcement": {"mode": "historical-limit", "code": [], "tests": []},
+        "limit": "65 unique IDs and current artifacts do not prove pre-batch absence. Do not retrospectively manufacture a before-image."
+      },
+      {
+        "id": "semantic-calibration-and-self-judging",
+        "procedure": "Keep semanticStatus provisional and Astra subject acceptance human-required. Do not use the cohort to change production routing automatically.",
+        "fields": ["research"], "severity": "normal", "delivery": ["seat", "arbiter", "maintainer"],
+        "roles": ["review", "verify", "research"],
+        "enforcement": {"mode": "guidance", "code": ["tools/benchmark-run.js"], "tests": []},
+        "limit": "MACHINE_LABELS_WITH_HUMAN_GATE must not imply enforced human sign-off. Six Astra subject judgments remain provisional. There is no calibrated judge or automatic production promotion."
+      },
+      {
+        "id": "phase-time-and-thinking-evidence",
+        "procedure": "Report actual native thinking-token fields when exposed. Measure instruction and product phases separately in a future controlled performance study.",
+        "fields": ["research"], "severity": "normal", "delivery": ["arbiter", "maintainer"],
+        "enforcement": {"mode": "historical-limit", "code": [], "tests": []},
+        "limit": "180/360/720-second totals include instruction overhead. Pooled cohorts 1/3/61 and one cell per model/domain/size do not establish speed rankings or net MAGI benefit."
+      },
+      {
+        "id": "unattributed-crash-and-config-drift",
+        "procedure": "Preserve originals, fingerprint configuration before diagnostic actions, and test the actual pinned CLI. Do not adopt a staged upgrade without evidence that it fixes the defect.",
+        "fields": ["workflow", "hooks"], "severity": "normal", "delivery": ["maintainer"],
+        "enforcement": {"mode": "historical-limit", "code": [], "tests": []},
+        "limit": "No causal regression for historical crash/config drift. A staged CLI is not adopted merely because an identity probe works."
+      },
+      {
+        "id": "lessons-code-first-and-single-source",
+        "procedure": "Put deterministic rules in the code that admits the action, add the observed failing regression, and link that code from concise handoffs. Keep manual judgments and evidence limits explicit. Classify fixture creation and SQLite inspection as writes; authorize owned temporary paths and verify cleanup. Do not run those tests under a read-only assignment.",
+        "fields": ["workflow"], "severity": "normal", "delivery": ["maintainer"],
+        "enforcement": {"mode": "prevention", "code": ["tools/seat-policy.js", "tools/install-plugin.js", "tools/plan-seal.js", "tools/dispatch-run.js"], "tests": ["tools/seat-policy.test.js", "tools/install-plugin.test.js", "tools/plan-seal.test.js", "tools/subscription-capacity.test.js"]},
+        "limit": "Schema, installation and new-seal checks require the catalog; selected leaf procedures enter the existing hashed native-read contract. This enforces catalog validity and delivery, not comprehension or execution of all 29 procedures. Manual judgments, source-only tools and explicit write authorization remain necessary."
+      },
+      {
+        "id": "verification-summary-crlf",
+        "procedure": "Normalize CRLF in test-report text before checking its summary, and require both exit zero and the expected test counts. Preserve the original diagnostic when correcting the parser. Do not normalize bytes in exact product fixtures.",
+        "fields": ["encoding", "workflow"], "severity": "high", "delivery": ["maintainer"],
+        "enforcement": {"mode": "source-only", "code": ["source-only:trial/rule-hardening/launcher-verification/verify.py"], "tests": []},
+        "limit": "Normalizing report transport is appropriate here; exact product/fixture bytes must not be normalized. Do not infer a failed product from this corrected parser diagnostic."
+      },
+      {
+        "id": "vault-mirror-prerequisite",
+        "procedure": "Preserve procedures in authorized memory extension notes and this session record. Do not fabricate the missing receipt or claim the vault write happened.",
+        "fields": ["vault"], "severity": "normal", "delivery": ["maintainer"],
+        "enforcement": {"mode": "external-limit", "code": [], "tests": []},
+        "limit": "Do not claim current canonical guide absence from a historical report alone. This bounded audit did not re-probe the vault or fabricate a receipt."
+      }
+    ]
   }
 }

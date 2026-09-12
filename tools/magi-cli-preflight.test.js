@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const child = require('node:child_process');
 const test = require('node:test');
-const { check, main } = require('./magi-cli-preflight.js');
+const { check, checkNativeLaunchState, main } = require('./magi-cli-preflight.js');
 const { FINGERPRINT, FINGERPRINT_V2 } = require('./cli-rules-stage.js');
 const { CLI_RUNTIME_TOOLS } = require('./runtime-paths.js');
 
@@ -118,7 +118,8 @@ function fixture(t) {
   const home = path.join(root, 'home');
   const references = path.join(runtimeRoot, 'skills', 'magi-cli', 'references');
   const seatProfiles = path.join(references, 'seat-profiles.json');
-  const profiles = { arbiterSkills: ['magi-mode'], forbiddenSeatSkills: ['magi-mode'],
+  const profiles = { schemaVersion: 7, operationalLessons: require('./seat-policy').loadProfiles().operationalLessons,
+    arbiterSkills: ['magi-mode'], forbiddenSeatSkills: ['magi-mode'],
     baseSkills: { openai: ['seat-openai'] }, roleSkills: { verify: ['testing'] }, classSkills: {} };
   put(seatProfiles, JSON.stringify(profiles));
   put(path.join(references, 'dispatch-matrix.json'), '{}');
@@ -150,6 +151,29 @@ function snapshot(root) {
   walk(root);
   return entries;
 }
+
+test('native launch state checks only the selected vendor and never launches a process', t => {
+  const f = fixture(t);
+  const state = path.join(f.home, '.codex', '.sandbox', 'deny_read_acl_state.json');
+  put(state, Buffer.alloc(22));
+  const hook = path.join(f.home, '.gemini', 'antigravity-cli', 'plugins', 'synara-capture', 'hooks.json');
+  put(hook, JSON.stringify({ 'synara-capture': { PreToolUse: [{ command: 'echo {"decision":"ask"}' }] } }));
+  const before = snapshot(f.root);
+  assert.throws(() => checkNativeLaunchState('openai', { ...f, platform: 'win32' }), /native sandbox state/i);
+  assert.throws(() => checkNativeLaunchState('google', f), /emits ask/);
+  assert.equal(checkNativeLaunchState('anthropic', f).status, 'not-applicable');
+  assert.deepEqual(snapshot(f.root), before);
+});
+
+test('selected vendor preflight does not require unrelated vendor binaries or state', t => {
+  const f = fixture(t);
+  fs.unlinkSync(f.env.MAGI_CODEX_BIN); fs.unlinkSync(f.env.MAGI_AGY_BIN);
+  put(path.join(f.home, '.codex', '.sandbox', 'deny_read_acl_state.json'), Buffer.alloc(22));
+  const result = check({ ...f, vendor: 'anthropic', platform: 'win32' });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.findings.filter(row => row.check.startsWith('binary:')).map(row => row.check), ['binary:anthropic']);
+  assert.equal(result.findings.some(row => row.check === 'sandbox:openai-state' || row.check === 'google:synara-capture'), false);
+});
 
 test('preflight uses bundled skills and v2 rules with file-only binary discovery', t => {
   const f = fixture(t);

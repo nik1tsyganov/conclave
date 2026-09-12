@@ -13,6 +13,8 @@ MAGI is not CONCLAVE. Do not run CONCLAVE's `session-whoami.js` or dispatch `cam
 
 ## Cursor CLI only
 
+CLI probes and new dispatches require current evidence-backed `MAGI_CAPACITY_RECEIPT` and `MAGI_LEGACY_CAPACITY` paths. The CLI run guide defines admission and the maintained `seat-profiles.json` lesson catalog. Selected lessons are inserted into leaf contracts automatically.
+
 For `cursor-cli`, use the [MAGI CLI skill](../magi-cli/SKILL.md), [CLI run procedure](references/cursor-cli.md), and [brief rules block](references/brief-rules-block.md). The native workflow below does not apply to CLI runs or their leaves.
 
 Grok 4.6 coordinates as the non-voting arbiter. It prepares plans and briefs, dispatches selected entries, and requests deterministic completion checks. Substantive implementation, repair, planning, research, review, verification, and votes belong to vendor seats. The arbiter keeps orchestration, routing, bridges, distribution, assessment, and retrospective skills. Each leaf receives only its staged vendor card and role/class skills.
@@ -20,7 +22,7 @@ Grok 4.6 coordinates as the non-voting arbiter. It prepares plans and briefs, di
 1. Set `MAGI_RULES_ROOT` to the external STANDING v2 / R01-R22 pack and `MAGI_VAULT_ROOT` to the ai-ops-vault checkout, then run the CLI preflight. Use `claude auth status` for the current Claude login check.
 2. Select each model and effort from the dispatch matrix. Run `model-probe.js --vendor <vendor> --model <model> --effort <effort> --evidence-dir <new-probe-dir>` for every exact pair, then import its captured `probe.json` with `model-availability.js --file <availability.json> --probe <probe.json>`.
 3. Require actual native evidence for every route. Catalog membership and an earlier login check do not prove model access. Unknown, mismatched, or unproven pairs are unavailable. Hashed probe evidence expires 60 minutes after its original completion; re-imports do not renew it.
-4. Prepare the complete plan after finalizing and hashing every brief. Bind the plan ID, CLI host/arbiter, all dispatch IDs, unit IDs, roles/classes, vendor/model/effort, absolute worktrees and brief paths, brief hashes, relative write scopes, author provenance, and any escalation reason. Astra always requires a recorded escalation reason.
+4. Prepare the complete plan after finalizing and hashing every brief. Bind the plan ID, CLI host/arbiter, all dispatch IDs, unit IDs, roles/classes, vendor/model/effort, absolute worktrees and brief paths, brief hashes, relative write scopes, author provenance, and any escalation reason. For coding defaults and overrides, follow the CLI matrix and its `cursor-cli.md` coding selection guide; benchmark and noncoding Astra routes retain their escalation rules.
 5. Seal the whole plan with `plan-seal.js --plan <draft.json> --run-dir <new-run-dir> --availability <availability.json>`. Optional `--skill-source-root` binds skill bytes into seal schemaVersion 2. Launch only its entries with `dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-dir> --dispatch-id <id> --rules-root <external-v2-pack>`.
 6. Finalize with `run-finalize.js --run-dir <run-dir>` and activate with `activation-check.js --run-dir <run-dir>`. For panel decisions, use `panel-tally.js --run-dir <run-dir> --unit-id <unit>`. It reads verified native POSITION responses and applies author recusal. No handwritten ballots, manual implementation logs, or arbiter votes can establish CLI approval.
 

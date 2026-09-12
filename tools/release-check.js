@@ -69,7 +69,7 @@ function main(io = process) {
   }
   const profiles = loadProfiles();
   if (
-    profiles.schemaVersion < 6 ||
+    profiles.schemaVersion < 7 ||
     profiles.principles?.leafSeat !== true ||
     profiles.principles?.skillsAreAllowListed !== true ||
     profiles.principles?.bridgesAreArbiterOnly !== true ||

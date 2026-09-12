@@ -19,6 +19,8 @@ The arbiter retains orchestration, routing, bridge, distribution, assessment, an
 
 ## Runtime procedure
 
+Before new native calls, set `MAGI_CAPACITY_RECEIPT` and `MAGI_LEGACY_CAPACITY` to current, evidence-backed capacity files, or pass `--capacity` and `--legacy-capacity`. Missing or stale evidence blocks launch. See the run guide for receipt requirements and time bounds.
+
 1. Set `MAGI_RULES_ROOT` to the external STANDING v2 / R01–R22 pack. Set `MAGI_VAULT_ROOT` to the ai-ops-vault checkout. Run `tools/magi-cli-preflight.js`.
 2. Use `claude auth status` for the Claude login check. Run `model-probe.js --vendor --model --effort --evidence-dir` for every selected exact pair.
 3. Import each captured `probe.json` with `model-availability.js --file <availability.json> --probe <probe.json>`. Evidence expires after 60 minutes from its original completion time. Re-imports do not renew it.
@@ -43,6 +45,8 @@ Changed route, class, author, scope, or brief requires a newly validated complet
 
 Profiles add `seat-openai`, `seat-anthropic`, or `seat-google` plus applicable class skills. The bundled `seat-skills/` source is the default. Staging creates `skills-manifest.json`; rule staging creates `rules-manifest.json`. Structural preflight checks real files and hashes against the generated `SEAT-CONTRACT.md`.
 
+`references/seat-profiles.json` also maintains `operationalLessons.entries`. The runner puts selected leaf procedures in `SEAT-CONTRACT.md`; native read evidence is required for acceptance. New seals and installations reject missing or invalid lesson policy. Each catalog entry distinguishes preventive checks, acceptance checks, detection, guidance, and remaining limits.
+
 Every seat is a leaf and cannot delegate. Seats must not edit policy, evidence, receipts, or telemetry. They acknowledge the bound BRIEF first line in the native final response. The STANDING v2 fingerprint is separate.
 
 OpenAI read-only roles use `read-only`; agy uses `--sandbox`. Claude non-implementation roles use the schema 5 `read-only-tools` profile: `--safe-mode --permission-mode dontAsk --tools Read,Glob,Grep --allowedTools Read,Glob,Grep`. They inspect authorized files and existing test evidence, but cannot execute shell commands. Provide the needed test reports in their inputs. Claude plan mode requires a separate approval turn and cannot reliably complete unattended leaf verification.
@@ -55,7 +59,7 @@ Review/verify entries require correct `authorVendor` provenance and another vend
 
 Critical `requiresPanel` classes need `magiConvened: true` and two distinct foreign review/verify vendors on the same unit and worktree. Critical approval requires at least two eligible native APPROVE positions after author recusal.
 
-Astra requires `escalation: true` and a reason with at least 16 characters and three distinct words. Greater capability never increases write scope.
+For coding, use the matrix class `codingDefault` and the coding selection guide in `references/cursor-cli.md`. Astra is the default; Luna handles simple mechanical work. Nondefault OpenAI coding choices require `routingReason`. Benchmark and noncoding Astra escalation rules remain unchanged. Greater capability never increases write scope.
 
 Convened implementation uses `min(3, implementation unit count)` distinct vendors. The 60% cap starts at two units. Planning, research, and review-only panels do not manufacture implementation rows. SLICES defines work and dependencies, not vendor authority.
 

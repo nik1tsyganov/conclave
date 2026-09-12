@@ -6,11 +6,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { GOOGLE_CAPTURE_EVENTS, SYNARA_CAPTURE_TRUST, allowedWorkspace, buildLaunch } = require('./cli-adapters.js');
 const { runLaunch } = require('./cli-runner.js');
+const { admitCapacity } = require('./subscription-capacity.js');
+const { checkNativeLaunchState } = require('./magi-cli-preflight.js');
 const { DEFAULT_RULES_ROOT, FINGERPRINT_V2, prepareRulesSource, stageRules, verifyStagedRules } = require('./cli-rules-stage.js');
 const { checkBriefFile } = require('./cli-brief-rules-check.js');
 const { verifyNativeProof, verifyProof } = require('./cli-proof.js');
 const { validateDispatchRow, ROLES } = require('./dispatch-schema.js');
-const { DEFAULT_MATRIX, bindDispatch, loadAvailability } = require('./dispatch-matrix.js');
+const { DEFAULT_MATRIX, bindDispatch, loadAvailability, routeAllowed } = require('./dispatch-matrix.js');
 const { loadProfiles, buildSeatProfile } = require('./seat-policy.js');
 const { prepareSeatSkills, stageSeatSkills, verifySeatSkills, verifySkillSource } = require('./cli-skill-stage.js');
 const { DEFAULT_PROFILES } = require('./seat-policy.js');
@@ -37,6 +39,7 @@ function parseArgs(argv) {
     '--evidence-dir', '--telemetry-log', '--activation-log', '--rules-root', '--review-permission-mode',
     '--matrix', '--availability', '--author-vendor', '--seat-profiles', '--skill-source-root', '--plan', '--plan-hash', '--run-dir', '--max-wall-ms', '--capture-sha256',
     '--prepare-recovery', '--recover-interrupted', '--recovery-sha256', '--recovery-attempt',
+    '--capacity', '--legacy-capacity', '--launch-availability', '--launch-availability-sha256',
   ]);
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
@@ -56,6 +59,8 @@ function usage() {
   return [
     'Usage: node tools/dispatch-run.js --plan <run-dir/dispatch-plan.json> --dispatch-id <id>',
     '  [--run-dir <dir>] [--availability <json>] [--max-wall-ms <milliseconds>]',
+    '  [--launch-availability <absolute fresh JSON> --launch-availability-sha256 <SHA-256>] (unstarted entry only)',
+    '  --capacity <included receipt.json> --legacy-capacity <ledger.json> (required for new native work)',
     '  [--rules-root <dir>] [--skill-source-root <dir>] [--on-topic --capture-sha256 <checkpoint hash>]',
     '  [--prepare-recovery <new request.json> --availability <fresh probes.json> [--recovery-attempt 2]]',
     '  [--recover-interrupted <request.json> --recovery-sha256 <inspected SHA-256>]',
@@ -64,6 +69,37 @@ function usage() {
     'Claude first returns AWAITING_ATTESTATION (ok:false, exit 0). Inspect its response, then attest the same capture hash without relaunching.',
     'Recovery preserves a stopped OpenAI read-only attempt. Explicit attempt 2 requires a completed clean failed first replacement and a later probe. Other plan entries must be committed PASS.',
   ].join('\n');
+}
+
+// Renewal preserves the sealed plan and the original probe artifacts. Copies are
+// byte-identical evidence, not rewritten probe records with invented timestamps.
+function prepareLaunchAvailability(opts, run, entry, evidenceDir) {
+  const file = opts.launchAvailability;
+  if (!path.isAbsolute(file || '') || !/^[a-f0-9]{64}$/.test(opts.launchAvailabilitySha256 || '')) throw argError('launch availability requires an absolute path and exact lowercase SHA-256');
+  assertPlainPath(file);
+  if (hashFile(file) !== opts.launchAvailabilitySha256) throw policyError('launch availability hash differs');
+  const available = loadAvailability(file);
+  const allowed = routeAllowed(run.matrix, entry, available);
+  if (!allowed.ok) throw policyError(allowed.reason);
+  const model = available.vendors[entry.vendor].models[entry.model];
+  const observed = model.efforts?.[entry.effort] || model;
+  const probe = JSON.parse(fs.readFileSync(observed.evidence.path, 'utf8'));
+  const paths = [file, observed.evidence.path, probe.capture, probe.log];
+  if (new Set(paths.map(p => path.resolve(p))).size !== 4) throw policyError('launch availability closure must have four distinct files');
+  const files = paths.map((source, index) => {
+    if (!path.isAbsolute(source)) throw policyError('launch availability evidence path must be absolute');
+    assertPlainPath(source);
+    return { path: source, sha256: hashFile(source), copy: path.join(evidenceDir, 'launch-availability', `${index}-${['availability.json', 'probe.json', 'capture.txt', 'vendor.log'][index]}`) };
+  });
+  const record = { schemaVersion: 1, path: file, sha256: opts.launchAvailabilitySha256, files };
+  const revalidate = () => {
+    for (const item of files) if (!item.sha256 || hashFile(item.path) !== item.sha256) throw policyError('launch availability evidence changed');
+    if (files[0].sha256 !== record.sha256 || files[1].sha256 !== observed.evidence.sha256 || files[2].sha256 !== probe.captureSha256 || files[3].sha256 !== probe.logSha256) throw policyError('launch availability closure binding differs');
+    const current = routeAllowed(run.matrix, entry, loadAvailability(file));
+    if (!current.ok) throw policyError(current.reason);
+  };
+  revalidate();
+  return { record, revalidate };
 }
 
 function required(opts) {
@@ -97,6 +133,8 @@ function seatContractText(opts, seatProfile, skillStage, ruleStage) {
     `Plan: ${opts.planId} (${opts.planHash})`,
     `Escalation: ${opts.escalation === true}; reason: ${opts.escalationReason || 'none'}`,
     `Permission profile: ${seatProfile.permissionProfile}`,
+    ...(seatProfile.lessons?.length ? ['', 'Operational lessons (automatically selected for this seat):',
+      ...seatProfile.lessons.map(lesson => `- ${lesson.id}: ${lesson.procedure}`)] : []),
     '',
     'This is a leaf seat. Do not dispatch, delegate, spawn, or ask another model/agent to perform work.',
     'This seat is not the arbiter. Do not change routing, model choice, panel membership, or deterministic gate outcomes.',
@@ -238,7 +276,7 @@ function acceptCheckpoint(run, entry, transaction, captureSha256) {
 
 async function runDispatch(opts, dependencies = {}) {
   if (!opts.plan || !opts.dispatchId) throw argError('--plan and --dispatch-id are required');
-  const maxWallMs = opts.maxWallMs === undefined ? 2700000 : Number(opts.maxWallMs);
+  const maxWallMs = opts.maxWallMs === undefined ? 1200000 : Number(opts.maxWallMs);
   if (!Number.isSafeInteger(maxWallMs) || maxWallMs < 1 || maxWallMs > 2700000) throw argError('--max-wall-ms must be an integer between 1 and 2700000');
   const planPath = fs.realpathSync(opts.plan);
   const runDir = path.dirname(planPath);
@@ -253,6 +291,8 @@ async function runDispatch(opts, dependencies = {}) {
   if (opts.recoverySha256 && !opts.recoverInterrupted) throw argError('recovery-sha256 requires recover-interrupted');
   if (opts.recoveryAttempt !== undefined && (!opts.prepareRecovery || !['1', '2'].includes(String(opts.recoveryAttempt)))) throw argError('recovery-attempt requires prepare-recovery and ordinal 1 or 2');
   const recoveryRequested = Boolean(opts.prepareRecovery || opts.recoverInterrupted);
+  const renewing = opts.launchAvailability !== undefined || opts.launchAvailabilitySha256 !== undefined;
+  if (renewing && (recoveryRequested || opts.onTopic || opts.captureSha256)) throw argError('launch availability is only for a new unstarted dispatch, not recovery or attestation');
   let recovery = null;
   if (recoveryRequested) {
     if (opts.onTopic || opts.captureSha256 || opts.evidenceDir) throw argError('recovery cannot override evidence or attestation options');
@@ -324,6 +364,8 @@ async function runDispatch(opts, dependencies = {}) {
   const transactionPath = path.join(runDir, '.magi-dispatches', `${transactionKey(planEntry)}.json`);
   assertPlainPath(transactionPath);
   const savedState = !recovery && fs.existsSync(transactionPath) ? JSON.parse(fs.readFileSync(transactionPath, 'utf8')) : null;
+  if (renewing && savedState) throw policyError('launch availability is only for an unstarted dispatch');
+  const launchAvailability = renewing ? prepareLaunchAvailability(opts, sealed, planEntry, evidenceDir) : null;
   const postRun = planEntry.vendor === 'anthropic';
   let legacyReplay = false;
   if (postRun && opts.onTopic === true && opts.captureSha256 === undefined && savedState?.status === 'PASS' &&
@@ -345,9 +387,10 @@ async function runDispatch(opts, dependencies = {}) {
   if (savedState?.status === 'PASS') verifyExecution(sealed, planEntry, savedState);
   const resumeAt = resuming ? Date.parse(savedState.startedAt) : undefined;
   if (resuming && !Number.isFinite(resumeAt)) throw policyError('completed dispatch is missing its launch time');
-  // The unchanged whole plan remains validated at its seal time. Only the new
-  // physical attempt needs a fresh exact-route probe, checked separately above.
-  const binding = bindDispatch(opts, matrix, availability, recovery ? Date.parse(seal.sealedAt) : resumeAt);
+  const renewedReplay = resuming && JSON.parse(fs.readFileSync(path.join(savedState.evidenceDir, 'launch.json'), 'utf8')).launchAvailability;
+  // Renewal/recovery checks the selected route separately. Historical whole-plan
+  // validation stays at seal time; default launches retain their existing gate.
+  const binding = bindDispatch(opts, matrix, availability, recovery || renewing || renewedReplay ? Date.parse(seal.sealedAt) : resumeAt);
   if (inside(binding.planPath, cwd)) throw policyError('dispatch plan must be outside the product worktree');
   opts = { ...opts, ...binding.entry, cwd, planHash: binding.planHash, planId: binding.plan.planId };
   const telemetryLog = path.resolve(opts.telemetryLog || path.join(runDir, 'telemetry', 'dispatches.jsonl'));
@@ -383,6 +426,12 @@ async function runDispatch(opts, dependencies = {}) {
     requireExisting: !savedState, forbiddenRoots: [opts.rulesRoot, seal.skillSource?.sourceRoot].filter(Boolean) });
   if (!savedState) snapshotEvidenceReads(evidenceReadDirs);
   opts = { ...opts, evidenceReadDirs };
+  let capacityAdmission;
+  if (!savedState) {
+    if (loadProfiles().schemaVersion < 7) throw policyError('new native work requires operational lesson policy schema 7 or later');
+    capacityAdmission = admitCapacity(opts, binding.entry, maxWallMs, policyEnv);
+    (dependencies.checkNativeLaunchState || checkNativeLaunchState)(opts.vendor, { env: policyEnv, home: dependencies.home });
+  }
   let transaction;
   if (recovery) {
     // Exclusive directory creation is the one-attempt reservation. A crash here
@@ -415,6 +464,14 @@ async function runDispatch(opts, dependencies = {}) {
   if (fs.existsSync(evidenceDir) && fs.readdirSync(evidenceDir).length) throw policyError('evidence directory must be new or empty');
   fs.mkdirSync(evidenceDir, { recursive: true });
   evidenceCreated = true;
+  if (launchAvailability) {
+    launchAvailability.revalidate();
+    fs.mkdirSync(path.join(evidenceDir, 'launch-availability'));
+    for (const item of launchAvailability.record.files) {
+      fs.copyFileSync(item.path, item.copy, fs.constants.COPYFILE_EXCL);
+      if (hashFile(item.copy) !== item.sha256) throw policyError('launch availability changed during copy');
+    }
+  }
   if (inside(fs.realpathSync(evidenceDir), cwd)) throw policyError('evidence directory resolves inside the product worktree');
   const brief = path.join(evidenceDir, 'brief', 'BRIEF.md');
   fs.mkdirSync(path.dirname(brief), { recursive: true });
@@ -498,11 +555,14 @@ async function runDispatch(opts, dependencies = {}) {
     sequenceProtocol: SEQUENCE_PROTOCOL, startedAt: transaction.state.startedAt, prerequisites,
     ...(recovery ? { recoverySha256: recovery.sha256 } : {}),
     matrixVersion: matrix.schemaVersion, seatProfileVersion: seatProfiles.schemaVersion,
+    capacityAdmission: capacityAdmission.record,
+    ...(launchAvailability ? { launchAvailability: launchAvailability.record } : {}),
     seatContractPath, skillManifestPath: skillStage.manifestPath, runtimeSha256,
   });
 
   const protectedPaths = [binding.planPath, sealed.sealPath, sealed.availablePath, originalBrief, DEFAULT_MATRIX, DEFAULT_PROFILES, brief, seatContractPath, staged.manifestPath, skillStage.manifestPath, path.join(evidenceDir, 'seat-profile.json'), launchPath,
     ...(recovery ? [recovery.manifestPath, recovery.manifest.availability.path] : []),
+    ...(launchAvailability ? launchAvailability.record.files.flatMap(item => [item.path, item.copy]) : []),
     ...Object.entries(skillStage.manifest.skills).flatMap(([skill, files]) => files.map((file) => path.join(skillStage.root, skill, file.path))),
     ...staged.manifest.files.map((item) => path.join(path.dirname(brief), item.path))];
   const protectedHashes = protectedPaths.map((file) => ({ path: file, sha256: hashFile(file) }));
@@ -525,6 +585,12 @@ async function runDispatch(opts, dependencies = {}) {
       JSON.parse(fs.readFileSync(path.join(recovery.manifest.original.evidenceDir, 'launch.json'), 'utf8')), recovery.manifest.original.evidenceDir);
     if (recovery.manifest.previousAttempt) (dependencies.assertInterruptedChildStopped || assertInterruptedChildStopped)(recovery.manifest.previousAttempt.pid,
       JSON.parse(fs.readFileSync(path.join(recovery.manifest.previousAttempt.evidenceDir, 'launch.json'), 'utf8')), recovery.manifest.previousAttempt.evidenceDir);
+  }
+  (dependencies.checkNativeLaunchState || checkNativeLaunchState)(opts.vendor, { env: launch.env, home: dependencies.home });
+  capacityAdmission.revalidate();
+  if (launchAvailability) {
+    launchAvailability.revalidate();
+    for (const item of launchAvailability.record.files) if (hashFile(item.copy) !== item.sha256) throw policyError('launch availability copy changed before dispatch');
   }
   const result = await (dependencies.runLaunch || runLaunch)(launch, { pidFile, stdoutFile: stdoutPath, stderrFile: stderrPath, maxWallMs, signal: dependencies.signal });
   const processResultPath = path.join(evidenceDir, 'process-result.json');
@@ -711,4 +777,4 @@ async function main(argv = process.argv.slice(2), io = process, dependencies = {
 }
 
 if (require.main === module) main().then((code) => { process.exitCode = code; });
-module.exports = { appendJsonl, main, parseArgs, runDispatch, seatContractText };
+module.exports = { prepareLaunchAvailability, appendJsonl, main, parseArgs, runDispatch, seatContractText };

@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {probe}=require('./model-probe.js');
-const {temporary,nativeCapture}=require('./test-fixtures.js');
+const {temporary,nativeCapture,capacityFixture}=require('./test-fixtures.js');
 
 function fixture(t) {
   const root=temporary(t,'magi-probe-edge-');
@@ -16,7 +16,7 @@ function fixture(t) {
     fs.writeFileSync(launch.args[launch.args.indexOf('-o')+1],native.capture);
     return {ok:true,exitCode:0,exitConfirmed:true,stdout:'',stderr:native.log};
   };
-  return {root,calls:()=>calls,runLaunch,env:{...process.env,MAGI_ALLOWED_WORKSPACE_ROOTS:root},opts:{vendor:'openai',model:'gpt-5.6-terra',effort:'medium',evidenceDir:path.join(root,'evidence')}};
+  return {root,calls:()=>calls,runLaunch,env:{...process.env,MAGI_ALLOWED_WORKSPACE_ROOTS:root},opts:{vendor:'openai',model:'gpt-5.6-terra',effort:'medium',evidenceDir:path.join(root,'evidence'),...capacityFixture(root)}};
 }
 
 test('probe evidence inside a supplied workspace is rejected without calls or files',async t=>{

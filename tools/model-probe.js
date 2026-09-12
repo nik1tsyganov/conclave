@@ -9,13 +9,15 @@ const { resolveVendorBinary } = require('./vendor-binaries.js');
 const { allowedWorkspace, googleCaptureEnv, subscriptionEnv, CLAUDE_EXACT_MODEL_SETTINGS } = require('./cli-adapters.js');
 const { loadMatrix } = require('./dispatch-matrix.js');
 const { runLaunch } = require('./cli-runner.js');
+const { admitCapacity } = require('./subscription-capacity.js');
+const { checkNativeLaunchState } = require('./magi-cli-preflight.js');
 const { verifyProof } = require('./cli-proof.js');
 const { finalResponse, nativeLog } = require('./vendor-native.js');
 const { assertPlainPath, compareWorkspace, hashFile, inside, snapshotWorkspace, writeJson } = require('./dispatch-evidence.js');
 const { canonicalPlainPath, pathsOverlap, DEFAULT_ROOT } = require('./runtime-paths.js');
 const { challengeMatches } = require('./probe-evidence.js');
 
-async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 120000 }, dependencies = {}) {
+async function probe({ vendor, model, effort, evidenceDir, cwd, capacity, legacyCapacity, maxWallMs = 120000 }, dependencies = {}) {
   const sourceEnv = dependencies.env || process.env;
   const spec = loadMatrix().vendors?.[vendor]?.models?.[model];
   if (!spec?.efforts.includes(effort)) throw new Error('probe model/effort is outside the vendor catalog');
@@ -32,6 +34,8 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
   if (cwd && (!fs.existsSync(canonicalWork) || !fs.statSync(canonicalWork).isDirectory())) throw new Error('explicit probe cwd must be an existing directory');
   if (fs.existsSync(root) && fs.readdirSync(root).length) throw new Error('probe evidence directory must be new or empty');
   const binary = resolveVendorBinary(vendor, { env: sourceEnv });
+  const capacityAdmission = admitCapacity({ capacity, legacyCapacity }, { vendor, model, effort }, maxWallMs, sourceEnv);
+  (dependencies.checkNativeLaunchState || checkNativeLaunchState)(vendor, { env: sourceEnv, home: dependencies.home });
   fs.mkdirSync(root, { recursive: true });
   fs.mkdirSync(canonicalWork, { recursive: true });
   const challenge = `MAGI_PROBE_${crypto.randomBytes(16).toString('hex')}`;
@@ -55,11 +59,13 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
   const captureMetadata = captureIsolation ? { synaraCaptureEventsPath: captureIsolation.eventsPath, synaraCaptureEventsTrust: captureIsolation.trust } : {};
   const launch = { vendor, binary, args, env, cwd: canonicalWork, stdinFile, stdio: vendor === 'google' ? ['ignore', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'], ...captureMetadata };
   const startedAt = new Date().toISOString();
-  writeJson(path.join(root, 'launch.json'), { vendor, model, effort, binary, args, cwd: canonicalWork, startedAt, ...captureMetadata });
+  writeJson(path.join(root, 'launch.json'), { vendor, model, effort, binary, args, cwd: canonicalWork, startedAt, capacityAdmission: capacityAdmission.record, ...captureMetadata });
   if (captureIsolation) assertPlainPath(captureIsolation.eventsPath);
   const before = snapshotWorkspace(canonicalWork);
   let processResult = null;
   try {
+  (dependencies.checkNativeLaunchState || checkNativeLaunchState)(vendor, { env, home: dependencies.home });
+  capacityAdmission.revalidate();
   const result = await (dependencies.runLaunch || runLaunch)(launch, { pidFile: path.join(root, 'child.pid'), stdoutFile: path.join(root, 'stdout.log'), stderrFile: path.join(root, 'stderr.log'), maxWallMs });
   if (captureIsolation) assertPlainPath(captureIsolation.eventsPath);
   const completedAt = new Date().toISOString();
@@ -97,7 +103,7 @@ function parseArgs(argv) {
     for (let i = 0; i < argv.length; i += 2) {
       if (seen.has(argv[i])) throw new Error(`duplicate option: ${argv[i]}`);
       seen.add(argv[i]);
-      if (!['--vendor', '--model', '--effort', '--evidence-dir', '--cwd'].includes(argv[i]) || !argv[i + 1] || argv[i + 1].startsWith('--')) throw new Error('Usage: model-probe --vendor <vendor> --model <model> --effort <effort> --evidence-dir <new directory>');
+      if (!['--vendor', '--model', '--effort', '--evidence-dir', '--cwd', '--capacity', '--legacy-capacity'].includes(argv[i]) || !argv[i + 1] || argv[i + 1].startsWith('--')) throw new Error('Usage: model-probe --vendor <vendor> --model <model> --effort <effort> --evidence-dir <new directory> --capacity <receipt.json> --legacy-capacity <ledger.json>');
       opts[argv[i].slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = argv[i + 1];
     }
     return opts;
@@ -107,7 +113,7 @@ async function main(argv = process.argv.slice(2)) {
     const opts = parseArgs(argv);
     const result = await probe(opts);
     process.stdout.write(`${JSON.stringify({ status: result.status, vendor: result.vendor, requestedModel: result.requestedModel, observedModel: result.observedModel, effort: result.effort, probeFile: result.probeFile })}\n`); return 0;
-  } catch (error) { process.stderr.write(`MODEL_PROBE_FAIL: ${error.message}\n`); return 1; }
+  } catch (error) { process.stderr.write(`${error.code || 'MODEL_PROBE_FAIL'}: ${error.message}\n`); return 1; }
 }
 if (require.main === module) main().then((code) => { process.exitCode = code; });
 module.exports = { main, parseArgs, probe };

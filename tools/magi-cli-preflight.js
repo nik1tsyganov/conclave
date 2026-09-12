@@ -135,7 +135,18 @@ function checkWindowsSandboxState(home, env, platform) {
   return { value: file, status: 'syntax-valid', scope };
 }
 
+function checkNativeLaunchState(vendor, options = {}) {
+  const home = options.home || os.homedir();
+  const env = options.env || process.env;
+  const platform = options.platform || process.platform;
+  if (vendor === 'openai') return checkWindowsSandboxState(home, env, platform);
+  if (vendor === 'google') return inspectSynaraCaptureHooks(home, { ...options, env, platform });
+  if (vendor === 'anthropic') return { status: 'not-applicable', scope: 'Claude uses the isolated safe-mode adapter' };
+  throw new Error('Unknown native launch vendor');
+}
+
 function check(options = {}) {
+  if (options.vendor && !['openai', 'google', 'anthropic'].includes(options.vendor)) throw new Error('Unknown native launch vendor');
   const home = options.home || os.homedir();
   const findings = [];
   const record = (name, action) => {
@@ -158,11 +169,11 @@ function check(options = {}) {
     return { count: CLI_RUNTIME_TOOLS.length };
   });
 
-  for (const vendor of ['openai', 'google', 'anthropic']) {
+  for (const vendor of options.vendor ? [options.vendor] : ['openai', 'google', 'anthropic']) {
     record(`binary:${vendor}`, () => ({ value: resolveVendorBinary(vendor, { home, env: options.env }) }));
   }
 
-  record('sandbox:openai-state', () => checkWindowsSandboxState(home, options.env || process.env, options.platform || process.platform));
+  if (!options.vendor || options.vendor === 'openai') record('sandbox:openai-state', () => checkNativeLaunchState('openai', options));
 
   const arbiterSkills = unique(profiles?.arbiterSkills || []);
   const seatSkills = profiles ? requiredSeatSkills(profiles) : [];
@@ -213,7 +224,7 @@ function check(options = {}) {
     });
   }
 
-  record('google:synara-capture', () => inspectSynaraCaptureHooks(home, options));
+  if (!options.vendor || options.vendor === 'google') record('google:synara-capture', () => checkNativeLaunchState('google', options));
   record('vault:root', () => {
     const raw = (options.env !== undefined ? options.env : process.env).MAGI_VAULT_ROOT;
     if (!raw) return { value: null, note: 'set MAGI_VAULT_ROOT to ai-ops-vault for MAGI telemetry, skill sync, and analysis' };
@@ -241,7 +252,7 @@ function main(argv = process.argv.slice(2), io = process) {
   let result;
   try {
     const options = {};
-    const flags = { '--rules-root': 'rulesRoot', '--seat-profiles': 'seatProfiles' };
+    const flags = { '--rules-root': 'rulesRoot', '--seat-profiles': 'seatProfiles', '--vendor': 'vendor' };
     for (let i = 0; i < argv.length; i += 1) {
       const key = flags[argv[i]];
       if (!key || options[key] || !argv[i + 1] || argv[i + 1].startsWith('--')) throw new Error(`unknown, duplicate or incomplete preflight option: ${argv[i]}`);
@@ -256,4 +267,4 @@ function main(argv = process.argv.slice(2), io = process) {
 }
 
 if (require.main === module) process.exitCode = main();
-module.exports = { check, inspectSynaraCaptureHooks, main, requiredSeatSkills, synaraCaptureHookPaths };
+module.exports = { check, checkNativeLaunchState, inspectSynaraCaptureHooks, main, requiredSeatSkills, synaraCaptureHookPaths };

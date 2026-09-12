@@ -70,6 +70,22 @@ function skillFixture(root, skills) {
 }
 module.exports = { allAvailability, briefFixture, nativeCapture, probeRecord, ruleFixture, skillFixture, temporary };
 
+function capacityFixture(root) {
+  const source = path.join(root, 'capacity-source.txt');
+  fs.writeFileSync(source, 'Fictional test-only included capacity observation');
+  const now = Date.now(), matrix = require('./dispatch-matrix.js').loadMatrix();
+  const observations = Object.entries(matrix.vendors).map(([vendor, spec]) => ({
+    id: vendor + '-fixture', bucketId: vendor + '-included',
+    subjects: Object.entries(spec.models).flatMap(([model, value]) => value.efforts.map(effort => ({ vendor, model, effort }))),
+    legacyBucketIds: [], observedAt: new Date(now - 1000).toISOString(), expiresAt: new Date(now + 1790000).toISOString(),
+    remainingPercent: 50, included: true, paidUsageAuthorized: false,
+    source: { kind: 'owner-report', evidencePath: source, evidenceSha256: hashFile(source) },
+  }));
+  const capacity = path.join(root, 'capacity.json'), legacyCapacity = path.join(root, 'legacy-capacity.json');
+  writeJson(capacity, { schemaVersion: 1, observations }); writeJson(legacyCapacity, { buckets: [] });
+  return { capacity, legacyCapacity, source };
+}
+
 function createSealedRun(t, entries = [{}], options = {}) {
   const root = temporary(t, 'magi-run-');
   const cwd = path.join(root, 'work'); fs.mkdirSync(cwd);
@@ -79,7 +95,7 @@ function createSealedRun(t, entries = [{}], options = {}) {
   const dispatches = entries.map((entry, index) => {
     const role = entry.role || 'implement';
     const brief = briefFixture(path.join(root, 'briefs', String(index)), role);
-    return { class: 'standard-feature', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium', role, dispatchId: `d${index + 1}`, unitId: `u${index + 1}`, cwd, brief, briefSha256: hashFile(brief), writeScope: role === 'implement' ? ['result.txt'] : [], ...entry };
+    return { class: 'standard-feature', vendor: 'openai', model: role === 'implement' ? 'gpt-6-astra' : 'gpt-5.6-terra', effort: role === 'implement' ? 'high' : 'medium', routingReason: 'Explicit fixture route preserves the tested vendor contract', role, dispatchId: `d${index + 1}`, unitId: `u${index + 1}`, cwd, brief, briefSha256: hashFile(brief), writeScope: role === 'implement' ? ['result.txt'] : [], ...entry };
   });
   const planObject = { planId: 'fixture-run', hostMode: 'cursor-cli', arbiter: { vendor: 'xai', model: 'grok-4.6', effort: 'high' }, ...options, dispatches };
   const planSource = path.join(root, 'source-plan.json'); writeJson(planSource, planObject);
@@ -88,7 +104,8 @@ function createSealedRun(t, entries = [{}], options = {}) {
   const skills = [...new Set(dispatches.flatMap((entry) => require('./seat-policy.js').buildSeatProfile(profiles, entry).skills))];
   const skillSourceRoot = skillFixture(root, skills);
   const sealed = require('./plan-seal.js').sealPlan({ plan: planSource, runDir, availability, skillSourceRoot });
-  const opts = { plan: sealed.planPath, runDir, rulesRoot: ruleFixture(root), skillSourceRoot };
+  const { capacity, legacyCapacity } = capacityFixture(root);
+  const opts = { plan: sealed.planPath, runDir, rulesRoot: ruleFixture(root), skillSourceRoot, capacity, legacyCapacity };
   return { root, cwd, runDir, opts, dispatches, available, availability, planSource, planObject, sealed };
 }
 
@@ -125,6 +142,7 @@ function fakeVendor(action = () => {}, response = 'ACK fixture\nPOSITION: APPROV
   };
   // Synthetic dispatches authorize only their temporary-filesystem root.
   return { buildLaunch, runLaunch, codexSessionTranscript: collect, googleSessionTranscript: collect,
+    checkNativeLaunchState: () => ({ status: 'synthetic-native-state', scope: 'No provider process in this fixture' }),
     calls: () => calls, env: { ...process.env, MAGI_ALLOWED_WORKSPACE_ROOTS: os.tmpdir() } };
 }
 
@@ -166,7 +184,7 @@ function syntheticInstructionRows(launch, sessionId) {
   }
   throw new Error('unknown synthetic native vendor');
 }
-Object.assign(module.exports, { createSealedRun, fakeVendor });
+Object.assign(module.exports, { capacityFixture, createSealedRun, fakeVendor });
 
 // Test-only completion: inspect the known synthetic report before attesting it.
 // General run options intentionally carry no advance topicality assertion.

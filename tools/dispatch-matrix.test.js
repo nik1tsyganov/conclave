@@ -25,8 +25,39 @@ function availabilityFor(vendor, model, observedModel = model, observedAt) {
 }
 function arbiter() { return { vendor: 'xai', model: 'grok-4.6', effort: 'high' }; }
 
+for (const effort of ['low', 'medium', 'high', 'xhigh']) {
+  test(`Grok arbiter accepts ${effort} without changing the requested identity`, () => {
+    assert.equal(matrix.principles.arbiterEffortDefault, 'high');
+    for (const hostMode of ['cursor-cli', 'synara']) {
+      const plan = { hostMode, arbiter: { ...arbiter(), effort }, dispatches: reviewOnlyRows() };
+      const before = structuredClone(plan);
+      assert.equal(validatePlan(plan, matrix).ok, true);
+      assert.deepStrictEqual(plan, before);
+    }
+  });
+}
+
+test('Grok arbiter rejects unsupported and missing efforts', () => {
+  for (const effort of ['bogus', 'none', 'max', 'HIGH', 'high-fast', '', null, undefined]) {
+    assert.throws(() => validatePlan({
+      hostMode: 'cursor-cli', arbiter: { ...arbiter(), effort }, dispatches: reviewOnlyRows(),
+    }, matrix), /arbiter effort must be/);
+  }
+});
+
+test('arbiter effort options do not permit a different vendor or model', () => {
+  for (const [change, message] of [
+    [{ vendor: 'openai' }, /arbiter vendor must be xai/],
+    [{ model: 'grok-4.3' }, /arbiter model must be grok-4\.6/],
+  ]) {
+    assert.throws(() => validatePlan({
+      hostMode: 'cursor-cli', arbiter: { ...arbiter(), ...change }, dispatches: reviewOnlyRows(),
+    }, matrix), message);
+  }
+});
+
 test('Astra is fail-closed until exact fresh local model proof exists', () => {
-  const route = { class: 'extreme-end-to-end', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high', escalation: true, escalationReason: 'lower tier failed the required correctness check' };
+  const route = { class: 'extreme-end-to-end', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high', escalation: true, escalationReason: 'lower tier failed the required correctness check', routingReason: 'This bounded repair needs a high effort implementation' };
   assert.strictEqual(routeAllowed(matrix, route, {}).ok, false);
   assert.strictEqual(routeAllowed(matrix, route, availabilityFor('openai', 'gpt-6-astra')).ok, true);
   assert.strictEqual(routeAllowed(matrix, route, availabilityFor('openai', 'gpt-6-astra', 'gpt-5.6-sol')).ok, false);
@@ -35,7 +66,7 @@ test('Astra is fail-closed until exact fresh local model proof exists', () => {
 });
 
 test('Astra escalation-only lanes require explicit reason', () => {
-  const base = { class: 'debug-mystery', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high' };
+  const base = { class: 'architecture-planning', role: 'plan', vendor: 'openai', model: 'gpt-6-astra', effort: 'high' };
   const availability = availabilityFor('openai', 'gpt-6-astra');
   assert.match(routeAllowed(matrix, base, availability).reason, /escalation-only/);
   assert.match(routeAllowed(matrix, { ...base, escalation: true }, availability).reason, /escalationReason/);
@@ -58,22 +89,21 @@ test('architecture planning is a read-only plan lane rather than implementation'
   }).ok, false);
 });
 
-test('standard feature rejects frontier over-routing not listed by policy', () => {
+test('standard feature admits the owner approved Astra default with exact proof', () => {
   const result = routeAllowed(matrix, {
     class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high',
   }, availabilityFor('openai', 'gpt-6-astra'));
-  assert.strictEqual(result.ok, false);
-  assert.match(result.reason, /route not in matrix/);
+  assert.strictEqual(result.ok, true);
 });
 
 test('synara is a legal CLI hostMode and banana is not', () => {
   assert.deepStrictEqual(validatePlan({
     hostMode: 'synara', arbiter: arbiter(), magiConvened: true,
-    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' }],
+    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high' }],
   }, matrix), { ok: true, dispatches: 1, implementUnits: 1 });
   assert.throws(() => validatePlan({
     hostMode: 'banana', arbiter: arbiter(), magiConvened: true,
-    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' }],
+    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high' }],
   }, matrix), /hostMode must be cursor-cli or synara/);
 });
 
@@ -81,7 +111,7 @@ test('implement cannot take evidenceReadDirs', () => {
   assert.throws(() => validatePlan({
     hostMode: 'synara', arbiter: arbiter(), magiConvened: true,
     dispatches: [{
-      unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium',
+      unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high',
       evidenceReadDirs: [root],
     }],
   }, matrix), /implement cannot take evidenceReadDirs/);
@@ -97,7 +127,7 @@ test('Grok cannot occupy a seat', () => {
 test('single implementation unit is not rejected by the 60 percent floor', () => {
   assert.deepStrictEqual(validatePlan({
     hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true,
-    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' }],
+    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high' }],
   }, matrix), { ok: true, dispatches: 1, implementUnits: 1 });
 });
 
@@ -105,8 +135,8 @@ test('two implementation units in convened MAGI require two vendors', () => {
   assert.throws(() => validatePlan({
     hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true,
     dispatches: [
-      { unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' },
-      { unitId: 'u2', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' },
+      { unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high' },
+      { unitId: 'u2', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high' },
     ],
   }, matrix), /requires 2 implement vendors|distribution floor/);
 });
@@ -116,7 +146,7 @@ test('three implementation units in convened MAGI require all three vendors', ()
   assert.doesNotThrow(() => validatePlan({
     hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true,
     dispatches: [
-      { unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' },
+      { unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high' },
       { unitId: 'u2', class: 'standard-feature', role: 'implement', vendor: 'anthropic', model: 'sonnet', effort: 'medium' },
       { unitId: 'u3', class: 'standard-feature', role: 'implement', vendor: 'google', model: 'gemini-3.8-flash-medium', effort: 'fused-medium' },
     ],
@@ -177,7 +207,7 @@ test('availability loader record supports exact proof format', () => {
   fs.writeFileSync(file, JSON.stringify(availabilityFor('openai', 'gpt-6-astra')), 'utf8');
   const loaded = JSON.parse(fs.readFileSync(file, 'utf8'));
   assert.strictEqual(routeAllowed(matrix, {
-    class: 'extreme-end-to-end', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high', escalation: true, escalationReason: 'lower tier failed the required correctness check',
+    class: 'extreme-end-to-end', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high', escalation: true, escalationReason: 'lower tier failed the required correctness check', routingReason: 'This bounded repair needs a high effort implementation',
   }, loaded).ok, true);
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -187,12 +217,12 @@ test('missing author provenance cannot bypass review independence', () => {
 });
 test('duplicate implementation units cannot fabricate distribution', () => {
   assert.throws(() => validatePlan({ hostMode: 'cursor-cli', arbiter: arbiter(), dispatches: [
-    { unitId: 'u', role: 'implement', class: 'standard-feature', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' },
+    { unitId: 'u', role: 'implement', class: 'standard-feature', vendor: 'openai', model: 'gpt-6-astra', effort: 'high' },
     { unitId: 'u', role: 'implement', class: 'standard-feature', vendor: 'anthropic', model: 'sonnet', effort: 'medium' },
   ] }, matrix), /duplicate implementation/);
 });
 test('ordinary routes also require fresh native proof for their exact effort', () => {
-  assert.match(routeAllowed(matrix, { class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' }).reason, /probe-required/);
+  assert.match(routeAllowed(matrix, { class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high' }).reason, /probe-required/);
 });
 
 const benchmarkPairs = [
@@ -358,4 +388,94 @@ test('generated packets pass policy and native workspace audit protects packet a
     assert.equal(compareWorkspace(before, snapshotWorkspace(fixture.cwd), fixture.writeScope).ok, false);
     assert.throws(() => strictPlan(plan, matrix, evidence), /benchmark/);
   }
+});
+
+
+const codingReason = 'This bounded parser repair needs deeper dependency analysis';
+function codingRow(className = 'standard-feature', model = 'gpt-6-astra', effort = 'high', extra = {}) {
+  return { unitId: 'coding', class: className, role: 'implement', vendor: 'openai', model, effort, ...extra };
+}
+
+test('coding defaults choose Astra for substantive work and Luna for mechanical work', () => {
+  for (const [className, model, effort] of [
+    ['standard-feature', 'gpt-6-astra', 'high'], ['debug-mystery', 'gpt-6-astra', 'high'],
+    ['agentic-long-run', 'gpt-6-astra', 'high'], ['security-sensitive', 'gpt-6-astra', 'xhigh'],
+    ['extreme-end-to-end', 'gpt-6-astra', 'xhigh'], ['bulk-mechanical', 'gpt-5.6-luna', 'medium'],
+  ]) {
+    const route = chooseRoute(matrix, { className, role: 'implement', availability: evidence });
+    assert.equal(route.model, model); assert.equal(route.effort, effort);
+    assert.notEqual(route.escalation, true);
+  }
+});
+
+test('coding selector preserves exact requested effort and requires a task reason', () => {
+  for (const [className, model, defaultEffort] of [['standard-feature', 'gpt-6-astra', 'high'], ['bulk-mechanical', 'gpt-5.6-luna', 'medium']]) {
+    for (const effort of ['medium', 'high', 'xhigh']) {
+      const options = { className, role: 'implement', effort, availability: evidence };
+      if (effort !== defaultEffort) assert.throws(() => chooseRoute(matrix, options), /reason|eligible/);
+      const chosen = chooseRoute(matrix, { ...options, routingReason: codingReason });
+      assert.equal(chosen.model, model); assert.equal(chosen.effort, effort);
+      assert.equal(chosen.routingReason, codingReason);
+    }
+  }
+  for (const effort of ['low', 'max', 'none']) assert.throws(() => chooseRoute(matrix, {
+    className: 'standard-feature', role: 'implement', effort, routingReason: codingReason, availability: evidence,
+  }), /eligible|effort/);
+});
+
+test('public plan validation accepts approved coding default without escalation', () => {
+  for (const row of [codingRow(), codingRow('bulk-mechanical', 'gpt-5.6-luna', 'medium')]) {
+    assert.equal(validatePlan({ hostMode: 'synara', arbiter: arbiter(), dispatches: [row] }, matrix).ok, true);
+  }
+});
+
+test('public plan validation requires reason for coding effort or other OpenAI model', () => {
+  for (const row of [codingRow('standard-feature', 'gpt-6-astra', 'medium'), codingRow('standard-feature', 'gpt-6-astra', 'xhigh'),
+    codingRow('standard-feature', 'gpt-5.6-luna', 'medium'), codingRow('standard-feature', 'gpt-5.6-terra', 'medium')]) {
+    assert.throws(() => validatePlan({ hostMode: 'synara', arbiter: arbiter(), dispatches: [row] }, matrix), /routingReason/);
+    for (const routingReason of ['default', 'same same same same']) assert.throws(() => validatePlan({
+      hostMode: 'synara', arbiter: arbiter(), dispatches: [{ ...row, routingReason }],
+    }, matrix), /routingReason/);
+    assert.equal(validatePlan({ hostMode: 'synara', arbiter: arbiter(), dispatches: [{ ...row, routingReason: codingReason }] }, matrix).ok, true);
+  }
+});
+
+test('coding selector never downgrades an unavailable requested pair or silently selects Terra or Sol', () => {
+  const unavailable = structuredClone(evidence);
+  delete unavailable.vendors.openai.models['gpt-6-astra'].efforts.xhigh;
+  assert.throws(() => chooseRoute(matrix, { className: 'standard-feature', role: 'implement', effort: 'xhigh', routingReason: codingReason, availability: unavailable }), /eligible/);
+  delete unavailable.vendors.openai.models['gpt-6-astra'];
+  assert.throws(() => chooseRoute(matrix, { className: 'standard-feature', role: 'implement', excludedVendors: ['anthropic', 'google'], availability: unavailable }), /eligible/);
+  const alternate = chooseRoute(matrix, { className: 'standard-feature', role: 'implement', model: 'gpt-5.6-terra', routingReason: codingReason, availability: unavailable });
+  assert.equal(alternate.model, 'gpt-5.6-terra');
+  assert.throws(() => chooseRoute(matrix, { className: 'standard-feature', role: 'implement', model: 'gpt-5.6-terra', availability: unavailable }), /eligible|routingReason/);
+});
+
+test('coding defaults retain exact fresh native proof gates', () => {
+  const opts = { className: 'standard-feature', role: 'implement', model: 'gpt-6-astra', effort: 'high' };
+  assert.throws(() => chooseRoute(matrix, opts), /eligible/);
+  const stale = structuredClone(evidence);
+  stale.vendors.openai.models['gpt-6-astra'].efforts.high.observedAt = new Date(Date.now() - 7200000).toISOString();
+  assert.throws(() => chooseRoute(matrix, { ...opts, availability: stale }), /eligible/);
+  const wrong = structuredClone(evidence);
+  wrong.vendors.openai.models['gpt-6-astra'].efforts.high = wrong.vendors.openai.models['gpt-6-astra'].efforts.medium;
+  assert.throws(() => chooseRoute(matrix, { ...opts, availability: wrong }), /eligible/);
+});
+
+test('coding preference retains vendor alternatives and independent review distribution', () => {
+  const alternate = chooseRoute(matrix, { className: 'standard-feature', role: 'implement', excludedVendors: ['openai'], availability: evidence });
+  assert.notEqual(alternate.vendor, 'openai');
+  assert.equal(validatePlan({ hostMode: 'synara', arbiter: arbiter(), magiConvened: true, dispatches: [codingRow(), { ...alternate, unitId: 'foreign' }] }, matrix).ok, true);
+  assert.throws(() => validatePlan({ hostMode: 'synara', arbiter: arbiter(), magiConvened: true, dispatches: [codingRow(), { ...codingRow(), unitId: 'second' }] }, matrix), /requires 2 implement vendors|distribution floor/);
+});
+
+test('legacy matrices and noncoding Astra lanes retain frontier escalation', () => {
+  const legacy = structuredClone(matrix);
+  for (const cls of Object.values(legacy.classes)) delete cls.codingDefault;
+  assert.match(routeAllowed(legacy, codingRow('debug-mystery'), evidence).reason, /escalation-only/);
+  assert.match(routeAllowed(matrix, { class: 'architecture-planning', role: 'plan', vendor: 'openai', model: 'gpt-6-astra', effort: 'high' }, evidence).reason, /escalation-only/);
+});
+
+test('substantive Luna override needs routingReason even when escalationReason exists', () => {
+  assert.throws(() => validatePlan({ hostMode: 'synara', arbiter: arbiter(), dispatches: [codingRow('standard-feature', 'gpt-5.6-luna', 'medium', { escalation: true, escalationReason: codingReason })] }, matrix), /routingReason/);
 });

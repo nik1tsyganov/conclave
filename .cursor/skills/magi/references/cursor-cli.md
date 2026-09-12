@@ -32,13 +32,17 @@ Binary resolution uses explicit overrides, environment overrides, configured/dis
 
 ## Probe each exact model and effort
 
+Before a native probe or dispatch, supply `--capacity <receipt.json>` and `--legacy-capacity <capacity-state.json>`, or set `MAGI_CAPACITY_RECEIPT` and `MAGI_LEGACY_CAPACITY` to those absolute paths. The shared `tools/subscription-capacity.js` validator requires a current, positive included-capacity observation for the exact vendor/model/effort, with paid usage disabled. The observation binds its source evidence by SHA256 and maps every applicable legacy bucket. Do not fabricate an observation or renew it by changing its timestamp. Obtain new vendor-native evidence or an explicit current owner report.
+
+The receipt must remain valid through the planned call. Ordinary dispatch defaults to 20 minutes; use `--max-wall-ms` for a shorter bound when needed. Receipts have a maximum 30-minute validity window. Missing, stale, changed, exhausted, or mismatched evidence blocks a new launch before staging or native execution. The runner checks the selected vendor's native state and rechecks admission immediately before spawn. These checks validate supplied evidence; they do not independently query every provider's billing system. Completed readback and Claude attestation do not launch a model and need no renewed receipt.
+
 The catalog in `dispatch-matrix.json` defines legal combinations. Catalog membership is not a current availability claim. Every intended model/effort pair needs fresh native evidence in the executing environment. Unknown or unproven pairs are unavailable.
 
 For one catalog route:
 
 ```powershell
-node tools/model-probe.js --vendor openai --model gpt-5.6-terra --effort medium --evidence-dir C:/src/magi-runs/probes/terra-medium
-node tools/model-availability.js --file C:/src/magi-runs/availability.json --probe C:/src/magi-runs/probes/terra-medium/probe.json
+node tools/model-probe.js --vendor openai --model gpt-6-astra --effort high --evidence-dir C:/src/magi-runs/probes/astra-high
+node tools/model-availability.js --file C:/src/magi-runs/availability.json --probe C:/src/magi-runs/probes/astra-high/probe.json
 ```
 
 Use a new evidence directory for each probe. Repeat for every pair selected by the plan. Google efforts use the matrix's fused names, such as `fused-high`. Probes invoke native CLIs and use included subscription capacity. Offline contract tests do not perform these calls.
@@ -51,7 +55,7 @@ When the arbiter is Synara-hosted, snapshot live `synara_capabilities` before se
 node tools/synara-catalog.js --import C:/src/magi-runs/synara-capabilities.json --out C:/src/magi-runs/synara-catalog.json
 ```
 
-Pass that file as `--synara-catalog` to `plan-seal.js`. Seal may narrow the static dispatch-matrix to models Synara currently lists. It must not invent routes Synara does not list, and it must not skip MAGI probes or `cli-proof`. Google fused efforts stay MAGI-side; `launch.json` records both `magiEffort` and the Synara option key (`reasoningEffort` vs `effort`).
+Pass that file as `--synara-catalog` to `plan-seal.js`. New seals record `synaraCatalogPolicy: diagnostic-only-v1`: the catalog is a hashed diagnostic snapshot and does not restrict native CLI routes. Historical seals without this marker retain their original narrowing. MAGI still requires exact native probes and `cli-proof`. Google fused efforts stay MAGI-side; `launch.json` records both `magiEffort` and the Synara option key (`reasoningEffort` vs `effort`).
 
 By default, a probe creates a scratch workspace under its evidence directory. If you supply `--cwd`, it must already exist and must not contain the evidence directory. Keep both paths outside the runtime. An unconfirmed child exit leaves incomplete scope evidence; inspect the recorded PID and stop before another attempt.
 
@@ -77,7 +81,7 @@ The plan contains these fields:
 |---|---|
 | `planId` | Unique safe identifier for the whole run. |
 | `hostMode` | `cursor-cli` for plain Cursor Agent, or `synara` when this Grok arbiter is Synara-hosted. |
-| `arbiter` | `{"vendor":"xai","model":"grok-4.6","effort":"high"}`; the matrix also accepts xhigh. |
+| `arbiter` | `{"vendor":"xai","model":"grok-4.6","effort":"high"}`; effort supports low, medium, high, and xhigh. High is the default. Fast mode is optional. |
 | `magiConvened` | True when a MAGI panel is convened; required for critical classes. |
 | `dispatches` | All intended implementation, review, verification, planning, and research entries. |
 
@@ -87,7 +91,13 @@ An implementation `writeScope` contains concrete relative paths with forward sla
 
 Review and verify entries require `authorVendor`. It must match the unit's implementation provenance and differ from the reviewing vendor. They use the same unit and product worktree. Ordinary implementation approval needs foreign verification and review, with every review returning native APPROVE. A critical `requiresPanel` class also requires `magiConvened: true` and two distinct foreign review/verify vendors for that unit and worktree.
 
-Astra routes require `escalation: true` and a substantive `escalationReason` with at least 16 characters and three distinct words. Carry any escalation authorization in the complete plan. A stronger model does not grant broader permissions.
+Ordinary coding routes use the class `codingDefault`: Astra high for standard features, debugging, and long agentic work; Astra xhigh for security-sensitive and extreme end-to-end work; Luna medium for bulk mechanical work. This is an owner-selected policy, not a ranking inferred from the provisional benchmark.
+
+The arbiter selects medium for bounded work with clear acceptance checks, high for interacting changes or uncertain diagnosis, and xhigh for substantial ambiguity or high-consequence changes. Other listed OpenAI coding model/effort choices require a `routingReason` describing the task-specific cause (at least 16 trimmed characters and three distinct words). `escalationReason` is not a substitute. Classify simple work as `bulk-mechanical`; do not silently downgrade a substantive task to Luna. Record an explicit alternative when the preferred pair lacks fresh proof or included capacity.
+
+`chooseRoute` honors an explicit model/effort request without silently switching effort. The plan validator checks legal choices and reasons; it cannot prove that the arbiter classified the task correctly. Fresh exact-pair probes, foreign review, critical panels, distribution, and scope checks still apply. Defaults select coding routes; they do not override the required vendor distribution.
+
+Benchmark and noncoding Astra routes still require `escalation: true` and a substantive `escalationReason` with at least 16 characters and three distinct words. Historical sealed matrix snapshots retain their original rules. A stronger model does not grant broader permissions.
 
 Implementation distribution counts implementation units only. A convened run uses `min(3, implementation unit count)` distinct implementation vendors. The 60% cap starts at two implementation units. Review-only, plan, and research runs do not invent implementation rows.
 
@@ -152,6 +162,14 @@ Production Claude dispatches request a native `--json-schema` envelope. Put the 
 Google probes and dispatches supply `--log-file <evidence-dir>/native-cli.log`. Each call has a unique evidence directory. Default second-resolution home-log names can collide during parallel calls, so proof collection uses the pinned native file when building `vendor.log`.
 
 ## Read the committed evidence
+
+### Maintained lessons and enforcement
+
+The maintained lesson catalog is `seat-profiles.json` → `operationalLessons.entries`. Its 29 session records carry procedures, delivery selectors, code/test references, and explicit enforcement limits. The original scratch register is historical evidence. New plan seals and installations require the current catalog; the seal binds its bytes with the seat profiles.
+
+The runner selects relevant leaf procedures by role/vendor and inserts them into the required `SEAT-CONTRACT.md`. The existing native instruction-read and hash checks reject results without full contract-read evidence. This is an acceptance check after execution; it does not prevent an early product access. Arbiter and maintainer procedures remain in the policy rather than expanding every leaf brief.
+
+On this machine, `node C:/Users/YESSIR/.claude/docs/tools/lesson-brief.js --fields dispatch,workflow --format md` reads current canonical sources, including the installed policy. Its normal invocation rebuilds in memory; `--index` explicitly chooses an offline snapshot. General listings are not dispatch briefs. To select leaf guidance, add `--delivery seat --role verify --vendor openai` with the actual role/vendor. Arbiter and maintainer work use their corresponding delivery selector. Native host startup pointers provide discovery. MAGI runner checks provide enforcement even when an agent forgets a procedure. They do not constrain arbitrary commands outside MAGI or replace semantic judgment or an OS sandbox.
 
 `cli-proof.js` requires native evidence, separate from requested identity:
 

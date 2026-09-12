@@ -63,39 +63,7 @@ function attemptId(opts, probeOnly = false) {
   return `${opts.subject}-${probeOnly ? 'p' : opts.task[0] + opts.task.at(-1)}-a${n}`;
 }
 
-// Receipt schema: {schemaVersion:1,observations:[{id,bucketId,subjects:[{vendor,
-// model,effort}],legacyBucketIds:[],observedAt,expiresAt,remainingPercent,
-// included:true,paidUsageAuthorized:false,source:{kind,evidencePath,evidenceSha256}}]}.
-// kind is vendor-native or owner-report; model reachability is not capacity.
-function validateCapacity(receipt, legacy, pair, now = Date.now()) {
-  required(receipt?.schemaVersion === 1 && Array.isArray(receipt.observations), 'Invalid capacity receipt');
-  required(Array.isArray(legacy?.buckets), 'Legacy capacity ledger is missing buckets');
-  required(legacy.buckets.every(row => typeof row?.bucketId === 'string' && ['unknown', 'available', 'exhausted'].includes(row.status)) && new Set(legacy.buckets.map(row => row.bucketId)).size === legacy.buckets.length, 'Legacy capacity buckets must be unique and valid');
-  const matches = receipt.observations.filter(row => row?.subjects?.some(item => item.vendor === pair.vendor && item.model === pair.model && item.effort === pair.effort));
-  required(matches.length === 1, 'Require exactly one capacity observation for the exact subject pair');
-  const row = matches[0]; const observed = Date.parse(row.observedAt); const expiry = Date.parse(row.expiresAt);
-  required(row.subjects.every(item => item?.vendor === pair.vendor && typeof item.model === 'string' && typeof item.effort === 'string'), 'Shared capacity subjects must name the same vendor');
-  required(safeId(row.id) && typeof row.bucketId === 'string' && row.bucketId.length > 0, 'Capacity observation identity is missing');
-  required(Number.isFinite(observed) && Number.isFinite(expiry) && observed <= now && expiry > now && expiry > observed && expiry - observed <= 1800000, 'Capacity observation is future, expired, or exceeds 30 minutes');
-  required(row.included === true && row.paidUsageAuthorized === false && typeof row.remainingPercent === 'number' && Number.isFinite(row.remainingPercent) && row.remainingPercent > 0 && row.remainingPercent <= 100, 'Included positive capacity is not established');
-  required(['vendor-native', 'owner-report'].includes(row.source?.kind) && path.isAbsolute(row.source?.evidencePath || '') && /^[a-f0-9]{64}$/.test(row.source?.evidenceSha256 || ''), 'Capacity needs admitted source evidence');
-  assertPlainPath(row.source.evidencePath); required(hashFile(row.source.evidencePath) === row.source.evidenceSha256, 'Capacity source evidence changed');
-  required(Array.isArray(row.legacyBucketIds) && new Set(row.legacyBucketIds).size === row.legacyBucketIds.length, 'Explicit unique legacyBucketIds are required');
-  // Native agy /usage groups Flash and Pro under shared weekly and 5-hour limits.
-  // Unknown Claude keys remain applicable until their independent scope is known.
-  const separateClaude = new Set(['fable', 'opus', 'sonnet', 'haiku'].map(model => `claude/weekly-${model}`));
-  const known = legacy.buckets.filter(item => pair.vendor === 'openai' ? item.bucketId.startsWith('codex/') : pair.vendor === 'anthropic'
-    ? item.bucketId.startsWith('claude/') && (!separateClaude.has(item.bucketId) || item.bucketId === `claude/weekly-${pair.model}`)
-    : item.bucketId.startsWith('gemini/'));
-  required(known.every(item => row.legacyBucketIds.includes(item.bucketId)), 'Capacity mapping omits a known matching/shared legacy bucket');
-  const prefix = pair.vendor === 'openai' ? 'codex/' : pair.vendor === 'anthropic' ? 'claude/' : 'gemini/';
-  for (const id of row.legacyBucketIds) {
-    const prior = legacy.buckets.find(item => item.bucketId === id);
-    required(prior && id.startsWith(prefix), 'Unknown or cross-vendor legacy capacity mapping');
-    if (prior.status === 'exhausted') required(Number.isFinite(Date.parse(prior.asOf)) && observed > Date.parse(prior.asOf), 'Known exhaustion requires a later admitted reading');
-  }
-  return row;
-}
+const { validateCapacity, admitCapacity } = require('./subscription-capacity');
 
 function briefText(template, id, pair, manifest) {
   const block = template.match(/```text\r?\n([\s\S]*?)\r?\n```/); required(block, 'Runtime brief template has no text block');
@@ -150,6 +118,11 @@ function nativeReplay(runtime, env, dependencies) {
 
 async function runMode(mode, opts, dependencies = {}) {
   required(MODES.includes(mode), 'Unknown mode');
+  const maxWallMs = typeof opts.maxWallMs === 'string' ? Number(opts.maxWallMs) : opts.maxWallMs;
+  if (opts.maxWallMs !== undefined) {
+    required(mode === 'prepare', '--max-wall-ms is only valid for prepare');
+    required(Number.isSafeInteger(maxWallMs) && maxWallMs > 0 && maxWallMs <= 1200000, '--max-wall-ms must be a positive safe integer at most 1200000');
+  }
   if (mode === 'init') return initialize(opts);
   const config = loadConfig(opts.root);
   if (mode === 'status') {
@@ -224,19 +197,20 @@ async function runMode(mode, opts, dependencies = {}) {
       return tool === 'git' ? result.stdout.trim() : JSON.parse(result.stdout);
     } catch (error) { if (error.exitConfirmed === true && !native) safeToUnlock = true; throw error; }
   }
-  async function admission(dir, pair) {
-    const report = await command(dir, 'preflight', 'magi-cli-preflight', ['--rules-root', config.rulesRoot]); required(report.ok === true, 'MAGI preflight failed');
+  async function admission(dir, pair, maxWallMs) {
+    const report = await command(dir, 'preflight', 'magi-cli-preflight', ['--rules-root', config.rulesRoot, '--vendor', pair.vendor]); required(report.ok === true, 'MAGI preflight failed');
     required(path.isAbsolute(opts.capacity || ''), 'Absolute capacity receipt required');
     const receipt = read(opts.capacity); const legacy = read(config.legacyCapacity);
     write(path.join(dir, 'capacity-receipt.json'), receipt); write(path.join(dir, 'legacy-capacity.json'), legacy);
-    const observed = validateCapacity(receipt, legacy, pair);
-    write(path.join(dir, 'capacity-admission.json'), { observationId: observed.id, observedAt: observed.observedAt, checkedAt: new Date().toISOString(), receiptSha256: hashFile(opts.capacity), legacySha256: hashFile(config.legacyCapacity) });
-    return () => { checkFrozen(config); required(hashFile(opts.capacity) === read(path.join(dir, 'capacity-admission.json')).receiptSha256 && hashFile(config.legacyCapacity) === read(path.join(dir, 'capacity-admission.json')).legacySha256, 'Capacity changed before native launch'); validateCapacity(receipt, legacy, pair); };
+    const admitted = admitCapacity({ capacity: opts.capacity, legacyCapacity: config.legacyCapacity }, pair, maxWallMs, env);
+    write(path.join(dir, 'capacity-admission.json'), admitted.record);
+    return () => { checkFrozen(config); admitted.revalidate(); };
   }
   try {
     if (mode === 'prepare') {
       const id = attemptId(opts); const pair = subject(opts.subject); const dir = operationDir = path.join(config.root, 'attempts', id); fs.mkdirSync(dir);
       const fixture = require(path.join(config.source, 'tools', 'benchmark-fixtures.js')).generateBenchmark(opts.task, path.join(dir, 'product'));
+      if (maxWallMs !== undefined) fixture.maxWallMs = maxWallMs;
       write(path.join(dir, 'fixture.json'), fixture);
       const template = fs.readFileSync(path.join(runtime.templatesDir, 'brief-rules-block.md'), 'utf8');
       fs.writeFileSync(path.join(dir, 'brief.md'), briefText(template, id, pair, fixture), { flag: 'wx' });
@@ -250,8 +224,8 @@ async function runMode(mode, opts, dependencies = {}) {
     }
     if (mode === 'probe') {
       const pair = subject(opts.subject, true); const id = attemptId(opts, true); const dir = operationDir = path.join(config.root, 'probes', id); fs.mkdirSync(dir); fs.mkdirSync(path.join(dir, 'product'));
-      const admit = await admission(dir, pair); admit(); write(path.join(dir, 'started.json'), { subject: pair, startedAt: new Date().toISOString() });
-      const result = await command(dir, 'probe', 'model-probe', ['--vendor', pair.vendor, '--model', pair.model, '--effort', pair.effort, '--evidence-dir', path.join(dir, 'native'), '--cwd', path.join(dir, 'product')], 165000, true);
+      const admit = await admission(dir, pair, 120000); admit(); write(path.join(dir, 'started.json'), { subject: pair, startedAt: new Date().toISOString() });
+      const result = await command(dir, 'probe', 'model-probe', ['--vendor', pair.vendor, '--model', pair.model, '--effort', pair.effort, '--evidence-dir', path.join(dir, 'native'), '--cwd', path.join(dir, 'product'), '--capacity', opts.capacity, '--legacy-capacity', config.legacyCapacity], 165000, true);
       required(result.status === 'PASS', 'Native probe did not pass');
       const availability = path.join(dir, 'availability.json');
       await command(dir, 'availability', 'model-availability', ['--file', availability, '--probe', path.join(dir, 'native', 'probe.json')]);
@@ -268,12 +242,12 @@ async function runMode(mode, opts, dependencies = {}) {
         const candidates = fs.readdirSync(path.join(config.root, 'probes')).map(id => path.join(config.root, 'probes', id, 'completed.json')).filter(file => fs.existsSync(file)).map(boundRead).filter(item => item.status === 'PASS' && item.subject.id === pair.id).sort((a, b) => a.completedAt.localeCompare(b.completedAt));
         const latest = candidates.at(-1); required(latest, 'No completed exact-pair probe; run probe first'); required(hashFile(latest.availability) === latest.availabilitySha256, 'Probe availability changed'); availability = latest.availability;
       }
-      const admit = await admission(state.dir, pair);
+      const admit = await admission(state.dir, pair, state.manifest.maxWallMs);
       required(path.isAbsolute(availability || ''), 'Absolute availability path required');
       await command(state.dir, 'seal', 'plan-seal', ['--plan', path.join(state.dir, 'plan.json'), '--run-dir', dispatchOptions.runDir, '--availability', availability]);
       admit(); protectedWorkspace(state.manifest, true); checkHashes(state.bindings);
       write(path.join(state.dir, 'started.json'), { startedAt: new Date().toISOString(), subject: pair, maxWallMs: state.manifest.maxWallMs });
-      const args = ['--plan', dispatchOptions.plan, '--run-dir', dispatchOptions.runDir, '--dispatch-id', state.id, '--rules-root', config.rulesRoot, '--max-wall-ms', String(state.manifest.maxWallMs)];
+      const args = ['--plan', dispatchOptions.plan, '--run-dir', dispatchOptions.runDir, '--dispatch-id', state.id, '--rules-root', config.rulesRoot, '--max-wall-ms', String(state.manifest.maxWallMs), '--capacity', opts.capacity, '--legacy-capacity', config.legacyCapacity];
       const result = await command(state.dir, 'native-run', 'dispatch-run', args, state.manifest.maxWallMs + 45000, true);
       const status = result.ok === true && result.receipt?.status === 'PASS' ? 'PASS' : result.status === 'AWAITING_ATTESTATION' ? result.status : 'INCOMPLETE';
       required(status !== 'INCOMPLETE', 'Dispatch output has no accepted native status');
@@ -313,7 +287,7 @@ async function runMode(mode, opts, dependencies = {}) {
 
 function parseArgs(argv) {
   const [mode, ...rest] = argv; required(MODES.includes(mode), 'Mode must be ' + MODES.join('|'));
-  const opts = {}; const allowed = ['root', 'runtime', 'source', 'rules-root', 'legacy-capacity', 'subject', 'task', 'attempt', 'capacity', 'availability', 'capture-sha256'];
+  const opts = {}; const allowed = ['root', 'runtime', 'source', 'rules-root', 'legacy-capacity', 'subject', 'task', 'attempt', 'capacity', 'availability', 'capture-sha256', 'max-wall-ms'];
   for (let i = 0; i < rest.length; i += 2) { const flag = rest[i]; required(flag?.startsWith('--') && allowed.includes(flag.slice(2)) && rest[i + 1] && !rest[i + 1].startsWith('--'), 'Unknown or incomplete option: ' + flag); const key = flag.slice(2).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase()); required(!Object.hasOwn(opts, key), 'Duplicate option: ' + flag); opts[key] = rest[i + 1]; }
   return { mode, opts };
 }

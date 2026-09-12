@@ -96,7 +96,19 @@ function routeAllowed(matrix, route, availability = {}, nowMs = Date.now()) {
   const modelSpec = matrix.vendors?.[route.vendor]?.models?.[route.model];
   if (!modelSpec) return { ok: false, reason: `model absent from vendor catalog: ${route.vendor}/${route.model}` };
   if (!modelSpec.efforts.includes(route.effort)) return { ok: false, reason: `effort ${route.effort} unsupported by ${route.model}` };
-  if (matched.escalationOnly || modelSpec.tier === 'frontier-plus') {
+  // Opt in per ordinary coding class; old sealed matrices and benchmark lanes keep their contract.
+  const codingDefault = route.role === 'implement' && !cls.benchmarkOnly ? cls.codingDefault : null;
+  const approvedCoding = codingDefault && route.vendor === 'openai' && ['gpt-6-astra', 'gpt-5.6-luna'].includes(route.model);
+  if (codingDefault && route.vendor === 'openai') {
+    if (!['medium', 'high', 'xhigh'].includes(route.effort)) return { ok: false, reason: 'coding effort must be medium, high or xhigh' };
+    if (route.model !== codingDefault.model || route.effort !== codingDefault.effort) {
+      const reason = route.routingReason;
+      if (typeof reason !== 'string' || reason.trim().length < 16 || new Set(reason.trim().toLowerCase().split(/\s+/)).size < 3) {
+        return { ok: false, reason: 'nondefault OpenAI coding route requires a substantive routingReason' };
+      }
+    }
+  }
+  if (matched.escalationOnly || (modelSpec.tier === 'frontier-plus' && !approvedCoding)) {
     if (route.escalation !== true) return { ok: false, reason: `escalation-only route requires escalation=true: ${route.vendor}/${route.model}` };
     if (typeof route.escalationReason !== 'string' || route.escalationReason.trim().length < 16 || new Set(route.escalationReason.trim().toLowerCase().split(/\s+/)).size < 3) {
       return { ok: false, reason: `escalation-only route requires escalationReason: ${route.vendor}/${route.model}` };
@@ -125,7 +137,7 @@ function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
   if (!isCliHostMode(plan.hostMode)) throw policyError('hostMode must be cursor-cli or synara');
   if (plan.arbiter?.vendor !== 'xai') throw policyError('arbiter vendor must be xai');
   if (plan.arbiter?.model !== matrix.principles.arbiterModel) throw policyError(`arbiter model must be ${matrix.principles.arbiterModel}`);
-  if (!['high', 'xhigh'].includes(plan.arbiter?.effort)) throw policyError('arbiter effort must be high or xhigh');
+  if (!['low', 'medium', 'high', 'xhigh'].includes(plan.arbiter?.effort)) throw policyError('arbiter effort must be low, medium, high or xhigh');
   if (!Array.isArray(plan.dispatches) || plan.dispatches.length === 0) throw policyError('plan.dispatches must be non-empty');
   validateBenchmarkPurpose(plan, matrix);
 
@@ -232,18 +244,29 @@ function bindDispatch(opts, matrix, availability, nowMs) {
   return { ...validated, entry: structuredClone(entry) };
 }
 
-function chooseRoute(matrix, { className, role, excludedVendors = [], availability = {}, allowEscalation = false, escalationReason = null }) {
+function chooseRoute(matrix, { className, role, excludedVendors = [], availability = {}, allowEscalation = false, escalationReason = null, model = null, effort = null, routingReason = null }) {
   if (matrix.classes?.[className]?.benchmarkOnly === true) throw policyError('benchmark conditions require an explicit subject pair, not automatic route selection');
   const list = matrix.classes?.[className]?.[role];
   if (!Array.isArray(list)) throw policyError(`no route for ${className}/${role}`);
+  const codingDefault = role === 'implement' ? matrix.classes[className].codingDefault : null;
   for (const route of [...list].sort((a, b) => a.priority - b.priority)) {
     if (excludedVendors.includes(route.vendor)) continue;
-    const escalationOnly = route.escalationOnly || matrix.vendors[route.vendor].models[route.model].tier === 'frontier-plus';
+    if (model !== null && route.model !== model) continue;
+    if (effort !== null && route.effort !== effort) continue;
+    if (codingDefault) {
+      // A requested effort binds the preferred model unless the arbiter names another one.
+      if (effort !== null && model === null && route.model !== codingDefault.model) continue;
+      if (route.vendor === 'openai' && model === null && route.model !== codingDefault.model) continue;
+      if (route.model === codingDefault.model && effort === null && route.effort !== codingDefault.effort) continue;
+    }
+    const approvedCoding = codingDefault && route.vendor === 'openai' && ['gpt-6-astra', 'gpt-5.6-luna'].includes(route.model);
+    const escalationOnly = route.escalationOnly || (matrix.vendors[route.vendor].models[route.model].tier === 'frontier-plus' && !approvedCoding);
     if (escalationOnly && !allowEscalation) continue;
     const candidate = {
       class: className,
       role,
       ...route,
+      ...(routingReason !== null ? { routingReason } : {}),
       ...(escalationOnly ? { escalation: true, escalationReason } : {}),
     };
     const result = routeAllowed(matrix, candidate, availability);

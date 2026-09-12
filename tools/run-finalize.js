@@ -325,6 +325,27 @@ function verifySavedExecution(run, entry, state, pending, allowReceiptProjection
     if (!state.artifacts.some((item) => item.path === artifact(name) && item.sha256 === (projections.has(item.path) ? hash(`${JSON.stringify(projections.get(item.path), null, 2)}\n`) : hashFile(artifact(name))))) throw new Error(`missing committed artifact: ${name}`);
   }
   const launch = readJson(artifact('launch.json'));
+  if (launch.launchAvailability !== undefined) {
+    const admission = launch.launchAvailability;
+    if (recovery || admission?.schemaVersion !== 1 || !Array.isArray(admission.files) || admission.files.length !== 4 || !Number.isFinite(Date.parse(state.startedAt))) throw new Error('invalid saved launch availability');
+    const names = ['availability.json', 'probe.json', 'capture.txt', 'vendor.log'];
+    for (const [index, item] of admission.files.entries()) {
+      if (!path.isAbsolute(item.path || '') || item.copy !== artifact(`launch-availability/${index}-${names[index]}`) || !/^[a-f0-9]{64}$/.test(item.sha256 || '')) throw new Error('invalid launch availability closure');
+      for (const file of [item.path, item.copy]) {
+        assertPlainPath(file);
+        if (hashFile(file) !== item.sha256 || !state.artifacts.some(row => row.path === file && row.sha256 === item.sha256)) throw new Error('launch availability evidence is not committed');
+      }
+    }
+    const [source, probeFile, capture, log] = admission.files;
+    if (source.path !== admission.path || source.sha256 !== admission.sha256) throw new Error('saved launch availability source differs');
+    const available = loadAvailability(source.copy);
+    const model = available.vendors?.[entry.vendor]?.models?.[entry.model];
+    const observed = model?.efforts?.[entry.effort] || model;
+    const probe = readJson(probeFile.copy);
+    if (observed?.evidence?.path !== probeFile.path || observed.evidence.sha256 !== probeFile.sha256 || probe.capture !== capture.path || probe.captureSha256 !== capture.sha256 || probe.log !== log.path || probe.logSha256 !== log.sha256) throw new Error('saved launch availability closure differs');
+    const allowed = routeAllowed(run.matrix, entry, available, Date.parse(state.startedAt));
+    if (!allowed.ok) throw new Error(`saved launch availability invalid: ${allowed.reason}`);
+  }
   if (recovery && launch.recoverySha256 !== state.recoverySha256) throw new Error('replacement launch has missing recovery lineage');
   if (entry.evidenceReadDirs?.length) {
     const dirs = validateEvidenceReadDirs(entry, { plan: run.plan, runDir: run.root, requireExisting: true,
@@ -390,7 +411,14 @@ function verifySavedExecution(run, entry, state, pending, allowReceiptProjection
     sourcePath: transcriptBinding.sourcePath, sha256: hash(transcriptText) }, 'instruction transcript binding');
   const captureText = fs.readFileSync(artifact('capture.txt'), 'utf8');
   if (entry.vendor === 'anthropic' && (transcriptText !== captureText || transcriptBinding.sourcePath !== artifact('capture.txt'))) throw new Error('Claude instruction transcript differs from its native capture');
-  const seatProfile = buildSeatProfile(loadProfiles(), entry);
+  // Historical readback uses its hash-bound policy; new launch, recovery and
+  // checkpoint activation retain their separate current-runtime requirements.
+  let profiles;
+  if (run.seal.schemaVersion === 2) {
+    if (typeof run.seal.profilesText !== 'string' || hash(run.seal.profilesText) !== run.seal.profilesSha256) throw new Error('sealed run policy snapshots changed');
+    profiles = JSON.parse(run.seal.profilesText);
+  } else profiles = loadProfiles();
+  const seatProfile = buildSeatProfile(profiles, entry);
   same(readJson(artifact('seat-profile.json')), seatProfile, 'instruction seat profile');
   const instructionReads = verifyInstructionReadEvidence({ vendor: entry.vendor, sessionId, captureText, transcriptText, expectedCwd: entry.cwd,
     googleTranscriptBinding: { conversationId: sessionId, sha256: transcriptBinding.sha256 },

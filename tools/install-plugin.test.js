@@ -103,6 +103,18 @@ function sourceFixture(t, broad = false) {
   put(path.join(source, 'sentinel.txt'), 'source must survive');
   return { root, source, installed };
 }
+
+test('broad installer rejects missing operational policy before replacing a working install', t => {
+  const { source, installed } = sourceFixture(t, true);
+  installMagiCursor({ sourceRoot: source, destination: installed });
+  const before = snapshot(installed);
+  const file = path.join(source, '.cursor/skills/magi-cli/references/seat-profiles.json');
+  const profiles = JSON.parse(fs.readFileSync(file, 'utf8'));
+  delete profiles.operationalLessons;
+  put(file, JSON.stringify(profiles));
+  assert.throws(() => installMagiCursor({ sourceRoot: source, destination: installed }), /operational lesson/i);
+  assert.deepStrictEqual(snapshot(installed), before);
+});
 function install(f, destination = f.installed) { return installMagiCursorCli({ sourceRoot: f.source, destination }); }
 function snapshot(root, prefix = '') {
   if (!fs.existsSync(root)) return [];
@@ -271,6 +283,29 @@ test('broad Cursor installation excludes tests while retaining every other tool 
   t.diagnostic(JSON.stringify({ beforeTools: sourceFiles.length, beforeBytes: size(sourceFiles), afterTools: expected.length, afterBytes: size(expected) }));
 });
 
+test('missing operational lessons cannot replace a working CLI install', t => {
+  const f = sourceFixture(t);
+  install(f);
+  const file = path.join(f.source, '.cursor/skills/magi-cli/references/seat-profiles.json');
+  const profiles = JSON.parse(fs.readFileSync(file, 'utf8'));
+  profiles.schemaVersion = 7;
+  delete profiles.operationalLessons;
+  put(file, JSON.stringify(profiles));
+  const before = snapshot(f.installed);
+  assert.throws(() => install(f), /operational lesson/i);
+  assert.deepStrictEqual(snapshot(f.installed), before);
+});
+
+test('installed CLI check rejects removed operational lesson policy', t => {
+  const f = sourceFixture(t);
+  install(f);
+  const file = path.join(f.installed, 'skills/magi-cli/references/seat-profiles.json');
+  const profiles = JSON.parse(fs.readFileSync(file, 'utf8'));
+  delete profiles.operationalLessons;
+  put(file, JSON.stringify(profiles));
+  assert.throws(() => checkMagiCli(f.installed), /operational lesson/i);
+});
+
 for (const broad of [false, true]) test(`${broad ? 'broad Cursor' : 'CLI'} installed runtime loads contracts, all entry-point dependencies, and bundled skills without source`, t => {
   const f = sourceFixture(t, broad);
   if (broad) installMagiCursor({ sourceRoot: f.source, destination: f.installed });
@@ -299,7 +334,7 @@ for (const broad of [false, true]) test(`${broad ? 'broad Cursor' : 'CLI'} insta
       }
       return found;
     };
-    const names = ['dispatch-matrix', 'seat-policy', 'dispatch-run', 'cli-skill-stage', 'plan-seal', 'model-probe', 'probe-evidence', 'vendor-native', 'run-finalize', 'panel-tally', 'magi-cli-preflight', 'plugin-surface'];
+    const names = ['dispatch-matrix', 'seat-policy', 'dispatch-run', 'cli-skill-stage', 'plan-seal', 'model-probe', 'probe-evidence', 'vendor-native', 'run-finalize', 'panel-tally', 'magi-cli-preflight', 'plugin-surface', 'subscription-capacity', 'benchmark-run', 'benchmark-fixtures', 'project-fixtures'];
     for (const name of names) require(path.join(process.cwd(), 'tools', name + '.js'));
     const runtime = require('./tools/runtime-paths.js').resolveRuntimePaths();
     assert.equal(runtime.layout, 'installed');

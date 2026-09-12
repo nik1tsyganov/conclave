@@ -12,10 +12,10 @@ MAGI is not CONCLAVE. `/magi` uses Cursor Task mode. `/magi-cli` uses native ven
 
 | Seat | Vendor | Model policy |
 |---|---|---|
-| Melchior | OpenAI | Luna → Terra → Sol → Astra by task class; Astra requires explicit escalation. |
+| Melchior | OpenAI | Astra for coding; Luna for simple mechanical tasks. The arbiter selects medium, high, or xhigh under the matrix policy. |
 | Balthasar | Anthropic | Sonnet, Fable, or Opus by role and class. |
 | Casper | Google | Flash or Pro catalog routes, with exact native agy slug evidence. |
-| Arbiter | xAI | Grok 4.6 high by default; the matrix also accepts xhigh. |
+| Arbiter | xAI | Grok 4.6 high by default; low, medium, high, and xhigh are supported. Fast mode is optional. |
 
 The [dispatch matrix](.cursor/skills/magi-cli/references/dispatch-matrix.json) defines legal combinations. Every selected model/effort pair needs fresh native proof. Catalog membership does not establish current availability. Unknown and unproven pairs are unavailable.
 
@@ -56,9 +56,11 @@ For real projects, give Cursor the [project-run handoff](.cursor/skills/magi-cli
 
 Example commands for one catalog route and a prepared plan:
 
+First set `MAGI_CAPACITY_RECEIPT` and `MAGI_LEGACY_CAPACITY` to current evidence-backed capacity files. See the CLI run guide for their contract. New native calls fail closed without valid admission. The maintained 29-lesson catalog lives in the existing seat profiles; selected procedures reach leaf contracts automatically.
+
 ```powershell
-node tools/model-probe.js --vendor openai --model gpt-5.6-terra --effort medium --evidence-dir C:/magi-runs/probes/terra-medium
-node tools/model-availability.js --file C:/magi-runs/availability.json --probe C:/magi-runs/probes/terra-medium/probe.json
+node tools/model-probe.js --vendor openai --model gpt-6-astra --effort high --evidence-dir C:/magi-runs/probes/astra-high
+node tools/model-availability.js --file C:/magi-runs/availability.json --probe C:/magi-runs/probes/astra-high/probe.json
 node tools/plan-seal.js --plan C:/magi-runs/draft-plan.json --run-dir C:/magi-runs/run-001 --availability C:/magi-runs/availability.json
 node tools/dispatch-run.js --plan C:/magi-runs/run-001/dispatch-plan.json --run-dir C:/magi-runs/run-001 --dispatch-id implement-1 --rules-root $env:MAGI_RULES_ROOT
 node tools/run-finalize.js --run-dir C:/magi-runs/run-001

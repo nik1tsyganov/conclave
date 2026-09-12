@@ -13,7 +13,42 @@ function policyError(message) {
 }
 
 function loadProfiles(file = DEFAULT_PROFILES) {
-  return JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'));
+  const profiles = JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'));
+  validateOperationalLessons(profiles);
+  return profiles;
+}
+
+function validateOperationalLessons(profiles) {
+  if (profiles?.schemaVersion === 6) return [];
+  const catalog = profiles?.operationalLessons;
+  const fail = message => { throw policyError(`operational lessons: ${message}`); };
+  const object = value => value && typeof value === 'object' && !Array.isArray(value);
+  const text = value => typeof value === 'string' && value.trim().length > 0 && value === value.trim();
+  function list(value, allowed, label, empty = false) {
+    if (!Array.isArray(value) || (!empty && !value.length) || new Set(value).size !== value.length ||
+        value.some(item => !text(item) || (allowed && !allowed.includes(item)))) fail(`invalid ${label}`);
+  }
+  if (profiles?.schemaVersion !== 7 || !object(catalog) || catalog.schemaVersion !== 1 ||
+      Object.keys(catalog).some(key => !['schemaVersion', 'entries'].includes(key)) ||
+      !Array.isArray(catalog.entries) || !catalog.entries.length) fail('schema 7 requires catalog schema 1');
+  const ids = new Set();
+  for (const entry of catalog.entries) {
+    if (!object(entry) || Object.keys(entry).some(key => !['id', 'procedure', 'fields', 'severity', 'delivery', 'enforcement', 'limit', 'roles', 'vendors'].includes(key))) fail('unknown entry field');
+    if (typeof entry.id !== 'string' || !/^[a-z][a-z0-9-]{0,95}$/.test(entry.id) || ids.has(entry.id)) fail('invalid or duplicate id');
+    ids.add(entry.id);
+    if (!text(entry.procedure) || entry.procedure.length > 512 || /[\r\n\x00]/.test(entry.procedure)) fail('procedure must be one nonblank line of at most 512 characters');
+    list(entry.fields, ['powershell', 'electron', 'renderer', 'encoding', 'shell-escaping', 'hooks', 'workflow', 'dispatch', 'vault', 'research', 'docs'], 'fields');
+    list(entry.delivery, ['seat', 'arbiter', 'maintainer'], 'delivery');
+    if (!['critical', 'high', 'normal'].includes(entry.severity)) fail('invalid severity');
+    if (entry.roles !== undefined) list(entry.roles, ['implement', 'review', 'verify', 'plan', 'research'], 'roles');
+    if (entry.vendors !== undefined) list(entry.vendors, ['openai', 'anthropic', 'google'], 'vendors');
+    if (!object(entry.enforcement) || Object.keys(entry.enforcement).some(key => !['mode', 'code', 'tests'].includes(key)) ||
+        !['prevention', 'acceptance', 'detection', 'source-only', 'guidance', 'external-limit', 'historical-limit'].includes(entry.enforcement.mode)) fail('invalid enforcement');
+    list(entry.enforcement.code, null, 'enforcement code', true);
+    list(entry.enforcement.tests, null, 'enforcement tests', true);
+    if (!text(entry.limit)) fail('missing limit');
+  }
+  return catalog.entries;
 }
 
 function expectedSkills(profiles, { vendor, role, className }) {
@@ -27,6 +62,10 @@ function expectedSkills(profiles, { vendor, role, className }) {
 }
 
 function validateSeat(profiles, seat) {
+  const lessons = validateOperationalLessons(profiles).filter(entry => entry.delivery.includes('seat') &&
+    (!entry.roles || entry.roles.includes(seat.role)) && (!entry.vendors || entry.vendors.includes(seat.vendor)))
+    .map(({ id, procedure }) => ({ id, procedure }));
+  if (lessons.map(entry => `${entry.id}: ${entry.procedure}`).join('\n').length > 2048) throw policyError('selected lesson text exceeds 2048 characters');
   const vendorSpec = profiles.vendors?.[seat.vendor];
   if (!vendorSpec) throw policyError(`unknown seat vendor: ${seat.vendor}`);
   if (!vendorSpec.roles.includes(seat.role)) throw policyError(`${seat.vendor} may not perform role ${seat.role}`);
@@ -54,6 +93,7 @@ function validateSeat(profiles, seat) {
     skills: expected,
     permissionProfile: vendorSpec.writePermission[seat.role],
     proofFields: vendorSpec.proof,
+    ...(profiles.schemaVersion === 7 ? { lessons } : {}),
   };
 }
 
@@ -71,5 +111,6 @@ module.exports = {
   buildSeatProfile,
   expectedSkills,
   loadProfiles,
+  validateOperationalLessons,
   validateSeat,
 };

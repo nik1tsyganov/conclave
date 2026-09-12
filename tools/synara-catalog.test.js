@@ -17,7 +17,7 @@ const {
   normalizeCapabilities,
   remapFableFallback,
 } = require('./synara-catalog.js');
-const { loadMatrix } = require('./dispatch-matrix.js');
+const { loadMatrix, routeAllowed } = require('./dispatch-matrix.js');
 
 function capabilitiesFixture() {
   return {
@@ -141,18 +141,45 @@ test('CLI host catalogs keep native Astra routes and remain hash-bound diagnosti
   }
 });
 
-test('Synara catalog cannot replace fresh matching native proof or Astra escalation', t => {
-  for (const mutation of ['missing', 'stale', 'mismatched', 'escalation']) {
+test('Synara catalog cannot replace fresh matching native Astra proof', t => {
+  for (const mutation of ['missing', 'stale', 'mismatched']) {
     const run = astraPlan(t, 'synara');
     const proof = run.available.vendors.openai.models['gpt-6-astra'].efforts.high;
     if (mutation === 'missing') delete run.available.vendors.openai.models['gpt-6-astra'];
     if (mutation === 'stale') proof.observedAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     if (mutation === 'mismatched') proof.observedModel = 'gpt-5.6-sol';
-    if (mutation === 'escalation') delete run.plan.dispatches[0].escalation;
     writeJson(run.availability, run.available);
     writeJson(run.planSource, run.plan);
-    assert.throws(() => sealPlan(run.sealOptions), /fresh|proof|observed|available|stale|escalation/i);
+    assert.throws(() => sealPlan(run.sealOptions), /fresh|proof|observed|available|stale/i);
     assert.equal(fs.existsSync(run.sealOptions.runDir), false);
+  }
+});
+
+test('Synara seals approved Astra coding defaults without escalation or override reasons', t => {
+  const run = astraPlan(t, 'synara');
+  for (const key of ['escalation', 'escalationReason', 'routingReason']) delete run.plan.dispatches[0][key];
+  writeJson(run.planSource, run.plan);
+  const saved = readSealedRun(sealPlan(run.sealOptions).runDir);
+  assert.equal(saved.plan.dispatches[0].model, 'gpt-6-astra');
+  assert.equal(saved.plan.dispatches[0].effort, 'high');
+  assert.notEqual(saved.plan.dispatches[0].escalation, true);
+});
+
+test('catalog presence cannot waive legacy, noncoding or benchmark Astra escalation', t => {
+  const run = astraPlan(t, 'synara');
+  const matrix = loadMatrix();
+  const legacy = structuredClone(matrix);
+  delete legacy.classes['debug-mystery'].codingDefault;
+  const base = { vendor: 'openai', model: 'gpt-6-astra', effort: 'high' };
+  for (const [policy, route] of [
+    [legacy, { ...base, class: 'debug-mystery', role: 'implement' }],
+    [matrix, { ...base, class: 'architecture-planning', role: 'plan' }],
+    [matrix, { ...base, class: 'benchmark-software', role: 'implement' }],
+  ]) {
+    assert.match(routeAllowed(policy, route, run.available).reason, /escalation-only/);
+    assert.match(routeAllowed(policy, { ...route, escalation: true }, run.available).reason, /escalationReason/);
+    assert.equal(routeAllowed(policy, { ...route, escalation: true,
+      escalationReason: 'Bounded comparison requires the exact frontier route' }, run.available).ok, true);
   }
 });
 

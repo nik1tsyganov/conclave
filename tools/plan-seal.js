@@ -4,7 +4,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { DEFAULT_MATRIX, loadAvailability, loadMatrix, readValidatedPlan, sha256, validatePlan } = require('./dispatch-matrix.js');
-const { DEFAULT_PROFILES, buildSeatProfile } = require('./seat-policy.js');
+const { DEFAULT_PROFILES, buildSeatProfile, validateOperationalLessons } = require('./seat-policy.js');
 const { bindSkillSource } = require('./cli-skill-stage.js');
 const { ATTESTATION_PROTOCOL, hashFile, writeJson } = require('./dispatch-evidence.js');
 const { readJsonFile } = require('./json-file.js');
@@ -33,6 +33,8 @@ function sealPlan({ plan, runDir, availability, synaraCatalog, skillSourceRoot }
   const catalog = synaraCatalog ? loadCatalog(synaraCatalog) : null;
   const validated = readValidatedPlan(plan, undefined, JSON.parse(matrixText), available, Date.parse(sealedAt));
   const profiles = JSON.parse(profilesText);
+  if (profiles.schemaVersion < 7) throw new Error('new plans require operational lesson policy');
+  validateOperationalLessons(profiles);
   const skillSource = bindSkillSource({ sourceRoot: skillSourceRoot, skills: [...new Set(validated.plan.dispatches.flatMap(entry => buildSeatProfile(profiles, entry).skills))] });
   // Keep the producer's path spelling in evidence; native paths are for containment.
   const root = path.resolve(runDir);

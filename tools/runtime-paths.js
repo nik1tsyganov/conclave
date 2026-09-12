@@ -16,6 +16,7 @@ const CLI_RUNTIME_TOOLS = Object.freeze([
   'runtime-paths.js', 'seat-policy.js', 'telemetry-append.js', 'vendor-binaries.js', 'json-file.js',
   'synara-catalog.js', 'magi-synara-watch.js', 'host-helper-evidence.js', 'host-helper-worktree.js',
   'instruction-read-evidence.js', 'evidence-read-access.js',
+  'subscription-capacity.js', 'benchmark-run.js', 'benchmark-fixtures.js', 'project-fixtures.js',
   'magi-vault.js', 'magi-vault-link.js', 'magi-vault-sync.js', 'magi-vault-analyze.js', 'magi-skill-web.js',
   'dispatch-log.pass.jsonl', 'dispatch-log.fail.jsonl',
 ]);

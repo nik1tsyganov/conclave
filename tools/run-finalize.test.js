@@ -145,3 +145,48 @@ test('ballots cannot be supplied by the arbiter or inferred from prose', async (
   assert.equal(finalizeRun(run.runDir).approvalStatus, 'FAIL');
   assert.throws(() => tallyUnit(inspectRun(run.runDir), 'u1'), /exactly one POSITION/);
 });
+
+for (const vendor of ['openai', 'anthropic']) test(`schema6 synthetic ${vendor} saved evidence verifies against its sealed profile`, async t => {
+  // Deliberately synthesize a legacy profile, not an old native provider run.
+  // Preserve captured instruction bytes; schema6 contracts could contain extra prose.
+  const entry = vendor === 'anthropic' ? { vendor, model: 'sonnet', effort: 'medium' } : {};
+  const run = createSealedRun(t, [entry]); const native = fakeVendor();
+  await runDispatch({ ...run.opts, dispatchId: 'd1' }, native);
+  const sealFile = path.join(run.runDir, 'plan-seal.json');
+  const seal = JSON.parse(fs.readFileSync(sealFile, 'utf8'));
+  const profiles = JSON.parse(seal.profilesText);
+  profiles.schemaVersion = 6; delete profiles.operationalLessons;
+  seal.profilesText = JSON.stringify(profiles);
+  seal.profilesSha256 = require('./dispatch-evidence.js').hash(seal.profilesText);
+  writeJson(sealFile, seal);
+  const stateFile = path.join(run.runDir, '.magi-dispatches', transactionKey(run.dispatches[0]) + '.json');
+  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  const profileFile = path.join(state.evidenceDir, 'seat-profile.json');
+  writeJson(profileFile, require('./seat-policy.js').buildSeatProfile(profiles, run.dispatches[0]));
+  const launchFile = path.join(state.evidenceDir, 'launch.json');
+  const launch = JSON.parse(fs.readFileSync(launchFile, 'utf8')); launch.seatProfileVersion = 6; writeJson(launchFile, launch);
+  for (const item of state.artifacts) if ([sealFile, profileFile, launchFile].includes(item.path)) item.sha256 = hashFile(item.path);
+  if (vendor === 'anthropic') {
+    const checkpointFile = path.join(state.evidenceDir, 'checkpoint.json');
+    const checkpoint = JSON.parse(fs.readFileSync(checkpointFile, 'utf8'));
+    for (const item of checkpoint.protectedInputs) if ([sealFile, profileFile, launchFile].includes(item.path)) item.sha256 = hashFile(item.path);
+    writeJson(checkpointFile, checkpoint);
+    state.artifacts.find(item => item.path === checkpointFile).sha256 = hashFile(checkpointFile);
+  }
+  writeJson(stateFile, state);
+  const before = [sealFile, stateFile, profileFile, launchFile].map(hashFile);
+  const sealed = require('./plan-seal.js').readSealedRun(run.runDir);
+  const reader = require('./run-finalize.js');
+  assert.equal(require('./seat-policy.js').loadProfiles().schemaVersion, 7);
+  if (vendor === 'anthropic') reader.verifyCheckpoint(sealed, run.dispatches[0], state);
+  else {
+    reader.verifyExecution(sealed, run.dispatches[0], state);
+    assert.equal((await runDispatch({ ...run.opts, dispatchId: 'd1' }, native)).replayed, true);
+  }
+  assert.equal(native.calls(), 1);
+  assert.deepEqual([sealFile, stateFile, profileFile, launchFile].map(hashFile), before);
+  fs.appendFileSync(profileFile, ' ');
+  assert.throws(() => vendor === 'anthropic' ? reader.verifyCheckpoint(sealed, run.dispatches[0], state) : reader.verifyExecution(sealed, run.dispatches[0], state), /evidence changed/);
+  seal.profilesText += ' '; writeJson(sealFile, seal);
+  assert.throws(() => require('./plan-seal.js').readSealedRun(run.runDir), /policy snapshots changed/);
+});

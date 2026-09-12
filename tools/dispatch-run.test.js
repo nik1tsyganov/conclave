@@ -73,7 +73,7 @@ test('workspace denial precedes transaction reservation and an explicit root per
 test('sealed launch binds route and rejects every changed identity before spawn', async (t) => {
   const run = createSealedRun(t);
   const native = fakeVendor();
-  for (const [field, value] of Object.entries({ vendor: 'google', model: 'gpt-5.6-sol', effort: 'high', class: 'debug-mystery', unitId: 'other', authorVendor: 'anthropic', escalation: true })) {
+  for (const [field, value] of Object.entries({ vendor: 'google', model: 'gpt-5.6-sol', effort: 'xhigh', class: 'debug-mystery', unitId: 'other', authorVendor: 'anthropic', escalation: true })) {
     await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1', [field]: value }, native), /differs from validated plan/);
   }
   assert.equal(native.calls(), 0);
@@ -95,7 +95,7 @@ test('valid launch records scope and native evidence; retry returns the same tra
   const opts = { ...run.opts, dispatchId: 'd1' };
   const first = await runDispatch(opts, native);
   assert.equal(first.receipt.changedFiles[0].path, 'result.txt');
-  assert.equal(first.receipt.modelObserved, 'gpt-5.6-terra');
+  assert.equal(first.receipt.modelObserved, 'gpt-6-astra');
   assert.equal(first.receipt.planHash, run.sealed.planHash);
   const replay = await runDispatch(opts, native);
   assert.equal(replay.replayed, true); assert.equal(replay.proofId, first.proofId); assert.equal(native.calls(), 1);
@@ -642,4 +642,111 @@ test('completed recovery rejects missing, tampered, duplicate or unbound lineage
   const state = JSON.parse(fs.readFileSync(paths.transactionPath)); delete state.recoverySha256; writeJson(paths.transactionPath, state);
   assert.equal(inspectRun(f.run.runDir).outcomes[0].status, 'INVALID');
   assert.throws(() => require('./dispatch-evidence.js').verifyCommittedRow(state.telemetry), /missing recovery lineage/);
+});
+
+// Synthetic historical seal: age the original probe records before any dispatch.
+function expiredPlan(t, entries = [{}]) {
+  const run = createSealedRun(t, entries);
+  const old = new Date(Date.now() - 2 * 3600000).toISOString();
+  for (const vendor of Object.values(run.available.vendors)) for (const model of Object.values(vendor.models)) {
+    for (const observed of Object.values(model.efforts)) {
+      const record = JSON.parse(fs.readFileSync(observed.evidence.path, 'utf8'));
+      record.startedAt = record.completedAt = observed.observedAt = old;
+      writeJson(observed.evidence.path, record);
+      observed.evidence.sha256 = hashFile(observed.evidence.path);
+    }
+  }
+  const availablePath = path.join(run.runDir, 'availability.json');
+  writeJson(availablePath, run.available);
+  const sealPath = path.join(run.runDir, 'plan-seal.json');
+  const seal = JSON.parse(fs.readFileSync(sealPath, 'utf8'));
+  seal.sealedAt = old; seal.availabilitySha256 = hashFile(availablePath); writeJson(sealPath, seal);
+  return run;
+}
+function renewedProbe(run, entry = run.dispatches[0]) {
+  const { probeRecord } = require('./test-fixtures.js');
+  const matrix = require('./dispatch-matrix.js').loadMatrix();
+  const observed = probeRecord(path.join(run.root, 'renewed'), entry.vendor, entry.model, entry.effort,
+    matrix.vendors[entry.vendor].models[entry.model].canonical || entry.model);
+  const file = path.join(run.root, 'renewed.json');
+  writeJson(file, { schemaVersion: 2, vendors: { [entry.vendor]: { models: { [entry.model]: { efforts: { [entry.effort]: observed } } } } } });
+  return { launchAvailability: file, launchAvailabilitySha256: hashFile(file) };
+}
+test('launch renewal admits only selected fresh route and replays against its recorded admission', async t => {
+  const run = expiredPlan(t, [{}, { role: 'review', class: 'review-adversarial', vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', authorVendor: 'openai' }]);
+  const sealHash = hashFile(path.join(run.runDir, 'plan-seal.json'));
+  const original = hashFile(path.join(run.runDir, 'availability.json'));
+  const native = fakeVendor(); const opts = { ...run.opts, dispatchId: 'd1' };
+  await assert.rejects(runDispatch(opts, native), /stale/);
+  const renewal = renewedProbe(run);
+  const result = await runDispatch({ ...opts, ...renewal }, native);
+  assert.equal(result.ok, true); assert.equal(native.calls(), 1);
+  const launch = JSON.parse(fs.readFileSync(path.join(run.runDir, 'out/d1/launch.json'), 'utf8'));
+  assert.equal(launch.launchAvailability.files.length, 4);
+  for (const file of launch.launchAvailability.files) assert.equal(hashFile(file.copy), file.sha256);
+  assert.equal((await runDispatch(opts, native)).replayed, true);
+  await assert.rejects(runDispatch({ ...opts, ...renewal }, native), /unstarted/);
+  assert.equal(native.calls(), 1);
+  assert.equal(hashFile(path.join(run.runDir, 'plan-seal.json')), sealHash);
+  assert.equal(hashFile(path.join(run.runDir, 'availability.json')), original);
+});
+
+test('launch renewal CLI requires paired absolute hash-bound input and rejects stale or wrong routes before spawn', async t => {
+  const run = expiredPlan(t); const native = fakeVendor(); const opts = { ...run.opts, dispatchId: 'd1' };
+  const renewal = renewedProbe(run);
+  assert.deepEqual(parseArgs(['--launch-availability', renewal.launchAvailability, '--launch-availability-sha256', renewal.launchAvailabilitySha256]), { onTopic: false, ...renewal });
+  for (const invalid of [
+    { launchAvailability: renewal.launchAvailability },
+    { launchAvailabilitySha256: renewal.launchAvailabilitySha256 },
+    { ...renewal, launchAvailability: 'relative.json' },
+    { ...renewal, launchAvailabilitySha256: '0'.repeat(64) },
+    { launchAvailability: path.join(run.runDir, 'availability.json'), launchAvailabilitySha256: hashFile(path.join(run.runDir, 'availability.json')) },
+    { ...renewal, prepareRecovery: path.join(run.root, 'recovery.json') },
+  ]) await assert.rejects(runDispatch({ ...opts, ...invalid }, native), /launch availability|stale/);
+  const available = JSON.parse(fs.readFileSync(renewal.launchAvailability, 'utf8'));
+  const model = available.vendors.openai.models['gpt-6-astra'];
+  model.efforts.xhigh = model.efforts.high; delete model.efforts.high;
+  writeJson(renewal.launchAvailability, available);
+  await assert.rejects(runDispatch({ ...opts, ...renewal, launchAvailabilitySha256: hashFile(renewal.launchAvailability) }, native), /probe-required/);
+  assert.equal(native.calls(), 0);
+  assert.equal(fs.existsSync(path.join(run.runDir, '.magi-dispatches')), false);
+});
+
+test('launch renewal binds probe capture bytes before spawn and across native execution', async t => {
+  for (const timing of ['before', 'during']) {
+    const run = expiredPlan(t); const renewal = renewedProbe(run);
+    const available = JSON.parse(fs.readFileSync(renewal.launchAvailability, 'utf8'));
+    const probe = JSON.parse(fs.readFileSync(available.vendors.openai.models['gpt-6-astra'].efforts.high.evidence.path, 'utf8'));
+    const native = fakeVendor(() => { if (timing === 'during') fs.appendFileSync(probe.capture, 'tampered'); });
+    if (timing === 'before') fs.appendFileSync(probe.capture, 'tampered');
+    await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1', ...renewal }, native), /probe artifact hash mismatch|protected input changed/);
+    assert.equal(native.calls(), timing === 'before' ? 0 : 1);
+    if (timing === 'during') await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1', ...renewal }, native), /unstarted/);
+  }
+});
+
+test('launch renewal cannot hide changed original seal or changed copied evidence during replay', async t => {
+  const run = expiredPlan(t); const renewal = renewedProbe(run); const native = fakeVendor();
+  const opts = { ...run.opts, dispatchId: 'd1' };
+  const original = path.join(run.runDir, 'availability.json'); const bytes = fs.readFileSync(original);
+  fs.appendFileSync(original, ' ');
+  await assert.rejects(runDispatch({ ...opts, ...renewal }, native), /sealed run inputs changed/);
+  assert.equal(native.calls(), 0); fs.writeFileSync(original, bytes);
+  assert.equal((await runDispatch({ ...opts, ...renewal }, native)).ok, true);
+  fs.appendFileSync(path.join(run.runDir, 'out/d1/launch-availability/2-capture.txt'), 'changed');
+  await assert.rejects(runDispatch(opts, native), /committed evidence changed/);
+  assert.equal(native.calls(), 1);
+});
+
+test('launch renewal Claude checkpoint attests and replays without a new availability override', async t => {
+  const run = expiredPlan(t, [{ vendor: 'anthropic', model: 'sonnet', effort: 'medium', role: 'verify', class: 'test-verification', authorVendor: 'openai' }]);
+  const renewal = renewedProbe(run); const native = fakeVendor(); const opts = { ...run.opts, dispatchId: 'd1' };
+  const checkpoint = await runDispatch({ ...opts, ...renewal }, native);
+  assert.equal(checkpoint.status, 'AWAITING_ATTESTATION');
+  assert.equal((await runDispatch(opts, native)).status, 'AWAITING_ATTESTATION');
+  await assert.rejects(runDispatch({ ...opts, ...renewal, onTopic: true, captureSha256: checkpoint.captureSha256 }, native), /unstarted/);
+  const accepted = await runDispatch({ ...opts, onTopic: true, captureSha256: checkpoint.captureSha256 }, native);
+  assert.equal(accepted.ok, true);
+  assert.equal((await runDispatch(opts, native)).replayed, true);
+  assert.equal(native.calls(), 1);
 });
