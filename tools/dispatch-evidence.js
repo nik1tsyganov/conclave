@@ -7,6 +7,7 @@ const { execFileSync, spawnSync } = require('node:child_process');
 
 const ATTESTATION_PROTOCOL = 'magi-claude-post-run-attestation-v1';
 const AWAITING_ATTESTATION = 'AWAITING_ATTESTATION';
+const RECOVERY_PROTOCOL = 'magi-interrupted-readonly-v1';
 
 function evidenceError(message, code = 'EVIDENCE_FAIL') { return Object.assign(new Error(message), { code }); }
 function hash(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
@@ -84,6 +85,55 @@ function compareWorkspace(before, after, scope = []) {
   return { ok: !gitChanged && changedFiles.every((file) => file.allowed), changedFiles, gitChanged, coverage: after.coverage };
 }
 function transactionKey(entry) { return hash(JSON.stringify([entry.dispatchId, entry.unitId, entry.role])); }
+function recoveryPaths(runRoot, entry, attempt = 1) {
+  if (![1, 2].includes(attempt)) throw evidenceError('recovery attempt must be 1 or 2');
+  const root = path.join(runRoot, '.magi-recoveries', transactionKey(entry) + (attempt === 2 ? '.2' : ''));
+  return { root, manifestPath: path.join(root, 'recovery.json'), transactionPath: path.join(root, 'transaction.json'), attemptRoot: path.join(root, 'attempt') };
+}
+function assertInterruptedChildStopped(pid, launch, evidenceDir, options = {}) {
+  if (!Number.isSafeInteger(pid) || pid < 1) throw evidenceError('interrupted child PID is missing or invalid');
+  const nowMs = options.nowMs ?? Date.now();
+  const report = { targetPid: pid, targetLabel: options.label || 'interrupted-child', checkedAt: new Date(nowMs).toISOString(), lifetime: options.lifetime || null, matches: [] };
+  const reject = message => { throw Object.assign(evidenceError(message), { processCheck: report }); };
+  let probe = 'LIVE';
+  try { (options.kill || process.kill)(pid, 0); }
+  catch (error) { probe = error.code === 'ESRCH' ? 'ABSENT' : 'UNKNOWN'; report.probeError = error.code || error.message; }
+  report.pidProbe = probe;
+  // A dead parent PID does not establish that an orphan native child is gone.
+  // Inspect the Windows process inventory without interpolating shell arguments.
+  if ((options.platform || process.platform) !== 'win32') reject('interrupted child liveness is unknown: process inventory is unsupported on this platform');
+  let rows;
+  try { rows = options.inventory ? options.inventory() : JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    "Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine,@{Name='CreationDate';Expression={$_.CreationDate.ToUniversalTime().ToString('o')}} | ConvertTo-Json -Compress"],
+  { encoding: 'utf8', timeout: 15000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })); }
+  catch (error) { report.inventoryError = error.message; reject('interrupted child process inventory is unknown'); }
+  if (!Array.isArray(rows) || !rows.length) reject('interrupted child process inventory is unknown');
+  if (rows.some(row => !row || !Number.isSafeInteger(row.ProcessId) || row.ProcessId < 0 || !Number.isSafeInteger(row.ParentProcessId) || row.ParentProcessId < 0)) reject('interrupted child process inventory identity is unknown');
+  const life = options.lifetime;
+  // Only the original child's explicit close event can clear a reused numeric
+  // PID. UTC ordering cannot establish direct-child ancestry across clock edits.
+  const closed = life?.protocol === 'magi-process-lifetime-v1' && life.pid === pid &&
+    life.exitConfirmed === true && life.exitEvidence === 'child-close-event';
+  report.originalChildCloseConfirmed = Boolean(closed);
+  const exe = path.basename(launch.binary).toLowerCase();
+  const needle = evidenceDir.replaceAll('\\', '/').toLowerCase();
+  for (const row of rows) {
+    if (row.ProcessId === pid || row.ParentProcessId === pid) {
+      const directChild = row.ParentProcessId === pid;
+      const reusedPid = !directChild && row.ProcessId === pid && closed;
+      report.matches.push({ targetLabel: report.targetLabel, pid: row.ProcessId, ppid: row.ParentProcessId, creationDate: row.CreationDate ?? null,
+        name: row.Name ?? null, executablePath: row.ExecutablePath ?? null, relation: directChild ? 'DIRECT_CHILD' : 'PID',
+        disposition: reusedPid ? 'REUSED_PID_AFTER_CLOSE' : 'BLOCKED' });
+    }
+    // This scan is independent of PID/PPID exemptions, including reused PIDs.
+    if (String(row.Name).toLowerCase() !== exe) continue;
+    if (typeof row.CommandLine !== 'string' || !row.CommandLine) { report.nativeMatch = { pid: row.ProcessId, ppid: row.ParentProcessId, creationDate: row.CreationDate ?? null, reason: 'UNKNOWN_COMMAND' }; reject('native process command line is unknown'); }
+    if (row.CommandLine.replaceAll('\\', '/').toLowerCase().includes(needle)) { report.nativeMatch = { pid: row.ProcessId, ppid: row.ParentProcessId, creationDate: row.CreationDate ?? null, reason: 'ATTEMPT_COMMAND' }; reject('interrupted native attempt is still live'); }
+  }
+  if (report.matches.some(match => match.disposition === 'BLOCKED')) reject('interrupted child or descendant is still live or unknown');
+  if (probe === 'UNKNOWN' || (probe === 'LIVE' && !report.matches.some(match => match.relation === 'PID'))) reject('interrupted child liveness is live or unknown: PID probe and inventory disagree');
+  return { ...report, pid, status: 'ABSENT', method: 'pid-and-windows-process-inventory-with-close-receipt' };
+}
 function reserveTransaction(binding, evidenceDir, attestationProtocol) {
   const root = path.join(path.dirname(binding.planPath), '.magi-dispatches');
   assertPlainPath(root);
@@ -118,11 +168,28 @@ function appendUniqueRow(file, row) {
   fs.appendFileSync(file, `${JSON.stringify(row)}\n`, 'utf8');
   return true;
 }
+function committedRunRoot(row) {
+  const directory = path.dirname(row.transactionPath);
+  if (path.basename(directory) === '.magi-dispatches') return path.dirname(directory);
+  if (path.basename(row.transactionPath) === 'transaction.json' && path.basename(path.dirname(directory)) === '.magi-recoveries' && /^[a-f0-9]{64}(\.2)?$/.test(path.basename(directory))) return path.dirname(path.dirname(directory));
+  throw evidenceError('committed transaction has an unrecognized run location');
+}
 function verifyCommittedRow(row, { checkLogs = true } = {}) {
   if (row.schemaVersion !== 2 || row.status !== 'PASS' || !row.transactionPath) throw evidenceError('activation requires a committed dispatch transaction');
   const state = JSON.parse(fs.readFileSync(row.transactionPath, 'utf8'));
   if (state.status !== 'PASS' || JSON.stringify(state.telemetry) !== JSON.stringify(row)) throw evidenceError('telemetry and committed transaction disagree');
   verifyArtifacts(state);
+  const root = committedRunRoot(row);
+  if (path.basename(path.dirname(row.transactionPath)) !== '.magi-dispatches') {
+    const { readSealedRun } = require('./plan-seal.js');
+    const { resolveRecovery } = require('./run-finalize.js');
+    const run = readSealedRun(root);
+    const entry = run.plan.dispatches.find(item => item.dispatchId === row.dispatchId);
+    if (!entry || !state.recoverySha256) throw evidenceError('committed replacement is missing recovery lineage');
+    const original = JSON.parse(fs.readFileSync(path.join(root, '.magi-dispatches', `${transactionKey(entry)}.json`), 'utf8'));
+    const recovery = resolveRecovery(run, entry, original);
+    if (!recovery || recovery.transactionPath !== row.transactionPath || JSON.stringify(recovery.state) !== JSON.stringify(state)) throw evidenceError('committed replacement lineage changed');
+  }
   for (const log of checkLogs ? state.logs || [] : []) {
     const matches = fs.readFileSync(log, 'utf8').split(/\r?\n/).filter(Boolean).map(JSON.parse).filter((item) => item.dispatchId === row.dispatchId && item.unitId === row.unitId && item.role === row.role);
     if (matches.length !== 1 || JSON.stringify(matches[0]) !== JSON.stringify(row)) throw evidenceError('dispatch log and committed transaction disagree');
@@ -138,4 +205,4 @@ function verifyArtifacts(state) {
   }
 }
 
-module.exports = { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, appendUniqueRow, assertPlainPath, compareWorkspace, hash, hashFile, inside, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, verifyArtifacts, verifyCommittedRow, writeJson };
+module.exports = { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, RECOVERY_PROTOCOL, appendUniqueRow, assertPlainPath, assertInterruptedChildStopped, committedRunRoot, compareWorkspace, hash, hashFile, inside, recoveryPaths, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, verifyArtifacts, verifyCommittedRow, writeJson };

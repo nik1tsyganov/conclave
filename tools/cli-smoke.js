@@ -11,6 +11,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { buildLaunch } = require('./cli-adapters.js');
+const { validateClaudeResponseLaunch } = require('./vendor-native.js');
 const { checkBriefText, formatMissing, verifyStagedSeat } = require('./cli-brief-rules-check.js');
 
 const VENDORS = ['openai', 'google', 'anthropic'];
@@ -92,6 +93,11 @@ function assertGooglePlan(plan, body, skillRoot) {
   }
 }
 
+function assertClaudePlan(plan, body) {
+  assertNoBodyLeak('anthropic', plan, body);
+  validateClaudeResponseLaunch(plan);
+}
+
 async function main(argv = process.argv.slice(2), io = process) {
   try {
     const options = parseArgs(argv);
@@ -118,6 +124,7 @@ async function main(argv = process.argv.slice(2), io = process) {
       assertNoBodyLeak(vendor, plan, body);
       if (vendor === 'openai') assertOpenaiPlan(plan, briefPath);
       if (vendor === 'google') assertGooglePlan(plan, body, staged.skillRoot);
+      if (vendor === 'anthropic') assertClaudePlan(plan, body);
     }
     io.stdout.write(`${JSON.stringify({ ok: true, vendors: VENDORS, dryRun: true, diagnostic: 'pointer-delivery-only', activationEligible: false })}\n`);
     return 0;
@@ -129,4 +136,4 @@ async function main(argv = process.argv.slice(2), io = process) {
 }
 
 if (require.main === module) main().then((code) => { process.exitCode = code; });
-module.exports = { VENDORS, assertGooglePlan, assertNoBodyLeak, assertOpenaiPlan, googlePlanHasSkillsAddDir, main, parseArgs };
+module.exports = { VENDORS, assertClaudePlan, assertGooglePlan, assertNoBodyLeak, assertOpenaiPlan, googlePlanHasSkillsAddDir, main, parseArgs };

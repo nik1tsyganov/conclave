@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, nativeLog } = require('./vendor-native.js');
+const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, nativeLog, validateClaudeResponseLaunch } = require('./vendor-native.js');
 const { parseClaude, verifyProof } = require('./cli-proof.js');
 const { runDispatch } = require('./dispatch-run.js');
 const { finalizeRun, inspectRun } = require('./run-finalize.js');
@@ -13,6 +13,9 @@ const { completeSyntheticDispatch, createSealedRun, fakeVendor, nativeCapture, t
 
 const RESPONSE = 'ACK fixture\nPOSITION: APPROVE\nDone.';
 const protocol = { responseProtocol: CLAUDE_RESPONSE_PROTOCOL };
+const legacySchema = JSON.stringify({ type: 'object', properties: { response: {
+  type: 'string', description: 'The final report, starting with the exact first line of the bound brief.',
+} }, required: ['response'], additionalProperties: false });
 
 function claudeRun(t) {
   return createSealedRun(t, [{ vendor: 'anthropic', model: 'sonnet', effort: 'medium', role: 'verify', class: 'test-verification', authorVendor: 'openai' }]);
@@ -175,7 +178,8 @@ test('production launch binds the structured schema and protocol before a child 
     launch => { launch.responseProtocol = 'legacy-text'; },
     launch => { launch.args = []; },
     launch => { launch.args.push(...launch.args); },
-    launch => { launch.args[1] = JSON.stringify({ type: 'object', additionalProperties: true }); },
+    launch => { launch.args[launch.args.indexOf('--json-schema') + 1] = JSON.stringify({ type: 'object', additionalProperties: true }); },
+    launch => { launch.args[launch.args.indexOf('--json-schema') + 1] = legacySchema; },
   ]) {
     const run = claudeRun(t);
     const native = fakeVendor();
@@ -183,6 +187,22 @@ test('production launch binds the structured schema and protocol before a child 
     native.buildLaunch = options => { const launch = build(options); alter(launch); return launch; };
     await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1' }, native), /protocol|schema/);
     assert.equal(native.calls(), 0);
+  }
+});
+
+test('historical Claude v1 accepts only the exact old schema during readback', () => {
+  const launch = { vendor: 'anthropic', ...protocol, args: [
+    '-p', '--safe-mode', '--append-system-prompt', 'Historical context',
+    '--output-format', 'stream-json', '--verbose', '--json-schema', legacySchema,
+  ] };
+  validateClaudeResponseLaunch(launch, { historical: true });
+  assert.throws(() => validateClaudeResponseLaunch(launch), /schema/);
+  for (const schema of [
+    legacySchema.replace('"type":"string"', '"type":"number"'),
+    legacySchema.replace('"additionalProperties":false', '"additionalProperties":true'),
+    legacySchema.replace('The final report', 'Different description'),
+  ]) {
+    assert.throws(() => validateClaudeResponseLaunch({ ...launch, args: [...launch.args.slice(0, -1), schema] }, { historical: true }), /schema/);
   }
 });
 

@@ -7,11 +7,15 @@ const path = require('node:path');
 const test = require('node:test');
 const { inspectHooks, inspectJoinManifest, main, waitForDispatches, watch, writeJoinManifest } = require('./magi-synara-watch.js');
 
+function captureHook(decision) {
+  return JSON.stringify({ 'synara-capture': { PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: 'echo ' + JSON.stringify({ decision }) }] }] } });
+}
+
 test('watchdog is silent when hooks allow and no leftover RUNNING pid', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-watch-clean-'));
   test.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const hooks = path.join(root, 'hooks.json');
-  fs.writeFileSync(hooks, JSON.stringify({ hooks: { PreToolUse: [{ hooks: [{ decision: 'allow' }] }] } }), 'utf8');
+  fs.writeFileSync(hooks, captureHook('allow'), 'utf8');
   const runRoot = path.join(root, 'runs');
   fs.mkdirSync(path.join(runRoot, '.magi-dispatches'), { recursive: true });
   fs.writeFileSync(path.join(runRoot, '.magi-dispatches', 'ok.json'), JSON.stringify({ status: 'PASS', evidenceDir: path.join(runRoot, 'out', 'd1') }), 'utf8');
@@ -24,7 +28,7 @@ test('watchdog notifies on RUNNING plus a dead pid and on ask hooks', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-watch-dirty-'));
   test.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const hooks = path.join(root, 'hooks.json');
-  fs.writeFileSync(hooks, JSON.stringify({ hooks: { PreToolUse: [{ hooks: [{ decision: 'ask' }] }] } }), 'utf8');
+  fs.writeFileSync(hooks, captureHook('ask'), 'utf8');
   const ask = inspectHooks(hooks);
   assert.equal(ask.kind, 'hooks-ask');
 
@@ -62,7 +66,7 @@ test('scan exit is fail-closed when leftovers exist and clean otherwise', () => 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-watch-exit-'));
   test.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const hooks = path.join(root, 'hooks.json');
-  fs.writeFileSync(hooks, JSON.stringify({ hooks: { PreToolUse: [{ hooks: [{ decision: 'allow' }] }] } }), 'utf8');
+  fs.writeFileSync(hooks, captureHook('allow'), 'utf8');
   const runRoot = path.join(root, 'runs');
   fs.mkdirSync(path.join(runRoot, '.magi-dispatches'), { recursive: true });
   fs.writeFileSync(path.join(runRoot, '.magi-dispatches', 'ok.json'), JSON.stringify({ status: 'PASS', evidenceDir: path.join(runRoot, 'out', 'd1') }), 'utf8');
@@ -81,6 +85,19 @@ test('wait without a dispatch id fails before treating an empty run as joined', 
   test.after(() => fs.rmSync(root, { recursive: true, force: true }));
   assert.throws(() => waitForDispatches({ runDir: root, dispatchIds: [], timeoutMs: 40, pollMs: 10 }), /--wait requires --dispatch-id/);
   assert.equal(main(['--wait', '--run-dir', root]), 2);
+});
+
+test('explicit malformed or unknown hooks alert without changing the hook file', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-watch-hooks-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const file = path.join(root, 'explicit.json');
+  assert.equal(inspectHooks(file).kind, 'hooks-missing');
+  for (const text of ['{broken', '{}', JSON.stringify({ 'synara-capture': { PreToolUse: [{ command: 'node unknown.cjs' }] } })]) {
+    fs.writeFileSync(file, text);
+    assert.equal(inspectHooks(file).kind, 'hooks-invalid', text);
+    assert.equal(watch({ runRoots: [], hooks: [file] }).notify, true);
+    assert.equal(fs.readFileSync(file, 'utf8'), text);
+  }
 });
 
 test('join times out on a missing dispatch id', () => {

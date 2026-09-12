@@ -8,14 +8,65 @@ const { isCliHostMode, ROLES } = require('./dispatch-schema.js');
 const { verifyProbe } = require('./probe-evidence.js');
 const { parseJsonBytes, readJsonFile } = require('./json-file.js');
 const { validateEvidenceReadDirs } = require('./evidence-read-access.js');
+const { canonicalPlainPath } = require('./runtime-paths.js');
 
 const DEFAULT_MATRIX = require('./runtime-paths.js').resolveRuntimePaths().matrixPath;
 const DEFAULT_PROBE_MAX_AGE_MINUTES = 60;
+// Admission metadata only. Fixture generators, judges and answers are not runtime inputs.
+const BENCHMARK_VERSION = 'domain-benchmark-v1';
+const BENCHMARK_ROLES = { software: 'implement', writing: 'research', planning: 'plan' };
+const BENCHMARK_WRITE_SCOPES = {
+  'software-s': ['src/import.cjs'],
+  'software-m': ['src/import.cjs', 'src/digest.cjs'],
+  'software-l': ['src/roster.cjs', 'src/repository.cjs'],
+};
 
 function argumentError(message) { const e = new Error(message); e.code = 'ARGUMENT_ERROR'; return e; }
 function policyError(message) { const e = new Error(message); e.code = 'POLICY_FAIL'; return e; }
 function sha256(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
 function validId(value) { return typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(value); }
+
+function validateBenchmarkPurpose(plan, matrix) {
+  if (plan.purpose !== undefined && !['product', 'benchmark'].includes(plan.purpose)) throw policyError('unknown plan purpose');
+  const benchmarkRoutes = plan.dispatches.filter(route => matrix.classes?.[route?.class]?.benchmarkOnly === true || /^benchmark-/.test(route?.class || ''));
+  if (plan.purpose !== 'benchmark') {
+    if (benchmarkRoutes.length || plan.benchmark !== undefined) throw policyError('benchmark routes and metadata require purpose=benchmark');
+    return;
+  }
+  if (plan.dispatches.length !== 1 || benchmarkRoutes.length !== 1) throw policyError('benchmark purpose requires exactly one benchmark subject dispatch');
+  if (plan.magiConvened !== false) throw policyError('benchmark purpose requires magiConvened=false');
+  const binding = plan.benchmark;
+  if (!binding || typeof binding !== 'object' || Array.isArray(binding) ||
+      Object.keys(binding).sort().join(',') !== 'packetSha256,taskId,version' ||
+      binding.version !== BENCHMARK_VERSION || !/^[a-f0-9]{64}$/.test(binding.packetSha256 || '')) {
+    throw policyError('benchmark requires exact version, taskId and packetSha256 binding');
+  }
+  const task = typeof binding.taskId === 'string' && /^(software|writing|planning)-(s|m|l)$/.exec(binding.taskId);
+  if (!task) throw policyError('benchmark taskId is not allowlisted');
+  const [, domain, size] = task;
+  const route = plan.dispatches[0];
+  if (route.class !== `benchmark-${domain}` || matrix.classes?.[route.class]?.benchmarkOnly !== true || route.role !== BENCHMARK_ROLES[domain]) {
+    throw policyError('benchmark task domain must match its canonical class and role');
+  }
+  const expectedScope = BENCHMARK_WRITE_SCOPES[binding.taskId] || [];
+  const sortedScope = [...expectedScope].sort();
+  const exactScope = value => Array.isArray(value) && value.length === expectedScope.length &&
+    value.every(name => typeof name === 'string') && [...value].sort().every((name, index) => name === sortedScope[index]);
+  if (!exactScope(route.writeScope)) throw policyError('benchmark writeScope must exactly match the frozen task scope');
+  try {
+    if (typeof route.cwd !== 'string' || !path.isAbsolute(route.cwd)) throw new Error('absolute cwd required');
+    const cwd = canonicalPlainPath(route.cwd);
+    if (!fs.statSync(cwd).isDirectory()) throw new Error('cwd must be a directory');
+    const packetPath = canonicalPlainPath(path.join(cwd, 'benchmark.json'));
+    if (!fs.statSync(packetPath).isFile()) throw new Error('benchmark.json must be a file');
+    const bytes = fs.readFileSync(packetPath);
+    if (sha256(bytes) !== binding.packetSha256) throw new Error('packet hash differs from bound plan');
+    const packet = parseJsonBytes(bytes);
+    if (!packet || packet.version !== binding.version || packet.taskId !== binding.taskId || packet.domain !== domain || packet.size !== size || !exactScope(packet.writeScope)) {
+      throw new Error('packet version, taskId, domain, size or writeScope differs from canonical task');
+    }
+  } catch (error) { throw policyError(`benchmark packet invalid: ${error.message}`); }
+}
 
 function loadMatrix(file = DEFAULT_MATRIX) {
   return readJsonFile(path.resolve(file));
@@ -45,7 +96,19 @@ function routeAllowed(matrix, route, availability = {}, nowMs = Date.now()) {
   const modelSpec = matrix.vendors?.[route.vendor]?.models?.[route.model];
   if (!modelSpec) return { ok: false, reason: `model absent from vendor catalog: ${route.vendor}/${route.model}` };
   if (!modelSpec.efforts.includes(route.effort)) return { ok: false, reason: `effort ${route.effort} unsupported by ${route.model}` };
-  if (matched.escalationOnly || modelSpec.tier === 'frontier-plus') {
+  // Opt in per ordinary coding class; old sealed matrices and benchmark lanes keep their contract.
+  const codingDefault = route.role === 'implement' && !cls.benchmarkOnly ? cls.codingDefault : null;
+  const approvedCoding = codingDefault && route.vendor === 'openai' && ['gpt-6-astra', 'gpt-5.6-luna'].includes(route.model);
+  if (codingDefault && route.vendor === 'openai') {
+    if (!['medium', 'high', 'xhigh'].includes(route.effort)) return { ok: false, reason: 'coding effort must be medium, high or xhigh' };
+    if (route.model !== codingDefault.model || route.effort !== codingDefault.effort) {
+      const reason = route.routingReason;
+      if (typeof reason !== 'string' || reason.trim().length < 16 || new Set(reason.trim().toLowerCase().split(/\s+/)).size < 3) {
+        return { ok: false, reason: 'nondefault OpenAI coding route requires a substantive routingReason' };
+      }
+    }
+  }
+  if (matched.escalationOnly || (modelSpec.tier === 'frontier-plus' && !approvedCoding)) {
     if (route.escalation !== true) return { ok: false, reason: `escalation-only route requires escalation=true: ${route.vendor}/${route.model}` };
     if (typeof route.escalationReason !== 'string' || route.escalationReason.trim().length < 16 || new Set(route.escalationReason.trim().toLowerCase().split(/\s+/)).size < 3) {
       return { ok: false, reason: `escalation-only route requires escalationReason: ${route.vendor}/${route.model}` };
@@ -74,8 +137,9 @@ function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
   if (!isCliHostMode(plan.hostMode)) throw policyError('hostMode must be cursor-cli or synara');
   if (plan.arbiter?.vendor !== 'xai') throw policyError('arbiter vendor must be xai');
   if (plan.arbiter?.model !== matrix.principles.arbiterModel) throw policyError(`arbiter model must be ${matrix.principles.arbiterModel}`);
-  if (!['high', 'xhigh'].includes(plan.arbiter?.effort)) throw policyError('arbiter effort must be high or xhigh');
+  if (!['low', 'medium', 'high', 'xhigh'].includes(plan.arbiter?.effort)) throw policyError('arbiter effort must be low, medium, high or xhigh');
   if (!Array.isArray(plan.dispatches) || plan.dispatches.length === 0) throw policyError('plan.dispatches must be non-empty');
+  validateBenchmarkPurpose(plan, matrix);
 
   const implement = [];
   const ids = new Set();
@@ -180,17 +244,29 @@ function bindDispatch(opts, matrix, availability, nowMs) {
   return { ...validated, entry: structuredClone(entry) };
 }
 
-function chooseRoute(matrix, { className, role, excludedVendors = [], availability = {}, allowEscalation = false, escalationReason = null }) {
+function chooseRoute(matrix, { className, role, excludedVendors = [], availability = {}, allowEscalation = false, escalationReason = null, model = null, effort = null, routingReason = null }) {
+  if (matrix.classes?.[className]?.benchmarkOnly === true) throw policyError('benchmark conditions require an explicit subject pair, not automatic route selection');
   const list = matrix.classes?.[className]?.[role];
   if (!Array.isArray(list)) throw policyError(`no route for ${className}/${role}`);
+  const codingDefault = role === 'implement' ? matrix.classes[className].codingDefault : null;
   for (const route of [...list].sort((a, b) => a.priority - b.priority)) {
     if (excludedVendors.includes(route.vendor)) continue;
-    const escalationOnly = route.escalationOnly || matrix.vendors[route.vendor].models[route.model].tier === 'frontier-plus';
+    if (model !== null && route.model !== model) continue;
+    if (effort !== null && route.effort !== effort) continue;
+    if (codingDefault) {
+      // A requested effort binds the preferred model unless the arbiter names another one.
+      if (effort !== null && model === null && route.model !== codingDefault.model) continue;
+      if (route.vendor === 'openai' && model === null && route.model !== codingDefault.model) continue;
+      if (route.model === codingDefault.model && effort === null && route.effort !== codingDefault.effort) continue;
+    }
+    const approvedCoding = codingDefault && route.vendor === 'openai' && ['gpt-6-astra', 'gpt-5.6-luna'].includes(route.model);
+    const escalationOnly = route.escalationOnly || (matrix.vendors[route.vendor].models[route.model].tier === 'frontier-plus' && !approvedCoding);
     if (escalationOnly && !allowEscalation) continue;
     const candidate = {
       class: className,
       role,
       ...route,
+      ...(routingReason !== null ? { routingReason } : {}),
       ...(escalationOnly ? { escalation: true, escalationReason } : {}),
     };
     const result = routeAllowed(matrix, candidate, availability);

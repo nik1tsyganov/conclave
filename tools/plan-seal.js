@@ -4,7 +4,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { DEFAULT_MATRIX, loadAvailability, loadMatrix, readValidatedPlan, sha256, validatePlan } = require('./dispatch-matrix.js');
-const { DEFAULT_PROFILES, buildSeatProfile } = require('./seat-policy.js');
+const { DEFAULT_PROFILES, buildSeatProfile, validateOperationalLessons } = require('./seat-policy.js');
 const { bindSkillSource } = require('./cli-skill-stage.js');
 const { ATTESTATION_PROTOCOL, hashFile, writeJson } = require('./dispatch-evidence.js');
 const { readJsonFile } = require('./json-file.js');
@@ -13,8 +13,12 @@ const { loadCatalog, narrowMatrix } = require('./synara-catalog.js');
 const { INSTRUCTION_READ_PROTOCOL } = require('./instruction-read-evidence.js');
 const { validateEvidenceReadDirs } = require('./evidence-read-access.js');
 
-function matrixForPlan(plan, catalog, base = loadMatrix()) {
-  if (!catalog) return base;
+const SYNARA_CATALOG_POLICY = 'diagnostic-only-v1';
+
+function matrixForCatalog(catalog, base, policy) {
+  // Both supported hosts launch vendor CLIs. Their native probes authorize
+  // routes; Synara's agent catalog is diagnostic evidence for new seals.
+  if (!catalog || policy === SYNARA_CATALOG_POLICY) return base;
   return narrowMatrix(base, catalog).matrix;
 }
 
@@ -27,8 +31,10 @@ function sealPlan({ plan, runDir, availability, synaraCatalog, skillSourceRoot }
   const draft = readJsonFile(plan);
   if (draft.hostMode === 'synara' && !synaraCatalog) throw new Error('synara hostMode requires --synara-catalog');
   const catalog = synaraCatalog ? loadCatalog(synaraCatalog) : null;
-  const validated = readValidatedPlan(plan, undefined, matrixForPlan(draft, catalog, JSON.parse(matrixText)), available, Date.parse(sealedAt));
+  const validated = readValidatedPlan(plan, undefined, JSON.parse(matrixText), available, Date.parse(sealedAt));
   const profiles = JSON.parse(profilesText);
+  if (profiles.schemaVersion < 7) throw new Error('new plans require operational lesson policy');
+  validateOperationalLessons(profiles);
   const skillSource = bindSkillSource({ sourceRoot: skillSourceRoot, skills: [...new Set(validated.plan.dispatches.flatMap(entry => buildSeatProfile(profiles, entry).skills))] });
   // Keep the producer's path spelling in evidence; native paths are for containment.
   const root = path.resolve(runDir);
@@ -63,7 +69,7 @@ function sealPlan({ plan, runDir, availability, synaraCatalog, skillSourceRoot }
     availabilitySha256: hashFile(availablePath), sealedAt,
     attestationProtocol: ATTESTATION_PROTOCOL,
     instructionReadProtocol: INSTRUCTION_READ_PROTOCOL,
-    ...(catalog ? { synaraCatalogSha256: hashFile(catalogPath) } : {}),
+    ...(catalog ? { synaraCatalogSha256: hashFile(catalogPath), synaraCatalogPolicy: SYNARA_CATALOG_POLICY } : {}),
   };
   writeJson(sealPath, seal);
   return { ...seal, planPath, runDir: root };
@@ -83,13 +89,14 @@ function readSealedRun(runDir) {
   const plan = readJsonFile(planPath);
   if (plan.planId !== seal.planId || !Number.isFinite(Date.parse(seal.sealedAt))) throw new Error('invalid run seal');
   let catalog = null;
+  if (seal.synaraCatalogPolicy !== undefined && (seal.synaraCatalogPolicy !== SYNARA_CATALOG_POLICY || !seal.synaraCatalogSha256)) throw new Error('unsupported or unbound Synara catalog policy');
   if (seal.synaraCatalogSha256) {
     const catalogPath = path.join(root, 'synara-catalog.json');
     if (hashFile(catalogPath) !== seal.synaraCatalogSha256) throw new Error('sealed run inputs changed');
     catalog = loadCatalog(catalogPath);
   }
   const matrixBase = seal.schemaVersion === 2 ? JSON.parse(seal.matrixText) : loadMatrix();
-  const matrix = matrixForPlan(plan, catalog, matrixBase);
+  const matrix = matrixForCatalog(catalog, matrixBase, seal.synaraCatalogPolicy);
   validatePlan(plan, matrix, loadAvailability(availablePath), Date.parse(seal.sealedAt));
   for (const entry of plan.dispatches) validateEvidenceReadDirs(entry, { plan, runDir: root, forbiddenRoots: [seal.skillSource?.sourceRoot].filter(Boolean) });
   return { root, sealPath, seal, planPath, availablePath, plan, matrix };

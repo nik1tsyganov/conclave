@@ -289,7 +289,12 @@ test('replay rejects rewritten evidence snapshots after their artifact hashes ar
 for (const vendor of ['google', 'anthropic']) {
   test(`${vendor} cannot broaden permissions alongside evidence access`, async t => {
     const run = accessFixture(t, vendor); inputs(run); const native = nativeFixture(); const build = native.buildLaunch;
-    native.buildLaunch = opts => { const launch = build(opts); launch.args.push(...(vendor === 'google' ? ['--yolo'] : ['--permission-mode', 'bypassPermissions'])); return launch; };
+    native.buildLaunch = opts => {
+      const launch = build(opts);
+      if (vendor === 'anthropic') launch.args.splice(launch.args.indexOf('--'), 0, '--permission-mode', 'bypassPermissions');
+      else launch.args.push('--yolo');
+      return launch;
+    };
     await assert.rejects(complete(run, native), /must remain/);
     assert.equal(native.calls(), 0);
   });

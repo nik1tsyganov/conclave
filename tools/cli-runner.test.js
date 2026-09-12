@@ -21,6 +21,11 @@ test('runner preserves buffered UTF-8, records one PID and waits for native exit
   assert.equal(done.stdout, '結果'); assert.equal(done.ok, true); assert.equal(done.exitConfirmed, true);
   assert.equal(fs.readFileSync(path.join(root, 'child.pid'), 'utf8').trim(), '4123');
   assert.equal(spawnOptions.shell, false); assert.equal(spawnOptions.windowsHide, true);
+  assert.equal(done.lifetime.protocol, 'magi-process-lifetime-v1');
+  assert.equal(done.lifetime.pid, done.pid); assert.equal(done.lifetime.exitConfirmed, true);
+  assert.equal(done.lifetime.exitEvidence, 'child-close-event');
+  assert.ok(Date.parse(done.lifetime.startedAt) <= Date.parse(done.lifetime.endedAt));
+  assert.ok(done.lifetime.elapsedMs >= 0);
 });
 test('wall timeout kills only the recorded process and confirms its exit', async () => {
   const child = childFixture(); const killed = [];

@@ -22,9 +22,10 @@ to the assigned native vendor seats. Do not use Cursor Task agents as vendors.
 
 Start with one implementation unit, one foreign verifier, and one foreign
 reviewer. Choose legal model/effort pairs from the installed matrix after
-checking included capacity. For an ordinary feature, prefer Sonnet/medium
-implementation, Terra/medium test verification, and Gemini Pro/high review,
-only if those exact routes remain legal and fresh native probes pass.
+checking included capacity and the distribution breaker. For an ordinary
+feature, select the implementation vendor from currently eligible routes.
+Select foreign verification and review routes from their own matrix classes.
+Require fresh exact native probes for every chosen model and effort.
 For another class, follow its matrix and panel requirements. Do not downgrade it.
 
 Use a new attempt directory outside the product. Preserve existing user changes.
@@ -41,7 +42,8 @@ This completion must reuse the saved call. Never pre-attest unseen output.
 Budget: at most three fresh exact-pair probes and three task dispatches for this
 one-unit attempt. Reuse valid unexpired probes where possible. No automatic
 fallback, repair loop, repeated battery, extra billing, or framework edits.
-If the task cannot fit that bound, narrow it to a useful unit before spending calls.
+If the complete task cannot fit that bound, stop and prepare a larger complete
+plan before spending calls. Do not split known units to evade distribution rules.
 
 At every stop, export project-run-report.js, including the failed command output
 when applicable. Record a short TRIAGE.md with expected behavior, actual behavior,
@@ -79,12 +81,14 @@ Set `MAGI_FIELD_LIBRARY_ROOT` and `MAGI_VAULT_SKILLS_ROOT` and run `magi-vault-s
 
 Read the co-located [CLI command reference](cursor-cli.md), [dispatch matrix](dispatch-matrix.json), [seat profiles](seat-profiles.json), and [brief template](brief-rules-block.md). The command reference governs exact CLI arguments and plan fields. This handoff adds the trial boundary and failure-recording process.
 
-Read `C:/Users/YESSIR/.claude/docs/capacity-state.json` before probes. An exhausted bucket stays blocked until fresh evidence clears it. Do not infer capacity from an old successful call. Do not use API keys, paid credits, or overage. The recorded Opus block also affects any standing Fable-to-Opus fallback. Authentication success alone does not prove included headroom.
+Read `C:/Users/YESSIR/.claude/docs/capacity-state.json` before probes. Block exhausted buckets unless their recorded reset time has passed. After that reset, capacity becomes unknown, never automatically available. Follow `mix-mode` before probing shared or known-separate unknown buckets. Do not infer capacity from an old successful call. Do not use API keys, paid credits, or overage. The recorded Opus block also affects any standing Fable-to-Opus fallback. Authentication success alone does not prove included headroom.
+
+The host must also apply the current `mix-mode` distribution policy before sealing. The matrix validator does not read the machine's rolling breaker. While it is tripped, do not assign eligible implementation to Claude. Preserve the complete-plan distinct-vendor requirement and 60% cap. If the project has no legal complete split, report `PAUSE` and leave uncovered units `NOT_RUN`. Do not relabel units, toggle `magiConvened`, or count probes and earlier slices as implementation. Only the canonical telemetry writer can change the breaker from qualifying evidence.
 
 Suggested external layout:
 
 ```text
-C:/src/magi-project-runs/<project>/<attempt-id>/
+C:/Users/YESSIR/.local/scratch/magi-project-runs/<project>/<attempt-id>/
   context.md              objective, project root, starting revision, dirty paths
   commands/               exact arguments, exit codes, UTF-8 stdout and stderr
   probes/                 fresh native exact-pair evidence
@@ -93,7 +97,7 @@ C:/src/magi-project-runs/<project>/<attempt-id>/
   draft-plan.json
   run/                    created by plan-seal.js; runtime-owned evidence
 
-C:/src/magi-project-issues/<project>-<attempt-id>/
+C:/Users/YESSIR/.local/scratch/magi-project-issues/<project>-<attempt-id>/
   report.json             generated diagnostic snapshot
   REPORT.md               generated readable findings
   TRIAGE.md               Cursor's evidence-backed classification and next step
@@ -111,15 +115,25 @@ Choose one concrete behavior and its acceptance checks. Examples include a repro
 
 Prepare all briefs before sealing. Each brief must contain the literal required template blocks, actual rule paths, the correct role/vendor/host values, a unique first-line ACK, and the exact read/write boundary. Hash the finished bytes. Checker entries bind the implementer's vendor, unit, and worktree.
 
-For ordinary feature trials, the three suggested entries are:
+For ordinary feature trials, choose all three entries from currently eligible routes:
 
 | Order | Role / class | Candidate route | Required behavior |
 |---|---|---|---|
-| 1 | implement / standard-feature | anthropic / sonnet / medium | Make the scoped change and run appropriate checks. |
-| 2 | verify / test-verification | openai / gpt-5.6-terra / medium | Independently run suitable non-mutating checks; inspect the resulting files. |
-| 3 | review / review-adversarial | google / gemini-3.1-pro-high / fused-high | Read files and captured tests; challenge defects and missing cases. |
+| 1 | implement / standard-feature | Eligible implementation pair | Make the scoped change and run appropriate checks. |
+| 2 | verify / test-verification | Eligible pair from a foreign vendor | Inspect source and meaningful test evidence; run checks only when the role's tools permit them. |
+| 3 | review / review-adversarial | Eligible pair from another foreign vendor | Read files and captured tests; challenge defects and missing cases. |
 
 The matrix and fresh probes govern actual eligibility. This table does not override them. Google review briefs must request file-read tools and existing test evidence. Do not require RunCommand in its sandbox. Claude read-only seats can use Read/Glob/Grep; they cannot execute test commands. Select checker roles that can perform the required check.
+
+OpenAI may need shell commands to read local files. Permit read-only file reads,
+searches, and directory listings inside declared roots. Do not combine required
+file inspection with a blanket shell or subprocess ban. For a review of saved
+tests, prohibit product execution, test execution, installs, network requests,
+delegation, and file-write commands. Preserve the contract's automatic runtime
+temporary-file exception for its exact restricted scratch directory. Keep product,
+evidence, instruction, and global files immutable. Place SCOPE before the single
+final POSITION line. Check the generated contract and finished brief for conflicts
+before sealing; prose must match the selected vendor's actual read tools.
 
 Each generated seat contract names the staged rules and required role skills by absolute path. Before accepting a seat, inspect its report and available native read evidence. Missing or unread required instructions are a blocker, even if the task answer is topical. Preserve that evidence and export the stopped trial; do not let the seat declare those instructions optional.
 
@@ -183,7 +197,74 @@ The issues directory is the durable queue. Link recurring symptoms to earlier re
 
 Give the next repair session the report directory and original run directory. Reproduce first. Fix only the proven cause. Add a relevant regression test, obtain independent verification and review, then run the same project acceptance checks in a fresh attempt. Keep the old failure. Close its TRIAGE entry by linking the passing correction; do not replace its generated report.
 
+## Recover a host-interrupted read-only attempt
+
+A host crash can leave a `RUNNING` transaction after its native child stops. Do
+not delete that transaction, change its status, or resume its native session.
+The explicit recovery command supports OpenAI `review`, `verify`, and `plan`
+entries with empty write scope and the existing bound read-only scratch profile.
+All other entries in the sealed plan must already have committed PASS evidence.
+Implementation and other vendor recovery are unsupported.
+
+First capture a fresh native availability probe for the exact interrupted
+model/effort. The new availability file needs only that route. The original sealed
+availability remains unchanged. Prepare an external request file:
+
+```powershell
+node tools/dispatch-run.js --plan "$magiRun/dispatch-plan.json" --dispatch-id r2 --prepare-recovery "$magiAttempt/recovery-request.json" --availability "$magiAttempt/fresh-availability.json"
+```
+
+Preparation launches no child. Inspect the returned request, original native ID,
+stopped-child evidence, frozen file inventories, prerequisite hashes, and the
+returned `recoverySha256`. Then use that exact hash:
+
+```powershell
+node tools/dispatch-run.js --plan "$magiRun/dispatch-plan.json" --dispatch-id r2 --recover-interrupted "$magiAttempt/recovery-request.json" --recovery-sha256 <inspected-sha256>
+```
+
+Supply the normal configured rules and skill sources for the new launch. The
+runtime rechecks process liveness, frozen inputs, and current route availability.
+It writes one exclusive replacement below `.magi-recoveries/<logical-key>/`.
+The original transaction and `out/r2` remain unchanged. The replacement uses a
+new native session and its own restricted scratch directory. Normal instruction,
+proof, scope, approval, and tally checks still apply.
+
+Missing or terminal original evidence, live or unknown children, drift, and
+incomplete or duplicate recovery lineage stop recovery. The original request
+cannot relaunch a failed or interrupted replacement. A completed replacement can
+replay without another child, including after its probe expires.
+
+One explicit second replacement is supported after a terminal first `FAIL`.
+The first replacement must have completed native final output, a confirmed clean
+scope audit, unchanged inputs, and an absent native child. Capture a new probe
+after that failure, then prepare a separate request:
+
+```powershell
+node tools/dispatch-run.js --plan "$magiRun/dispatch-plan.json" --dispatch-id r2 --prepare-recovery "$magiAttempt/recovery-request-2.json" --recovery-attempt 2 --availability "$magiAttempt/fresh-availability-2.json"
+```
+
+Inspect the new request and its returned SHA-256. It binds both earlier native
+IDs, both stopped-child checks, and the first failure's manifest, transaction,
+native transcript, and evidence hashes. Launch through `--recover-interrupted`
+with this second request and its inspected hash. Do not pass `--recovery-attempt`
+to the launch command. The second folder is `.magi-recoveries/<logical-key>.2/`.
+The first folder and original evidence remain byte-identical. A running,
+successful, incomplete, or unsafe first replacement cannot authorize attempt 2.
+There is no automatic retry or third attempt. The old failed request cannot
+credit the second result.
+
+Finalization validates all histories, credits one selected result per logical
+entry, and reports `interruptedAttempt` and `failedRecoveryAttempt` separately.
+Preserve all three evidence trees.
+
 ## Synara as the outer harness
+
+Preflight and the watchdog share one file-only hook inspector. The known Windows
+Synara capture wrapper passes only with reviewed helper bytes and the Google
+adapter's fixed child environment. An unknown or changed helper stops that check;
+review the new helper before updating its fingerprint. This is not a provider
+outage, a native permission test, or proof from hook events. Keep native receipts
+and instruction-read checks as the acceptance authority.
 
 When this Grok arbiter is hosted in Synara, use `hostMode: synara` and snapshot `synara_capabilities` with `synara-catalog.js` before sealing. Map MAGI vendor names to Synara providers only for catalog checks (`openai`/`codex`, `anthropic`/`claudeAgent`, `google`/`antigravity`). Launch remains `dispatch-run.js`.
 
@@ -192,6 +273,50 @@ Use Synara worktrees as an implement `cwd` when the worktree is already inside M
 Do not create MAGI seats as Synara threads. Do not substitute Cursor Task elector slugs for seats.
 
 ## Scope of this handoff
+
+### Domain benchmark subjects
+
+The `benchmark-software/implement`, `benchmark-writing/research`, and
+`benchmark-planning/plan` routes admit owner-requested measurements. They do not
+promote a model into a production lane. Production routes remain unchanged.
+
+Each subject plan must declare `purpose: "benchmark"`, `magiConvened: false`,
+and exactly one dispatch. Set `plan.benchmark` to exactly
+`{ "version": "domain-benchmark-v1", "taskId": "software-s", "packetSha256": "<64 lowercase hex characters>" }`.
+The fixed packet is `benchmark.json` in the dispatch's absolute `cwd`.
+Its hash, version, task ID, domain, size, and write scope must match the plan.
+Paths must resolve without symlinks or junctions. No arbitrary packet path is
+accepted. Seal, dispatch binding, and replay repeat this validation.
+
+Allowed task IDs are `software-s/m/l`, `writing-s/m/l`, and `planning-s/m/l`
+(expand each slash notation into three separate IDs). Software S permits only
+`src/import.cjs`; M permits `src/import.cjs` and `src/digest.cjs`; L permits
+`src/roster.cjs` and `src/repository.cjs`. Writing and planning permit no product
+writes. The packet, tests, and other files remain outside the write scope.
+Keep the normal native write audit and protected-input checks.
+
+Each domain admits the same eleven requested model/effort pairs. Fresh exact
+native proof, required instruction reads, approval policy, and scope checks
+still apply. Astra also requires `escalation: true` and a meaningful reason.
+Fable/high is a separate diagnostic alternative; its result cannot replace an
+xhigh condition. Priority values enumerate candidates, not quality rankings.
+Select the intended condition explicitly; do not substitute the next candidate
+when a bucket is unavailable.
+
+Keep fixture generators, judges, and reference answers outside the staged leaf
+runtime. The runtime uses only small admission metadata and the frozen packet.
+The packet's content is owner-authored input, bound by its hash. The software
+class adds `code-minimalism`; the other classes add no skills. Existing role and
+vendor cards still apply.
+
+Nine tasks across eleven pairs yield 99 possible subject observations. With one
+observation per cell, report case findings only. Short/medium/long describe task
+complexity, not endurance. Native validity and independent task quality are
+separate verdicts. A valid session can fail the task. An unavailable or invalid
+session cannot establish model quality. Preserve failed records and all exact
+conditions. Do not infer rankings, routing promotion, or a successful MAGI
+product run from this benchmark. Grok named in plan metadata alone is not proof
+that Grok led a run.
 
 Start fresh attempts after this update. Implementation-based checker receipts now bind `magi-unit-sequence-v1` prerequisite evidence. Older checker receipts lack that contract and will fail the updated validator. Preserve those historical runs with their original runtime; do not rewrite their receipts or present them as new acceptance.
 

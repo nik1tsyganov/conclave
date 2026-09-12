@@ -12,10 +12,10 @@ MAGI is not CONCLAVE. `/magi` uses Cursor Task mode. `/magi-cli` uses native ven
 
 | Seat | Vendor | Model policy |
 |---|---|---|
-| Melchior | OpenAI | Luna → Terra → Sol → Astra by task class; Astra requires explicit escalation. |
+| Melchior | OpenAI | Astra for coding; Luna for simple mechanical tasks. The arbiter selects medium, high, or xhigh under the matrix policy. |
 | Balthasar | Anthropic | Sonnet, Fable, or Opus by role and class. |
 | Casper | Google | Flash or Pro catalog routes, with exact native agy slug evidence. |
-| Arbiter | xAI | Grok 4.6 high by default; the matrix also accepts xhigh. |
+| Arbiter | xAI | Grok 4.6 high by default; low, medium, high, and xhigh are supported. Fast mode is optional. |
 
 The [dispatch matrix](.cursor/skills/magi-cli/references/dispatch-matrix.json) defines legal combinations. Every selected model/effort pair needs fresh native proof. Catalog membership does not establish current availability. Unknown and unproven pairs are unavailable.
 
@@ -56,9 +56,11 @@ For real projects, give Cursor the [project-run handoff](.cursor/skills/magi-cli
 
 Example commands for one catalog route and a prepared plan:
 
+First set `MAGI_CAPACITY_RECEIPT` and `MAGI_LEGACY_CAPACITY` to current evidence-backed capacity files. See the CLI run guide for their contract. New native calls fail closed without valid admission. The maintained 29-lesson catalog lives in the existing seat profiles; selected procedures reach leaf contracts automatically.
+
 ```powershell
-node tools/model-probe.js --vendor openai --model gpt-5.6-terra --effort medium --evidence-dir C:/magi-runs/probes/terra-medium
-node tools/model-availability.js --file C:/magi-runs/availability.json --probe C:/magi-runs/probes/terra-medium/probe.json
+node tools/model-probe.js --vendor openai --model gpt-6-astra --effort high --evidence-dir C:/magi-runs/probes/astra-high
+node tools/model-availability.js --file C:/magi-runs/availability.json --probe C:/magi-runs/probes/astra-high/probe.json
 node tools/plan-seal.js --plan C:/magi-runs/draft-plan.json --run-dir C:/magi-runs/run-001 --availability C:/magi-runs/availability.json
 node tools/dispatch-run.js --plan C:/magi-runs/run-001/dispatch-plan.json --run-dir C:/magi-runs/run-001 --dispatch-id implement-1 --rules-root $env:MAGI_RULES_ROOT
 node tools/run-finalize.js --run-dir C:/magi-runs/run-001
@@ -85,7 +87,9 @@ The generated `SEAT-CONTRACT.md` points to the staged skills. Structural checks 
 
 OpenAI non-implementation seats use read-only mode; agy uses sandbox mode. Claude uses the schema 5 `read-only-tools` profile: `--safe-mode --permission-mode dontAsk --tools Read,Glob,Grep --allowedTools Read,Glob,Grep`. These Claude seats inspect files and existing test evidence. They cannot run shell commands. Plan mode needs a separate approval turn and cannot reliably finish unattended leaf verification.
 
-Claude implementation uses `--safe-mode --permission-mode bypassPermissions`, with declared product scope and post-run auditing. Safe mode disables global customization and hooks while preserving subscription authentication and role permissions. The adapter appends the final-response contract with `--append-system-prompt`; it preserves the native system prompt and permissions. Do not use `--bare`; it disables OAuth. These controls do not sandbox vendor home directories or provide universal hostile-process isolation.
+Claude implementation uses `--safe-mode --permission-mode bypassPermissions`, with declared product scope and post-run auditing. Safe mode disables global customization and hooks while preserving subscription authentication and role permissions. The production adapter supplies the brief pointer as a positional print-mode query after `--`, ignores stdin, and leaves the native system prompt unchanged. `stream-json` retains native Read events; the JSON schema requires a string response. The verifier checks the exact brief acknowledgment separately. Do not use `--bare`; it disables OAuth. These controls do not sandbox vendor home directories or provide universal hostile-process isolation.
+
+Both `cursor-cli` and `synara` plans dispatch native vendor CLIs. New seals keep the Synara catalog as a hashed diagnostic snapshot, with `synaraCatalogPolicy: diagnostic-only-v1`. The catalog does not limit native CLI routes. MAGI's matrix, fresh native model/effort probes, and escalation checks still authorize each route. Historical seals without this policy marker retain their original catalog narrowing.
 
 ## Native evidence and completion
 
@@ -101,6 +105,8 @@ Missing observation, substitution, artifact changes, or scope violations fail. R
 
 Google probes and dispatches pin `--log-file` to `native-cli.log` in their own unique evidence directory. The collector uses that native file when building `vendor.log` for proof. Default second-resolution home logs can collide during parallel calls.
 
+Google child processes also receive a fixed `synara-capture-events.jsonl` destination and an `allow` hook response. This avoids the installed Synara hook's malformed fallback response without changing global hook configuration. The runtime hashes these events as `diagnostic-untrusted`; they never replace native identity, usage, or instruction-read evidence. Non-implementation calls retain `--sandbox`.
+
 A successful committed transaction binds the plan hash, exact entry, brief acknowledgment, native proof, scope audit, receipts, and idempotent telemetry. Duplicate logical dispatches cannot count twice. Failed evidence remains recorded.
 
 Execution PASS and approval are separate. Ordinary implementation approval needs foreign verification and review, with every review returning native APPROVE. Critical classes require a convened plan with two distinct foreign review/verify vendors on the same unit and worktree. Approval then requires at least two eligible native APPROVE votes after author recusal.
@@ -114,12 +120,11 @@ A convened implementation run uses `min(3, implementation unit count)` distinct 
 ```powershell
 npm test
 node tools/release-check.js
-node tools/cross-repo-check.js --kit-root C:/src/magi-kit --vault-root $env:MAGI_RULES_ROOT
 ```
 
-`npm run check` combines the unit suite and release check. `npm run check:cross-repo` accepts `MAGI_KIT_ROOT` and `MAGI_RULES_ROOT`, or pass explicit roots to the tool.
+`npm run check` combines the unit suite and release check. Current source ownership is in `skill-sources.json`; use `magi-vault-sync.js --status` for the leaf mirror and `--index` for the separate skill catalog. These commands may create directories or write catalog files. See the [project guide](.cursor/skills/magi-cli/references/project-runs.md) for their repository roots.
 
-Cross-repository checks compare all skill maps, forbidden skills, bundled file hashes, the v2 fingerprint, exact R01–R22 inventory, index links, and leaf template semantics. Offline success does not establish native authentication, model availability, or full tri-vendor acceptance.
+`npm run check:cross-repo` is archived-kit compatibility validation. It still accepts `MAGI_KIT_ROOT` and `MAGI_RULES_ROOT`, or explicit `--kit-root` and `--vault-root` paths. Its historical skill maps can differ from current MAGI. Preserve and report those failures; do not restore archived skills to make them pass. It also checks v2 rules and leaf template semantics. Current mirror/catalog checks do not replace every historical invariant. Offline success does not establish native authentication, model availability, or full tri-vendor acceptance.
 
 Standalone `cli-smoke.js` checks transport plans using staged inputs. It never invokes a vendor and returns `activationEligible: false`. Production launches use the sealed-plan transaction.
 

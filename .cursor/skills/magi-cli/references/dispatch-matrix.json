@@ -1,6 +1,6 @@
 {
   "schemaVersion": 3,
-  "updated": "2026-09-05",
+  "updated": "2026-09-11",
   "principles": {
     "arbiterVendor": "xai",
     "arbiterModel": "grok-4.6",
@@ -27,7 +27,7 @@
         "gpt-5.6-sol": { "efforts": ["none", "low", "medium", "high", "xhigh", "max"], "tier": "frontier" },
         "gpt-6-astra": { "efforts": ["low", "medium", "high", "xhigh", "max"], "tier": "frontier-plus", "availability": "probe-required" }
       },
-      "note": "Astra is an escalation tier, not the standing default. It is illegal until the local Codex path proves exact gpt-6-astra reachability and, where marked escalationOnly, the route carries an explicit escalation reason."
+      "note": "Owner coding preference: Astra for substantive implementation, Luna for bulk-mechanical work. Approved coding defaults do not require escalation. Exact fresh native proof remains mandatory; other OpenAI coding models and nondefault effort need a substantive routing reason. Legacy, benchmark and noncoding frontier escalation rules remain unchanged."
     },
     "anthropic": {
       "models": {
@@ -48,6 +48,60 @@
     }
   },
   "classes": {
+    "benchmark-software": {
+      "benchmarkOnly": true,
+      "provenance": "Owner-requested domain-benchmark-v1 measurement; admission is not routing promotion. Fable/high is a separate diagnostic condition.",
+      "implement": [
+        { "vendor": "openai", "model": "gpt-5.6-luna", "effort": "medium", "priority": 1 },
+        { "vendor": "openai", "model": "gpt-5.6-terra", "effort": "medium", "priority": 2 },
+        { "vendor": "openai", "model": "gpt-5.6-sol", "effort": "high", "priority": 3 },
+        { "vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 4, "requiresProbe": true, "escalationOnly": true },
+        { "vendor": "anthropic", "model": "sonnet", "effort": "medium", "priority": 5 },
+        { "vendor": "anthropic", "model": "opus", "effort": "high", "priority": 6 },
+        { "vendor": "anthropic", "model": "fable", "effort": "xhigh", "priority": 7 },
+        { "vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 8 },
+        { "vendor": "google", "model": "gemini-3.8-flash-high", "effort": "fused-high", "priority": 9 },
+        { "vendor": "google", "model": "gemini-3.8-flash-medium", "effort": "fused-medium", "priority": 10 },
+        { "vendor": "google", "model": "gemini-3.8-flash-low", "effort": "fused-low", "priority": 11 },
+        { "vendor": "anthropic", "model": "fable", "effort": "high", "priority": 12, "diagnosticOnly": true }
+      ]
+    },
+    "benchmark-writing": {
+      "benchmarkOnly": true,
+      "provenance": "Owner-requested domain-benchmark-v1 measurement; admission is not routing promotion. Fable/high is a separate diagnostic condition.",
+      "research": [
+        { "vendor": "openai", "model": "gpt-5.6-luna", "effort": "medium", "priority": 1 },
+        { "vendor": "openai", "model": "gpt-5.6-terra", "effort": "medium", "priority": 2 },
+        { "vendor": "openai", "model": "gpt-5.6-sol", "effort": "high", "priority": 3 },
+        { "vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 4, "requiresProbe": true, "escalationOnly": true },
+        { "vendor": "anthropic", "model": "sonnet", "effort": "medium", "priority": 5 },
+        { "vendor": "anthropic", "model": "opus", "effort": "high", "priority": 6 },
+        { "vendor": "anthropic", "model": "fable", "effort": "xhigh", "priority": 7 },
+        { "vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 8 },
+        { "vendor": "google", "model": "gemini-3.8-flash-high", "effort": "fused-high", "priority": 9 },
+        { "vendor": "google", "model": "gemini-3.8-flash-medium", "effort": "fused-medium", "priority": 10 },
+        { "vendor": "google", "model": "gemini-3.8-flash-low", "effort": "fused-low", "priority": 11 },
+        { "vendor": "anthropic", "model": "fable", "effort": "high", "priority": 12, "diagnosticOnly": true }
+      ]
+    },
+    "benchmark-planning": {
+      "benchmarkOnly": true,
+      "provenance": "Owner-requested domain-benchmark-v1 measurement; admission is not routing promotion. Fable/high is a separate diagnostic condition.",
+      "plan": [
+        { "vendor": "openai", "model": "gpt-5.6-luna", "effort": "medium", "priority": 1 },
+        { "vendor": "openai", "model": "gpt-5.6-terra", "effort": "medium", "priority": 2 },
+        { "vendor": "openai", "model": "gpt-5.6-sol", "effort": "high", "priority": 3 },
+        { "vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 4, "requiresProbe": true, "escalationOnly": true },
+        { "vendor": "anthropic", "model": "sonnet", "effort": "medium", "priority": 5 },
+        { "vendor": "anthropic", "model": "opus", "effort": "high", "priority": 6 },
+        { "vendor": "anthropic", "model": "fable", "effort": "xhigh", "priority": 7 },
+        { "vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 8 },
+        { "vendor": "google", "model": "gemini-3.8-flash-high", "effort": "fused-high", "priority": 9 },
+        { "vendor": "google", "model": "gemini-3.8-flash-medium", "effort": "fused-medium", "priority": 10 },
+        { "vendor": "google", "model": "gemini-3.8-flash-low", "effort": "fused-low", "priority": 11 },
+        { "vendor": "anthropic", "model": "fable", "effort": "high", "priority": 12, "diagnosticOnly": true }
+      ]
+    },
     "architecture-planning": {
       "plan": [
         { "vendor": "anthropic", "model": "opus", "effort": "high", "priority": 1 },
@@ -58,34 +112,53 @@
     },
     "standard-feature": {
       "implement": [
-        { "vendor": "openai", "model": "gpt-5.6-terra", "effort": "medium", "priority": 1 },
-        { "vendor": "anthropic", "model": "sonnet", "effort": "medium", "priority": 2 },
-        { "vendor": "google", "model": "gemini-3.8-flash-medium", "effort": "fused-medium", "priority": 3, "requiresProbe": true }
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "medium", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 1, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "xhigh", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "medium", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "high", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "xhigh", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-terra", "effort": "medium", "priority": 11},
+        {"vendor": "anthropic", "model": "sonnet", "effort": "medium", "priority": 12},
+        {"vendor": "google", "model": "gemini-3.8-flash-medium", "effort": "fused-medium", "priority": 13, "requiresProbe": true}
       ],
       "verify": [
-        { "vendor": "openai", "model": "gpt-5.6-sol", "effort": "medium", "priority": 1 },
-        { "vendor": "anthropic", "model": "opus", "effort": "medium", "priority": 2 },
-        { "vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 3 }
-      ]
+        {"vendor": "openai", "model": "gpt-5.6-sol", "effort": "medium", "priority": 1},
+        {"vendor": "anthropic", "model": "opus", "effort": "medium", "priority": 2},
+        {"vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 3}
+      ],
+      "codingDefault": {"vendor": "openai", "model": "gpt-6-astra", "effort": "high"}
     },
     "bulk-mechanical": {
       "implement": [
-        { "vendor": "openai", "model": "gpt-5.6-luna", "effort": "medium", "priority": 1 },
-        { "vendor": "google", "model": "gemini-3.8-flash-low", "effort": "fused-low", "priority": 2, "requiresProbe": true },
-        { "vendor": "anthropic", "model": "sonnet", "effort": "low", "priority": 3 }
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "medium", "priority": 1, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "high", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "xhigh", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "medium", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "xhigh", "priority": 5, "requiresProbe": true},
+        {"vendor": "google", "model": "gemini-3.8-flash-low", "effort": "fused-low", "priority": 12, "requiresProbe": true},
+        {"vendor": "anthropic", "model": "sonnet", "effort": "low", "priority": 13}
       ],
       "verify": [
-        { "vendor": "openai", "model": "gpt-5.6-terra", "effort": "medium", "priority": 1 },
-        { "vendor": "anthropic", "model": "sonnet", "effort": "medium", "priority": 2 }
-      ]
+        {"vendor": "openai", "model": "gpt-5.6-terra", "effort": "medium", "priority": 1},
+        {"vendor": "anthropic", "model": "sonnet", "effort": "medium", "priority": 2}
+      ],
+      "codingDefault": {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "medium"}
     },
     "debug-mystery": {
       "implement": [
-        { "vendor": "anthropic", "model": "fable", "effort": "xhigh", "priority": 1 },
-        { "vendor": "openai", "model": "gpt-5.6-sol", "effort": "high", "priority": 2 },
-        { "vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 3 },
-        { "vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 4, "requiresProbe": true, "escalationOnly": true }
-      ]
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "medium", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 1, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "xhigh", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "medium", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "high", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "xhigh", "priority": 5, "requiresProbe": true},
+        {"vendor": "anthropic", "model": "fable", "effort": "xhigh", "priority": 11},
+        {"vendor": "openai", "model": "gpt-5.6-sol", "effort": "high", "priority": 12},
+        {"vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 13}
+      ],
+      "codingDefault": {"vendor": "openai", "model": "gpt-6-astra", "effort": "high"}
     },
     "long-context-analysis": {
       "research": [
@@ -97,21 +170,33 @@
     },
     "agentic-long-run": {
       "implement": [
-        { "vendor": "anthropic", "model": "fable", "effort": "xhigh", "priority": 1 },
-        { "vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 2, "requiresProbe": true },
-        { "vendor": "google", "model": "gemini-3.8-flash-high", "effort": "fused-high", "priority": 3, "requiresProbe": true },
-        { "vendor": "openai", "model": "gpt-5.6-sol", "effort": "high", "priority": 4 }
-      ]
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "medium", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 1, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "xhigh", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "medium", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "high", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "xhigh", "priority": 5, "requiresProbe": true},
+        {"vendor": "anthropic", "model": "fable", "effort": "xhigh", "priority": 11},
+        {"vendor": "google", "model": "gemini-3.8-flash-high", "effort": "fused-high", "priority": 13, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-sol", "effort": "high", "priority": 14}
+      ],
+      "codingDefault": {"vendor": "openai", "model": "gpt-6-astra", "effort": "high"}
     },
     "security-sensitive": {
       "implement": [
-        { "vendor": "anthropic", "model": "opus", "effort": "xhigh", "priority": 1 },
-        { "vendor": "openai", "model": "gpt-5.6-sol", "effort": "xhigh", "priority": 2 },
-        { "vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 3 },
-        { "vendor": "openai", "model": "gpt-6-astra", "effort": "xhigh", "priority": 4, "requiresProbe": true, "escalationOnly": true }
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "medium", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "xhigh", "priority": 1, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "medium", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "high", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "xhigh", "priority": 5, "requiresProbe": true},
+        {"vendor": "anthropic", "model": "opus", "effort": "xhigh", "priority": 11},
+        {"vendor": "openai", "model": "gpt-5.6-sol", "effort": "xhigh", "priority": 12},
+        {"vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 13}
       ],
       "minimumReviewVendors": 2,
-      "requiresPanel": true
+      "requiresPanel": true,
+      "codingDefault": {"vendor": "openai", "model": "gpt-6-astra", "effort": "xhigh"}
     },
     "review-adversarial": {
       "review": [
@@ -138,11 +223,17 @@
     },
     "extreme-end-to-end": {
       "implement": [
-        { "vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 1, "requiresProbe": true },
-        { "vendor": "anthropic", "model": "fable", "effort": "xhigh", "priority": 2 },
-        { "vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 3 }
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "medium", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "high", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-6-astra", "effort": "xhigh", "priority": 1, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "medium", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "high", "priority": 5, "requiresProbe": true},
+        {"vendor": "openai", "model": "gpt-5.6-luna", "effort": "xhigh", "priority": 5, "requiresProbe": true},
+        {"vendor": "anthropic", "model": "fable", "effort": "xhigh", "priority": 12},
+        {"vendor": "google", "model": "gemini-3.1-pro-high", "effort": "fused-high", "priority": 13}
       ],
-      "requiresPanel": true
+      "requiresPanel": true,
+      "codingDefault": {"vendor": "openai", "model": "gpt-6-astra", "effort": "xhigh"}
     }
   }
 }

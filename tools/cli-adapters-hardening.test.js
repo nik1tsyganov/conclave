@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const { execFileSync } = require('node:child_process');
 const { allowedWorkspace, anthropicLaunch, googleLaunch, openaiLaunch } = require('./cli-adapters.js');
 const { CLAUDE_RESPONSE_PROTOCOL, CLAUDE_RESPONSE_SCHEMA, validateClaudeResponseLaunch } = require('./vendor-native.js');
 
@@ -36,6 +37,30 @@ test('workspace authorization keeps host-native POSIX paths', { skip: process.pl
   const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'magi-posix-ws-')));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   assert.strictEqual(allowedWorkspace(root, { MAGI_DEV_ROOT: root }), path.resolve(root));
+});
+
+test('Windows workspace authorization compares native short and long path aliases', { skip: process.platform !== 'win32' }, t => {
+  const longRoot = fs.realpathSync.native(process.env.ProgramFiles);
+  const shortRoot = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    '(New-Object -ComObject Scripting.FileSystemObject).GetFolder($env:ProgramFiles).ShortPath'],
+  { encoding: 'utf8', windowsHide: true, timeout: 10000 }).trim();
+  if (shortRoot.toLowerCase() === longRoot.toLowerCase()) return t.skip('Program Files has no native short path alias');
+  for (const [cwdRoot, allowedRoot] of [[longRoot, shortRoot], [shortRoot, longRoot]]) {
+    const env = { MAGI_DEV_ROOT: allowedRoot };
+    assert.strictEqual(allowedWorkspace(cwdRoot, env), cwdRoot);
+    const missing = path.join(cwdRoot, 'magi-authorization-fixture', 'workspace');
+    assert.strictEqual(allowedWorkspace(missing, env), missing);
+    assert.throws(() => allowedWorkspace(`${cwdRoot}-sibling`, env), { code: 'WORKSPACE_FORBIDDEN' });
+  }
+});
+
+test('Windows workspace authorization rejects junction candidates and allowed roots', { skip: process.platform !== 'win32' }, t => {
+  const f = fixture(t); const allowed = path.join(f.dir, 'allowed'); const outside = path.join(f.dir, 'outside');
+  fs.mkdirSync(allowed); fs.mkdirSync(outside);
+  const link = path.join(allowed, 'alias'); fs.symlinkSync(outside, link, 'junction');
+  assert.throws(() => allowedWorkspace(path.join(link, 'missing'), { MAGI_DEV_ROOT: allowed }), /symlink|junction/);
+  assert.throws(() => allowedWorkspace(outside, { MAGI_DEV_ROOT: link }), /symlink|junction/);
+  assert.deepStrictEqual(fs.readdirSync(outside), []);
 });
 
 test('OpenAI non-implement roles are read-only while implementer is workspace-write', (t) => {
@@ -76,14 +101,21 @@ test('Claude non-implement roles do not inherit implement bypassPermissions', (t
     assert.ok(!JSON.stringify(CLAUDE_RESPONSE_SCHEMA).includes('minLength'));
     assert.strictEqual(launch.permissionMode, role === 'implement' ? 'bypassPermissions' : 'dontAsk');
     assert.ok(launch.args.includes('--safe-mode'), 'global hooks and skills must not override a leaf contract');
+    assert.deepStrictEqual(JSON.parse(launch.args[launch.args.indexOf('--settings') + 1]), { switchModelsOnFlag: false, fallbackModel: [] }, 'exact-model runs must preserve refusals and never switch to an unadmitted model');
     assert.ok(!launch.args.includes('--bare'), 'bare mode disables subscription OAuth');
     assert.ok(!launch.args.includes('--system-prompt'), 'native system controls must remain in place');
-    const finalContract = launch.args[launch.args.indexOf('--append-system-prompt') + 1];
+    assert.ok(!launch.args.includes('--append-system-prompt'));
+    assert.strictEqual(launch.args.at(-2), '--');
+    assert.strictEqual(launch.stdinFile, undefined);
+    assert.deepStrictEqual(launch.stdio, ['ignore', 'pipe', 'pipe']);
+    assert.ok(!fs.existsSync(f.briefPath + '.pointer.md'));
+    assert.deepStrictEqual(CLAUDE_RESPONSE_SCHEMA.properties.response, { type: 'string' });
+    const finalContract = launch.args.at(-1);
     assert.ok(!finalContract.includes('ACK test brief'), 'acknowledgment content stays in the bound brief');
     assert.ok(finalContract.includes("Your FINAL response must start with the brief's exact first line"));
     assert.ok(finalContract.includes('Native permissions still apply'));
     assert.ok(!finalContract.includes(fs.readFileSync(f.briefPath, 'utf8')), 'the brief body remains on disk');
-    assert.ok(!fs.readFileSync(launch.stdinFile, 'utf8').includes('ACK test brief'), 'the pointer carries no brief content');
+    assert.ok(!finalContract.includes('ACK test brief'), 'the pointer carries no brief content');
     assert.ok(!launch.env.ANTHROPIC_API_KEY);
     if (role !== 'implement') {
       assert.strictEqual(launch.args[launch.args.indexOf('--tools') + 1], 'Read,Glob,Grep');
@@ -106,20 +138,63 @@ test('every adapter keeps even a single-line brief body out of launch arguments 
   }
 });
 
-test('Claude pointer and system prompt require a FIRST native Read of the seat contract, not Bash cat', (t) => {
+test('OpenAI first-read recipe uses forward paths and reads an apostrophe path on Windows', { skip: process.platform !== 'win32' }, t => {
+  const f = fixture(t); const cwd = path.join(f.dir, '.local', "O'Brien [read]"); fs.mkdirSync(cwd, { recursive: true });
+  const contract = path.join(cwd, "SEAT'S-CONTRACT.md"); const content = 'exact forward-path read sentinel'; fs.writeFileSync(contract, content);
+  const launch = openaiLaunch({ briefPath: f.briefPath, seatContractPath: contract, skillRoot: f.skillRoot, cwd,
+    role: 'verify', model: 'gpt-5.6-luna', effort: 'medium', capturePath: path.join(f.dir, 'capture.txt'),
+    env: { ...fakeBins, MAGI_ALLOWED_WORKSPACE_ROOTS: f.dir }, mustExistBinary: false });
+  const pointer = fs.readFileSync(launch.stdinFile, 'utf8');
+  const match = pointer.match(/const r = await tools\.exec_command\((\{[^\n]+\})\); text\(r.output\);/);
+  assert.ok(match); const args = JSON.parse(match[1]);
+  assert.strictEqual(Object.hasOwn(args, 'workdir'), false); assert.ok(!args.cmd.includes('\\'));
+  assert.ok(args.cmd.includes("O''Brien [read]")); assert.ok(args.cmd.includes("SEAT''S-CONTRACT.md"));
+  assert.strictEqual(launch.cwd, cwd, 'native launch cwd retains its original canonical form');
+  assert.deepStrictEqual(Object.keys(args).sort(), ['cmd', 'max_output_tokens']);
+  const output = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', args.cmd],
+    { cwd: launch.cwd, encoding: 'utf8', windowsHide: true, timeout: 10000 });
+  assert.strictEqual(output.trimEnd(), content);
+});
+
+test('Claude launch validation rejects changed prompt transport and lost native proof flags', (t) => {
+  const f = fixture(t);
+  const launch = anthropicLaunch({ ...f, cwd: 'C:\\src\\product-a', role: 'plan',
+    env: fakeBins, mustExistBinary: false });
+  const mutations = [
+    row => { row.stdinFile = f.briefPath; },
+    row => { row.stdio[0] = 'pipe'; },
+    row => { row.args.splice(-2, 1); },
+    row => { row.args.push('extra prompt'); },
+    row => { row.args[row.args.length - 1] = ''; },
+    row => { row.args.splice(row.args.indexOf('-p'), 1); },
+    row => { row.args.splice(row.args.indexOf('--safe-mode'), 1); },
+    row => { row.args.splice(row.args.indexOf('--verbose'), 1); },
+    row => { row.args[row.args.indexOf('--output-format') + 1] = 'json'; },
+    row => { row.args.unshift('--output-format', 'text'); },
+    row => { row.args.unshift('--append-system-prompt', 'duplicate instructions'); },
+    row => { row.args.unshift('--system-prompt=replace native controls'); },
+    row => { row.args.unshift('--bare'); },
+  ];
+  for (const mutate of mutations) {
+    const changed = structuredClone(launch);
+    mutate(changed);
+    assert.throws(() => validateClaudeResponseLaunch(changed), /Claude launch/);
+  }
+});
+
+test('Claude positional pointer requires a FIRST native Read of the seat contract once', (t) => {
   const f = fixture(t);
   const launch = anthropicLaunch({
     briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
     cwd: 'C:\\src\\product-a', model: 'fable', effort: 'xhigh', role: 'implement',
     env: fakeBins, mustExistBinary: false,
   });
-  const pointer = fs.readFileSync(launch.stdinFile, 'utf8');
-  const system = launch.args[launch.args.indexOf('--append-system-prompt') + 1];
+  const pointer = launch.args.at(-1);
   assert.match(pointer, /FIRST use the Read tool/);
   assert.ok(pointer.includes(f.seatContractPath));
   assert.match(pointer, /Do not cat or Bash instruction files/);
-  assert.match(system, /Use the Read tool/);
-  assert.match(system, /Do not use Bash or cat for instruction files/);
+  assert.strictEqual(pointer.split('Read tool').length - 1, 1);
+  assert.ok(!launch.args.includes('--append-system-prompt'));
   assert.ok(pointer.length <= 2000);
 });
 
@@ -128,15 +203,11 @@ test('every adapter requires contract-listed reads before product work and treat
   for (const build of [openaiLaunch, googleLaunch, anthropicLaunch]) {
     const launch = build({ ...f, cwd: 'C:\\src\\product-a', model: 'fixture', effort: 'high', role: 'verify',
       capturePath: path.join(f.dir, 'capture.txt'), env: fakeBins, mustExistBinary: false });
-    const pointer = launch.stdinFile ? fs.readFileSync(launch.stdinFile, 'utf8') : launch.args[launch.args.indexOf('-p') + 1];
+    const pointer = launch.stdinFile ? fs.readFileSync(launch.stdinFile, 'utf8') : launch.args.at(-1);
     assert.ok(pointer.includes('Complete every required instruction read in that contract before product work.'));
     assert.ok(pointer.includes('If any required instruction is missing or unreadable, stop and report a blocker.'));
     assert.ok(pointer.length <= 2000);
-    if (launch.vendor === 'anthropic') {
-      const system = launch.args[launch.args.indexOf('--append-system-prompt') + 1];
-      assert.ok(system.includes('Complete every required instruction read in that contract before product work.'));
-      assert.ok(system.includes('Native permissions still apply.'));
-    }
+    assert.ok(pointer.includes('Native permissions still apply.'));
   }
 });
 
@@ -167,7 +238,7 @@ test('Google and Claude launchers mount only staged seat skill root, not full gl
   assert.ok(!google.args.includes('C:\\Users\\test\\.claude\\skills'));
 });
 
-test('Google launches drop inherited Synara Antigravity capture environment', (t) => {
+test('Google launches replace inherited Synara capture with a local diagnostic stream', (t) => {
   const f = fixture(t);
   const launch = googleLaunch({
     briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
@@ -178,7 +249,9 @@ test('Google launches drop inherited Synara Antigravity capture environment', (t
       SYNARA_ANTIGRAVITY_HOOK_DECISION: 'ask',
     },
   });
-  assert.ok(!Object.prototype.hasOwnProperty.call(launch.env, 'SYNARA_ANTIGRAVITY_EVENTS'));
-  assert.ok(!Object.prototype.hasOwnProperty.call(launch.env, 'SYNARA_ANTIGRAVITY_HOOK_DECISION'));
+  assert.strictEqual(launch.env.SYNARA_ANTIGRAVITY_EVENTS, path.join(f.dir, 'synara-capture-events.jsonl'));
+  assert.strictEqual(launch.env.SYNARA_ANTIGRAVITY_HOOK_DECISION, 'allow');
+  assert.strictEqual(launch.synaraCaptureEventsPath, launch.env.SYNARA_ANTIGRAVITY_EVENTS);
+  assert.strictEqual(launch.synaraCaptureEventsTrust, 'diagnostic-untrusted');
   assert.strictEqual(launch.env.AGY_CLI_DISABLE_AUTO_UPDATE, 'true');
 });

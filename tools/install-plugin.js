@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { CLI_RUNTIME_TOOLS, canonicalPlainPath, pathsOverlap, resolveRuntimePaths } = require('./runtime-paths.js');
 const { regularFiles } = require('./cli-skill-stage.js');
+const { validateOperationalLessons } = require('./seat-policy.js');
 const {
   INSTALLED_MAGI_SURFACE,
   INSTALLED_MAGI_CLI_SURFACE,
@@ -113,12 +114,17 @@ function readInstalledManifest(dest) {
   catch (error) { return { ok: false, error: `invalid .cursor-plugin/plugin.json: ${error.message}` }; }
 }
 
-function installMagiCursor() {
-  return writeInstall(prepareInstall(ROOT, MAGI_DEST, magiCursorManifest(), [
+function installMagiCursor({ destination = MAGI_DEST, sourceRoot = ROOT } = {}) {
+  const prepared = prepareInstall(sourceRoot, destination, magiCursorManifest(), [
     ['.cursor/skills', 'skills'], ['.cursor/rules', 'rules'], ['agents', 'agents'],
-    ['tools', 'tools'], ['seat-skills', 'seat-skills'],
+    ['tools', 'tools'], ['seat-skills', 'seat-skills'], ['skill-sources.json', 'skill-sources.json'],
     ['commands/magi.md', 'commands/magi.md'], ['commands/magi-cli.md', 'commands/magi-cli.md'],
-  ]));
+  ], validateCliFiles);
+  // Validate legacy installed tests against source before dropping them from the new bundle.
+  for (const file of prepared.files.keys()) {
+    if (file.startsWith('tools/') && (file.endsWith('.test.js') || path.posix.basename(file) === 'test-fixtures.js')) prepared.files.delete(file);
+  }
+  return writeInstall(prepared);
 }
 
 function validateCliFiles(files) {
@@ -128,6 +134,8 @@ function validateCliFiles(files) {
     if (!files.has(required)) throw new Error(`installer source missing required file: ${required}`);
   }
   const profiles = JSON.parse(files.get('skills/magi-cli/references/seat-profiles.json').toString('utf8'));
+  if (profiles.schemaVersion < 7) throw new Error('installer source lacks operational lesson policy');
+  validateOperationalLessons(profiles);
   const skills = new Set(['baseSkills', 'roleSkills', 'classSkills'].flatMap(key => Object.values(profiles[key] || {}).flat()));
   for (const skill of skills) {
     if (typeof skill !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(skill) || !files.has(`seat-skills/${skill}/SKILL.md`)) {
@@ -189,6 +197,8 @@ function checkMagiCli(destination = MAGI_CLI_DEST) {
   if (fs.existsSync(path.join(paths.root, 'agents'))) throw new Error('magi-cursor-cli must not have an agents/ directory');
   checkSurface(paths.root, INSTALLED_MAGI_CLI_SURFACE, 'magi-cursor-cli');
   const profiles = JSON.parse(fs.readFileSync(paths.seatProfilesPath, 'utf8'));
+  if (profiles.schemaVersion < 7) throw new Error('installed runtime lacks operational lesson policy');
+  validateOperationalLessons(profiles);
   const skills = new Set(['baseSkills', 'roleSkills', 'classSkills'].flatMap(key => Object.values(profiles[key] || {}).flat()));
   for (const skill of skills) {
     if (typeof skill !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(skill) || !files.has(path.join(paths.seatSkillsRoot, skill, 'SKILL.md'))) {
@@ -239,6 +249,7 @@ module.exports = {
   readInstalledManifest,
   checkMagi,
   checkMagiCli,
+  installMagiCursor,
   installMagiCursorCli,
   main,
 };

@@ -23,7 +23,7 @@ function fixture(t) {
   const seatContractPath = path.join(evidence, 'SEAT-CONTRACT.md');
   fs.writeFileSync(seatContractPath, seatContractText({ ...run.dispatches[0], planId: run.planObject.planId,
     planHash: run.sealed.planHash }, seatProfile, skillStage, ruleStage));
-  const options = { briefPath, seatContractPath, skillRoot: skillStage.root, seatProfile,
+  const options = { briefPath, seatContractPath, skillRoot: skillStage.root, seatProfile, expectedCwd: run.cwd,
     rulesManifest: ruleStage.manifest, skillsManifest: skillStage.manifest, sessionId: SESSION };
   return { run, options, files: collectRequiredInstructionFiles(options).files };
 }
@@ -36,10 +36,10 @@ function claudeRows(f) {
       tool_use_result: { type: 'text', file: { filePath: file.path, content: text, startLine: 1, numLines: lines.length, totalLines: lines.length } } }];
   });
 }
-function codexRows(f) {
+function codexRows(f, { omitWorkdir = false } = {}) {
   return [{ type: 'session_meta', payload: { id: SESSION, session_id: SESSION, cwd: f.run.cwd } }, ...f.files.flatMap((file, index) => {
     const cmd = `Get-Content -Raw -LiteralPath '${file.path.replaceAll("'", "''")}' -Encoding UTF8`;
-    const args = { cmd, workdir: f.run.cwd, max_output_tokens: 10000 };
+    const args = { cmd, ...(omitWorkdir ? {} : { workdir: f.run.cwd }), max_output_tokens: 10000 };
     const output = file.text + '\n'; const callId = `read-${index}`;
     return [{ type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: callId,
       input: `const r = await tools.exec_command(${JSON.stringify(args)});\ntext(r.output);` } },
@@ -56,6 +56,50 @@ function verify(f, vendor, rows) {
     ...(vendor === 'google' ? { googleTranscriptBinding: { conversationId: SESSION, sha256: crypto.createHash('sha256').update(text).digest('hex') } } : {}),
     [vendor === 'anthropic' ? 'captureText' : 'transcriptText']: text });
 }
+
+test('Codex accepts omitted workdir only with complete native reads at the expected cwd', t => {
+  const f = fixture(t);
+  assert.equal(verify(f, 'openai', codexRows(f, { omitWorkdir: true })).status, 'PASS');
+  assert.equal(verify(f, 'openai', codexRows(f)).status, 'PASS', 'legacy explicit workdir remains valid');
+});
+
+for (const [label, mutate] of Object.entries({
+  'missing native cwd': rows => { delete rows[2].payload.item.cwd; },
+  'wrong native cwd': (rows, f) => { rows[2].payload.item.cwd = f.run.root; },
+  'unsafe native cwd': (rows, f) => { rows[2].payload.item.cwd = f.run.cwd + '\u0008'; },
+  'wrong explicit workdir': (rows, f, args) => { args.workdir = f.run.root; },
+  'null explicit workdir': (rows, f, args) => { args.workdir = null; },
+  'empty explicit workdir': (rows, f, args) => { args.workdir = ''; },
+  'control character in explicit workdir': (rows, f, args) => { args.workdir = f.run.cwd + '\u0008'; },
+  'unknown read argument': (rows, f, args) => { args.login = false; },
+  'injected read command': (rows, f, args) => { args.cmd += '; Write-Output fabricated'; rows[2].payload.item.command[2] = args.cmd; },
+})) {
+  test(`Codex omitted-workdir recipe rejects ${label}`, t => {
+    const f = fixture(t), rows = codexRows(f, { omitWorkdir: true });
+    const args = { cmd: rows[2].payload.item.command[2], max_output_tokens: 10000 };
+    mutate(rows, f, args);
+    rows[1].payload.input = `const r = await tools.exec_command(${JSON.stringify(args)}); text(r.output);`;
+    assert.throws(() => verify(f, 'openai', rows), { code: 'INSTRUCTION_READ_FAIL' });
+  });
+}
+
+test('Codex rejects internally consistent cwd forgery against the expected dispatch cwd', t => {
+  const f = fixture(t), rows = codexRows(f);
+  rows[0].payload.cwd = f.run.root;
+  for (const row of rows) {
+    if (row.payload?.type === 'custom_tool_call') {
+      const args = JSON.parse(row.payload.input.match(/tools\.exec_command\((\{[^\n]+\})\)/)[1]);
+      args.workdir = f.run.root;
+      row.payload.input = `const r = await tools.exec_command(${JSON.stringify(args)}); text(r.output);`;
+    } else if (row.payload?.item?.type === 'CommandExecution') row.payload.item.cwd = pathToFileURL(f.run.root).href;
+  }
+  assert.throws(() => verify(f, 'openai', rows), { code: 'INSTRUCTION_READ_FAIL' });
+});
+
+test('Codex read proof requires an expected dispatch cwd', t => {
+  const f = fixture(t); delete f.options.expectedCwd;
+  assert.throws(() => verify(f, 'openai', codexRows(f)), { code: 'INSTRUCTION_READ_FAIL' });
+});
 
 function googleRows(f) {
   const time = '2026-09-06T07:47:54Z';
@@ -231,6 +275,49 @@ test('Google native view_file batches correlate full content by logical step eve
   assert.equal(ordered.files.length, f.files.length);
   assert.ok(reordered.files.every(file => file.requestStep < file.resultStep));
   assert.equal(reordered.applicationProven, undefined);
+});
+
+test('Google accepts gaps and asynchronous product events only after complete instruction coverage', t => {
+  const f = fixture(t);
+  const reads = googleRows(f);
+  const expected = verify(f, 'google', reads).files;
+  for (const gap of [0, 1, 8]) {
+    const rows = [...reads,
+      { step_index: reads.length + gap, type: 'PLANNER_RESPONSE', source: 'MODEL', status: 'DONE', tool_calls: [{ name: 'run_command', args: { CommandLine: 'node --test' } }] },
+      { step_index: reads.length + gap + 1, type: 'ASYNC_PRODUCT_EVENT', source: 'SYSTEM' },
+      { step_index: reads.length + gap + 3, type: 'GENERIC', source: 'MODEL', status: 'DONE', content: 'Product result' },
+    ];
+    const result = verify(f, 'google', rows);
+    assert.equal(result.status, 'PASS');
+    assert.deepEqual(result.files, expected);
+    assert.equal(verify(f, 'google', [...rows].reverse()).status, 'PASS');
+  }
+});
+
+test('Google rejects a logical gap before the final required read result', t => {
+  const f = fixture(t); const rows = googleRows(f);
+  rows.at(-1).step_index += 1;
+  assert.throws(() => verify(f, 'google', rows), { code: 'INSTRUCTION_READ_FAIL' });
+});
+
+test('Google retains integer and duplicate step safeguards after instruction coverage', t => {
+  const f = fixture(t); const rows = googleRows(f);
+  for (const step_index of [rows.length - 1, -1, 1.5, '100', Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(() => verify(f, 'google', [...rows, { step_index, type: 'GENERIC' }]), { code: 'INSTRUCTION_READ_FAIL' });
+  }
+});
+
+test('Google does not finish coverage while its final required result is missing or invalid', t => {
+  const f = fixture(t);
+  for (const kind of ['missing', 'altered', 'truncated', 'early product']) {
+    const rows = googleRows(f);
+    if (kind === 'missing') rows.pop();
+    if (kind === 'altered') rows.at(-1).content += 'changed';
+    if (kind === 'truncated') rows.at(-1).truncated_fields = ['content'];
+    if (kind === 'early product') rows[rows.length - 1] = { step_index: rows.length - 1, type: 'PLANNER_RESPONSE', tool_calls: [{ name: 'run_command', args: {} }] };
+    rows.push({ step_index: rows.length, type: 'GENERIC', source: 'MODEL', status: 'DONE', content: 'Product output' });
+    assert.throws(() => verify(f, 'google', rows), { code: 'INSTRUCTION_READ_FAIL' });
+  }
 });
 
 for (const [label, mutate] of Object.entries({

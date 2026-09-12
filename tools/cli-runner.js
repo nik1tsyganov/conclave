@@ -11,6 +11,8 @@ function runLaunch(launch, options = {}) {
   return new Promise((resolve, reject) => {
     if (options.signal?.aborted) { reject(Object.assign(new Error('dispatch cancelled before launch'), { code: 'CANCELLED' })); return; }
     const spawnFn = options.spawn || spawn;
+    const lifetimeStart = Date.now();
+    const monotonicStart = process.hrtime.bigint();
     const child = spawnFn(launch.binary, launch.args, {
       cwd: launch.cwd,
       env: launch.env || process.env,
@@ -110,8 +112,10 @@ function runLaunch(launch, options = {}) {
 
     child.once('close', (code) => {
       if (settled) return;
-      if (failureError) { fail(Object.assign(failureError, { pid, exitConfirmed: true })); return; }
-      finish({ ok: code === 0 && !killReason, exitCode: code ?? 1, killed: Boolean(killReason), killReason, exitConfirmed: true });
+      const lifetime = { protocol: 'magi-process-lifetime-v1', pid, startedAt: new Date(lifetimeStart).toISOString(), endedAt: new Date().toISOString(),
+        elapsedMs: Number(process.hrtime.bigint() - monotonicStart) / 1e6, exitConfirmed: true, exitEvidence: 'child-close-event' };
+      if (failureError) { fail(Object.assign(failureError, { pid, exitConfirmed: true, lifetime })); return; }
+      finish({ ok: code === 0 && !killReason, exitCode: code ?? 1, killed: Boolean(killReason), killReason, exitConfirmed: true, lifetime });
     });
     // Every post-spawn write runs with cleanup and close listeners installed.
     try {

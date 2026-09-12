@@ -6,6 +6,20 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const { bindWorktree } = require('./host-helper-worktree.js');
+const { temporary } = require('./test-fixtures.js');
+
+test('worktree bind rejects a junction before writing a binding', t => {
+  const root = temporary(t, 'magi-worktree-junction-');
+  const allowed = path.join(root, 'allowed');
+  const target = path.join(root, 'outside');
+  fs.mkdirSync(allowed); fs.mkdirSync(target);
+  const link = path.join(allowed, 'alias');
+  const out = path.join(root, 'binding.json');
+  fs.symlinkSync(target, link, process.platform === 'win32' ? 'junction' : 'dir');
+  assert.throws(() => bindWorktree({ cwd: link, out, env: { MAGI_DEV_ROOT: allowed, MAGI_ALLOWED_WORKSPACE_ROOTS: '' } }), /symlink|junction/);
+  assert.equal(fs.existsSync(out), false);
+  assert.deepEqual(fs.readdirSync(target), []);
+});
 
 test('worktree bind accepts a MAGI-allowed directory and never counts as a vote', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-worktree-bind-'));

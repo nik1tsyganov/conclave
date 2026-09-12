@@ -38,10 +38,11 @@ test('installed CLI completes Claude checkpoint, foreign checks, activation, tal
   collector.codexSessionTranscript=native.codexSessionTranscript;
   collector.googleSessionTranscript=native.googleSessionTranscript;
   const {main}=require(path.join(tools,'dispatch-run.js'));
-  const common=['--plan',run.sealed.planPath,'--rules-root',run.opts.rulesRoot];
+  const common=['--plan',run.sealed.planPath,'--rules-root',run.opts.rulesRoot,
+    '--capacity',run.opts.capacity,'--legacy-capacity',run.opts.legacyCapacity];
   async function dispatch(id,extra=[]) {
     let stdout='',stderr='';
-    const code=await main([...common,'--dispatch-id',id,...extra],{stdout:{write:x=>stdout+=x},stderr:{write:x=>stderr+=x}});
+    const code=await main([...common,'--dispatch-id',id,...extra],{stdout:{write:x=>stdout+=x},stderr:{write:x=>stderr+=x}},{env:native.env});
     assert.equal(code,0,stderr);
     return JSON.parse(stdout);
   }

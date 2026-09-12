@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {probe}=require('./model-probe.js');
-const {temporary,nativeCapture}=require('./test-fixtures.js');
+const {temporary,nativeCapture,capacityFixture}=require('./test-fixtures.js');
 
 function fixture(t) {
   const root=temporary(t,'magi-probe-edge-');
@@ -16,27 +16,46 @@ function fixture(t) {
     fs.writeFileSync(launch.args[launch.args.indexOf('-o')+1],native.capture);
     return {ok:true,exitCode:0,exitConfirmed:true,stdout:'',stderr:native.log};
   };
-  return {root,calls:()=>calls,runLaunch,opts:{vendor:'openai',model:'gpt-5.6-terra',effort:'medium',evidenceDir:path.join(root,'evidence')}};
+  return {root,calls:()=>calls,runLaunch,env:{...process.env,MAGI_ALLOWED_WORKSPACE_ROOTS:root},opts:{vendor:'openai',model:'gpt-5.6-terra',effort:'medium',evidenceDir:path.join(root,'evidence'),...capacityFixture(root)}};
 }
 
 test('probe evidence inside a supplied workspace is rejected without calls or files',async t=>{
   const f=fixture(t),cwd=path.join(f.root,'product');fs.mkdirSync(cwd);
   const evidenceDir=path.join(cwd,'probe');
-  await assert.rejects(probe({...f.opts,cwd,evidenceDir},{runLaunch:f.runLaunch}),/outside.*workspace/i);
+  await assert.rejects(probe({...f.opts,cwd,evidenceDir},{runLaunch:f.runLaunch,env:f.env}),/outside.*workspace/i);
   assert.equal(f.calls(),0);assert.deepEqual(fs.readdirSync(cwd),[]);
+});
+
+test('probe applies workspace authorization before evidence or vendor launch',async t=>{
+  const f=fixture(t),cwd=path.join(f.root,'product');fs.mkdirSync(cwd);
+  const denied={...f.env,MAGI_DEV_ROOT:path.join(f.root,'different-root'),MAGI_ALLOWED_WORKSPACE_ROOTS:''};
+  await assert.rejects(probe({...f.opts,cwd},{runLaunch:f.runLaunch,env:denied}),{code:'WORKSPACE_FORBIDDEN'});
+  assert.equal(f.calls(),0);assert.equal(fs.existsSync(f.opts.evidenceDir),false);
+  const result=await probe({...f.opts,cwd},{runLaunch:f.runLaunch,env:f.env});
+  assert.equal(result.status,'PASS');assert.equal(f.calls(),1);
+  const processResult=JSON.parse(fs.readFileSync(result.processResult.path));
+  assert.equal(processResult.exitConfirmed,true);
+  assert.equal(result.processResult.sha256,require('./dispatch-evidence.js').hashFile(result.processResult.path));
+});
+
+test('default probe workspace applies authorization before creating its evidence root',async t=>{
+  const f=fixture(t);
+  const denied={...f.env,MAGI_DEV_ROOT:path.join(f.root,'different-root'),MAGI_ALLOWED_WORKSPACE_ROOTS:''};
+  await assert.rejects(probe(f.opts,{runLaunch:f.runLaunch,env:denied}),{code:'WORKSPACE_FORBIDDEN'});
+  assert.equal(f.calls(),0);assert.equal(fs.existsSync(f.opts.evidenceDir),false);
 });
 
 test('invalid probe timeout cannot create evidence or call a vendor',async t=>{
   const f=fixture(t);
   for(const maxWallMs of [NaN,Infinity,0,-1,1.5]) {
-    await assert.rejects(probe({...f.opts,maxWallMs},{runLaunch:f.runLaunch}),/maxWallMs/);
+    await assert.rejects(probe({...f.opts,maxWallMs},{runLaunch:f.runLaunch,env:f.env}),/maxWallMs/);
     assert.equal(f.calls(),0);assert.equal(fs.existsSync(f.opts.evidenceDir),false);
   }
 });
 
 test('probe preserves the owned PID and incomplete cleanup after unconfirmed exit',async t=>{
   const f=fixture(t);let options;
-  await assert.rejects(probe(f.opts,{runLaunch:async(launch,opts)=>{
+  await assert.rejects(probe(f.opts,{env:f.env,runLaunch:async(launch,opts)=>{
     options=opts;const error=Object.assign(new Error('synthetic unconfirmed child exit'),{code:'CHILD_EXIT_UNCONFIRMED',pid:1234,exitConfirmed:false});throw error;
   }}),/unconfirmed child/);
   assert.equal(options.pidFile,path.join(f.opts.evidenceDir,'child.pid'));
@@ -49,7 +68,7 @@ test('probe preserves the owned PID and incomplete cleanup after unconfirmed exi
 test('both default and separate probe workspaces succeed with native fixture evidence',async t=>{
   const f=fixture(t),cwd=path.join(f.root,'product');fs.mkdirSync(cwd);fs.writeFileSync(path.join(cwd,'keep.txt'),'unchanged');
   for(const [name,work]of [['default',undefined],['external',cwd]]) {
-    const result=await probe({...f.opts,cwd:work,evidenceDir:path.join(f.root,name)},{runLaunch:f.runLaunch});
+    const result=await probe({...f.opts,cwd:work,evidenceDir:path.join(f.root,name)},{runLaunch:f.runLaunch,env:f.env});
     assert.equal(result.status,'PASS');
   }
   assert.equal(f.calls(),2);assert.equal(fs.readFileSync(path.join(cwd,'keep.txt'),'utf8'),'unchanged');
@@ -57,9 +76,9 @@ test('both default and separate probe workspaces succeed with native fixture evi
 
 test('probe rejects a missing explicit cwd and runtime output before mutation',async t=>{
   const f=fixture(t),missing=path.join(f.root,'typo');
-  await assert.rejects(probe({...f.opts,cwd:missing},{runLaunch:f.runLaunch}),/existing directory/);
+  await assert.rejects(probe({...f.opts,cwd:missing},{runLaunch:f.runLaunch,env:f.env}),/existing directory/);
   assert.equal(fs.existsSync(missing),false);assert.equal(fs.existsSync(f.opts.evidenceDir),false);
   const evidenceDir=path.join(__dirname,'unexpected-probe-output');
-  await assert.rejects(probe({...f.opts,evidenceDir},{runLaunch:f.runLaunch}),/outside the runtime/);
+  await assert.rejects(probe({...f.opts,evidenceDir},{runLaunch:f.runLaunch,env:{...f.env,MAGI_ALLOWED_WORKSPACE_ROOTS:__dirname}}),/outside the runtime/);
   assert.equal(fs.existsSync(evidenceDir),false);assert.equal(f.calls(),0);
 });

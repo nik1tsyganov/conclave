@@ -2,6 +2,9 @@
 'use strict';
 
 const fs = require('node:fs');
+const { isDeepStrictEqual } = require('node:util');
+const { validateDispatchRow } = require('./dispatch-schema.js');
+const { committedRunRoot, verifyCommittedRow } = require('./dispatch-evidence.js');
 const { ensureVaultHome, looksSecret, requireVaultRoot, vaultError } = require('./magi-vault.js');
 
 function readJsonl(file) {
@@ -18,34 +21,73 @@ function readJsonl(file) {
 function hogFindings(rows) {
   const implementRows = rows.filter((row) => row.role === 'implement');
   if (!implementRows.length) return [{ id: 'hog:no-implement', severity: 'attention', detail: 'no implement rows; distribution floor cannot be scored' }];
-  const seen = new Set();
   const findings = [];
+  const groups = new Map();
   for (const row of implementRows) {
-    const key = `${row.dispatchId}\u0000${row.unitId}\u0000${row.vendor}`;
-    if (seen.has(key)) findings.push({ id: 'hog:duplicate', severity: 'fail', detail: `duplicate implement row ${row.dispatchId}/${row.unitId}/${row.vendor}` });
-    seen.add(key);
+    try {
+      if (row.schemaVersion !== 2) throw new Error('legacy row has no sealed plan context');
+      validateDispatchRow(row, { requireProof: true });
+      const key = JSON.stringify([row.planId, row.planHash]);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(row);
+    } catch (error) {
+      findings.push({ id: 'hog:unmeasured', severity: 'attention', detail: `legacy or invalid plan context: ${error.message}` });
+    }
   }
-  const counts = {};
-  for (const row of implementRows) counts[row.vendor] = (counts[row.vendor] || 0) + 1;
-  const total = implementRows.length;
-  for (const [vendor, count] of Object.entries(counts)) {
-    const share = count / total;
-    if (share > 0.6) findings.push({ id: 'hog:floor', severity: 'fail', detail: `${vendor} implement share ${Math.round(share * 100)}% exceeds 60%` });
+  for (const group of groups.values()) {
+    const { planId, planHash } = group[0];
+    const report = (id, severity, detail) => findings.push({ id, severity, planId, planHash, detail });
+    const seen = new Set();
+    let duplicate = false;
+    for (const row of group) {
+      const key = JSON.stringify([row.dispatchId, row.unitId, row.vendor]);
+      if (seen.has(key)) { report('hog:duplicate', 'fail', `duplicate implement row ${row.dispatchId}/${row.unitId}/${row.vendor}`); duplicate = true; }
+      seen.add(key);
+    }
+    if (duplicate) continue;
+    try {
+      // Load lazily: finalization can call the vault linker after publishing its exports.
+      const { readSealedRun } = require('./plan-seal.js');
+      const runRoot = committedRunRoot(group[0]);
+      const run = readSealedRun(runRoot);
+      if (run.plan.planId !== planId || run.seal.planHash !== planHash) throw new Error('sealed plan binding differs');
+      const planned = run.plan.dispatches.filter(row => row.role === 'implement');
+      const identity = row => [row.dispatchId, row.unitId, row.vendor];
+      const ordered = rows => rows.map(identity).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+      if (!isDeepStrictEqual(ordered(group), ordered(planned))) throw new Error('implementation rows are incomplete or differ from the sealed plan');
+      for (const row of group) {
+        if (committedRunRoot(row) !== runRoot) throw new Error('rows refer to different sealed runs');
+        verifyCommittedRow(row);
+      }
+      // readSealedRun applies validatePlan's min(3, units) and configured share cap.
+      report('hog:holds', 'ok', `sealed plan implementation distribution holds across ${planned.length} units; global rolling policy is not scored`);
+    } catch (error) {
+      report(error.code === 'POLICY_FAIL' ? 'hog:plan-invalid' : 'hog:unmeasured', error.code === 'POLICY_FAIL' ? 'fail' : 'attention', `sealed plan distribution cannot be scored: ${error.message}`);
+    }
   }
-  const vendors = Object.keys(counts);
-  if (vendors.length < 3) findings.push({ id: 'hog:idle-seat', severity: 'attention', detail: `expected 3 implement vendors, got ${vendors.length}` });
-  if (!findings.length) findings.push({ id: 'hog:holds', severity: 'ok', detail: 'implement distribution floor holds' });
   return findings;
 }
 
 function analyzeRows(rows) {
   const vendorByRole = { implement: {}, verify: {}, review: {} };
+  const plannedNotRun = { rowCount: 0, vendorShare: { implement: {}, verify: {}, review: {} } };
+  const outcomeKeys = ['dispatchId', 'unitId', 'role', 'vendor', 'class', 'planId', 'planHash', 'status'];
   const hostModes = {};
   let capturedByLead = 0;
   let missingCapturedBy = 0;
   let proofPresent = 0;
   let tokenPresent = 0;
   for (const row of rows) {
+    // Only the exact non-call outcome shape emitted by inspectRun is exempt.
+    // A NOT_RUN label with capture/proof/other fields remains visible for checks.
+    if (row.status === 'NOT_RUN' && Object.keys(row).length === outcomeKeys.length
+        && outcomeKeys.every(key => typeof row[key] === 'string' && row[key].trim())
+        && /^[a-f0-9]{64}$/.test(row.planHash)) {
+      plannedNotRun.rowCount += 1;
+      const share = plannedNotRun.vendorShare[row.role];
+      if (share) share[row.vendor] = (share[row.vendor] || 0) + 1;
+      continue;
+    }
     if (row.capturedBy === 'lead') capturedByLead += 1;
     else if (!row.capturedBy) missingCapturedBy += 1;
     if (row.role && vendorByRole[row.role] && row.vendor) {
@@ -55,14 +97,15 @@ function analyzeRows(rows) {
     if (row.proofId) proofPresent += 1;
     if (typeof row.vendorSideTokens === 'number' || typeof row.totalTokens === 'number') tokenPresent += 1;
   }
+  const activityRowCount = rows.length - plannedNotRun.rowCount;
   const findings = [];
   if (!rows.length) findings.push({ id: 'capture:zero-rows', severity: 'attention', detail: 'vault telemetry is empty; later MAGI analysis has nothing to score' });
   if (missingCapturedBy > 0) findings.push({ id: 'capture:missing-capturedBy', severity: 'attention', detail: `${missingCapturedBy} rows missing capturedBy` });
-  if (rows.length && proofPresent / rows.length < 0.5) {
-    findings.push({ id: 'proof:low', severity: 'attention', detail: `proofPresent ${proofPresent}/${rows.length}` });
+  if (activityRowCount && proofPresent / activityRowCount < 0.5) {
+    findings.push({ id: 'proof:low', severity: 'attention', detail: `proofPresent ${proofPresent}/${activityRowCount}` });
   }
-  if (rows.length && tokenPresent / rows.length < 0.5) {
-    findings.push({ id: 'tokens:null-rate', severity: 'attention', detail: `token fields present on ${tokenPresent}/${rows.length} rows` });
+  if (activityRowCount && tokenPresent / activityRowCount < 0.5) {
+    findings.push({ id: 'tokens:null-rate', severity: 'attention', detail: `token fields present on ${tokenPresent}/${activityRowCount} rows` });
   }
   findings.push(...hogFindings(rows));
   const needsAttention = findings.some((item) => item.severity !== 'ok');
@@ -70,9 +113,12 @@ function analyzeRows(rows) {
     schemaVersion: 1,
     analyzedAt: new Date().toISOString(),
     rowCount: rows.length,
+    activityRowCount,
+    plannedNotRun,
     captureHealth: { capturedByLead, missingCapturedBy, proofPresent, tokenPresent },
     vendorShare: vendorByRole,
     hostMode: hostModes,
+    globalDistribution: { status: 'unmeasured', detail: 'The separate global rolling-window breaker requires its own eligible completed window. This report does not clear or update it.' },
     findings,
     needsAttention,
   };
@@ -84,6 +130,8 @@ function renderAnalysisMarkdown(report) {
     '',
     `Analyzed at: ${report.analyzedAt}`,
     `Rows: ${report.rowCount}`,
+    `Planned NOT_RUN rows: ${report.plannedNotRun.rowCount}`,
+    `Rows requiring capture checks: ${report.activityRowCount} (not a count of proven native calls)`,
     `Needs attention: ${report.needsAttention ? 'yes' : 'no'}`,
     '',
     '## Findings',
@@ -96,7 +144,7 @@ function renderAnalysisMarkdown(report) {
     const parts = Object.entries(share).map(([vendor, count]) => `${vendor}:${count}`);
     lines.push(`- ${role}: ${parts.join(', ') || 'none'}`);
   }
-  lines.push('', 'This file is the durable MAGI analysis snapshot. Raw JSONL stays gitignored.');
+  lines.push('', report.globalDistribution.detail, '', 'This file is the durable MAGI analysis snapshot. Raw JSONL stays gitignored.');
   return `${lines.join('\n')}\n`;
 }
 

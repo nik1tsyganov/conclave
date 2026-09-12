@@ -6,9 +6,101 @@ const os = require('node:os');
 const path = require('node:path');
 const child = require('node:child_process');
 const test = require('node:test');
-const { check, main } = require('./magi-cli-preflight.js');
+const { check, checkNativeLaunchState, main } = require('./magi-cli-preflight.js');
 const { FINGERPRINT, FINGERPRINT_V2 } = require('./cli-rules-stage.js');
 const { CLI_RUNTIME_TOOLS } = require('./runtime-paths.js');
+
+// Exact installed helper reviewed for the conditional capture preflight exception.
+const CAPTURE_HELPER = String.raw`const fs = require("node:fs");
+const event = process.argv[2] || "unknown";
+let payload = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => { payload += chunk; });
+process.stdin.on("end", () => {
+  const target = process.env.SYNARA_ANTIGRAVITY_EVENTS;
+  if (!target) {
+    // Match the installed permission policy for inactive PreToolUse hooks.
+    // PreInvocation has no injected steps and must not emit a decision.
+    process.stdout.write(
+      (event === "pre-tool"
+        ? '{"decision":"ask"}'
+        : "{}") + "\n",
+    );
+    return;
+  }
+  let capturedPayload = payload.trim();
+  try {
+    const input = JSON.parse(capturedPayload);
+    const sanitized = {};
+    for (const key of ["conversationId", "transcriptPath", "modelName"]) {
+      if (typeof input[key] === "string" && input[key].trim()) sanitized[key] = input[key];
+    }
+    if (Number.isInteger(input.stepIdx) && input.stepIdx >= 0) sanitized.stepIdx = input.stepIdx;
+    if (event === "pre-tool") {
+      const name = input.toolCall && typeof input.toolCall.name === "string"
+        ? input.toolCall.name.trim()
+        : "";
+      if (name) {
+        sanitized.toolCall = {
+          name,
+          ...(input.toolCall.args && typeof input.toolCall.args === "object"
+            ? { args: input.toolCall.args }
+            : {}),
+        };
+      }
+    } else if (event === "post-tool") {
+      const name = input.toolCall && typeof input.toolCall.name === "string"
+        ? input.toolCall.name.trim()
+        : "";
+      if (name) {
+        sanitized.toolCall = {
+          name,
+          ...(input.toolCall.args && typeof input.toolCall.args === "object"
+            ? { args: input.toolCall.args }
+            : {}),
+        };
+      }
+      sanitized.failed = typeof input.error === "string" && input.error.trim().length > 0;
+      if (typeof input.error === "string" && input.error.trim()) sanitized.error = input.error;
+      if (input.toolOutput !== undefined) sanitized.toolOutput = input.toolOutput;
+      if (input.result !== undefined) sanitized.result = input.result;
+    }
+    capturedPayload = JSON.stringify(sanitized);
+  } catch {
+    capturedPayload = "{}";
+  }
+  fs.appendFileSync(target, event + "\t" + capturedPayload + "\n");
+  if (event === "pre-tool") {
+    const decision = process.env.SYNARA_ANTIGRAVITY_HOOK_DECISION === "allow" ? "allow" : "ask";
+    process.stdout.write(JSON.stringify({ decision }) + "\n");
+  } else if (event === "pre-invocation") {
+    // PreInvocation accepts optional injectSteps, not a permission decision.
+    process.stdout.write("{}\n");
+  } else {
+    // Stop and other non-tool hooks: empty object allows the agent to exit.
+    // Do not emit decision:"stop" — it is not a recognized stop decision and
+    // can hang the print process after the reply is already visible (#465).
+    process.stdout.write("{}\n");
+  }
+});
+`;
+
+function conditionalCapture(f) {
+  const binary = path.join(f.home, 'AppData', 'Local', 'Programs', 'synara-desktop', 'Synara.exe');
+  const helper = path.join(f.home, '.gemini', 'antigravity-cli', 'plugins', 'synara-capture', 'capture.cjs');
+  put(binary, 'file-only discovery');
+  put(helper, CAPTURE_HELPER);
+  const hooks = { 'synara-capture': {} };
+  for (const [event, argument] of Object.entries({ PreToolUse: 'pre-tool', PostToolUse: 'post-tool', PreInvocation: 'pre-invocation', PostInvocation: 'post-invocation', Stop: 'stop' })) {
+    const fallback = event === 'PreToolUse' ? '{"decision":"ask"}' : '{}';
+    const command = 'if not defined SYNARA_ANTIGRAVITY_EVENTS (more >nul 2>nul & echo ' + fallback + ') else (set ELECTRON_RUN_AS_NODE=1&& ' + binary + ' ' + helper + ' ' + argument + ')';
+    hooks['synara-capture'][event] = event.endsWith('ToolUse') ? [{ matcher: '*', hooks: [{ type: 'command', command }] }] : [{ type: 'command', command }];
+  }
+  const file = path.join(path.dirname(helper), 'hooks.json');
+  put(file, JSON.stringify(hooks));
+  f.platform = 'win32';
+  return { hooks, file, helper };
+}
 
 function put(file, body = 'fixture\n') {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -26,7 +118,8 @@ function fixture(t) {
   const home = path.join(root, 'home');
   const references = path.join(runtimeRoot, 'skills', 'magi-cli', 'references');
   const seatProfiles = path.join(references, 'seat-profiles.json');
-  const profiles = { arbiterSkills: ['magi-mode'], forbiddenSeatSkills: ['magi-mode'],
+  const profiles = { schemaVersion: 7, operationalLessons: require('./seat-policy').loadProfiles().operationalLessons,
+    arbiterSkills: ['magi-mode'], forbiddenSeatSkills: ['magi-mode'],
     baseSkills: { openai: ['seat-openai'] }, roleSkills: { verify: ['testing'] }, classSkills: {} };
   put(seatProfiles, JSON.stringify(profiles));
   put(path.join(references, 'dispatch-matrix.json'), '{}');
@@ -58,6 +151,29 @@ function snapshot(root) {
   walk(root);
   return entries;
 }
+
+test('native launch state checks only the selected vendor and never launches a process', t => {
+  const f = fixture(t);
+  const state = path.join(f.home, '.codex', '.sandbox', 'deny_read_acl_state.json');
+  put(state, Buffer.alloc(22));
+  const hook = path.join(f.home, '.gemini', 'antigravity-cli', 'plugins', 'synara-capture', 'hooks.json');
+  put(hook, JSON.stringify({ 'synara-capture': { PreToolUse: [{ command: 'echo {"decision":"ask"}' }] } }));
+  const before = snapshot(f.root);
+  assert.throws(() => checkNativeLaunchState('openai', { ...f, platform: 'win32' }), /native sandbox state/i);
+  assert.throws(() => checkNativeLaunchState('google', f), /emits ask/);
+  assert.equal(checkNativeLaunchState('anthropic', f).status, 'not-applicable');
+  assert.deepEqual(snapshot(f.root), before);
+});
+
+test('selected vendor preflight does not require unrelated vendor binaries or state', t => {
+  const f = fixture(t);
+  fs.unlinkSync(f.env.MAGI_CODEX_BIN); fs.unlinkSync(f.env.MAGI_AGY_BIN);
+  put(path.join(f.home, '.codex', '.sandbox', 'deny_read_acl_state.json'), Buffer.alloc(22));
+  const result = check({ ...f, vendor: 'anthropic', platform: 'win32' });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.findings.filter(row => row.check.startsWith('binary:')).map(row => row.check), ['binary:anthropic']);
+  assert.equal(result.findings.some(row => row.check === 'sandbox:openai-state' || row.check === 'google:synara-capture'), false);
+});
 
 test('preflight uses bundled skills and v2 rules with file-only binary discovery', t => {
   const f = fixture(t);
@@ -244,6 +360,61 @@ test('synara-capture PreToolUse allow passes Google preflight', t => {
   put(path.join(f.home, '.gemini', 'antigravity-cli', 'plugins', 'synara-capture', 'hooks.json'),
     '{"synara-capture":{"PreToolUse":[{"hooks":[{"command":"echo {\\"decision\\":\\"allow\\"}"}]}]}}');
   assert.equal(check(f).ok, true);
+});
+
+test('known conditional capture uses the adapter allow branch without writes or native calls', t => {
+  const f = fixture(t);
+  const { file } = conditionalCapture(f);
+  f.env.SYNARA_ANTIGRAVITY_HOOK_DECISION = 'ask';
+  const before = snapshot(f.root);
+  for (const name of ['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork']) t.mock.method(child, name, () => { throw new Error('no native calls'); });
+  const result = check(f);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const row = result.findings.find(row => row.check === 'google:synara-capture');
+  assert.equal(row.status, 'adapter-isolated');
+  assert.equal(require('./magi-synara-watch.js').inspectHooks(file, f), null);
+  assert.match(row.scope, /diagnostics.*not native proof/i);
+  assert.match(row.scope, /runtime.*untested/i);
+  assert.equal(f.env.SYNARA_ANTIGRAVITY_HOOK_DECISION, 'ask');
+  assert.deepEqual(snapshot(f.root), before);
+});
+
+test('malformed capture JSON and hook shapes fail without writes', t => {
+  const f = fixture(t);
+  const file = path.join(f.home, '.gemini', 'config', 'plugins', 'synara-capture', 'hooks.json');
+  for (const body of ['{broken', 'null', '{}', '{"synara-capture":{"PreToolUse":"bad"}}', '{"synara-capture":{"PreToolUse":[{"hooks":[{}]}]}}']) {
+    put(file, body);
+    const before = snapshot(f.root);
+    assert.equal(check(f).findings.find(row => row.check === 'google:synara-capture').ok, false, body);
+    assert.equal(require('./magi-synara-watch.js').inspectHooks(file, f).kind, 'hooks-invalid');
+    assert.deepEqual(snapshot(f.root), before);
+  }
+});
+
+test('conditional capture rejects modified active branches and helpers', t => {
+  const f = fixture(t);
+  const { hooks, file, helper } = conditionalCapture(f);
+  const command = hooks['synara-capture'].PreToolUse[0].hooks[0].command;
+  for (const changed of [command.replace('if not defined', 'if defined'), command.replace(' pre-tool)', ' pre-tool & echo {"decision":"ask"})'), command.replace('SYNARA_ANTIGRAVITY_EVENTS', 'OTHER_EVENTS')]) {
+    hooks['synara-capture'].PreToolUse[0].hooks[0].command = changed;
+    put(file, JSON.stringify(hooks));
+    assert.equal(check(f).findings.find(row => row.check === 'google:synara-capture').ok, false);
+  }
+  hooks['synara-capture'].PreToolUse[0].hooks[0].command = command;
+  put(file, JSON.stringify(hooks));
+  put(helper, CAPTURE_HELPER.replace('=== "allow"', '=== "deny"'));
+  assert.equal(check(f).findings.find(row => row.check === 'google:synara-capture').ok, false);
+});
+
+test('conditional capture cannot waive an extra ask command or a non-Windows shell', t => {
+  const f = fixture(t);
+  const { hooks, file } = conditionalCapture(f);
+  f.platform = 'linux';
+  assert.equal(check(f).findings.find(row => row.check === 'google:synara-capture').ok, false);
+  f.platform = 'win32';
+  hooks['synara-capture'].PreToolUse[0].hooks.push({ type: 'command', command: 'echo {"decision":"ask"}' });
+  put(file, JSON.stringify(hooks));
+  assert.equal(check(f).findings.find(row => row.check === 'google:synara-capture').ok, false);
 });
 
 test('Windows preflight rejects the 22-NUL native sandbox regression without writes', t => {
@@ -440,4 +611,21 @@ test('MAGI rejects Windows drive-root-relative CODEX_HOME even when the director
     assert.match(result.findings.find(row => row.check === 'sandbox:openai-state').error, /fully qualified CODEX_HOME/);
     assert.deepEqual(snapshot(f.root), before);
   }
+});
+
+test('PreInvocation accepts neutral output and rejects permission decisions', t => {
+  const f = fixture(t);
+  const file = path.join(f.home, '.gemini', 'antigravity-cli', 'plugins', 'synara-capture', 'hooks.json');
+  for (const [command, expected] of [['echo {}', true], ['echo {"decision":"allow"}', false], ['echo {"decision":"ask"}', false]]) {
+    put(file, JSON.stringify({'synara-capture': {PreInvocation: [{type: 'command', command}]}}));
+    assert.equal(check(f).findings.find(row => row.check === 'google:synara-capture').ok, expected, command);
+  }
+});
+
+test('conditional PreInvocation rejects the previous invalid decision fallback', t => {
+  const f = fixture(t);
+  const { hooks, file } = conditionalCapture(f);
+  hooks['synara-capture'].PreInvocation[0].command = hooks['synara-capture'].PreInvocation[0].command.replace('echo {}', 'echo {"decision":"allow"}');
+  put(file, JSON.stringify(hooks));
+  assert.equal(check(f).findings.find(row => row.check === 'google:synara-capture').ok, false);
 });

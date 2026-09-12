@@ -16,7 +16,8 @@ function claudeRun(t) {
 }
 function command(run, extra = []) {
   return parseArgs(['--plan', run.opts.plan, '--run-dir', run.runDir, '--dispatch-id', 'd1',
-    '--rules-root', run.opts.rulesRoot, '--skill-source-root', run.opts.skillSourceRoot, ...extra]);
+    '--rules-root', run.opts.rulesRoot, '--skill-source-root', run.opts.skillSourceRoot,
+    '--capacity', run.opts.capacity, '--legacy-capacity', run.opts.legacyCapacity, ...extra]);
 }
 function saved(run, id = 'd1') {
   const entry = run.dispatches.find(row => row.dispatchId === id);
