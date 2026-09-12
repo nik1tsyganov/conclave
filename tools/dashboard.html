@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>MAGI · Run observatory</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/dashboard.css">
+  <script src="/dashboard.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#work">Skip to dispatches</a>
+  <header class="masthead">
+    <div class="brand"><span class="sigil" aria-hidden="true">Ⅲ</span> MAGI <span class="edition">OBSERVATORY</span></div>
+    <span class="connection" id="connection" role="status"><i class="dot"></i><span>Connecting</span></span>
+  </header>
+  <div class="shell">
+    <aside class="rail" aria-label="Seat filters">
+      <div class="rail-caption">THE COUNCIL</div>
+      <button class="seat-filter selected" data-vendor="all" aria-pressed="true"><span>All seats</span><b id="all-count">—</b></button>
+      <button class="seat-filter" data-vendor="openai" aria-pressed="false"><span><strong>Melchior</strong><small>OpenAI · correctness</small></span><b id="openai-count">—</b></button>
+      <button class="seat-filter" data-vendor="anthropic" aria-pressed="false"><span><strong>Balthasar</strong><small>Anthropic · scrutiny</small></span><b id="anthropic-count">—</b></button>
+      <button class="seat-filter" data-vendor="google" aria-pressed="false"><span><strong>Casper</strong><small>Google · perspective</small></span><b id="google-count">—</b></button>
+      <div class="rail-note"><span class="small-label">OBSERVER MODE</span><p>Follow the work.<br>Keep the gates intact.</p><small>This view reads recorded activity. It does not dispatch seats or approve their work.</small></div>
+    </aside>
+    <main id="main">
+      <section class="heading">
+        <div><p class="eyebrow">MULTI-SEAT OPERATIONS</p><h1>Run observatory<span class="title-dot">.</span></h1><p id="run-name" class="run-name">Waiting for a sealed run</p></div>
+        <div class="controls"><button id="refresh" class="button" type="button">Refresh</button><button id="pause" class="button secondary" type="button" aria-pressed="false">Pause updates</button></div>
+      </section>
+      <div id="notice" class="notice" role="status" hidden></div>
+      <section class="facts" aria-label="Recorded run status">
+        <div><span class="small-label">DISPATCHES</span><strong id="dispatch-count">—</strong></div>
+        <div><span class="small-label">RECORDED EXECUTION</span><strong id="execution">—</strong></div>
+        <div><span class="small-label">RECORDED APPROVAL</span><strong id="approval">—</strong></div>
+        <div><span class="small-label">LAST SNAPSHOT</span><strong id="snapshot-time">—</strong></div>
+      </section>
+      <section class="map-section" aria-labelledby="map-title">
+        <div class="section-head"><div><p class="eyebrow">THE COMMUNICATION MAP</p><h2 id="map-title">One arbiter. Three perspectives.</h2></div><p class="legend"><span class="legend-line"></span> Recorded <span class="legend-line planned"></span> Planned</p></div>
+        <div class="map" id="map">
+          <svg class="wires" viewBox="0 0 1000 345" preserveAspectRatio="none" aria-hidden="true">
+            <defs><marker id="route-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1 L8 5 L1 9" class="route-arrow"/></marker></defs>
+            <path class="wire" id="wire-openai" d="M500 91 V145 H166 V218"/>
+            <path class="wire" id="wire-anthropic" d="M500 91 V218"/>
+            <path class="wire" id="wire-google" d="M500 91 V145 H834 V218"/>
+            <circle cx="500" cy="145" r="4" class="junction"/>
+            <g id="handoff-route" class="handoff-route"><path id="handoff-in" pathLength="100"/><path id="handoff-out" pathLength="100"/></g>
+          </svg>
+          <div class="arbiter"><span class="small-label">ARBITER</span><strong>Coordinator</strong><small>Routes work · does not vote</small></div>
+          <div class="map-seats">
+            <button class="map-seat" data-vendor="openai" aria-pressed="false"><span class="node-top"><span class="small-label">OPENAI</span><span class="node-signal">No activity</span></span><strong>Melchior</strong><span class="node-model">Awaiting plan</span><span class="node-bottom">—</span></button>
+            <button class="map-seat" data-vendor="anthropic" aria-pressed="false"><span class="node-top"><span class="small-label">ANTHROPIC</span><span class="node-signal">No activity</span></span><strong>Balthasar</strong><span class="node-model">Awaiting plan</span><span class="node-bottom">—</span></button>
+            <button class="map-seat" data-vendor="google" aria-pressed="false"><span class="node-top"><span class="small-label">GOOGLE</span><span class="node-signal">No activity</span></span><strong>Casper</strong><span class="node-model">Awaiting plan</span><span class="node-bottom">—</span></button>
+          </div>
+        </div>
+        <p class="map-note">Select a handoff to trace its route through the arbiter. New launch records briefly pulse; history stays still.</p>
+        <div class="handoff-heading"><div><span class="small-label">TASK HANDOFFS</span> <span id="handoff-count" class="count">0</span></div><button id="follow-handoffs" class="button secondary" type="button" aria-pressed="true">Follow latest</button></div>
+        <p id="handoff-announcement" class="sr-only" role="status" aria-live="polite"></p>
+        <div id="handoff-focus" class="handoff-focus" hidden>
+          <div class="handoff-meta"><span id="handoff-state" class="status">Planned dependency</span><time id="handoff-time"></time></div>
+          <div class="handoff-flow">
+            <div class="handoff-end"><span class="small-label">FROM</span><button id="handoff-from" type="button"></button><span id="handoff-from-task"></span></div>
+            <div class="handoff-link"><span>via arbiter</span><i aria-hidden="true"></i></div>
+            <div class="handoff-end"><span class="small-label">TO</span><button id="handoff-to" type="button"></button><span id="handoff-to-task"></span></div>
+          </div>
+          <p id="handoff-unit" class="handoff-unit"></p><p id="handoff-note" class="handoff-note"></p>
+        </div>
+        <div id="edges" class="edges" aria-label="Work handoffs"><p class="empty">Handoffs will appear as work is recorded.</p></div>
+      </section>
+      <div class="work-grid">
+        <section class="work" id="work" aria-labelledby="work-title" tabindex="-1">
+          <div class="section-head"><div><p class="eyebrow">SEAT ACTIVITY</p><h2 id="work-title">The work, in view.</h2></div><span id="work-count" class="count">0</span></div>
+          <label class="search"><span class="small-label">FIND A DISPATCH</span><input id="search" type="search" placeholder="Model, role, unit, or status" autocomplete="off"></label>
+          <div id="dispatches" class="dispatches"><p class="empty">Connecting to the run…</p></div>
+        </section>
+        <section class="timeline" aria-labelledby="timeline-title"><div class="section-head"><div><p class="eyebrow">RECORDED SIGNALS</p><h2 id="timeline-title">Activity trail</h2></div><span id="event-count" class="count">0</span></div><ol id="events" class="events"><li class="empty">No events received yet.</li></ol></section>
+      </div>
+      <footer><span id="footer-state">Auto-refresh every 2 seconds</span><span>Local observer · no vendor calls</span></footer>
+    </main>
+  </div>
+  <dialog id="detail" aria-labelledby="detail-title"><div class="dialog-head"><div><p class="eyebrow">DISPATCH DETAIL</p><h2 id="detail-title">Recorded evidence</h2></div><button id="close-detail" class="button secondary" type="button">Close</button></div><dl id="detail-fields"></dl><p class="detail-note">These are recorded facts, not a fresh acceptance check. A successful execution can still receive a review rejection.</p></dialog>
+</body>
+</html>

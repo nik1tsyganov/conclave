@@ -14,6 +14,7 @@ const {
   writeManifest,
   readInstalledManifest,
   CLI_RUNTIME_TOOLS,
+  CLI_DASHBOARD_FILES,
   installMagiCursor,
   installMagiCursorCli,
   checkMagiCli,
@@ -93,7 +94,8 @@ function sourceFixture(t, broad = false) {
   const entries = broad
     ? ['.cursor/skills', '.cursor/rules', 'commands', 'agents', 'seat-skills', 'skill-sources.json', 'tools']
     : ['.cursor/skills/magi-cli', '.cursor/rules', 'commands/magi-cli.md', 'seat-skills',
-      'skill-sources.json', 'tools/templates', 'tools/install-plugin.js', ...CLI_RUNTIME_TOOLS.map(name => `tools/${name}`)];
+      'skill-sources.json', 'tools/templates', 'tools/install-plugin.js',
+      ...[...CLI_RUNTIME_TOOLS, ...CLI_DASHBOARD_FILES].map(name => `tools/${name}`)];
   for (const relative of entries) {
     const from = path.join(repo, relative);
     const to = path.join(source, relative);
@@ -194,8 +196,40 @@ test('CLI installs into an empty directory and safely reinstalls known plugin co
   checkMagiCli(f.installed);
   assert.strictEqual(fs.readFileSync(path.join(f.installed, 'commands', 'magi-cli.md'), 'utf8'), '# changed command\n');
   assert.strictEqual(fs.existsSync(path.join(f.installed, 'sentinel.txt')), false);
-  for (const name of ['plan-seal.js', 'model-probe.js', 'probe-evidence.js', 'vendor-native.js', 'run-finalize.js', 'panel-tally.js', 'plugin-surface.js']) {
+  for (const name of ['plan-seal.js', 'model-probe.js', 'probe-evidence.js', 'vendor-native.js', 'run-finalize.js', 'panel-tally.js', 'plugin-surface.js', ...CLI_DASHBOARD_FILES]) {
     assert.deepStrictEqual(fs.readFileSync(path.join(f.installed, 'tools', name)), fs.readFileSync(path.join(f.source, 'tools', name)));
+  }
+});
+
+test('missing optional dashboard files fail the install check but leave native runtime preflight intact', t => {
+  const f = sourceFixture(t);
+  install(f);
+  const lookalikes = ['dashboard-helper.js', 'magi-dashboard-helper.js'];
+  for (const name of lookalikes) put(path.join(f.installed, 'tools', name), 'module.exports = 1;');
+  const evidence = require(path.join(f.installed, 'tools', 'dispatch-evidence.js'));
+  const before = evidence.runtimeManifest();
+  for (const name of fs.readdirSync(path.join(f.installed, 'tools'))) {
+    if (name.endsWith('.js') && !name.endsWith('.test.js') && !CLI_DASHBOARD_FILES.includes(name)) {
+      assert.ok(before.some(file => file.path === name), `production file is not bound: ${name}`);
+    }
+  }
+  for (const name of CLI_DASHBOARD_FILES) {
+    assert.strictEqual(CLI_RUNTIME_TOOLS.includes(name), false);
+    assert.strictEqual(before.some(file => file.path === name), false);
+    fs.unlinkSync(path.join(f.installed, 'tools', name));
+    assert.throws(() => checkMagiCli(f.installed), /magi-cursor-cli missing:/);
+  }
+  assert.deepStrictEqual(evidence.runtimeManifest(), before);
+  const preflight = require(path.join(f.installed, 'tools', 'magi-cli-preflight.js')).check({
+    runtimeRoot: f.installed, home: path.join(f.root, 'empty-home'), vendor: 'anthropic',
+    env: { MAGI_CLAUDE_BIN: process.execPath },
+  });
+  assert.strictEqual(preflight.findings.find(row => row.check === 'runtime:files').ok, true);
+  assert.doesNotThrow(() => require(path.join(f.installed, 'tools', 'dispatch-run.js')));
+  for (const name of lookalikes) {
+    put(path.join(f.installed, 'tools', name), 'module.exports = 2;');
+    assert.notStrictEqual(evidence.runtimeManifest().find(file => file.path === name).sha256,
+      before.find(file => file.path === name).sha256);
   }
 });
 
@@ -213,7 +247,7 @@ for (const added of ['file', 'empty-directory', 'nested-junction', 'malformed-ma
   });
 }
 
-for (const missing of ['tools/run-finalize.js', 'seat-skills/testing/SKILL.md', '.cursor/skills/magi-cli/references/seat-profiles.json']) {
+for (const missing of ['tools/run-finalize.js', 'tools/dashboard.html', 'seat-skills/testing/SKILL.md', '.cursor/skills/magi-cli/references/seat-profiles.json']) {
   test(`missing source ${missing} preserves a previous install`, t => {
     const f = sourceFixture(t);
     install(f);
@@ -401,4 +435,82 @@ test('documented startup command works without source or home policy in an isola
   assert.deepStrictEqual(snapshot(home), []);
   assert.strictEqual(fs.existsSync(f.source), false);
   t.diagnostic(JSON.stringify({ command, exitCode: result.status, stdout: result.stdout.trim(), sourceAvailable: false, homeFiles: 0 }));
+});
+
+for (const broad of [false, true]) test(`${broad ? 'broad Cursor' : 'CLI'} installed dashboard starts, serves assets and observations, and stops without source or native calls`, t => {
+  const f = sourceFixture(t, broad);
+  if (broad) installMagiCursor({ sourceRoot: f.source, destination: f.installed });
+  else install(f);
+  const runDir = path.join(f.root, 'run');
+  const plan = JSON.stringify({ planId: 'dashboard-install', hostMode: 'cursor-cli', dispatches: [
+    { dispatchId: 'implement-1', unitId: 'unit-1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high' },
+  ] });
+  put(path.join(runDir, 'dispatch-plan.json'), plan);
+  put(path.join(runDir, 'plan-seal.json'), JSON.stringify({ schemaVersion: 2, planId: 'dashboard-install',
+    planHash: require('node:crypto').createHash('sha256').update(plan).digest('hex'), sealedAt: '2026-01-01T00:00:00.000Z' }));
+  const moved = path.join(f.root, 'source-unavailable');
+  assert.strictEqual(path.dirname(f.source), f.root);
+  assert.strictEqual(path.dirname(moved), f.root);
+  fs.renameSync(f.source, moved);
+  const before = snapshot(f.installed), runBefore = snapshot(runDir);
+  const script = `
+    const assert = require('node:assert/strict');
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const Module = require('node:module');
+    const http = require('node:http');
+    const child = require('node:child_process');
+    for (const name of ['exec', 'execSync', 'execFile', 'execFileSync', 'spawn', 'spawnSync', 'fork']) child[name] = () => { throw new Error('native calls forbidden'); };
+    const resolve = Module._resolveFilename;
+    Module._resolveFilename = function (...args) {
+      const found = resolve.apply(this, args);
+      if (path.isAbsolute(found)) {
+        const relative = path.relative(process.cwd(), found);
+        assert.ok(relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative), 'dependency outside installed runtime: ' + found);
+      }
+      return found;
+    };
+    const listen = http.Server.prototype.listen;
+    http.Server.prototype.listen = () => { throw new Error('import must not start a listener'); };
+    const { startServer } = require('./tools/magi-dashboard.js');
+    http.Server.prototype.listen = listen;
+    (async () => {
+      const dashboard = await startServer({ runDir: process.env.TEST_RUN, port: 0 });
+      try {
+        const url = new URL(dashboard.url);
+        assert.equal(url.hostname, '127.0.0.1');
+        assert.equal(new URLSearchParams(url.hash.slice(1)).get('token'), dashboard.token);
+        for (const [route, file] of [['/', 'dashboard.html'], ['/dashboard.css', 'dashboard.css'], ['/dashboard.js', 'dashboard.js']]) {
+          const response = await fetch(dashboard.origin + route);
+          assert.equal(response.status, 200);
+          assert.deepEqual(Buffer.from(await response.arrayBuffer()), fs.readFileSync(path.join('tools', file)));
+        }
+        assert.equal((await fetch(dashboard.origin + '/api/snapshot')).status, 401);
+        const response = await fetch(dashboard.origin + '/api/snapshot', { headers: { Authorization: 'Bearer ' + dashboard.token } });
+        assert.equal(response.status, 200);
+        const observed = await response.json();
+        assert.equal(observed.run.id, 'dashboard-install');
+        assert.equal(observed.dispatches.length, 1);
+      } finally {
+        const closed = new Promise(resolve => dashboard.server.close(resolve));
+        dashboard.server.closeAllConnections();
+        await closed;
+      }
+      assert.equal(dashboard.server.listening, false);
+      console.log(JSON.stringify({ sourceAvailable: false, nativeCalls: 0, assets: 3, snapshots: 1, listenerClosed: true }));
+    })().catch(error => { console.error(error); process.exitCode = 1; });
+  `;
+  const result = spawnSync(process.execPath, ['-e', script], {
+    cwd: f.installed, env: { ...process.env, TEST_RUN: runDir }, input: '', encoding: 'utf8',
+    timeout: 30000, windowsHide: true, shell: false,
+  });
+  assert.strictEqual(result.status, 0, result.stderr || result.error?.message);
+  assert.strictEqual(fs.existsSync(f.source), false);
+  assert.deepStrictEqual(snapshot(f.installed), before);
+  assert.deepStrictEqual(snapshot(runDir), runBefore);
+  const command = 'node tools/magi-dashboard.js --run-dir <sealed-run-directory>';
+  for (const relative of ['skills/magi-cli/SKILL.md', 'skills/magi-cli/references/cursor-cli.md']) {
+    assert.ok(fs.readFileSync(path.join(f.installed, relative), 'utf8').includes(command));
+  }
+  t.diagnostic(result.stdout.trim());
 });

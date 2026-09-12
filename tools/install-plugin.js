@@ -22,6 +22,8 @@ const USER_SKILL_MAGI = path.join(os.homedir(), '.cursor', 'skills', 'magi');
 const USER_SKILL_MAGI_CLI = path.join(os.homedir(), '.cursor', 'skills', 'magi-cli');
 const USER_RULES_DIR = path.join(os.homedir(), '.cursor', 'rules');
 const CLAUDE_CMD_DIR = path.join(os.homedir(), '.claude', 'commands');
+// Optional observer files ship with the plugin but are not native runtime prerequisites.
+const CLI_DASHBOARD_FILES = Object.freeze(['magi-dashboard.js', 'dashboard.html', 'dashboard.css', 'dashboard.js']);
 
 function bail(msg) { console.error(`CANNOT RUN: ${msg}`); process.exit(2); }
 function copyDir(src, dest) { if (!fs.existsSync(src)) throw new Error(`missing ${src}`); fs.cpSync(src, dest, { recursive: true }); }
@@ -150,6 +152,7 @@ function installMagiCursorCli({ destination = MAGI_CLI_DEST, sourceRoot = ROOT }
     ['commands/magi-cli.md', 'commands/magi-cli.md'], ['tools/templates', 'tools/templates'],
     ['seat-skills', 'seat-skills'], ['skill-sources.json', 'skill-sources.json'],
     ...CLI_RUNTIME_TOOLS.map(tool => [`tools/${tool}`, `tools/${tool}`]),
+    ...CLI_DASHBOARD_FILES.map(file => [`tools/${file}`, `tools/${file}`]),
   ], validateCliFiles);
   return writeInstall(prepared);
 }
@@ -187,6 +190,7 @@ function checkMagiCli(destination = MAGI_CLI_DEST) {
     'rules/magi-arbiter.mdc',
     'commands/magi-cli.md',
     ...CLI_RUNTIME_TOOLS.map((name) => `tools/${name}`),
+    ...CLI_DASHBOARD_FILES.map((name) => `tools/${name}`),
     'skill-sources.json',
   ];
   const missing = required.filter((rel) => !files.has(path.join(paths.root, rel)));
@@ -243,6 +247,7 @@ if (require.main === module) {
 module.exports = {
   ROOT,
   CLI_RUNTIME_TOOLS,
+  CLI_DASHBOARD_FILES,
   magiCursorManifest,
   magiCliManifest,
   writeManifest,

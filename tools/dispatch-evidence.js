@@ -13,7 +13,8 @@ function evidenceError(message, code = 'EVIDENCE_FAIL') { return Object.assign(n
 function hash(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
 function hashFile(file) { return hash(fs.readFileSync(file)); }
 function runtimeManifest() {
-  return fs.readdirSync(__dirname).filter(name => name.endsWith('.js') && !name.endsWith('.test.js')).sort().map(name => ({ path: name, sha256: hashFile(path.join(__dirname, name)) }));
+  // The optional observer never participates in native dispatch or acceptance.
+  return fs.readdirSync(__dirname).filter(name => name.endsWith('.js') && !name.endsWith('.test.js') && name !== 'magi-dashboard.js' && name !== 'dashboard.js').sort().map(name => ({ path: name, sha256: hashFile(path.join(__dirname, name)) }));
 }
 function assertPlainPath(file) {
   let current = path.resolve(file);
