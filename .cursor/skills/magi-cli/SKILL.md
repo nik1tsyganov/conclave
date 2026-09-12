@@ -33,6 +33,12 @@ Unknown or unproven models are unavailable. Every native model/effort pair is pr
 
 Changed route, class, author, scope, or brief requires a newly validated complete plan and seal. A graph override or ad-hoc launch flag cannot alter a sealed dispatch.
 
+## Optional run dashboard
+
+From the source or installed runtime root, run `node tools/magi-dashboard.js --run-dir <sealed-run-directory>`. Add `--port <port>` to choose a port; the default is a random loopback port. Open the printed URL, including its token fragment. Ctrl+C stops the dashboard only.
+
+The dashboard reads recorded activity. It is not an acceptance checker and never launches vendor calls. It excludes prompts, credentials, and raw transcripts. Native work does not require it. See `references/cursor-cli.md` for the viewer's limits.
+
 ## Seat roles and permissions
 
 | Role | Product permission | Core work |

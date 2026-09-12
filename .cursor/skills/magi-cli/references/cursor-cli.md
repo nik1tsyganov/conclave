@@ -161,6 +161,21 @@ Production Claude dispatches request a native `--json-schema` envelope. Put the 
 
 Google probes and dispatches supply `--log-file <evidence-dir>/native-cli.log`. Each call has a unique evidence directory. Default second-resolution home-log names can collide during parallel calls, so proof collection uses the pinned native file when building `vendor.log`.
 
+## Optional run dashboard
+
+From the source or installed runtime root, start the viewer for a sealed run:
+
+```powershell
+node tools/magi-dashboard.js --run-dir <sealed-run-directory>
+# Optional: --port <port>
+```
+
+Open the printed URL, including its token fragment. The server binds only to loopback and selects a random port by default. The token stays in the browser fragment and authorizes local data requests. Press Ctrl+C to stop the dashboard only; vendor work continues independently.
+
+The viewer reads recorded activity and refreshes it as run files change. It does not launch vendors, dispatch, attest, finalize, or check acceptance. Missing or stopped dashboard files do not block native work. The installer includes this optional viewer separately from mandatory runtime prerequisites.
+
+The view excludes prompts, credentials, and raw transcripts. Recorded states and prerequisite links describe saved evidence; they do not prove live process health, direct peer messaging, or approval. Use the normal native evidence and finalization procedure for acceptance.
+
 ## Read the committed evidence
 
 ### Maintained lessons and enforcement

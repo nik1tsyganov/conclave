@@ -74,6 +74,18 @@ Each launch uses the sealed availability snapshot. An optional `--availability` 
 
 The runner consumes route fields from the sealed entry. It rejects changed class, author, role, model, effort, scope, or brief. A corrected route requires a new complete plan and seal. A SLICES vendor column or edited graph node cannot override it.
 
+## Optional run dashboard
+
+From the source or installed runtime root, open a read-only view of a sealed run:
+
+```powershell
+node tools/magi-dashboard.js --run-dir <sealed-run-directory>
+```
+
+The command prints a loopback URL with a token fragment. Open that URL in your browser. It uses a random port by default; add `--port <port>` to select one. Press Ctrl+C to stop the dashboard only.
+
+The view shows recorded activity. It does not check acceptance or launch vendor calls. It excludes prompts, credentials, and raw transcripts. A missing or stopped dashboard does not block native work. See the [CLI run guide](.cursor/skills/magi-cli/references/cursor-cli.md) for details.
+
 ## Seat capabilities and scope
 
 [Seat profiles](.cursor/skills/magi-cli/references/seat-profiles.json) select the vendor card, role skills, and domain class extras. Long-run classes add no host loop or harness copies. The runtime stages only those lean files and hashes them.
