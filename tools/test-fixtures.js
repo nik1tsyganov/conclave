@@ -18,14 +18,14 @@ function nativeCapture(vendor, model, effort, response, sandbox = 'read-only') {
   const result = { type: 'result', subtype: 'success', is_error: false, result: response, session_id: SESSION, usage: { input_tokens: 100, output_tokens: 23 }, modelUsage: { [model]: { inputTokens: 100, outputTokens: 23 } } };
   return { capture: JSON.stringify(result), log: JSON.stringify({ type: 'assistant', sessionId: SESSION, effort, message: { model, content: [{ type: 'text', text: response }], usage: { input_tokens: 100, output_tokens: 23 } } }) };
 }
-function probeRecord(root, vendor, model, effort, observedModel = model) {
+function probeRecord(root, vendor, model, effort, observedModel = model, completedAt) {
   const directory = path.join(root, `${vendor}-${model}-${effort}`);
   fs.mkdirSync(directory, { recursive: true });
   const native = nativeCapture(vendor, observedModel, effort, CHALLENGE);
   const capture = path.join(directory, 'capture.txt');
   const log = path.join(directory, 'vendor.log');
   fs.writeFileSync(capture, native.capture); fs.writeFileSync(log, native.log);
-  const completedAt = new Date().toISOString();
+  completedAt ??= new Date().toISOString();
   const file = path.join(directory, 'probe.json');
   writeJson(file, { schemaVersion: 1, status: 'PASS', vendor, requestedModel: model, observedModel, effort, challenge: CHALLENGE, capture, log, captureSha256: hashFile(capture), logSha256: hashFile(log), startedAt: completedAt, completedAt });
   return { available: true, vendor, requestedModel: model, observedModel, effort, observedAt: completedAt, evidence: { path: file, sha256: hashFile(file) } };

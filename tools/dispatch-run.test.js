@@ -333,11 +333,37 @@ async function failedRecovery(t, entries) {
   f.first = require('./dispatch-evidence.js').recoveryPaths(f.run.runDir, f.run.dispatches.at(-1));
   f.secondRequest = path.join(f.run.root, 'recovery-request-2.json');
   f.firstRequestSha256 = prepared.recoverySha256;
-  const observed = require('./test-fixtures.js').probeRecord(path.join(f.run.root, 'retry-probes'), 'openai', 'gpt-5.6-sol', 'high');
+  const predecessor = JSON.parse(fs.readFileSync(f.first.transactionPath));
+  // Keep synthetic event order explicit when both events share one clock tick.
+  const completedAt = new Date(Math.max(Date.now(), Date.parse(predecessor.completedAt) + 1)).toISOString();
+  const observed = require('./test-fixtures.js').probeRecord(path.join(f.run.root, 'retry-probes'), 'openai', 'gpt-5.6-sol', 'high', undefined, completedAt);
   f.opts.availability = path.join(f.run.root, 'retry-availability.json');
   writeJson(f.opts.availability, { vendors: { openai: { models: { 'gpt-5.6-sol': { efforts: { high: observed } } } } } });
   return f;
 }
+
+test('second recovery fixture orders a renewed probe when the clock has not advanced', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  const f = await failedRecovery(t);
+  const prepared = await runDispatch({ ...f.opts, prepareRecovery: f.secondRequest, recoveryAttempt: 2 }, f.deps);
+  assert.equal(prepared.status, 'RECOVERY_PREPARED');
+  const manifest = JSON.parse(fs.readFileSync(f.secondRequest));
+  const availability = JSON.parse(fs.readFileSync(f.opts.availability));
+  const observed = availability.vendors.openai.models['gpt-5.6-sol'].efforts.high;
+  assert.equal(Date.parse(observed.observedAt), Date.parse(manifest.previousAttempt.completedAt) + 1);
+});
+
+test('second recovery rejects a probe at the failed predecessor completion time', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  const f = await failedRecovery(t);
+  const predecessor = JSON.parse(fs.readFileSync(f.first.transactionPath));
+  const observed = require('./test-fixtures.js').probeRecord(path.join(f.run.root, 'retry-probes'), 'openai', 'gpt-5.6-sol', 'high', undefined, predecessor.completedAt);
+  writeJson(f.opts.availability, { vendors: { openai: { models: { 'gpt-5.6-sol': { efforts: { high: observed } } } } } });
+  await assert.rejects(runDispatch({ ...f.opts, prepareRecovery: f.secondRequest, recoveryAttempt: 2 }, f.deps),
+    /second recovery requires a probe after the failed predecessor/);
+  assert.equal(f.deps.calls(), 0);
+  assert.equal(fs.existsSync(f.secondRequest), false);
+});
 
 test('explicit second recovery prepares after a completed clean failed predecessor', async t => {
   const f = await failedRecovery(t);
