@@ -84,7 +84,7 @@ node tools/magi-dashboard.js --run-dir <sealed-run-directory>
 
 The command prints a loopback URL with a token fragment. Open that URL in your browser. It uses a random port by default; add `--port <port>` to select one. Press Ctrl+C to stop the dashboard only.
 
-The view shows recorded activity. It does not check acceptance or launch vendor calls. It excludes prompts, credentials, and raw transcripts. A missing or stopped dashboard does not block native work. See the [CLI run guide](.cursor/skills/magi-cli/references/cursor-cli.md) for details.
+The view shows recorded activity and selectable seat-to-seat handoff routes. New launch-bound handoffs briefly pulse; historical and planned links stay still. It does not check acceptance or launch vendor calls. It excludes prompts, credentials, and raw transcripts. A missing or stopped dashboard does not block native work. See the [CLI run guide](.cursor/skills/magi-cli/references/cursor-cli.md) for details.
 
 ## Seat capabilities and scope
 

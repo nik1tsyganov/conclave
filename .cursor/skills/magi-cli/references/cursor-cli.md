@@ -176,6 +176,10 @@ The viewer reads recorded activity and refreshes it as run files change. It does
 
 The view excludes prompts, credentials, and raw transcripts. Recorded states and prerequisite links describe saved evidence; they do not prove live process health, direct peer messaging, or approval. Use the normal native evidence and finalization procedure for acceptance.
 
+Select a task handoff to highlight its source seat, arbiter route, and receiving seat. The detail shows roles, task IDs, launch time, and upstream proof references. Follow latest selects the newest recorded handoff. Planned dependencies use dashed lines; a recorded receiving launch replaces the matching planned link. Recovery attempts keep separate handoff records.
+
+New handoffs pulse briefly only during continuous observation and within 15 seconds of their recorded launch. Initial load, reconnect, resume, old records, and planned links do not pulse. Pause and hidden tabs invalidate pending observation requests. Reduced-motion preferences suppress moving particles. The diagram shows recorded prerequisite use through the arbiter; it does not claim direct seat messaging.
+
 ## Read the committed evidence
 
 ### Maintained lessons and enforcement

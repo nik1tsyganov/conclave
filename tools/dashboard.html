@@ -40,10 +40,12 @@
         <div class="section-head"><div><p class="eyebrow">THE COMMUNICATION MAP</p><h2 id="map-title">One arbiter. Three perspectives.</h2></div><p class="legend"><span class="legend-line"></span> Recorded <span class="legend-line planned"></span> Planned</p></div>
         <div class="map" id="map">
           <svg class="wires" viewBox="0 0 1000 345" preserveAspectRatio="none" aria-hidden="true">
+            <defs><marker id="route-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1 L8 5 L1 9" class="route-arrow"/></marker></defs>
             <path class="wire" id="wire-openai" d="M500 91 V145 H166 V218"/>
             <path class="wire" id="wire-anthropic" d="M500 91 V218"/>
             <path class="wire" id="wire-google" d="M500 91 V145 H834 V218"/>
             <circle cx="500" cy="145" r="4" class="junction"/>
+            <g id="handoff-route" class="handoff-route"><path id="handoff-in" pathLength="100"/><path id="handoff-out" pathLength="100"/></g>
           </svg>
           <div class="arbiter"><span class="small-label">ARBITER</span><strong>Coordinator</strong><small>Routes work · does not vote</small></div>
           <div class="map-seats">
@@ -52,7 +54,18 @@
             <button class="map-seat" data-vendor="google" aria-pressed="false"><span class="node-top"><span class="small-label">GOOGLE</span><span class="node-signal">No activity</span></span><strong>Casper</strong><span class="node-model">Awaiting plan</span><span class="node-bottom">—</span></button>
           </div>
         </div>
-        <p class="map-note">Connections show recorded dispatches and returns. Bound prerequisites appear below; planned links are not delivered messages.</p>
+        <p class="map-note">Select a handoff to trace its route through the arbiter. New launch records briefly pulse; history stays still.</p>
+        <div class="handoff-heading"><div><span class="small-label">TASK HANDOFFS</span> <span id="handoff-count" class="count">0</span></div><button id="follow-handoffs" class="button secondary" type="button" aria-pressed="true">Follow latest</button></div>
+        <p id="handoff-announcement" class="sr-only" role="status" aria-live="polite"></p>
+        <div id="handoff-focus" class="handoff-focus" hidden>
+          <div class="handoff-meta"><span id="handoff-state" class="status">Planned dependency</span><time id="handoff-time"></time></div>
+          <div class="handoff-flow">
+            <div class="handoff-end"><span class="small-label">FROM</span><button id="handoff-from" type="button"></button><span id="handoff-from-task"></span></div>
+            <div class="handoff-link"><span>via arbiter</span><i aria-hidden="true"></i></div>
+            <div class="handoff-end"><span class="small-label">TO</span><button id="handoff-to" type="button"></button><span id="handoff-to-task"></span></div>
+          </div>
+          <p id="handoff-unit" class="handoff-unit"></p><p id="handoff-note" class="handoff-note"></p>
+        </div>
         <div id="edges" class="edges" aria-label="Work handoffs"><p class="empty">Handoffs will appear as work is recorded.</p></div>
       </section>
       <div class="work-grid">

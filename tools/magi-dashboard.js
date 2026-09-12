@@ -103,9 +103,11 @@ function createSnapshot(runDir, { nowMs = Date.now() } = {}) {
     if (!at) return;
     events.push({ id: `${dispatch.id}:${attempt}:${kind}`, at, dispatchId: dispatch.id, vendor: dispatch.vendor, kind, status, summary, source });
   }
-  function edge(from, to, kind, label, observed) {
+  function edge(from, to, kind, label, observed, metadata = {}) {
+    const id = `${kind}:${from}:${to}${metadata.attemptNumber === undefined ? '' : `:${metadata.attemptNumber}`}`;
+    if (edges.some(row => row.id === id)) return;
     if (edges.length >= LIMITS.edges) fail('Run graph exceeds the edge limit');
-    if (!edges.some(row => row.from === from && row.to === to && row.kind === kind)) edges.push({ from, to, kind, label, observed });
+    edges.push({ id, from, to, kind, label, observed, ...metadata });
   }
   function observe(entry, dispatch, relative, evidenceRelative, number) {
     const record = read.json(relative, true);
@@ -136,15 +138,21 @@ function createSnapshot(runDir, { nowMs = Date.now() } = {}) {
       if (!launch && ['PASS', 'AWAITING_ATTESTATION'].includes(attempt.status)) { attempt.status = 'UNKNOWN'; attempt.issue = 'INCOMPLETE_LAUNCH'; }
       if (launch) {
         const at = timestamp(launch.startedAt);
-        const launchBound = launch.planId === plan.planId && launch.planHash === seal.planHash && isDeepStrictEqual(launch.planEntry, entry) && at === startedAt;
+        const launchBound = launch.planId === plan.planId && launch.planHash === seal.planHash && isDeepStrictEqual(launch.planEntry, entry) && at && at === startedAt && Date.parse(at) <= nowMs;
         if (!launchBound) { attempt.status = 'UNKNOWN'; attempt.issue = 'UNBOUND_LAUNCH'; }
         else {
           event(dispatch, number, 'launch', at, 'RUNNING', 'Native launch metadata recorded', `${evidenceRelative}/launch.json`);
           edge('arbiter', dispatch.id, 'dispatch', 'Observed launch', true);
           if (launch.prerequisites !== undefined && (!Array.isArray(launch.prerequisites) || launch.prerequisites.length > LIMITS.dispatches)) fail('Launch prerequisites are invalid or exceed the limit');
           for (const prior of launch.prerequisites || []) {
-            if (object(prior) && ids.has(prior.dispatchId) && prior.dispatchId !== dispatch.id && HASH.test(prior.proofId || '') && HASH.test(prior.transactionSha256 || '')) edge(prior.dispatchId, dispatch.id, 'prerequisite', 'Bound prerequisite recorded at launch', true);
-            else { attempt.status = 'UNKNOWN'; attempt.issue = 'INVALID_PREREQUISITE'; }
+            if (object(prior) && ids.has(prior.dispatchId) && prior.dispatchId !== dispatch.id && HASH.test(prior.proofId || '') && HASH.test(prior.transactionSha256 || '')) {
+              // These are upstream references saved by the producer, not fresh proof validation
+              // or evidence of direct peer transport. Keep each consumer attempt distinct.
+              edge(prior.dispatchId, dispatch.id, 'prerequisite', 'Bound prerequisite recorded at launch', true, {
+                at, source: `${evidenceRelative}/launch.json`, proofId: prior.proofId, transactionSha256: prior.transactionSha256,
+                attemptId: attempt.id, attemptNumber: number,
+              });
+            } else { attempt.status = 'UNKNOWN'; attempt.issue = 'INVALID_PREREQUISITE'; }
           }
         }
       }
