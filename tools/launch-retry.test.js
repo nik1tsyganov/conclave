@@ -33,7 +33,7 @@ function failingOnce(vendor, stderr, times = 1) {
 }
 
 test('a classified launch failure keeps its evidence, marks the transaction RETRYABLE, and the same id re-runs to PASS', async t => {
-  const run = createSealedRun(t, [{ vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium', role: 'implement', class: 'standard-feature' }]);
+  const run = createSealedRun(t, [{ vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium', role: 'implement', class: 'standard-feature' }]);
   const native = failingOnce('openai', 'ERROR: Reconnecting... waiting for network');
   const opts = { ...run.opts, dispatchId: run.dispatches[0].dispatchId };
   await assert.rejects(runDispatch(opts, native), (error) => error.code === 'LAUNCH_RETRYABLE' && error.attempt === 1 && error.signature === 'network-reconnect');
@@ -52,14 +52,14 @@ test('a classified launch failure keeps its evidence, marks the transaction RETR
 });
 
 test('an unclassified failure stays terminal and retries are capped at two', async t => {
-  const run = createSealedRun(t, [{ vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium', role: 'implement', class: 'standard-feature' }]);
+  const run = createSealedRun(t, [{ vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium', role: 'implement', class: 'standard-feature' }]);
   const opts = { ...run.opts, dispatchId: run.dispatches[0].dispatchId };
   await assert.rejects(runDispatch(opts, failingOnce('openai', 'exit 1 for an unknown reason')), (error) => error.code === 'LAUNCH_FAIL');
   const file = path.join(run.runDir, '.magi-dispatches');
   assert.equal(JSON.parse(fs.readFileSync(path.join(file, fs.readdirSync(file)[0]), 'utf8')).status, 'FAIL');
   await assert.rejects(runDispatch(opts, fakeVendor()), /use a new dispatch ID/);
 
-  const run2 = createSealedRun(t, [{ vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium', role: 'implement', class: 'standard-feature' }]);
+  const run2 = createSealedRun(t, [{ vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium', role: 'implement', class: 'standard-feature' }]);
   const opts2 = { ...run2.opts, dispatchId: run2.dispatches[0].dispatchId };
   const always = failingOnce('openai', 'ERROR: Reconnecting... waiting for network', 99);
   await assert.rejects(runDispatch(opts2, always), (error) => error.code === 'LAUNCH_RETRYABLE' && error.attempt === 1);
@@ -72,7 +72,7 @@ test('an unclassified failure stays terminal and retries are capped at two', asy
 });
 
 test('a run refuses a launch beyond principles.maxConcurrentDispatches while earlier seats are RUNNING', async t => {
-  const run = createSealedRun(t, [{ vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium', role: 'implement', class: 'standard-feature' }]);
+  const run = createSealedRun(t, [{ vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium', role: 'implement', class: 'standard-feature' }]);
   const cap = require('./dispatch-matrix.js').loadMatrix().principles.maxConcurrentDispatches;
   assert.equal(cap, 3);
   const dir = path.join(run.runDir, '.magi-dispatches'); fs.mkdirSync(dir, { recursive: true });
@@ -83,4 +83,11 @@ test('a run refuses a launch beyond principles.maxConcurrentDispatches while ear
   fs.writeFileSync(path.join(dir, 'fake-running-0.json'), JSON.stringify({ status: 'RUNNING', startedAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString() }));
   const result = await runDispatch(opts, fakeVendor());
   assert.equal(result.receipt.status, 'PASS');
+});
+
+test('a Google seat that attempted a tool (soft-denied in the native log) is never classified as never-started', () => {
+  const nativeLog = 'I0916 ... tool_confirmation_manager.go:211] Print mode: soft-denying tool confirmation "ReplaceFileContent" at step 12\nYou are not logged into Antigravity.';
+  const verdict = classifyLaunchFailure({ code: 'LAUNCH_FAIL', vendor: 'google', stderr: 'exit', nativeLog });
+  assert.deepEqual([verdict.retryable, verdict.toolCalls > 0], [false, true]);
+  assert.equal(classifyLaunchFailure({ code: 'LAUNCH_FAIL', vendor: 'google', stderr: 'You are not logged into Antigravity.' }).signature, 'auth-missing');
 });

@@ -70,7 +70,7 @@ for (const vendor of ['google', 'anthropic']) {
 
 function authorlessChecks(t) {
   const run = createSealedRun(t, [
-    { unitId: 'u1', vendor: 'anthropic', model: 'sonnet', effort: 'medium', role: 'verify', class: 'test-verification', authorVendor: 'openai' },
+    { unitId: 'u1', vendor: 'anthropic', model: 'opus', effort: 'medium', role: 'verify', class: 'test-verification', authorVendor: 'openai' },
     { unitId: 'u1', vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', role: 'review', class: 'review-adversarial', authorVendor: 'openai' },
   ]);
   run.runDir = path.join(run.root, 'access-run');
@@ -230,7 +230,7 @@ test('reparse ancestors, linked descendants, and hardlink contents fail closed',
 test('complete prior author evidence is available to both checking seats through finalization', async t => {
   const run = createSealedRun(t, [
     { unitId: 'u1' },
-    { unitId: 'u1', vendor: 'anthropic', model: 'sonnet', effort: 'medium', role: 'verify', class: 'test-verification', authorVendor: 'openai' },
+    { unitId: 'u1', vendor: 'anthropic', model: 'opus', effort: 'medium', role: 'verify', class: 'test-verification', authorVendor: 'openai' },
     { unitId: 'u1', vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', role: 'review', class: 'review-adversarial', authorVendor: 'openai' },
   ]);
   run.runDir = path.join(run.root, 'access-run'); run.evidence = path.join(run.root, 'evidence');

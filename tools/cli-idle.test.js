@@ -25,11 +25,13 @@ test('decide: google and anthropic silent stdio past idleStdioMs but under wall 
     }
 });
 
-test('decide: anthropic cpu frozen past idleCpuMs -> kill idle-cpu', () => {
+test('decide: anthropic cpu frozen past idleCpuMs alone does not kill (idle-cpu rung retired 2026-09-16); all signals silent past idleActivityMs does', () => {
     const sample = {
         vendor: 'anthropic', nowMs: 2000, startedAtMs: 0, lastStdioAtMs: 0, stdioBytes: 100, cpuMs: 100, lastCpuAtMs: 0, maxWallMs: 5000, idleStdioMs: 1000, idleCpuMs: 1000
     };
-    assert.deepStrictEqual(decide(sample), { action: 'kill', reason: 'idle-cpu', killMethod: 'pid-only' });
+    assert.deepStrictEqual(decide(sample), { action: 'continue', reason: null, killMethod: 'pid-only' });
+    assert.deepStrictEqual(decide({ ...sample, idleActivityMs: 1500 }), { action: 'kill', reason: 'idle-activity', killMethod: 'pid-only' });
+    assert.deepStrictEqual(decide({ ...sample, idleActivityMs: 1500, lastActivityAtMs: 1900 }), { action: 'continue', reason: null, killMethod: 'pid-only' });
 });
 
 test('forbiddenKill: matches taskkill /IM, pkill <name>, killall', () => {

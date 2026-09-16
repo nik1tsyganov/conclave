@@ -47,33 +47,12 @@
     "requireObservedModelProof": true,
     "unknownAvailabilityIsUnavailable": true,
     "frontierEscalationOnly": true,
-    "arbiterRetired2026-09-16": "xai/grok-4.6 retired as arbiter by owner instruction. The arbiter is the Jev decision engine (arbiter.decisionEngine); the hosting session (hostMode cursor-cli, synara or claude-code, declared by magi-whoami) runs the tools and holds no vote. A plan declares arbiter {vendor: \"jev\", model: \"jev-latest\", host: \"<session slug>\"}; plan-seal records the Jev classification per unit and refuses a plan whose class Jev cannot support unless an owner override reason is recorded."
+    "arbiterRetired2026-09-16": "xai/grok-4.6 retired as arbiter by owner instruction. The arbiter is the Jev decision engine (arbiter.decisionEngine); the hosting session (hostMode cursor-cli, synara or claude-code, declared by magi-whoami) runs the tools and holds no vote. A plan declares arbiter {vendor: \"jev\", model: \"jev-latest\", host: \"<session slug>\"}; plan-seal records the Jev classification per unit and refuses a plan whose class Jev cannot support unless an owner override reason is recorded.",
+    "catalogCulled2026-09-16": "Owner instruction: keep Astra and Sol (Codex), Fable and Opus (Claude), Gemini 3.1 Pro and Gemini 3.8 Flash (agy). Terra, Luna and Sonnet removed from every lane; Astra stays escalation-only where marked."
   },
   "vendors": {
     "openai": {
       "models": {
-        "gpt-5.6-luna": {
-          "efforts": [
-            "none",
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ],
-          "tier": "throughput"
-        },
-        "gpt-5.6-terra": {
-          "efforts": [
-            "none",
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ],
-          "tier": "balanced"
-        },
         "gpt-5.6-sol": {
           "efforts": [
             "none",
@@ -97,20 +76,10 @@
           "availability": "probe-required"
         }
       },
-      "note": "Astra is an escalation tier, not the standing default. It is illegal until the local Codex path proves exact gpt-6-astra reachability and, where marked escalationOnly, the route carries an explicit escalation reason."
+      "note": "Catalog culled 2026-09-16 (owner): Sol is the standing Codex seat model; Astra is the escalation tier (probe-required, escalationOnly where marked). Terra retired after truncating the instruction-read sequence on 3 of 5 launches; Luna retired as outdated."
     },
     "anthropic": {
       "models": {
-        "sonnet": {
-          "canonical": "claude-sonnet-5",
-          "efforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh"
-          ],
-          "tier": "balanced"
-        },
         "opus": {
           "canonical": "claude-opus-5",
           "efforts": [
@@ -134,7 +103,7 @@
           "tier": "agentic-frontier"
         }
       },
-      "note": "Fable is role-specialized for ambitious long-horizon agentic work; Opus remains the conservative judgment/review lane."
+      "note": "Catalog culled 2026-09-16 (owner): Fable (agentic frontier) and Opus (judgment/review). Sonnet retired."
     },
     "google": {
       "models": {
@@ -167,7 +136,7 @@
           "availability": "probe-required"
         }
       },
-      "note": "agy uses whole-slug effort. Probe-required entries are illegal until a live agy probe records that exact observed slug."
+      "note": "Catalog culled 2026-09-16 (owner): Gemini 3.1 Pro (deep) and Gemini 3.8 Flash (agentic/balanced/throughput). agy uses whole-slug effort; probe-required entries are illegal until a live agy probe records that exact observed slug."
     }
   },
   "classes": {
@@ -207,13 +176,13 @@
       "implement": [
         {
           "vendor": "openai",
-          "model": "gpt-5.6-terra",
+          "model": "gpt-5.6-sol",
           "effort": "medium",
           "priority": 1
         },
         {
           "vendor": "anthropic",
-          "model": "sonnet",
+          "model": "fable",
           "effort": "medium",
           "priority": 2
         },
@@ -250,21 +219,21 @@
       "title": "Bulk mechanical edits: renames, migrations, formatting, repetitive changes with low judgment",
       "implement": [
         {
-          "vendor": "openai",
-          "model": "gpt-5.6-luna",
-          "effort": "medium",
-          "priority": 1
-        },
-        {
           "vendor": "google",
           "model": "gemini-3.8-flash-low",
           "effort": "fused-low",
-          "priority": 2,
+          "priority": 1,
           "requiresProbe": true
         },
         {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low",
+          "priority": 2
+        },
+        {
           "vendor": "anthropic",
-          "model": "sonnet",
+          "model": "fable",
           "effort": "low",
           "priority": 3
         }
@@ -272,13 +241,13 @@
       "verify": [
         {
           "vendor": "openai",
-          "model": "gpt-5.6-terra",
+          "model": "gpt-5.6-sol",
           "effort": "medium",
           "priority": 1
         },
         {
           "vendor": "anthropic",
-          "model": "sonnet",
+          "model": "opus",
           "effort": "medium",
           "priority": 2
         }
@@ -445,7 +414,7 @@
       "verify": [
         {
           "vendor": "openai",
-          "model": "gpt-5.6-terra",
+          "model": "gpt-5.6-sol",
           "effort": "medium",
           "priority": 1
         },
@@ -458,7 +427,7 @@
         },
         {
           "vendor": "anthropic",
-          "model": "sonnet",
+          "model": "opus",
           "effort": "medium",
           "priority": 3
         }

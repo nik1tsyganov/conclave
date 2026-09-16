@@ -10,7 +10,7 @@ const { readSealedRun } = require('./plan-seal.js');
 const { hashFile, snapshotWorkspace, transactionKey, writeJson } = require('./dispatch-evidence.js');
 const { completeSyntheticDispatch, createSealedRun, fakeVendor } = require('./test-fixtures.js');
 
-const verifier = { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'sonnet', effort: 'medium', authorVendor: 'openai' };
+const verifier = { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'opus', effort: 'medium', authorVendor: 'openai' };
 const reviewer = { unitId: 'u1', role: 'review', class: 'review-adversarial', vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', authorVendor: 'openai' };
 function panel(t, extra = []) { return createSealedRun(t, [{ unitId: 'u1' }, verifier, reviewer, ...extra]); }
 function dispatch(run, id, native) { return completeSyntheticDispatch({ ...run.opts, dispatchId: id }, native); }
@@ -107,7 +107,7 @@ test('review rejects any workspace change after verification before starting a c
 });
 
 test('verification binds the author scope while permitting other completed implementation units', async t => {
-  const run = panel(t, [{ unitId: 'u2', vendor: 'anthropic', model: 'sonnet', effort: 'medium', writeScope: ['other.txt'] }]);
+  const run = panel(t, [{ unitId: 'u2', vendor: 'anthropic', model: 'fable', effort: 'medium', writeScope: ['other.txt'] }]);
   const native = fakeVendor(launch => {
     if (launch.vendor === 'anthropic' && launch.role === 'implement') fs.writeFileSync(path.join(run.cwd, 'other.txt'), 'another unit', 'utf8');
   });

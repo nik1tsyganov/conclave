@@ -15,7 +15,7 @@ const RESPONSE = 'ACK fixture\nPOSITION: APPROVE\nDone.';
 const protocol = { responseProtocol: CLAUDE_RESPONSE_PROTOCOL };
 
 function claudeRun(t) {
-  return createSealedRun(t, [{ vendor: 'anthropic', model: 'sonnet', effort: 'medium', role: 'verify', class: 'test-verification', authorVendor: 'openai' }]);
+  return createSealedRun(t, [{ vendor: 'anthropic', model: 'opus', effort: 'medium', role: 'verify', class: 'test-verification', authorVendor: 'openai' }]);
 }
 
 function changeTerminal(native, mutate) {
@@ -47,18 +47,18 @@ function rewriteArtifact(result, file, update) {
 
 test('structured report extraction preserves native bytes and leaves plain probes unchanged', () => {
   const response = 'Unique "quoted" first line\r\nPOSITION: APPROVE\r\nThe source says auth required.\t\r\n';
-  const native = nativeCapture('anthropic', 'claude-sonnet-5', 'medium', ' plain probe challenge ');
+  const native = nativeCapture('anthropic', 'claude-opus-5', 'medium', ' plain probe challenge ');
   const terminal = JSON.parse(native.capture);
   terminal.structured_output = { response };
   terminal.result = ' legacy narration remains separate ';
   const capture = JSON.stringify(terminal);
   assert.equal(finalResponse('anthropic', capture, protocol), response);
   assert.equal(finalResponse('anthropic', capture), 'legacy narration remains separate');
-  const proof = parseClaude(capture, 'sonnet', 'medium', true, { ...protocol, expectedObservedModel: 'claude-sonnet-5', logText: native.log, requireObservedEffort: true });
+  const proof = parseClaude(capture, 'opus', 'medium', true, { ...protocol, expectedObservedModel: 'claude-opus-5', logText: native.log, requireObservedEffort: true });
   assert.equal(proof.responseProtocol, CLAUDE_RESPONSE_PROTOCOL);
   assert.equal(proof.effortObserved, 'medium');
   assert.equal(finalResponse('anthropic', native.capture), 'plain probe challenge');
-  assert.equal(Object.hasOwn(parseClaude(native.capture, 'sonnet', 'medium', true, { expectedObservedModel: 'claude-sonnet-5' }), 'responseProtocol'), false);
+  assert.equal(Object.hasOwn(parseClaude(native.capture, 'opus', 'medium', true, { expectedObservedModel: 'claude-opus-5' }), 'responseProtocol'), false);
   assert.throws(() => finalResponse('anthropic', native.capture, protocol), /structured_output/);
   assert.throws(() => finalResponse('anthropic', capture, { responseProtocol: 'legacy' }), /protocol/);
   assert.throws(() => finalResponse('google', capture, protocol), /another vendor/);
@@ -67,17 +67,17 @@ test('structured report extraction preserves native bytes and leaves plain probe
 test('Claude BOM capture has consistent proof, response and native session extraction', t => {
   const root = temporary(t);
   const response = `${RESPONSE}\r\nKeep inner BOM: \uFEFF and trailing whitespace\t \r\n`;
-  const native = nativeCapture('anthropic', 'claude-sonnet-5', 'medium', response);
+  const native = nativeCapture('anthropic', 'claude-opus-5', 'medium', response);
   const terminal = { ...JSON.parse(native.capture), structured_output: { response } };
   const transcriptDir = path.join(root, '.claude', 'projects', 'fixture');
   fs.mkdirSync(transcriptDir, { recursive: true });
   fs.writeFileSync(path.join(transcriptDir, `${terminal.session_id}.jsonl`), native.log, 'utf8');
-  for (const records of [[terminal], [{ type: 'system', subtype: 'init', session_id: terminal.session_id, model: 'claude-sonnet-5' }, terminal]]) {
+  for (const records of [[terminal], [{ type: 'system', subtype: 'init', session_id: terminal.session_id, model: 'claude-opus-5' }, terminal]]) {
     const capture = '\uFEFF' + records.map(JSON.stringify).join('\r\n') + '\r\n';
     assert.equal(finalResponse('anthropic', capture, protocol), response);
     assert.equal(finalResponse('anthropic', capture), response.trim());
     assert.ok(nativeLog('anthropic', capture, '', { home: root }).includes(native.log.trim()));
-    const proof = parseClaude(capture, 'sonnet', 'medium', true, { ...protocol, expectedObservedModel: 'claude-sonnet-5', logText: native.log, requireObservedEffort: true });
+    const proof = parseClaude(capture, 'opus', 'medium', true, { ...protocol, expectedObservedModel: 'claude-opus-5', logText: native.log, requireObservedEffort: true });
     assert.equal(proof.sessionId, terminal.session_id);
     assert.equal(proof.responseBytes, Buffer.byteLength(capture, 'utf8'));
     assert.throws(() => finalResponse('anthropic', capture + '{"partial":', protocol), /malformed structured/);
@@ -112,11 +112,11 @@ test('structured proof still requires native model, effort, session, numeric usa
   const root = temporary(t);
   const capture = path.join(root, 'capture.json');
   const log = path.join(root, 'native.log');
-  const native = nativeCapture('anthropic', 'claude-sonnet-5', 'medium', RESPONSE);
+  const native = nativeCapture('anthropic', 'claude-opus-5', 'medium', RESPONSE);
   const terminal = { ...JSON.parse(native.capture), structured_output: { response: RESPONSE } };
   writeJson(capture, terminal);
   fs.writeFileSync(log, native.log, 'utf8');
-  const options = { vendor: 'anthropic', capture, log, expectedModel: 'sonnet', expectedObservedModel: 'claude-sonnet-5', expectedEffort: 'medium', onTopic: true, ...protocol };
+  const options = { vendor: 'anthropic', capture, log, expectedModel: 'opus', expectedObservedModel: 'claude-opus-5', expectedEffort: 'medium', onTopic: true, ...protocol };
   assert.equal(verifyProof(options).responseProtocol, CLAUDE_RESPONSE_PROTOCOL);
   assert.throws(() => verifyProof({ ...options, expectedObservedModel: 'wrong-model' }), /model mismatch/);
   assert.throws(() => verifyProof({ ...options, expectedEffort: 'high' }), /effort mismatch/);
@@ -136,10 +136,10 @@ test('structured proof accepts the macOS CLI task_summary trailer and nothing el
   const root = temporary(t);
   const capture = path.join(root, 'capture.json');
   const log = path.join(root, 'native.log');
-  const native = nativeCapture('anthropic', 'claude-sonnet-5', 'medium', RESPONSE);
+  const native = nativeCapture('anthropic', 'claude-opus-5', 'medium', RESPONSE);
   const terminal = { ...JSON.parse(native.capture), structured_output: { response: RESPONSE } };
   fs.writeFileSync(log, native.log, 'utf8');
-  const options = { vendor: 'anthropic', capture, log, expectedModel: 'sonnet', expectedObservedModel: 'claude-sonnet-5', expectedEffort: 'medium', onTopic: true, ...protocol };
+  const options = { vendor: 'anthropic', capture, log, expectedModel: 'opus', expectedObservedModel: 'claude-opus-5', expectedEffort: 'medium', onTopic: true, ...protocol };
   const rows = trailer => [terminal, ...trailer].map(row => JSON.stringify(row)).join('\n');
   // Observed 2026-09-16: Claude Code 2.1.271 emits this row after `result`.
   fs.writeFileSync(capture, rows([{ type: 'system', subtype: 'task_summary', detail: null, session_id: terminal.session_id }]), 'utf8');
@@ -169,7 +169,7 @@ const malformed = [
   ['duplicate terminal', row => [row, { ...row }], /exactly one terminal/],
   ['error terminal', row => { row.subtype = 'error_during_execution'; row.is_error = true; }, /error result/],
   ['unsuccessful terminal', row => { row.subtype = 'error_max_turns'; }, /successful final terminal/],
-  ['wrong session', row => [{ type: 'system', subtype: 'init', model: 'claude-sonnet-5', session_id: 'other-session' }, row], /inconsistent sessions/],
+  ['wrong session', row => [{ type: 'system', subtype: 'init', model: 'claude-opus-5', session_id: 'other-session' }, row], /inconsistent sessions/],
   ['null native session', row => [{ type: 'assistant', session_id: null }, row], /inconsistent sessions/],
   ['missing terminal session', row => { delete row.session_id; }, /session identity/],
   ['event after terminal', row => [row, { type: 'assistant', session_id: row.session_id }], /successful final terminal/],

@@ -34,7 +34,7 @@ test('missing, stale, substituted and altered evidence cannot establish availabi
 for (const target of ['probe', 'capture', 'log', 'path alias', 'directory alias', 'hard link']) {
   test(`availability CLI refuses ${target} output without changing verified evidence`, t => {
     const root = temporary(t);
-    const proof = probeRecord(root, 'anthropic', 'sonnet', 'medium', 'claude-sonnet-5');
+    const proof = probeRecord(root, 'anthropic', 'opus', 'medium', 'claude-opus-5');
     const probe = proof.evidence.path;
     const native = JSON.parse(fs.readFileSync(probe, 'utf8'));
     let file = { probe, capture: native.capture, log: native.log }[target];
@@ -65,7 +65,7 @@ for (const target of ['probe', 'capture', 'log', 'path alias', 'directory alias'
 
 test('availability CLI preserves probe evidence when it creates and updates a separate output', t => {
   const root = temporary(t);
-  const proof = probeRecord(root, 'anthropic', 'sonnet', 'medium', 'claude-sonnet-5');
+  const proof = probeRecord(root, 'anthropic', 'opus', 'medium', 'claude-opus-5');
   const probe = proof.evidence.path;
   const native = JSON.parse(fs.readFileSync(probe, 'utf8'));
   const before = [probe, native.capture, native.log].map(hashFile);
@@ -77,7 +77,7 @@ test('availability CLI preserves probe evidence when it creates and updates a se
     assert.equal(result.error, undefined);
     assert.equal(result.status, 0, result.stderr);
     assert.equal(JSON.parse(result.stdout).evidence.sha256, hashFile(probe));
-    assert.equal(load(file).vendors.anthropic.models.sonnet.efforts.medium.available, true);
+    assert.equal(load(file).vendors.anthropic.models.opus.efforts.medium.available, true);
     assert.deepEqual([probe, native.capture, native.log].map(hashFile), before);
   }
 });

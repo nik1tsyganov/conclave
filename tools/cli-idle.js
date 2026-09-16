@@ -31,12 +31,11 @@ function decide(sample) {
         }
     }
 
-    if (typeof cpuMs === 'number' && Number.isFinite(cpuMs) &&
-        typeof lastCpuAtMs === 'number' && Number.isFinite(lastCpuAtMs)) {
-        if (nowMs - lastCpuAtMs >= idleCpuMs) {
-            return { action: 'kill', reason: 'idle-cpu', killMethod: 'pid-only' };
-        }
-    }
+    // The standalone idle-cpu kill was retired on 2026-09-16 (Codex review of the
+    // POSIX sampler): a seat blocked on a vendor API burns no local CPU, and the
+    // 180 s rung would have killed healthy Google and Anthropic seats. CPU
+    // progress is still one of the three signals of the idle-activity rung.
+    void idleCpuMs;
 
     return { action: 'continue', reason: null, killMethod: 'pid-only' };
 }

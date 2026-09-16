@@ -15,7 +15,6 @@ const VENDOR_MAP = Object.freeze({
 const MODEL_ALIASES = Object.freeze({
   openai: Object.freeze({}),
   anthropic: Object.freeze({
-    sonnet: ['sonnet', 'claude-sonnet-5', 'claude-sonnet-4-6'],
     opus: ['opus', 'opus[1m]', 'claude-opus-5'],
     fable: ['fable', 'claude-fable-5', 'claude-fable-5-1', 'claude-fable-5[1m]'],
   }),

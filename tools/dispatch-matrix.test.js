@@ -67,11 +67,11 @@ test('standard feature rejects frontier over-routing not listed by policy', () =
 test('synara is a legal CLI hostMode and banana is not', () => {
   assert.deepStrictEqual(validatePlan({
     hostMode: 'synara', arbiter: arbiter(), magiConvened: true,
-    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' }],
+    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }],
   }, matrix), { ok: true, dispatches: 1, implementUnits: 1 });
   assert.throws(() => validatePlan({
     hostMode: 'banana', arbiter: arbiter(), magiConvened: true,
-    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' }],
+    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }],
   }, matrix), /hostMode must be cursor-cli, synara or claude-code/);
 });
 
@@ -79,7 +79,7 @@ test('implement cannot take evidenceReadDirs', () => {
   assert.throws(() => validatePlan({
     hostMode: 'synara', arbiter: arbiter(), magiConvened: true,
     dispatches: [{
-      unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium',
+      unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium',
       evidenceReadDirs: [root],
     }],
   }, matrix), /implement cannot take evidenceReadDirs/);
@@ -95,7 +95,7 @@ test('Grok cannot occupy a seat', () => {
 test('single implementation unit is not rejected by the 60 percent floor', () => {
   assert.deepStrictEqual(validatePlan({
     hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true,
-    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' }],
+    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }],
   }, matrix), { ok: true, dispatches: 1, implementUnits: 1 });
 });
 
@@ -103,8 +103,8 @@ test('two implementation units in convened MAGI require two vendors', () => {
   assert.throws(() => validatePlan({
     hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true,
     dispatches: [
-      { unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' },
-      { unitId: 'u2', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' },
+      { unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' },
+      { unitId: 'u2', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' },
     ],
   }, matrix), /requires 2 implement vendors|distribution floor/);
 });
@@ -114,8 +114,8 @@ test('three implementation units in convened MAGI require all three vendors', ()
   assert.doesNotThrow(() => validatePlan({
     hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true,
     dispatches: [
-      { unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' },
-      { unitId: 'u2', class: 'standard-feature', role: 'implement', vendor: 'anthropic', model: 'sonnet', effort: 'medium' },
+      { unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' },
+      { unitId: 'u2', class: 'standard-feature', role: 'implement', vendor: 'anthropic', model: 'fable', effort: 'medium' },
       { unitId: 'u3', class: 'standard-feature', role: 'implement', vendor: 'google', model: 'gemini-3.8-flash-medium', effort: 'fused-medium' },
     ],
   }, matrix, availability));
@@ -185,10 +185,10 @@ test('missing author provenance cannot bypass review independence', () => {
 });
 test('duplicate implementation units cannot fabricate distribution', () => {
   assert.throws(() => validatePlan({ hostMode: 'cursor-cli', arbiter: arbiter(), dispatches: [
-    { unitId: 'u', role: 'implement', class: 'standard-feature', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' },
-    { unitId: 'u', role: 'implement', class: 'standard-feature', vendor: 'anthropic', model: 'sonnet', effort: 'medium' },
+    { unitId: 'u', role: 'implement', class: 'standard-feature', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' },
+    { unitId: 'u', role: 'implement', class: 'standard-feature', vendor: 'anthropic', model: 'fable', effort: 'medium' },
   ] }, matrix), /duplicate implementation/);
 });
 test('ordinary routes also require fresh native proof for their exact effort', () => {
-  assert.match(routeAllowed(matrix, { class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' }).reason, /probe-required/);
+  assert.match(routeAllowed(matrix, { class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }).reason, /probe-required/);
 });

@@ -18,7 +18,7 @@ const ROUTING = {
     classes: {
       'hard-risky': {
         implement: { distribution: dist([['claude:opus', 0.94], ['codex:gpt-6-astra', 0.04], ['gemini:gemini-3.1-pro-high', 0.01], ['claude:fable', 0.01]]) },
-        verify: { distribution: dist([['codex:gpt-6-astra', 0.89], ['codex:gpt-5.5', 0.05], ['gemini:gemini-3.1-pro-high', 0.04], ['claude:sonnet', 0.02]]) },
+        verify: { distribution: dist([['codex:gpt-6-astra', 0.89], ['codex:gpt-5.5', 0.05], ['gemini:gemini-3.1-pro-high', 0.04], ['claude:opus', 0.02]]) },
         review: { distribution: dist([['codex:gpt-6-astra', 0.46], ['gemini:gemini-3.1-pro-high', 0.38], ['codex:gpt-5.5', 0.07], ['claude:opus', 0.05]]) },
         effort: { top: 'xhigh' },
         thirdFamily: { p: 0.68 },
@@ -31,7 +31,7 @@ const ROUTING = {
         thirdFamily: { p: 0.25 },
       },
       'standard-feature': {
-        implement: { distribution: dist([['codex:gpt-5.6-terra', 0.42], ['claude:sonnet', 0.35], ['claude:opus', 0.2]]) },
+        implement: { distribution: dist([['codex:gpt-5.6-sol', 0.42], ['claude:sonnet', 0.35], ['claude:opus', 0.2]]) },
         verify: { distribution: dist([['claude:sonnet', 0.59], ['codex:gpt-6-astra', 0.3]]) },
         review: { distribution: dist([['codex:gpt-6-astra', 0.53], ['claude:sonnet', 0.3]]) },
         effort: { top: 'medium' },
@@ -108,7 +108,7 @@ describe('pickSeats', () => {
 
   it('never returns a model whose bucket is exhausted and records what it skipped', () => {
     const r = pickSeats('hard-risky', ROUTING, ledger({ 'codex-chatgpt-subscription': 'exhausted' }), { duo: true });
-    assert.deepStrictEqual([r.seats.verify.vendor, r.seats.verify.model], ['claude', 'sonnet']);
+    assert.deepStrictEqual([r.seats.verify.vendor, r.seats.verify.model], ['claude', 'opus']);
     assert.deepStrictEqual(r.seats.verify.skipped, ['codex:gpt-6-astra', 'codex:gpt-5.5', 'gemini:gemini-3.1-pro-high']);
     assert.strictEqual(r.seats.verify.gate, 'flagged');
     for (const classId of Object.keys(ROUTING['decisionMatrix2026-09-16'].classes)) {
@@ -123,7 +123,7 @@ describe('pickSeats', () => {
     assert.strictEqual(pickSeats('planning', ROUTING, ledger({ 'claude-all-models-weekly': 'unknown' })).seats.implement.model, 'fable');
     assert.strictEqual(pickSeats('planning', ROUTING, ledger({ 'claude-5h': 'exhausted' })).seats.implement.vendor, 'codex');
     assert.strictEqual(modelAvailable('claude', 'fable', { buckets: [] }), false);
-    assert.strictEqual(modelAvailable('claude', 'sonnet', { buckets: [] }), true);
+    assert.strictEqual(modelAvailable('claude', 'opus', { buckets: [] }), true);
   });
 
   it('surfaces to the owner when every candidate is exhausted', () => {
@@ -152,8 +152,8 @@ describe('conveneThirdFamily and netBenefit', () => {
 
   it('netBenefit gates at 0.6 and names the best single vendor in the state', async () => {
     const f = fake(() => ({ netBenefit: { noul: 0.6 } }));
-    const r = await netBenefit({ classId: 'standard-feature', unitCount: 3, bestSingleVendor: 'codex:gpt-5.6-terra' }, ROUTING, f);
-    assert.strictEqual(f.log[0].state.bestSingleVendor, 'codex:gpt-5.6-terra');
+    const r = await netBenefit({ classId: 'standard-feature', unitCount: 3, bestSingleVendor: 'codex:gpt-5.6-sol' }, ROUTING, f);
+    assert.strictEqual(f.log[0].state.bestSingleVendor, 'codex:gpt-5.6-sol');
     assert.strictEqual(r.convene, true);
     assert.strictEqual((await netBenefit({ classId: 'standard-feature', bestSingleVendor: 'x' }, ROUTING, fake(() => ({ netBenefit: { noul: 0.42 } })))).convene, false);
   });

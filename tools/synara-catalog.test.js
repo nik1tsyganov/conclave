@@ -25,14 +25,14 @@ function capabilitiesFixture() {
         provider: 'codex',
         models: [
           { slug: 'gpt-5.6-sol', supportedReasoningEfforts: [{ value: 'high' }, { value: 'xhigh' }] },
-          { slug: 'gpt-5.6-terra', supportedReasoningEfforts: [{ value: 'medium' }, { value: 'high' }] },
+          { slug: 'gpt-5.6-sol', supportedReasoningEfforts: [{ value: 'medium' }, { value: 'high' }] },
         ],
       },
       {
         provider: 'claudeAgent',
         models: [
           { slug: 'opus', name: 'opus' },
-          { slug: 'sonnet', name: 'sonnet' },
+          { slug: 'opus', name: 'opus' },
         ],
       },
       {

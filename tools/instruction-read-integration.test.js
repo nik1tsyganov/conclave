@@ -12,8 +12,8 @@ const json = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const rows = text => text.split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
 const encode = values => values.map(value => JSON.stringify(value)).join('\n') + '\n';
 const routes = [
-  { vendor: 'anthropic', model: 'sonnet', effort: 'medium', class: 'standard-feature', role: 'implement', unitId: 'u1' },
-  { vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium', class: 'test-verification', role: 'verify', authorVendor: 'anthropic', unitId: 'u1' },
+  { vendor: 'anthropic', model: 'fable', effort: 'medium', class: 'standard-feature', role: 'implement', unitId: 'u1' },
+  { vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium', class: 'test-verification', role: 'verify', authorVendor: 'anthropic', unitId: 'u1' },
   { vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', class: 'review-adversarial', role: 'review', authorVendor: 'anthropic', unitId: 'u1' },
 ];
 

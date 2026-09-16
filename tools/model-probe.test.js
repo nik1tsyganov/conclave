@@ -12,11 +12,11 @@ function fixture(t) {
     calls++;
     const prompt=fs.readFileSync(launch.stdinFile,'utf8');
     const challenge=prompt.match(/MAGI_PROBE_[a-f0-9]{32}/)[0];
-    const native=nativeCapture('openai','gpt-5.6-terra','medium',challenge);
+    const native=nativeCapture('openai','gpt-5.6-sol','medium',challenge);
     fs.writeFileSync(launch.args[launch.args.indexOf('-o')+1],native.capture);
     return {ok:true,exitCode:0,exitConfirmed:true,stdout:'',stderr:native.log};
   };
-  return {root,calls:()=>calls,runLaunch,opts:{vendor:'openai',model:'gpt-5.6-terra',effort:'medium',evidenceDir:path.join(root,'evidence')}};
+  return {root,calls:()=>calls,runLaunch,opts:{vendor:'openai',model:'gpt-5.6-sol',effort:'medium',evidenceDir:path.join(root,'evidence')}};
 }
 
 test('probe evidence inside a supplied workspace is rejected without calls or files',async t=>{

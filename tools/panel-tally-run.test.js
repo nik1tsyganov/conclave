@@ -8,7 +8,7 @@ const test = require('node:test');
 const { completeSyntheticDispatch, createSealedRun, fakeVendor } = require('./test-fixtures.js');
 const { finalizeRun, inspectRun, tallyUnit } = require('./run-finalize.js');
 
-const verifier = { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'sonnet', effort: 'medium', authorVendor: 'openai' };
+const verifier = { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'opus', effort: 'medium', authorVendor: 'openai' };
 const reviewer = { unitId: 'u1', role: 'review', class: 'review-adversarial', vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', authorVendor: 'openai' };
 function panel(t, extra, critical = false) {
   const author = critical ? { unitId: 'u1', class: 'security-sensitive', model: 'gpt-5.6-sol', effort: 'xhigh' } : { unitId: 'u1' };

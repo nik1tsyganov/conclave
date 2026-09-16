@@ -22,7 +22,7 @@ function fixture(t) {
   fs.writeFileSync(briefPath, 'ACK scratch\nVerify source.\n');
   fs.writeFileSync(seatContractPath, 'Read source.\n');
   const opts = { runDir, dispatchId: 'verify-one', cwd, briefPath, seatContractPath, skillRoot,
-    capturePath: path.join(evidence, 'capture.txt'), role: 'verify', model: 'gpt-5.6-terra', effort: 'medium',
+    capturePath: path.join(evidence, 'capture.txt'), role: 'verify', model: 'gpt-5.6-sol', effort: 'medium',
     readonlyScratch: true, mustExistBinary: false,
     env: { MAGI_DEV_ROOT: root, MAGI_CODEX_BIN: 'C:\\bin\\codex.exe', temp: 'unsafe', TMP: 'unsafe', NPM_CONFIG_CACHE: 'unsafe' } };
   return { root, evidence, opts };
@@ -33,7 +33,7 @@ function proofOptions(f, launch) {
     expectedCwd: launch.cwd, runDir: f.opts.runDir, dispatchId: f.opts.dispatchId, capture: f.opts.capturePath, launch };
 }
 
-const banner = 'OpenAI Codex v0.153.4\n--------\nsession id: session-one\nmodel: gpt-5.6-terra\nsandbox: custom permissions\nreasoning effort: medium\n--------\ntokens used\n123\n';
+const banner = 'OpenAI Codex v0.153.4\n--------\nsession id: session-one\nmodel: gpt-5.6-sol\nsandbox: custom permissions\nreasoning effort: medium\n--------\ntokens used\n123\n';
 
 test('scratch opt-in binds one write directory and replaces the whole profile', t => {
   const f = fixture(t);

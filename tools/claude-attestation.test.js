@@ -12,7 +12,7 @@ const { createReport } = require('./project-run-report.js');
 const { createSealedRun, fakeVendor } = require('./test-fixtures.js');
 
 function claudeRun(t) {
-  return createSealedRun(t, [{ vendor: 'anthropic', model: 'sonnet', effort: 'medium' }]);
+  return createSealedRun(t, [{ vendor: 'anthropic', model: 'fable', effort: 'medium' }]);
 }
 function command(run, extra = []) {
   return parseArgs(['--plan', run.opts.plan, '--run-dir', run.runDir, '--dispatch-id', 'd1',
@@ -77,7 +77,7 @@ test('pending reads and duplicate acceptance never repeat the synthetic child', 
   assert.equal(finalizeRun(run.runDir).executionStatus, 'PASS');
   const rows = fs.readFileSync(path.join(run.runDir, 'telemetry', 'dispatches.jsonl'), 'utf8').trim().split('\n');
   assert.equal(rows.length, 1);
-  assert.throws(() => verifyProof({ vendor: 'anthropic', capture: pending.capturePath, log: path.join(path.dirname(pending.capturePath), 'vendor.log'), expectedModel: 'sonnet', expectedObservedModel: 'claude-sonnet-5', expectedEffort: 'medium' }), /topicality/);
+  assert.throws(() => verifyProof({ vendor: 'anthropic', capture: pending.capturePath, log: path.join(path.dirname(pending.capturePath), 'vendor.log'), expectedModel: 'opus', expectedObservedModel: 'claude-opus-5', expectedEffort: 'medium' }), /topicality/);
 });
 
 test('premature or incomplete attestation flags cannot start a child or change a sealed run', async t => {
@@ -125,8 +125,8 @@ test('a new Claude PASS still requires its matching capture hash when attesting 
 });
 
 test('pending output cannot satisfy a dependent verifier', async t => {
-  const run = createSealedRun(t, [{ unitId: 'u1', vendor: 'anthropic', model: 'sonnet', effort: 'medium' },
-    { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium', authorVendor: 'anthropic' }]);
+  const run = createSealedRun(t, [{ unitId: 'u1', vendor: 'anthropic', model: 'fable', effort: 'medium' },
+    { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium', authorVendor: 'anthropic' }]);
   const native = fakeVendor();
   await runDispatch(command(run), native);
   await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd2' }, native), /implementation must finish/);
@@ -183,7 +183,7 @@ test('attestation requires unchanged runtime bytes from the recorded launch', as
 });
 
 test('attestation revalidates prerequisite transactions before committing a verifier', async t => {
-  const run = createSealedRun(t, [{ unitId: 'u1' }, { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'sonnet', effort: 'medium', authorVendor: 'openai' }]);
+  const run = createSealedRun(t, [{ unitId: 'u1' }, { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'opus', effort: 'medium', authorVendor: 'openai' }]);
   const native = fakeVendor();
   await runDispatch({ ...run.opts, dispatchId: 'd1' }, native);
   const pending = await runDispatch({ ...run.opts, dispatchId: 'd2' }, native);
@@ -388,8 +388,8 @@ test('initial log destinations cannot overwrite evidence directories run control
     run => path.join(run.runDir, 'implementation.jsonl'),
   ];
   for (const output of paths) {
-    const run = createSealedRun(t, [{ unitId: 'u1', vendor: 'anthropic', model: 'sonnet', effort: 'medium' },
-      { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium', authorVendor: 'anthropic' }]);
+    const run = createSealedRun(t, [{ unitId: 'u1', vendor: 'anthropic', model: 'fable', effort: 'medium' },
+      { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium', authorVendor: 'anthropic' }]);
     const native = fakeVendor();
     const before = snapshotWorkspace(run.runDir);
     await assert.rejects(runDispatch(command(run, ['--activation-log', output(run)]), native), /log destination.*overlap/);
@@ -447,7 +447,7 @@ test('default bundled skills resolve before initial destination validation creat
 
 test('logs cannot overwrite a prerequisite in a custom evidence directory', async t => {
   const run = createSealedRun(t, [{ unitId: 'u1' },
-    { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'sonnet', effort: 'medium', authorVendor: 'openai' }]);
+    { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'opus', effort: 'medium', authorVendor: 'openai' }]);
   const native = fakeVendor();
   const evidenceDir = path.join(run.runDir, 'custom-author-evidence');
   await runDispatch({ ...run.opts, dispatchId: 'd1', evidenceDir }, native);

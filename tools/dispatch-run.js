@@ -325,19 +325,26 @@ async function runDispatch(opts, dependencies = {}) {
   opts = { ...opts, evidenceReadDirs };
   // Concurrency cap (principles.maxConcurrentDispatches, 2026-09-16): count the
   // run's live RUNNING transactions before taking another seat.
-  if (fresh) {
+  const transaction = reserveTransaction(binding, evidenceDir, postRun ? ATTESTATION_PROTOCOL : undefined);
+  // Concurrency cap (principles.maxConcurrentDispatches, 2026-09-16): counted AFTER
+  // this launch's own transaction is reserved (an atomic wx create), so two
+  // launchers racing past the cap both see the overflow and both back off.
+  if (fresh && !transaction.replayed && !transaction.pending) {
     const cap = matrix.principles?.maxConcurrentDispatches;
     if (Number.isInteger(cap) && cap > 0) {
       const dir = path.dirname(transactionPath);
       const cutoff = Date.now() - (maxWallMs ?? 2700000);
-      const running = fs.existsSync(dir) ? fs.readdirSync(dir).filter((name) => {
-        if (path.join(dir, name) === transactionPath || !name.endsWith('.json')) return false;
+      const running = fs.readdirSync(dir).filter((name) => {
+        if (!name.endsWith('.json')) return false;
         try { const row = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')); return row.status === 'RUNNING' && Date.parse(row.startedAt) >= cutoff; } catch { return false; }
-      }).length : 0;
-      if (running >= cap) throw policyError(`concurrent dispatch cap reached: ${running} RUNNING of ${cap} allowed (principles.maxConcurrentDispatches)`);
+      }).length;
+      if (running > cap) {
+        if (!transaction.retrying) fs.rmSync(transaction.file, { force: true });
+        else atomicJson(transaction.file, { ...transaction.state, status: 'RETRYABLE', attempts: transaction.state.attempts });
+        throw policyError(`concurrent dispatch cap reached: ${running - 1} RUNNING of ${cap} allowed (principles.maxConcurrentDispatches)`);
+      }
     }
   }
-  const transaction = reserveTransaction(binding, evidenceDir, postRun ? ATTESTATION_PROTOCOL : undefined);
   const responseProtocol = opts.vendor === 'anthropic' ? CLAUDE_RESPONSE_PROTOCOL : undefined;
   if (transaction.pending) {
     if (attesting) return acceptCheckpoint(sealed, binding.entry, transaction, opts.captureSha256);
@@ -588,10 +595,12 @@ async function runDispatch(opts, dependencies = {}) {
     const { classifyLaunchFailure, MAX_ATTEMPTS } = require('./launch-retry.js');
     const priorAttempts = Array.isArray(transaction.state.attempts) ? transaction.state.attempts : [];
     const verdict = classifyLaunchFailure({ code: error.code, message: error.message, vendor: opts.vendor, stdout: childResult?.stdout, stderr: childResult?.stderr,
-      capture: (() => { try { const c = path.join(evidenceDir, 'capture.txt'); return fs.existsSync(c) ? fs.readFileSync(c, 'utf8') : ''; } catch { return ''; } })() });
+      capture: (() => { try { const c = path.join(evidenceDir, 'capture.txt'); return fs.existsSync(c) ? fs.readFileSync(c, 'utf8') : ''; } catch { return ''; } })(),
+      nativeLog: (() => { try { const n = launch?.nativeLogPath; return n && fs.existsSync(n) ? fs.readFileSync(n, 'utf8') : ''; } catch { return ''; } })() });
     if (verdict.retryable && evidenceCreated && (scopeAudit === null || scopeAudit.ok === true) && priorAttempts.length < MAX_ATTEMPTS - 1) {
       const attempt = priorAttempts.length + 1;
       const kept = `${evidenceDir}.attempt${attempt}`;
+      if (fs.existsSync(kept)) throw Object.assign(new Error(`retry evidence directory already exists: ${kept}; ${error.message}`), { code: 'LAUNCH_FAIL' });
       fs.renameSync(evidenceDir, kept);
       const record = { attempt, code: error.code, error: error.message, signature: verdict.signature, evidenceDir: kept, completedAt: new Date().toISOString() };
       atomicJson(transaction.file, { ...transaction.state, status: 'RETRYABLE', attempts: [...priorAttempts, record], scopeAudit, completedAt: record.completedAt });

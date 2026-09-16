@@ -10,7 +10,7 @@ test('Codex proof positive captures observed model, sandbox, session and tokens 
 OpenAI Codex v1.0
 --------
 session id: abc
-model: gpt-5.6-terra
+model: gpt-5.6-sol
 sandbox: workspace-write
 reasoning effort: high
 --------
@@ -18,8 +18,8 @@ body
 tokens used
 1,234
 `;
-  const proof = parseCodex(log, 'gpt-5.6-terra', { expectedSandbox: 'workspace-write', expectedEffort: 'high' });
-  assert.strictEqual(proof.modelObserved, 'gpt-5.6-terra');
+  const proof = parseCodex(log, 'gpt-5.6-sol', { expectedSandbox: 'workspace-write', expectedEffort: 'high' });
+  assert.strictEqual(proof.modelObserved, 'gpt-5.6-sol');
   assert.strictEqual(proof.sessionId, 'abc');
   assert.strictEqual(proof.vendorSideTokens, 1234);
   assert.strictEqual(proof.sandbox, 'workspace-write');
@@ -38,13 +38,13 @@ test('Codex proof rejects wrong expected sandbox/effort', () => {
 });
 
 test('Codex tokens phrase inside body is not a footer', () => {
-  const log = `OpenAI Codex v1.0\n--------\nsession id: abc\nmodel: gpt-5.6-terra\nsandbox: workspace-write\nreasoning effort: high\n--------\nbody\ntokens used\n1,234\nmore answer text`;
-  assert.throws(() => parseCodex(log, 'gpt-5.6-terra'), /missing tokens used/);
+  const log = `OpenAI Codex v1.0\n--------\nsession id: abc\nmodel: gpt-5.6-sol\nsandbox: workspace-write\nreasoning effort: high\n--------\nbody\ntokens used\n1,234\nmore answer text`;
+  assert.throws(() => parseCodex(log, 'gpt-5.6-sol'), /missing tokens used/);
 });
 
 test('Codex malformed thousands grouping', () => {
-  const log = `OpenAI Codex v1.0\n--------\nsession id: abc\nmodel: gpt-5.6-terra\nsandbox: workspace-write\nreasoning effort: high\n--------\nbody\ntokens used\n1234,567\n`;
-  assert.throws(() => parseCodex(log, 'gpt-5.6-terra'), /missing tokens used/);
+  const log = `OpenAI Codex v1.0\n--------\nsession id: abc\nmodel: gpt-5.6-sol\nsandbox: workspace-write\nreasoning effort: high\n--------\nbody\ntokens used\n1234,567\n`;
+  assert.throws(() => parseCodex(log, 'gpt-5.6-sol'), /missing tokens used/);
 });
 
 test('Codex invalid observed effort', () => {
@@ -80,8 +80,8 @@ test('standalone OpenAI proof requires nonempty capture as well as valid banner 
   const root = require('./test-fixtures.js').temporary(t);
   const capture = path.join(root, 'capture.txt');
   const log = path.join(root, 'native.log');
-  fs.writeFileSync(log, 'OpenAI Codex v1.0\n--------\nsession id: s1\nmodel: gpt-5.6-terra\nsandbox: read-only\nreasoning effort: medium\n--------\ntokens used\n123\n', 'utf8');
-  const options = { vendor: 'openai', capture, log, expectedModel: 'gpt-5.6-terra', expectedEffort: 'medium', expectedSandbox: 'read-only' };
+  fs.writeFileSync(log, 'OpenAI Codex v1.0\n--------\nsession id: s1\nmodel: gpt-5.6-sol\nsandbox: read-only\nreasoning effort: medium\n--------\ntokens used\n123\n', 'utf8');
+  const options = { vendor: 'openai', capture, log, expectedModel: 'gpt-5.6-sol', expectedEffort: 'medium', expectedSandbox: 'read-only' };
   for (const blank of ['', ' \t\r\n', '\uFEFF \n']) {
     fs.writeFileSync(capture, blank, 'utf8');
     assert.throws(() => verifyNativeProof(options), /capture is empty/);

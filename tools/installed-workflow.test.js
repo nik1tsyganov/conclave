@@ -6,8 +6,8 @@ const {installMagiCursorCli}=require('./install-plugin.js');
 
 test('installed CLI completes Claude checkpoint, foreign checks, activation, tally and diagnostic export',async t=>{
   const run=createSealedRun(t,[
-    {unitId:'u1',vendor:'anthropic',model:'sonnet',effort:'medium'},
-    {unitId:'u1',role:'verify',class:'test-verification',vendor:'openai',model:'gpt-5.6-terra',effort:'medium',authorVendor:'anthropic'},
+    {unitId:'u1',vendor:'anthropic',model:'fable',effort:'medium'},
+    {unitId:'u1',role:'verify',class:'test-verification',vendor:'openai',model:'gpt-5.6-sol',effort:'medium',authorVendor:'anthropic'},
     {unitId:'u1',role:'review',class:'review-adversarial',vendor:'google',model:'gemini-3.1-pro-high',effort:'fused-high',authorVendor:'anthropic'},
   ],{magiConvened:true});
   const installed=path.join(run.root,'runtime ü & [copy]');

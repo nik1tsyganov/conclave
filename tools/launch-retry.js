@@ -19,7 +19,7 @@ const SIGNATURES = Object.freeze([
 const TOOL_MARKERS = Object.freeze({
   anthropic: /"type":\s*"tool_use"/g,
   openai: /custom_tool_call|function_call|CommandExecution|exec_command/g,
-  google: /tool_confirmation|Tool confirmation|"step_type":\s*"tool"|RunCommand|ViewFile/g,
+  google: /tool confirmation|tool_confirmation|soft-denying|denied_actions":\s*\[\s*\{|"step_type":\s*"tool"|"tool_name"/gi,
 });
 
 function countToolCalls(vendor, text) {
@@ -29,10 +29,10 @@ function countToolCalls(vendor, text) {
 }
 
 // Pure: returns { retryable, signature, reason, toolCalls }.
-function classifyLaunchFailure({ code, message = '', vendor, stdout = '', stderr = '', capture = '' } = {}) {
+function classifyLaunchFailure({ code, message = '', vendor, stdout = '', stderr = '', capture = '', nativeLog = '' } = {}) {
   if (code !== 'LAUNCH_FAIL') return { retryable: false, reason: `code ${code || 'unknown'} is terminal`, signature: null, toolCalls: null };
-  const text = [message, stderr, stdout, capture].map((t) => String(t || '')).join('\n');
-  const toolCalls = countToolCalls(vendor, `${stdout}\n${stderr}\n${capture}`);
+  const text = [message, stderr, stdout, capture, nativeLog].map((t) => String(t || '')).join('\n');
+  const toolCalls = countToolCalls(vendor, `${stdout}\n${stderr}\n${capture}\n${nativeLog}`);
   if (toolCalls > 0) return { retryable: false, reason: 'the child made tool calls; the seat ran', signature: null, toolCalls };
   const hit = SIGNATURES.find((s) => s.re.test(text));
   if (!hit) return { retryable: false, reason: 'no never-started signature matched', signature: null, toolCalls };

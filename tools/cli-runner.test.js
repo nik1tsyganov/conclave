@@ -43,10 +43,10 @@ test('nonzero exits, failed spawn and unconfirmed termination fail closed', asyn
   bad.emit('error', Object.assign(new Error('missing'), { code: 'ENOENT' })); await assert.rejects(missing, { code: 'ENOENT' });
   await assert.rejects(runLaunch({ vendor: 'google', binary: 'fixture', args: [] }, { spawn: childFixture, maxWallMs: 5, pollMs: 5, killGraceMs: 10, sampleCpuMs: () => 1, kill: () => {} }), { code: 'CHILD_EXIT_UNCONFIRMED' });
 });
-test('CPU-idle detection handles buffered output without a stdio-only kill', async () => {
+test('idle-activity detection handles buffered output without a stdio-only kill', async () => {
   const child = childFixture();
-  const result = await runLaunch({ vendor: 'anthropic', binary: 'fixture', args: [] }, { spawn: () => child, maxWallMs: 500, pollMs: 5, idleCpuMs: 10, idleStdioMs: 5, sampleCpuMs: () => 10, kill: () => setImmediate(() => child.emit('close', 1)) });
-  assert.equal(result.killReason, 'idle-cpu');
+  const result = await runLaunch({ vendor: 'anthropic', binary: 'fixture', args: [] }, { spawn: () => child, maxWallMs: 500, pollMs: 5, idleCpuMs: 10, idleStdioMs: 5, idleActivityMs: 20, sampleCpuMs: () => 10, kill: () => setImmediate(() => child.emit('close', 1)) });
+  assert.equal(result.killReason, 'idle-activity');
 });
 
 test('PID persistence failure terminates its owned real Node child and waits for close', async t => {

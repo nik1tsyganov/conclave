@@ -62,7 +62,7 @@ test('naked route and ad hoc escalation cannot launch', async () => {
 test('sealed launch binds route and rejects every changed identity before spawn', async (t) => {
   const run = createSealedRun(t);
   const native = fakeVendor();
-  for (const [field, value] of Object.entries({ vendor: 'google', model: 'gpt-5.6-sol', effort: 'high', class: 'debug-mystery', unitId: 'other', authorVendor: 'anthropic', escalation: true })) {
+  for (const [field, value] of Object.entries({ vendor: 'google', model: 'gpt-6-astra', effort: 'high', class: 'debug-mystery', unitId: 'other', authorVendor: 'anthropic', escalation: true })) {
     await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1', [field]: value }, native), /differs from validated plan/);
   }
   assert.equal(native.calls(), 0);
@@ -84,7 +84,7 @@ test('valid launch records scope and native evidence; retry returns the same tra
   const opts = { ...run.opts, dispatchId: 'd1' };
   const first = await runDispatch(opts, native);
   assert.equal(first.receipt.changedFiles[0].path, 'result.txt');
-  assert.equal(first.receipt.modelObserved, 'gpt-5.6-terra');
+  assert.equal(first.receipt.modelObserved, 'gpt-5.6-sol');
   assert.equal(first.receipt.planHash, run.sealed.planHash);
   const replay = await runDispatch(opts, native);
   assert.equal(replay.replayed, true); assert.equal(replay.proofId, first.proofId); assert.equal(native.calls(), 1);
@@ -145,7 +145,7 @@ test('nonzero child, missing capture and malformed proof produce terminal failur
       const result = await launch(spec);
       if (failure === 'exit') return { ...result, ok: false, exitCode: 1 };
       if (failure === 'capture') fs.unlinkSync(spec.capturePath);
-      if (failure === 'proof') result.stderr = 'requested gpt-5.6-terra';
+      if (failure === 'proof') result.stderr = 'requested gpt-5.6-sol';
       return result;
     };
     await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1' }, native), /failed|capture|proof/i);
@@ -167,7 +167,7 @@ test('post-launch skill/rule additions and manifest rewrites invalidate transact
 
 test('availability cannot forge an exact model from a handwritten observation', async (t) => {
   const run = createSealedRun(t);
-  run.available.vendors.openai.models['gpt-5.6-terra'].efforts.medium.evidence.sha256 = 'a'.repeat(64);
+  run.available.vendors.openai.models['gpt-5.6-sol'].efforts.medium.evidence.sha256 = 'a'.repeat(64);
   writeJson(run.availability, run.available);
   const native = fakeVendor();
   await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1', availability: run.availability }, native), /availability override differs from sealed evidence/);
