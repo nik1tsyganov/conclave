@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { main } = require('./magi-whoami.js');
+const { main, HOST_MODES } = require('./magi-whoami.js');
 const { loadMatrix } = require('./dispatch-matrix.js');
 
 function invoke(argv) {
@@ -11,38 +11,39 @@ function invoke(argv) {
   return { exitCode, stdout, stderr };
 }
 
-test('the exact runtime arbiter declaration is legal in either argument order', () => {
-  const slug = loadMatrix().principles.arbiterModel;
-  for (const args of [['--mode', 'cursor-cli', '--slug', slug], ['--slug', slug, '--mode', 'cursor-cli'],
-    ['--mode', 'synara', '--slug', slug], ['--slug', slug, '--mode', 'synara']]) {
-    const result = invoke(args);
-    assert.equal(result.exitCode, 0);
-    assert.match(result.stdout, /^LEGAL\b/);
-    assert.match(result.stdout, /declaration only.*not proof of the actual picker/i);
-    assert.equal(result.stderr, '');
+test('every CLI host mode is legal with any host slug, and names the runtime arbiter engine', () => {
+  const { arbiterVendor, arbiterModel } = loadMatrix().principles;
+  assert.equal(arbiterVendor, 'jev');
+  assert.deepEqual(HOST_MODES, ['cursor-cli', 'synara', 'claude-code']);
+  for (const mode of HOST_MODES) for (const slug of ['claude-fable-5-1', 'cursor-grok-4.6-high-fast', 'gpt-5.6-sol']) {
+    for (const args of [['--mode', mode, '--slug', slug], ['--slug', slug, '--mode', mode]]) {
+      const result = invoke(args);
+      assert.equal(result.exitCode, 0, JSON.stringify(args));
+      assert.match(result.stdout, new RegExp(`^LEGAL: ${mode} host=${slug} arbiter=jev/${arbiterModel}\\.`));
+      assert.match(result.stdout, /declaration only.*not proof of the actual picker/i);
+      assert.equal(result.stderr, '');
+    }
   }
 });
 
-test('forbidden modes and inexact or foreign slugs are illegal', () => {
-  const slug = loadMatrix().principles.arbiterModel;
-  for (const [mode, declared] of [['cursor', slug], ['claude', slug], ['banana', slug], ['cursor-cli', slug.toUpperCase()],
-    ['cursor-cli', `cursor-${slug}-high-fast`], ['cursor-cli', 'gpt-5.6-sol'], ['synara', 'gpt-5.6-sol']]) {
-    const result = invoke(['--mode', mode, '--slug', declared]);
+test('modes outside the CLI host list are illegal', () => {
+  for (const mode of ['cursor', 'claude', 'banana', 'CURSOR-CLI']) {
+    const result = invoke(['--mode', mode, '--slug', 'any-host']);
     assert.equal(result.exitCode, 1);
     assert.equal(result.stdout, '');
     assert.match(result.stderr, /^ILLEGAL\b/);
   }
 });
 
-test('the declared slug follows runtime policy rather than a built-in model list', t => {
-  t.mock.method(require('./dispatch-matrix.js'), 'loadMatrix', () => ({ principles: { arbiterModel: 'fixture-arbiter' } }));
-  assert.equal(invoke(['--mode', 'cursor-cli', '--slug', 'fixture-arbiter']).exitCode, 0);
-  assert.equal(invoke(['--mode', 'synara', '--slug', 'fixture-arbiter']).exitCode, 0);
-  assert.equal(invoke(['--mode', 'cursor-cli', '--slug', 'grok-4.6']).exitCode, 1);
+test('the arbiter engine comes from runtime policy rather than a built-in list', t => {
+  t.mock.method(require('./dispatch-matrix.js'), 'loadMatrix', () => ({ principles: { arbiterVendor: 'jev', arbiterModel: 'fixture-engine' } }));
+  assert.match(invoke(['--mode', 'cursor-cli', '--slug', 'h']).stdout, /arbiter=jev\/fixture-engine/);
+  t.mock.method(require('./dispatch-matrix.js'), 'loadMatrix', () => ({ principles: {} }));
+  assert.equal(invoke(['--mode', 'cursor-cli', '--slug', 'h']).exitCode, 2);
 });
 
 test('missing duplicate unknown and malformed arguments fail with exit two', () => {
-  const legal = ['--mode', 'cursor-cli', '--slug', loadMatrix().principles.arbiterModel];
+  const legal = ['--mode', 'cursor-cli', '--slug', 'host-slug'];
   for (const args of [[], ['--mode'], ['--slug', 'grok-4.6'], ['--mode', 'cursor-cli'],
     ['--mode', '--slug', 'grok-4.6'], ['--mode', '', '--slug', 'grok-4.6'],
     ['--mode', 'cursor-cli', '--mode', 'cursor-cli'], ['--slug', 'grok-4.6', '--slug', 'grok-4.6'],

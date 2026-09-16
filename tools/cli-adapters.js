@@ -72,6 +72,8 @@ function openaiArgs({ role, model, effort, cwd, capturePath }, policy) {
     '-c', `model_reasoning_effort=${effort}`,
     '-c', 'memories.use_memories=false', '-c', 'memories.generate_memories=false',
     ...(provider ? ['-c', `model_provider=${provider}`] : []),
+    // R12 (leaf seat) enforced natively: no Codex sub-agents inside a seat.
+    '-c', 'features.multi_agent=false',
     '-C', cwd, '-o', capturePath, '-'];
 }
 
@@ -284,7 +286,9 @@ function anthropicLaunch(opts) {
     : 'dontAsk';
   // Keep authenticated native tools and permissions, but exclude global hooks,
   // plugins and instruction discovery. Leaf context is read from staged files.
-  const args = ['-p', '--safe-mode', '--model', ctx.model, '--effort', ctx.effort, '--permission-mode', permissionMode, '--add-dir', ctx.cwd];
+  // R12 (leaf seat) enforced natively, not by prompt: Claude's own subagent
+  // tools are denied on every seat (adopted from Droppy Code Hydra, 2026-09-16).
+  const args = ['-p', '--safe-mode', '--model', ctx.model, '--effort', ctx.effort, '--permission-mode', permissionMode, '--disallowedTools', 'Agent,Task', '--add-dir', ctx.cwd];
   // Native final-response instructions must survive tool-result narration.
   // Append to the native system prompt; never replace its permission controls.
   args.push('--append-system-prompt', anthropicSystemText(ctx));

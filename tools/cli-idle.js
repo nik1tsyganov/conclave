@@ -12,10 +12,22 @@ function decide(sample) {
     }
 
     if (vendor === 'anthropic' || vendor === 'google') {
-        // do NOT kill for idle-stdio
+        // do NOT kill for idle-stdio (google buffers stdout until exit)
     } else if (vendor === 'openai') {
         if (nowMs - lastStdioAtMs >= idleStdioMs) {
             return { action: 'kill', reason: 'idle-stdio', killMethod: 'pid-only' };
+        }
+    }
+
+    // Stalled-vs-thinking rung (adopted from Droppy Code Hydra, 2026-09-16):
+    // no stdio byte, no native-log growth and no CPU progress for idleActivityMs
+    // means the child is stuck, whatever the vendor. Any one signal resets it.
+    const { lastActivityAtMs, idleActivityMs } = sample;
+    if (Number.isFinite(idleActivityMs) && idleActivityMs > 0) {
+        const signals = [lastStdioAtMs, lastActivityAtMs, lastCpuAtMs].filter((t) => typeof t === 'number' && Number.isFinite(t));
+        const lastSignal = signals.length ? Math.max(...signals) : startedAtMs;
+        if (nowMs - lastSignal >= idleActivityMs) {
+            return { action: 'kill', reason: 'idle-activity', killMethod: 'pid-only' };
         }
     }
 

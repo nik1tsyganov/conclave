@@ -103,6 +103,14 @@ function reserveTransaction(binding, evidenceDir, attestationProtocol) {
     const previous = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (previous.requestHash !== requestHash) throw evidenceError('logical dispatch already belongs to a different validated plan', 'DUPLICATE_DISPATCH');
     if (previous.status === AWAITING_ATTESTATION) return { file, state: previous, pending: true, replayed: true };
+    if (previous.status === 'RETRYABLE') {
+      // A classified launch failure (R22 retry clause, 2026-09-16) re-runs under the same id.
+      const attempts = Array.isArray(previous.attempts) ? previous.attempts : [];
+      if (attempts.length >= require('./launch-retry.js').MAX_ATTEMPTS) throw evidenceError('launch retries exhausted; use a new dispatch ID and validate its plan', 'DUPLICATE_DISPATCH');
+      const retried = { ...state, attempts };
+      fs.writeFileSync(file, `${JSON.stringify(retried)}\n`, 'utf8');
+      return { file, state: retried, replayed: false, retrying: true };
+    }
     if (previous.status !== 'PASS') throw evidenceError(`logical dispatch is ${previous.status}; use a new dispatch ID and validate its plan`, 'DUPLICATE_DISPATCH');
     verifyCommittedRow(previous.telemetry);
     return { file, state: previous, replayed: true };

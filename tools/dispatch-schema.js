@@ -2,8 +2,8 @@
 
 const VENDORS = Object.freeze(['anthropic', 'openai', 'google']);
 const ROLES = Object.freeze(['implement', 'verify', 'review', 'plan', 'research']);
-const HOST_MODES = Object.freeze(['cursor', 'cursor-cli', 'synara']);
-const CLI_HOST_MODES = Object.freeze(['cursor-cli', 'synara']);
+const HOST_MODES = Object.freeze(['cursor', 'cursor-cli', 'synara', 'claude-code']);
+const CLI_HOST_MODES = Object.freeze(['cursor-cli', 'synara', 'claude-code']);
 
 function isCliHostMode(hostMode) {
   return CLI_HOST_MODES.includes(hostMode);
@@ -27,7 +27,7 @@ function validateDispatchRow(row, options = {}) {
   if (row.hostMode !== undefined && !HOST_MODES.includes(row.hostMode)) fail(`invalid hostMode: ${row.hostMode}`);
   if (row.routedBy !== undefined && row.routedBy !== 'arbiter') fail('invalid routedBy');
   if (row.capturedBy !== undefined && row.capturedBy !== 'lead') fail('invalid capturedBy');
-  if (options.requireCursorCli && !isCliHostMode(row.hostMode)) fail('hostMode must be cursor-cli or synara');
+  if (options.requireCursorCli && !isCliHostMode(row.hostMode)) fail('hostMode must be cursor-cli, synara or claude-code');
   if (options.requireArbiter && row.routedBy !== 'arbiter') fail('routedBy must be arbiter');
   if (options.requireDispatchId && (typeof row.dispatchId !== 'string' || row.dispatchId.length === 0)) fail('dispatchId required');
   if (options.requireUnitId && (typeof row.unitId !== 'string' || row.unitId.length === 0)) fail('unitId required');

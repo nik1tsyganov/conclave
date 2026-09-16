@@ -5,10 +5,21 @@ const { execFileSync } = require('node:child_process');
 function sampleCpuMs(pid, options = {}) {
   if (!Number.isInteger(pid) || pid <= 0) return null;
   const platform = options.platform || process.platform;
-  // POSIX has no sampler here: `ps -o time=` reports whole seconds only, which
-  // is coarser than the idle-CPU rung needs. Returning null disables that rung.
-  if (platform !== 'win32') return null;
   const exec = options.execFileSync || execFileSync;
+  // POSIX: `ps -o time=` reports whole seconds ([[HH:]MM:]SS[.ss]); coarse, but
+  // the idle-CPU rung measures minutes of silence, so seconds are enough
+  // (enabled 2026-09-16 with the Droppy-style idle watchdog).
+  if (platform !== 'win32') {
+    try {
+      const out = exec('ps', ['-o', 'time=', '-p', String(pid)], { encoding: 'utf8', timeout: 4000, stdio: ['ignore', 'pipe', 'pipe'] });
+      const text = String(out).trim();
+      if (!text) return null;
+      const parts = text.split(':').map(Number);
+      if (parts.some((n) => !Number.isFinite(n) || n < 0)) return null;
+      const seconds = parts.reduce((acc, n) => acc * 60 + n, 0);
+      return Math.round(seconds * 1000);
+    } catch { return null; }
+  }
   try {
     const out = exec(
       'powershell.exe',

@@ -20,7 +20,7 @@ function snapshot(root, relative = '') {
 test('sealing cannot write inside a product worktree', t => {
   const run = createSealedRun(t);
   const before = snapshot(run.root);
-  assert.throws(() => sealPlan({ plan: run.planSource, runDir: path.join(run.cwd, 'attempt'), availability: run.availability }), /overlap|outside.*product/);
+  assert.throws(() => sealPlan({ noJev: 'test fixture', plan: run.planSource, runDir: path.join(run.cwd, 'attempt'), availability: run.availability }), /overlap|outside.*product/);
   assert.deepEqual(snapshot(run.root), before);
 });
 
@@ -30,7 +30,7 @@ test('known seal destination collisions do not leave a partial plan', t => {
   fs.mkdirSync(runDir);
   fs.writeFileSync(path.join(runDir, 'availability.json'), 'existing bytes\n', 'utf8');
   const before = snapshot(run.root);
-  assert.throws(() => sealPlan({ plan: run.planSource, runDir, availability: run.availability }), /already exists|occupied/);
+  assert.throws(() => sealPlan({ noJev: 'test fixture', plan: run.planSource, runDir, availability: run.availability }), /already exists|occupied/);
   assert.deepEqual(snapshot(run.root), before);
 });
 
@@ -41,7 +41,7 @@ test('ordinary Windows case aliases use the same plain worktree without changing
   const original = JSON.stringify(plan);
   fs.writeFileSync(run.planSource, original, 'utf8');
   const runDir = path.join(run.root, 'alias-run');
-  const result = sealPlan({ plan: run.planSource, runDir, availability: run.availability });
+  const result = sealPlan({ noJev: 'test fixture', plan: run.planSource, runDir, availability: run.availability });
   assert.equal(fs.readFileSync(result.planPath, 'utf8'), original);
   assert.equal(fs.realpathSync.native(plan.dispatches[0].cwd), fs.realpathSync.native(run.cwd));
 });

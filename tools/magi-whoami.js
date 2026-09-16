@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 'use strict';
 
+// Declares which session hosts a MAGI run. Since 2026-09-16 the arbiter is the
+// Jev decision engine named by the runtime matrix; the host session runs the
+// tools and holds no vote, so any host slug is legal in a CLI host mode.
+const HOST_MODES = ['cursor-cli', 'synara', 'claude-code'];
+
 function main(argv = process.argv.slice(2), io = process) {
   try {
     const invalid = 'ARGUMENT_ERROR: expected exactly --mode <mode> and --slug <slug>';
@@ -13,14 +18,15 @@ function main(argv = process.argv.slice(2), io = process) {
           typeof value !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(value)) throw new Error(invalid);
       options[flag] = value;
     }
-    const slug = require('./dispatch-matrix.js').loadMatrix().principles?.arbiterModel;
-    if (typeof slug !== 'string' || !slug) throw new Error('POLICY_ERROR: runtime matrix has no arbiterModel');
+    const principles = require('./dispatch-matrix.js').loadMatrix().principles || {};
+    const engine = principles.arbiterModel;
+    if (typeof engine !== 'string' || !engine) throw new Error('POLICY_ERROR: runtime matrix has no arbiterModel');
     const mode = options['--mode'];
-    if (!['cursor-cli', 'synara'].includes(mode) || options['--slug'] !== slug) {
-      io.stderr.write(`ILLEGAL: cursor-cli and synara require the runtime arbiter slug ${slug}. Declaration only; not proof of the actual picker.\n`);
+    if (!HOST_MODES.includes(mode)) {
+      io.stderr.write(`ILLEGAL: host mode must be one of ${HOST_MODES.join(', ')}. Declaration only; not proof of the actual picker.\n`);
       return 1;
     }
-    io.stdout.write(`LEGAL: ${mode} ${slug}. Declaration only; not proof of the actual picker.\n`);
+    io.stdout.write(`LEGAL: ${mode} host=${options['--slug']} arbiter=${principles.arbiterVendor}/${engine}. Declaration only; not proof of the actual picker.\n`);
     return 0;
   } catch (error) {
     io.stderr.write(`${error.message}\n`);
@@ -29,4 +35,4 @@ function main(argv = process.argv.slice(2), io = process) {
 }
 
 if (require.main === module) process.exitCode = main();
-module.exports = { main };
+module.exports = { main, HOST_MODES };

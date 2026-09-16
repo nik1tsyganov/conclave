@@ -12,13 +12,57 @@ const { canonicalPlainPath, pathsOverlap, DEFAULT_ROOT } = require('./runtime-pa
 const { loadCatalog, narrowMatrix } = require('./synara-catalog.js');
 const { INSTRUCTION_READ_PROTOCOL } = require('./instruction-read-evidence.js');
 const { validateEvidenceReadDirs } = require('./evidence-read-access.js');
+const { readJsonFile: readJevRecord } = require('./json-file.js');
+
+// Jev is the arbiter (2026-09-16). `node tools/jev-plan-classify.js` asks the
+// decision engine for a class distribution per unit and writes a record bound to
+// each brief's hash; plan-seal reads that record (--jev-classification) and gates
+// it deterministically: the plan's class must be Jev's choice, or carry at least
+// the flag-gate probability, or the seal records an explicit --class-override
+// reason. Without a record the seal refuses unless --no-jev <reason> is given.
+function jevClassifyPlan(plan, matrix, { noJev, classOverride, jevClassification } = {}) {
+  const engine = matrix.arbiter?.decisionEngine || {};
+  const gates = engine.gates || {};
+  const policy = { route: gates.classifyRoute ?? 0.6, routeFlag: gates.classifyRouteFlagged ?? 0.4 };
+  const record = { engine: engine.engine || 'jev', model: engine.model || null, gates: policy, units: {} };
+  if (noJev) {
+    if (jevClassification) throw new Error('--no-jev and --jev-classification are mutually exclusive');
+    return { ...record, status: 'NOT_RUN', optOutReason: String(noJev) };
+  }
+  if (!jevClassification) throw new Error('Jev classification is required: run tools/jev-plan-classify.js and pass --jev-classification <file>, or record an opt-out with --no-jev <reason>');
+  const classified = readJevRecord(jevClassification);
+  if (classified.protocol !== 'magi-jev-plan-classify-v1' || !classified.units || typeof classified.units !== 'object') throw new Error('Jev classification record is malformed');
+  const units = new Map();
+  for (const entry of plan.dispatches) {
+    const unit = units.get(entry.unitId) || { classes: new Set(), briefSha256: null };
+    unit.classes.add(entry.class);
+    if (!unit.briefSha256 || entry.role === 'implement') unit.briefSha256 = entry.briefSha256;
+    units.set(entry.unitId, unit);
+  }
+  for (const [unitId, unit] of units) {
+    const row = classified.units[unitId];
+    if (!row) throw new Error(`Jev classification record has no row for ${unitId}`);
+    if (row.briefSha256 !== unit.briefSha256) throw new Error(`Jev classification for ${unitId} is bound to a different brief`);
+    if (typeof row.classId !== 'string' || !row.distribution || typeof row.distribution !== 'object') throw new Error(`Jev classification for ${unitId} is incomplete`);
+    const planClasses = [...unit.classes];
+    const agrees = planClasses.includes(row.classId);
+    const pPlan = Math.max(...planClasses.map(c => Number(row.distribution[c]) || 0));
+    const out = { jevClass: row.classId, p: row.p, confidence: row.confidence, gate: row.gate, planClasses, pPlan, agrees };
+    if (!agrees && pPlan < policy.routeFlag) {
+      if (!classOverride) throw new Error(`Jev classifies ${unitId} as ${row.classId} (p=${row.p}); the plan's class ${planClasses.join('/')} has p=${pPlan}; pass --class-override <reason> to seal anyway`);
+      out.override = String(classOverride);
+    } else if (!agrees) out.flag = 'plan-class-below-route-but-above-flag';
+    record.units[unitId] = out;
+  }
+  return { ...record, status: 'RUN', recordSha256: hashFile(jevClassification), recordPath: path.resolve(jevClassification) };
+}
 
 function matrixForPlan(plan, catalog, base = loadMatrix()) {
   if (!catalog) return base;
   return narrowMatrix(base, catalog).matrix;
 }
 
-function sealPlan({ plan, runDir, availability, synaraCatalog, skillSourceRoot }) {
+function sealPlan({ plan, runDir, availability, synaraCatalog, skillSourceRoot, noJev, classOverride, jevClassification }) {
   if (!plan || !runDir) throw new Error('--plan and --run-dir are required');
   const available = loadAvailability(availability);
   const sealedAt = new Date().toISOString();
@@ -34,6 +78,7 @@ function sealPlan({ plan, runDir, availability, synaraCatalog, skillSourceRoot }
   const root = path.resolve(runDir);
   const canonicalRoot = canonicalPlainPath(root);
   if (pathsOverlap(canonicalRoot, canonicalPlainPath(DEFAULT_ROOT))) throw new Error('run directory and runtime overlap');
+  const jevClassify = jevClassifyPlan(validated.plan, JSON.parse(matrixText), { noJev, classOverride, jevClassification });
   const planPath = path.join(root, 'dispatch-plan.json');
   const sealPath = path.join(root, 'plan-seal.json');
   const availablePath = path.join(root, 'availability.json');
@@ -64,6 +109,7 @@ function sealPlan({ plan, runDir, availability, synaraCatalog, skillSourceRoot }
     attestationProtocol: ATTESTATION_PROTOCOL,
     instructionReadProtocol: INSTRUCTION_READ_PROTOCOL,
     ...(catalog ? { synaraCatalogSha256: hashFile(catalogPath) } : {}),
+    jevClassify,
   };
   writeJson(sealPath, seal);
   return { ...seal, planPath, runDir: root };
@@ -98,8 +144,8 @@ function main(argv = process.argv.slice(2)) {
   try {
     const opts = {};
     for (let i = 0; i < argv.length; i += 2) {
-      if (!['--plan', '--run-dir', '--availability', '--synara-catalog', '--skill-source-root'].includes(argv[i]) || !argv[i + 1] || argv[i + 1].startsWith('--')) {
-        throw new Error('Usage: plan-seal --plan <json> --run-dir <new directory> [--availability <json>] [--synara-catalog <json>] [--skill-source-root <dir>]');
+      if (!['--plan', '--run-dir', '--availability', '--synara-catalog', '--skill-source-root', '--no-jev', '--class-override', '--jev-classification'].includes(argv[i]) || !argv[i + 1] || argv[i + 1].startsWith('--')) {
+        throw new Error('Usage: plan-seal --plan <json> --run-dir <new directory> [--availability <json>] [--synara-catalog <json>] [--skill-source-root <dir>] [--jev-classification <file> | --no-jev <reason>] [--class-override <reason>]');
       }
       const key = argv[i].slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
       if (Object.hasOwn(opts, key)) throw new Error(`duplicate plan-seal option: ${argv[i]}`);

@@ -74,6 +74,14 @@ function runLaunch(launch, options = {}) {
     });
 
     const pollMs = options.pollMs ?? 1000;
+    // Native log growth counts as activity (agy writes --log-file while stdout stays buffered).
+    const activityFile = options.activityFile || launch.nativeLogPath || null;
+    let lastActivitySize = -1;
+    let lastActivityAtMs = startedAtMs;
+    function sampleActivity() {
+      if (!activityFile) return;
+      try { const size = fs.statSync(activityFile).size; if (size !== lastActivitySize) { lastActivitySize = size; lastActivityAtMs = Date.now(); } } catch {}
+    }
     function requestKill(reason, error) {
       if (settled || killReason) return;
       killReason = reason;
@@ -91,6 +99,7 @@ function runLaunch(launch, options = {}) {
         if (lastCpuMs === null || cpuMs > lastCpuMs) lastCpuAtMs = nowMs;
         lastCpuMs = cpuMs;
       }
+      sampleActivity();
       const decision = decide({
         vendor: launch.vendor,
         nowMs,
@@ -99,9 +108,11 @@ function runLaunch(launch, options = {}) {
         stdioBytes,
         cpuMs,
         lastCpuAtMs,
+        lastActivityAtMs,
         maxWallMs: options.maxWallMs ?? 2700000,
         idleStdioMs: options.idleStdioMs ?? 180000,
         idleCpuMs: options.idleCpuMs ?? 180000,
+        idleActivityMs: options.idleActivityMs ?? 600000,
       });
       if (decision.action === 'kill') {
         requestKill(decision.reason);

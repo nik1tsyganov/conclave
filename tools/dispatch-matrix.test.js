@@ -21,7 +21,7 @@ function availabilityFor(vendor, model, observedModel = model, observedAt) {
   if (observedAt) entry.observedAt = observedAt;
   return { vendors: { [vendor]: { models: { [model]: entry } } } };
 }
-function arbiter() { return { vendor: 'xai', model: 'grok-4.6', effort: 'high' }; }
+function arbiter() { return { vendor: 'jev', model: 'jev-latest', host: 'test-host' }; }
 
 test('Astra is fail-closed until exact fresh local model proof exists', () => {
   const route = { class: 'extreme-end-to-end', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high', escalation: true, escalationReason: 'lower tier failed the required correctness check' };
@@ -72,7 +72,7 @@ test('synara is a legal CLI hostMode and banana is not', () => {
   assert.throws(() => validatePlan({
     hostMode: 'banana', arbiter: arbiter(), magiConvened: true,
     dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium' }],
-  }, matrix), /hostMode must be cursor-cli or synara/);
+  }, matrix), /hostMode must be cursor-cli, synara or claude-code/);
 });
 
 test('implement cannot take evidenceReadDirs', () => {

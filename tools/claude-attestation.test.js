@@ -433,7 +433,7 @@ test('default bundled skills resolve before initial destination validation creat
   fs.mkdirSync(path.join(runtime, refs), { recursive: true });
   for (const name of ['dispatch-matrix.json', 'seat-profiles.json']) fs.copyFileSync(path.join(__dirname, '..', refs, name), path.join(runtime, refs, name));
   fs.cpSync(run.opts.skillSourceRoot, path.join(runtime, 'seat-skills'), { recursive: true });
-  const sealed = require('./plan-seal.js').sealPlan({ plan: run.planSource, runDir, availability: run.availability,
+  const sealed = require('./plan-seal.js').sealPlan({ noJev: 'test fixture', plan: run.planSource, runDir, availability: run.availability,
     skillSourceRoot: path.join(runtime, 'seat-skills') });
   const isolatedDispatch = require(path.join(runtime, 'tools/dispatch-run.js')).runDispatch;
   const { skillSourceRoot: explicitSkills, ...opts } = command(run);

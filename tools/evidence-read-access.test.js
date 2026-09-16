@@ -19,7 +19,7 @@ function accessFixture(t, vendor = 'google') {
   run.evidence = path.join(run.root, 'evidence');
   run.dispatches[0].evidenceReadDirs = [run.evidence];
   writeJson(run.planSource, run.planObject);
-  const sealed = sealPlan({ plan: run.planSource, runDir: run.runDir, availability: run.availability, skillSourceRoot: run.opts.skillSourceRoot });
+  const sealed = sealPlan({ noJev: 'test fixture', plan: run.planSource, runDir: run.runDir, availability: run.availability, skillSourceRoot: run.opts.skillSourceRoot });
   run.opts = { ...run.opts, runDir: run.runDir, plan: sealed.planPath };
   return run;
 }
@@ -76,7 +76,7 @@ function authorlessChecks(t) {
   run.runDir = path.join(run.root, 'access-run');
   run.dispatches[1].evidenceReadDirs = [path.join(run.runDir, 'out/d1')];
   writeJson(run.planSource, run.planObject);
-  const sealed = sealPlan({ plan: run.planSource, runDir: run.runDir, availability: run.availability, skillSourceRoot: run.opts.skillSourceRoot });
+  const sealed = sealPlan({ noJev: 'test fixture', plan: run.planSource, runDir: run.runDir, availability: run.availability, skillSourceRoot: run.opts.skillSourceRoot });
   run.opts = { ...run.opts, runDir: run.runDir, plan: sealed.planPath };
   return run;
 }
@@ -236,7 +236,7 @@ test('complete prior author evidence is available to both checking seats through
   run.runDir = path.join(run.root, 'access-run'); run.evidence = path.join(run.root, 'evidence');
   for (const entry of run.dispatches.slice(1)) entry.evidenceReadDirs = [run.evidence, path.join(run.runDir, 'out/d1')];
   writeJson(run.planSource, run.planObject);
-  const sealed = sealPlan({ plan: run.planSource, runDir: run.runDir, availability: run.availability, skillSourceRoot: run.opts.skillSourceRoot });
+  const sealed = sealPlan({ noJev: 'test fixture', plan: run.planSource, runDir: run.runDir, availability: run.availability, skillSourceRoot: run.opts.skillSourceRoot });
   run.opts = { ...run.opts, runDir: run.runDir, plan: sealed.planPath };
   const native = nativeFixture();
   await require('./test-fixtures.js').completeSyntheticDispatch({ ...run.opts, dispatchId: 'd1' }, native);

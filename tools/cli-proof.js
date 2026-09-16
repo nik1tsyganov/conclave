@@ -126,6 +126,13 @@ function parseGoogle(captureText, logText, expectedModel) {
     }
   }
 
+  // agy in print mode soft-denies any permission it cannot prompt for and still
+  // reports SUCCESS with an empty response; the denial list names the missing
+  // grant (adopted from Droppy Code Hydra, 2026-09-16; observed live twice).
+  if (Array.isArray(envelope.denied_actions) && envelope.denied_actions.length) {
+    const denied = envelope.denied_actions.map((d) => d?.display_name || d?.action || 'unknown').join(', ');
+    throw proofError(`Google/agy soft-denied ${denied}: headless permission missing (status ${envelope.status || 'unknown'})`);
+  }
   if (!envelope.response || typeof envelope.response !== 'string' || envelope.response.trim() === '') throw proofError('Google/agy proof missing or whitespace response');
 
   const logStr = clean(logText);

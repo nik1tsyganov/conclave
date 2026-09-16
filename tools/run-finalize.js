@@ -275,7 +275,7 @@ function inspectRun(runDir) {
         const state = readJson(file);
         same(state.entry, entry, 'transaction entry');
         if (state.planHash !== run.seal.planHash) throw new Error('transaction plan hash mismatch');
-        if (!['PASS', 'FAIL', 'RUNNING', AWAITING_ATTESTATION].includes(state.status)) throw new Error('unknown transaction status');
+        if (!['PASS', 'FAIL', 'RUNNING', 'RETRYABLE', AWAITING_ATTESTATION].includes(state.status)) throw new Error('unknown transaction status');
         outcome.status = state.status;
         if (state.status === 'PASS') {
           const execution = verifyExecution(run, entry, state);
@@ -287,7 +287,8 @@ function inspectRun(runDir) {
           verifyCheckpoint(run, entry, state);
           outcome.error = 'Claude output awaits post-run inspection and capture-bound --on-topic attestation; no completion or approval is committed.';
           outcome.evidenceDir = state.evidenceDir;
-        } else if (state.error) outcome.error = state.error;
+        } else if (state.status === 'RETRYABLE') outcome.error = `launch failure classified retryable (${state.attempts?.at(-1)?.signature}); not re-dispatched`;
+        else if (state.error) outcome.error = state.error;
       } catch (error) { outcome.status = 'INVALID'; outcome.error = error.message; }
     }
     outcomes.push(outcome);

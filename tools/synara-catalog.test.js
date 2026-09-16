@@ -92,18 +92,17 @@ test('plan-seal requires a catalog for synara and rejects banana', (t) => {
   const plan = JSON.parse(fs.readFileSync(run.planSource, 'utf8'));
   plan.hostMode = 'banana';
   fs.writeFileSync(run.planSource, JSON.stringify(plan), 'utf8');
-  assert.throws(() => sealPlan({ plan: run.planSource, runDir: path.join(run.root, 'banana-run'), availability: run.availability }), /hostMode must be cursor-cli or synara/);
+  assert.throws(() => sealPlan({ noJev: 'test fixture', plan: run.planSource, runDir: path.join(run.root, 'banana-run'), availability: run.availability }), /hostMode must be cursor-cli, synara or claude-code/);
 
   const synaraPlan = JSON.parse(fs.readFileSync(run.planSource, 'utf8'));
   synaraPlan.hostMode = 'synara';
   const synaraSource = path.join(run.root, 'synara-plan.json');
   fs.writeFileSync(synaraSource, JSON.stringify(synaraPlan), 'utf8');
-  assert.throws(() => sealPlan({ plan: synaraSource, runDir: path.join(run.root, 'missing-catalog'), availability: run.availability }), /synara hostMode requires --synara-catalog/);
+  assert.throws(() => sealPlan({ noJev: 'test fixture', plan: synaraSource, runDir: path.join(run.root, 'missing-catalog'), availability: run.availability }), /synara hostMode requires --synara-catalog/);
 
   const catalogFile = path.join(run.root, 'capabilities.json');
   fs.writeFileSync(catalogFile, JSON.stringify(capabilitiesFixture()), 'utf8');
-  const sealed = sealPlan({
-    plan: synaraSource,
+  const sealed = sealPlan({ noJev: 'test fixture', plan: synaraSource,
     runDir: path.join(run.root, 'synara-run'),
     availability: run.availability,
     synaraCatalog: catalogFile,

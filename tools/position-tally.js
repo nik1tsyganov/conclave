@@ -46,6 +46,7 @@ const FORBIDDEN_ELECTORS = Object.freeze([
   'arbiter',
   'grok',
   'xai',
+  'jev',
   'camerlengo',
   'camerlengo-8',
   'lead',

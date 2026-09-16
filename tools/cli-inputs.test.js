@@ -12,7 +12,7 @@ test('UTF-8 BOM plan and availability retain their byte identity through sealing
   const run = createSealedRun(t);
   for (const file of [run.planSource, run.availability]) fs.writeFileSync(file, '\uFEFF'+fs.readFileSync(file,'utf8'));
   const bytes = fs.readFileSync(run.planSource);
-  const sealed = sealPlan({plan:run.planSource,runDir:path.join(run.root,'bom-run'),availability:run.availability,skillSourceRoot:run.opts.skillSourceRoot});
+  const sealed = sealPlan({ noJev: 'test fixture', plan:run.planSource,runDir:path.join(run.root,'bom-run'),availability:run.availability,skillSourceRoot:run.opts.skillSourceRoot});
   assert.equal(sealed.planHash,hashFile(run.planSource));
   assert.deepEqual(fs.readFileSync(sealed.planPath),bytes);
   assert.equal(readSealedRun(sealed.runDir).plan.planId,run.planObject.planId);
@@ -78,6 +78,6 @@ test('sealing cannot place run evidence inside its installed runtime', t => {
   const run=createSealedRun(t),destination=path.join(run.root,'installed-runtime');
   require('./install-plugin.js').installMagiCursorCli({destination});
   const runDir=path.join(destination,'saved-run');
-  assert.throws(()=>require(path.join(destination,'tools/plan-seal.js')).sealPlan({plan:run.planSource,availability:run.availability,runDir}),/runtime.*overlap|overlap.*runtime/i);
+  assert.throws(()=>require(path.join(destination,'tools/plan-seal.js')).sealPlan({ noJev: 'test fixture', plan:run.planSource,availability:run.availability,runDir}),/runtime.*overlap|overlap.*runtime/i);
   assert.equal(fs.existsSync(runDir),false);
 });

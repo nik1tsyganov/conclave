@@ -5,13 +5,13 @@ description: Start or continue a plan-bound MAGI Cursor CLI run. Not CONCLAVE an
 
 # /magi-cli
 
-If the chat is CONCLAVE, open a separate MAGI chat. From the MAGI runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6`. In a Synara-hosted Grok thread, `--mode synara` is also LEGAL. Stop unless the declared route is LEGAL. This checks the declaration against the runtime matrix; it does not prove the actual picker. Seats remain native CLIs.
+If the chat is CONCLAVE, open a separate MAGI chat. From the MAGI runtime root, run `node tools/magi-whoami.js --mode <cursor-cli|synara|claude-code> --slug <hosting session slug>` (for example `--mode cursor-cli --slug cursor-grok-4.6-high-fast`, or `--mode claude-code --slug claude-fable-5-1`); the declaration names the host, and the arbiter is the Jev decision engine from the runtime matrix. Stop unless the declared route is LEGAL. This checks the declaration against the runtime matrix; it does not prove the actual picker. Seats remain native CLIs.
 
 Read the MAGI CLI skill and its co-located `references/cursor-cli.md`, `dispatch-matrix.json`, `seat-profiles.json`, and `brief-rules-block.md`. The run guide contains the complete command arguments and plan-field contract.
 
 For real-project work, follow `references/project-runs.md` in that skill. Bound each attempt and export `project-run-report.js` at every stop, including failures before sealing. Keep the report and TRIAGE outside the product and run evidence.
 
-Grok 4.6 is the non-voting arbiter. It classifies, composes briefs and complete plans, dispatches vendor seats, and requests deterministic completion checks. It must not act as a substantive implementation, repair, plan, research, review, verification, or voting seat.
+The Jev decision engine (TypeSafe System One) is the arbiter: it proposes classification, seats, convene, net-benefit and tally distributions and code gates them. The hosting session is non-voting; it composes briefs and complete plans, runs `jev-plan-classify`, dispatches vendor seats, and requests deterministic completion checks. It must not act as a substantive implementation, repair, plan, research, review, verification, or voting seat.
 
 ## Prepare
 
@@ -25,7 +25,7 @@ Unknown or unproven model/effort pairs are unavailable. Availability replays has
 
 ## Seal the complete plan
 
-The plan binds `planId`, `hostMode: cursor-cli` (or `synara` when Synara hosts this arbiter), the xAI/Grok arbiter, and every dispatch entry. Each entry includes `dispatchId`, `unitId`, `class`, `role`, `vendor`, `model`, `effort`, absolute `cwd` and `brief`, `briefSha256`, and relative `writeScope`. Verify/review entries may list absolute `evidenceReadDirs` for non-voting host-helper files.
+The plan binds `planId`, `hostMode: cursor-cli` (or `synara` when Synara hosts this arbiter), the arbiter `{vendor: "jev", model: "jev-latest", host: <session slug>}`, and every dispatch entry. Each entry includes `dispatchId`, `unitId`, `class`, `role`, `vendor`, `model`, `effort`, absolute `cwd` and `brief`, `briefSha256`, and relative `writeScope`. Verify/review entries may list absolute `evidenceReadDirs` for non-voting host-helper files.
 
 Non-implementation roles use an empty write scope and remain read-only. Review/verify entries require a different, correct `authorVendor`. Astra requires `escalation: true` and a substantive reason with at least 16 characters and three distinct words.
 
@@ -36,6 +36,15 @@ Claude implementation uses `--safe-mode --permission-mode bypassPermissions`. Sa
 Critical classes require `magiConvened: true` and two distinct foreign review/verify vendors on the same unit and worktree. Implementation vendor count scales as `min(3, implementation units)`; the 60% cap starts at two units. Do not invent implementation rows for read-only panels.
 
 Run `plan-seal.js --plan <draft.json> --run-dir <new-run-dir> --availability <availability.json>`. A synara host also requires `--synara-catalog`. Optional `--skill-source-root` binds skill bytes into seal schemaVersion 2. Stop on failure.
+
+## Classify with Jev, then seal
+
+```text
+node tools/jev-plan-classify.js --plan <draft-plan.json> --out <record.json> [--provenance <run-parent>/jev-decisions.jsonl]
+node tools/plan-seal.js --plan <draft-plan.json> --run-dir <run-dir> --availability <availability.json> --skill-source-root <seat-skills> --jev-classification <record.json> [--class-override <reason>]
+```
+
+The record binds each unit's brief hash; the seal refuses when the plan's class is not Jev's choice and sits below the flag gate, unless `--class-override <reason>` records the owner's decision. `--no-jev <reason>` records an explicit opt-out (test fixtures, or an engine outage the owner accepts).
 
 ## Dispatch and conclude
 

@@ -81,13 +81,13 @@ function createSealedRun(t, entries = [{}], options = {}) {
     const brief = briefFixture(path.join(root, 'briefs', String(index)), role);
     return { class: 'standard-feature', vendor: 'openai', model: 'gpt-5.6-terra', effort: 'medium', role, dispatchId: `d${index + 1}`, unitId: `u${index + 1}`, cwd, brief, briefSha256: hashFile(brief), writeScope: role === 'implement' ? ['result.txt'] : [], ...entry };
   });
-  const planObject = { planId: 'fixture-run', hostMode: 'cursor-cli', arbiter: { vendor: 'xai', model: 'grok-4.6', effort: 'high' }, ...options, dispatches };
+  const planObject = { planId: 'fixture-run', hostMode: 'cursor-cli', arbiter: { vendor: 'jev', model: 'jev-latest', host: 'fixture-host' }, ...options, dispatches };
   const planSource = path.join(root, 'source-plan.json'); writeJson(planSource, planObject);
   const runDir = path.join(root, 'run');
   const profiles = require('./seat-policy.js').loadProfiles();
   const skills = [...new Set(dispatches.flatMap((entry) => require('./seat-policy.js').buildSeatProfile(profiles, entry).skills))];
   const skillSourceRoot = skillFixture(root, skills);
-  const sealed = require('./plan-seal.js').sealPlan({ plan: planSource, runDir, availability, skillSourceRoot });
+  const sealed = require('./plan-seal.js').sealPlan({ plan: planSource, runDir, availability, skillSourceRoot, noJev: options.noJev === undefined ? 'test fixture: Jev classification not exercised' : options.noJev, jevClassification: options.jevClassification, classOverride: options.classOverride });
   const opts = { plan: sealed.planPath, runDir, rulesRoot: ruleFixture(root), skillSourceRoot };
   return { root, cwd, runDir, opts, dispatches, available, availability, planSource, planObject, sealed };
 }

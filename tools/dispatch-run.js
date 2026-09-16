@@ -264,6 +264,8 @@ async function runDispatch(opts, dependencies = {}) {
   const transactionPath = path.join(runDir, '.magi-dispatches', `${transactionKey(planEntry)}.json`);
   assertPlainPath(transactionPath);
   const savedState = fs.existsSync(transactionPath) ? JSON.parse(fs.readFileSync(transactionPath, 'utf8')) : null;
+  // A RETRYABLE transaction (R22 launch-failure retry) launches again as if fresh.
+  const fresh = !savedState || savedState.status === 'RETRYABLE';
   const postRun = planEntry.vendor === 'anthropic';
   let legacyReplay = false;
   if (postRun && opts.onTopic === true && opts.captureSha256 === undefined && savedState?.status === 'PASS' &&
@@ -292,7 +294,7 @@ async function runDispatch(opts, dependencies = {}) {
   const activationLog = path.resolve(opts.activationLog || path.join(runDir, 'magi-dispatch-log.jsonl'));
   if ([telemetryLog, activationLog].some((file) => !inside(file, runDir) || inside(file, cwd))) throw policyError('dispatch logs must be inside the run directory and outside the product worktree');
   for (const file of [telemetryLog, activationLog, evidenceDir]) assertPlainPath(file);
-  if (!savedState) {
+  if (fresh) {
     if (opts.vendor === 'openai' && opts.role !== 'implement' &&
         !hostSamePath(evidenceDir, path.join(runDir, 'out', opts.dispatchId))) {
       throw policyError('OpenAI checking roles require the standard run/out/dispatch-id evidence directory for scoped scratch');
@@ -315,12 +317,26 @@ async function runDispatch(opts, dependencies = {}) {
     const stagedRules = path.join(evidenceDir, 'brief', 'RULES');
     if (inside(stagedRules, rules.root) || inside(rules.root, stagedRules)) throw policyError('rules source and staging directory must not overlap');
   }
-  const prerequisites = fs.existsSync(transactionPath) ? null : verifyPrerequisites(sealed, binding.entry,
+  const prerequisites = !fresh ? null : verifyPrerequisites(sealed, binding.entry,
     ['review', 'verify'].includes(opts.role) ? snapshotWorkspace(cwd) : undefined, new Date().toISOString());
   const evidenceReadDirs = validateEvidenceReadDirs(binding.entry, { plan: sealed.plan, runDir,
-    requireExisting: !savedState, forbiddenRoots: [opts.rulesRoot, seal.skillSource?.sourceRoot].filter(Boolean) });
-  if (!savedState) snapshotEvidenceReads(evidenceReadDirs);
+    requireExisting: fresh, forbiddenRoots: [opts.rulesRoot, seal.skillSource?.sourceRoot].filter(Boolean) });
+  if (fresh) snapshotEvidenceReads(evidenceReadDirs);
   opts = { ...opts, evidenceReadDirs };
+  // Concurrency cap (principles.maxConcurrentDispatches, 2026-09-16): count the
+  // run's live RUNNING transactions before taking another seat.
+  if (fresh) {
+    const cap = matrix.principles?.maxConcurrentDispatches;
+    if (Number.isInteger(cap) && cap > 0) {
+      const dir = path.dirname(transactionPath);
+      const cutoff = Date.now() - (maxWallMs ?? 2700000);
+      const running = fs.existsSync(dir) ? fs.readdirSync(dir).filter((name) => {
+        if (path.join(dir, name) === transactionPath || !name.endsWith('.json')) return false;
+        try { const row = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')); return row.status === 'RUNNING' && Date.parse(row.startedAt) >= cutoff; } catch { return false; }
+      }).length : 0;
+      if (running >= cap) throw policyError(`concurrent dispatch cap reached: ${running} RUNNING of ${cap} allowed (principles.maxConcurrentDispatches)`);
+    }
+  }
   const transaction = reserveTransaction(binding, evidenceDir, postRun ? ATTESTATION_PROTOCOL : undefined);
   const responseProtocol = opts.vendor === 'anthropic' ? CLAUDE_RESPONSE_PROTOCOL : undefined;
   if (transaction.pending) {
@@ -335,6 +351,7 @@ async function runDispatch(opts, dependencies = {}) {
   let scopeAudit = null;
   let before = null;
   let evidenceCreated = false;
+  let childResult = null;
   try {
   if (fs.existsSync(evidenceDir) && fs.readdirSync(evidenceDir).length) throw policyError('evidence directory must be new or empty');
   fs.mkdirSync(evidenceDir, { recursive: true });
@@ -427,6 +444,7 @@ async function runDispatch(opts, dependencies = {}) {
   if (JSON.stringify(evidenceReadsBefore) !== JSON.stringify(snapshotEvidenceReads(evidenceReadDirs))) throw policyError('read-only evidence inputs changed before launch');
   if (evidenceReadDirs.length) atomicJson(path.join(evidenceDir, 'evidence-reads-before.json'), evidenceReadsBefore);
   const result = await (dependencies.runLaunch || runLaunch)(launch, { pidFile, stdoutFile: stdoutPath, stderrFile: stderrPath, maxWallMs, signal: dependencies.signal });
+  childResult = result;
   for (const file of [telemetryLog, activationLog, capturePath, path.join(evidenceDir, 'vendor.log'), transaction.file, path.join(runDir, '.magi-sessions'), ...(launch.nativeLogPath ? [launch.nativeLogPath] : [])]) assertPlainPath(file);
   const after = snapshotWorkspace(cwd);
   atomicJson(path.join(evidenceDir, 'workspace-after.json'), after);
@@ -565,7 +583,22 @@ async function runDispatch(opts, dependencies = {}) {
     if (before && !scopeAudit) {
       try { scopeAudit = compareWorkspace(before, snapshotWorkspace(cwd), opts.writeScope); } catch (auditError) { scopeAudit = { ok: false, error: auditError.message }; }
     }
-    const failure = { ...transaction.state, status: 'FAIL', code: error.code || 'DISPATCH_FAIL', error: error.message, scopeAudit, completedAt: new Date().toISOString() };
+    // Launch-failure retry (R22 clause, 2026-09-16): a child that never got going
+    // may be re-dispatched under the same id; the failed evidence directory is kept.
+    const { classifyLaunchFailure, MAX_ATTEMPTS } = require('./launch-retry.js');
+    const priorAttempts = Array.isArray(transaction.state.attempts) ? transaction.state.attempts : [];
+    const verdict = classifyLaunchFailure({ code: error.code, message: error.message, vendor: opts.vendor, stdout: childResult?.stdout, stderr: childResult?.stderr,
+      capture: (() => { try { const c = path.join(evidenceDir, 'capture.txt'); return fs.existsSync(c) ? fs.readFileSync(c, 'utf8') : ''; } catch { return ''; } })() });
+    if (verdict.retryable && evidenceCreated && (scopeAudit === null || scopeAudit.ok === true) && priorAttempts.length < MAX_ATTEMPTS - 1) {
+      const attempt = priorAttempts.length + 1;
+      const kept = `${evidenceDir}.attempt${attempt}`;
+      fs.renameSync(evidenceDir, kept);
+      const record = { attempt, code: error.code, error: error.message, signature: verdict.signature, evidenceDir: kept, completedAt: new Date().toISOString() };
+      atomicJson(transaction.file, { ...transaction.state, status: 'RETRYABLE', attempts: [...priorAttempts, record], scopeAudit, completedAt: record.completedAt });
+      atomicJson(path.join(kept, 'receipt-ack.json'), { ...transaction.state, status: 'RETRYABLE', attempt: record });
+      throw Object.assign(new Error(`launch failure (${verdict.signature}) on attempt ${attempt} of ${MAX_ATTEMPTS}; re-run the same dispatch command: ${error.message}`), { code: 'LAUNCH_RETRYABLE', attempt, signature: verdict.signature });
+    }
+    const failure = { ...transaction.state, status: 'FAIL', code: error.code || 'DISPATCH_FAIL', error: error.message, scopeAudit, completedAt: new Date().toISOString(), ...(priorAttempts.length ? { attempts: priorAttempts } : {}), ...(verdict.reason ? { retryVerdict: verdict.reason } : {}) };
     atomicJson(transaction.file, failure);
     // Failed records never qualify for activation or successful usage accounting.
     if (evidenceCreated) {

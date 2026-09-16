@@ -23,7 +23,7 @@ test('seal binds required skill bytes and source identity before first dispatch'
 test('missing required source instruction fails before sealing creates output', t => {
   const run = createSealedRun(t); const runDir = path.join(run.root, 'missing-source-run');
   fs.unlinkSync(path.join(run.opts.skillSourceRoot, 'testing/SKILL.md'));
-  assert.throws(() => sealPlan({ plan: run.planSource, runDir, availability: run.availability,
+  assert.throws(() => sealPlan({ noJev: 'test fixture', plan: run.planSource, runDir, availability: run.availability,
     skillSourceRoot: run.opts.skillSourceRoot }), /missing SKILL.md/);
   assert.equal(fs.existsSync(runDir), false);
 });
@@ -71,4 +71,72 @@ test('legacy unbound plans stay readable but cannot launch new work or rewrite t
   assert.equal(fs.existsSync(path.join(run.runDir, '.magi-dispatches')), false);
   seal.profilesSha256 = 'a'.repeat(64); writeJson(file, seal);
   assert.throws(() => readSealedRun(run.runDir), /unsupported historical policy/);
+});
+
+// Jev is the arbiter (2026-09-16): the seal gates a classification record bound
+// to the unit's brief hash; without one it refuses unless an opt-out is recorded.
+function jevRecord(run, overrides = {}) {
+  const entry = run.planObject.dispatches[0];
+  const unitId = entry.unitId;
+  const row = { briefSha256: entry.briefSha256, classId: entry.class, p: 0.9, confidence: 0.9, gate: 'route', distribution: { [entry.class]: 0.9 }, ...overrides };
+  const file = path.join(run.root, `jev-${Math.random().toString(16).slice(2)}.json`);
+  writeJson(file, { protocol: 'magi-jev-plan-classify-v1', planId: run.planObject.planId, units: { [unitId]: row } });
+  return { file, unitId, entry };
+}
+
+test('sealing requires a Jev classification record or a recorded opt-out', t => {
+  const run = createSealedRun(t);
+  const base = { plan: run.planSource, availability: run.availability, skillSourceRoot: run.opts.skillSourceRoot };
+  assert.throws(() => sealPlan({ ...base, runDir: path.join(run.root, 'no-jev') }), /Jev classification is required/);
+  assert.equal(fs.existsSync(path.join(run.root, 'no-jev')), false);
+  const optOut = sealPlan({ ...base, runDir: path.join(run.root, 'opt-out'), noJev: 'owner said so' });
+  assert.deepEqual({ status: optOut.jevClassify.status, reason: optOut.jevClassify.optOutReason }, { status: 'NOT_RUN', reason: 'owner said so' });
+  assert.throws(() => sealPlan({ ...base, runDir: path.join(run.root, 'both'), noJev: 'x', jevClassification: jevRecord(run).file }), /mutually exclusive/);
+});
+
+test('an agreeing Jev record seals and is recorded with its hash; a disagreeing one needs an override', t => {
+  const run = createSealedRun(t);
+  const base = { plan: run.planSource, availability: run.availability, skillSourceRoot: run.opts.skillSourceRoot };
+  const agree = jevRecord(run);
+  const sealed = sealPlan({ ...base, runDir: path.join(run.root, 'agree'), jevClassification: agree.file });
+  assert.equal(sealed.jevClassify.status, 'RUN');
+  assert.equal(sealed.jevClassify.recordSha256, hashFile(agree.file));
+  assert.deepEqual(sealed.jevClassify.units[agree.unitId].agrees, true);
+  assert.equal(readSealedRun(path.join(run.root, 'agree')).seal.jevClassify.units[agree.unitId].jevClass, agree.entry.class);
+  const disagree = jevRecord(run, { classId: 'debug-mystery', p: 0.8, distribution: { 'debug-mystery': 0.8, [agree.entry.class]: 0.1 } });
+  assert.throws(() => sealPlan({ ...base, runDir: path.join(run.root, 'disagree'), jevClassification: disagree.file }), /pass --class-override/);
+  assert.equal(fs.existsSync(path.join(run.root, 'disagree')), false);
+  const overridden = sealPlan({ ...base, runDir: path.join(run.root, 'override'), jevClassification: disagree.file, classOverride: 'owner: fixture class is deliberate' });
+  assert.equal(overridden.jevClassify.units[agree.unitId].override, 'owner: fixture class is deliberate');
+  const flagged = jevRecord(run, { classId: 'debug-mystery', p: 0.5, distribution: { 'debug-mystery': 0.5, [agree.entry.class]: 0.45 } });
+  const sealedFlagged = sealPlan({ ...base, runDir: path.join(run.root, 'flagged'), jevClassification: flagged.file });
+  assert.equal(sealedFlagged.jevClassify.units[agree.unitId].flag, 'plan-class-below-route-but-above-flag');
+});
+
+test('a Jev record bound to another brief, or missing a unit, cannot seal', t => {
+  const run = createSealedRun(t);
+  const base = { plan: run.planSource, availability: run.availability, skillSourceRoot: run.opts.skillSourceRoot };
+  const stale = jevRecord(run, { briefSha256: 'a'.repeat(64) });
+  assert.throws(() => sealPlan({ ...base, runDir: path.join(run.root, 'stale'), jevClassification: stale.file }), /bound to a different brief/);
+  const missing = path.join(run.root, 'jev-missing.json');
+  writeJson(missing, { protocol: 'magi-jev-plan-classify-v1', units: {} });
+  assert.throws(() => sealPlan({ ...base, runDir: path.join(run.root, 'missing'), jevClassification: missing }), /no row for/);
+  writeJson(missing, { protocol: 'other', units: {} });
+  assert.throws(() => sealPlan({ ...base, runDir: path.join(run.root, 'malformed'), jevClassification: missing }), /malformed/);
+});
+
+test('jev-plan-classify writes a record bound to each unit brief from a fake engine', async t => {
+  const run = createSealedRun(t);
+  const { classifyPlan } = require('./jev-plan-classify.js');
+  const entry = run.planObject.dispatches[0];
+  const systemOne = async ({ questions }) => ({ ok: true, usage: { input_tokens: 1, output_tokens: 1 }, answers: { taskClass: { choice: entry.class, probabilities: { [entry.class]: 0.87 }, confidence: 0.8 } } });
+  const out = path.join(run.root, 'jev-record.json');
+  const record = await classifyPlan({ plan: run.planSource, out, systemOne });
+  assert.equal(record.requests, 1);
+  assert.deepEqual(record.units[entry.unitId].briefSha256, entry.briefSha256);
+  assert.equal(record.units[entry.unitId].gate, 'route');
+  const sealed = sealPlan({ plan: run.planSource, runDir: path.join(run.root, 'from-engine'), availability: run.availability, skillSourceRoot: run.opts.skillSourceRoot, jevClassification: out });
+  assert.equal(sealed.jevClassify.units[entry.unitId].agrees, true);
+  const notRun = async () => ({ ok: false, notRun: 'TYPESAFE_API_KEY not set' });
+  await assert.rejects(classifyPlan({ plan: run.planSource, out: path.join(run.root, 'x.json'), systemOne: notRun }), /Jev NOT_RUN/);
 });

@@ -71,10 +71,12 @@ function routeAllowed(matrix, route, availability = {}, nowMs = Date.now()) {
 
 function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
   if (!plan || typeof plan !== 'object' || Array.isArray(plan)) throw policyError('plan must be an object');
-  if (!isCliHostMode(plan.hostMode)) throw policyError('hostMode must be cursor-cli or synara');
-  if (plan.arbiter?.vendor !== 'xai') throw policyError('arbiter vendor must be xai');
+  if (!isCliHostMode(plan.hostMode)) throw policyError('hostMode must be cursor-cli, synara or claude-code');
+  // The arbiter is the Jev decision engine (2026-09-16); the host session only runs tools.
+  if (plan.arbiter?.vendor !== matrix.principles.arbiterVendor) throw policyError(`arbiter vendor must be ${matrix.principles.arbiterVendor}`);
   if (plan.arbiter?.model !== matrix.principles.arbiterModel) throw policyError(`arbiter model must be ${matrix.principles.arbiterModel}`);
-  if (!['high', 'xhigh'].includes(plan.arbiter?.effort)) throw policyError('arbiter effort must be high or xhigh');
+  if (plan.arbiter.effort !== undefined) throw policyError('arbiter effort is not a Jev field; declare the host session in arbiter.host instead');
+  if (plan.arbiter.host !== undefined && (typeof plan.arbiter.host !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(plan.arbiter.host))) throw policyError('arbiter.host must be a slug');
   if (!Array.isArray(plan.dispatches) || plan.dispatches.length === 0) throw policyError('plan.dispatches must be non-empty');
 
   const implement = [];
@@ -82,7 +84,7 @@ function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
   const authors = new Map();
   for (const route of plan.dispatches) {
     if (!route || typeof route !== 'object') throw policyError('invalid dispatch entry');
-    if (route.vendor === 'xai') throw policyError('arbiter/xai may not occupy a seat');
+    if (route.vendor === 'xai' || route.vendor === 'jev' || route.vendor === matrix.principles.arbiterVendor) throw policyError('the arbiter may not occupy a seat');
     if (!ROLES.includes(route.role)) throw policyError(`invalid role: ${route.role}`);
     const allowed = routeAllowed(matrix, route, availability, nowMs);
     if (!allowed.ok) throw policyError(allowed.reason);
