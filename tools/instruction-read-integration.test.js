@@ -92,7 +92,7 @@ test('generated OpenAI contract carries exact unbatched reads for every staged f
   const run = createSealedRun(t, [routes[1]]); const native = fakeVendor(launch => {
     const contract = fs.readFileSync(launch.seatContractPath, 'utf8');
     const commands = [...contract.matchAll(/const r = await tools\.exec_command\((\{[^\n]+\})\); text\(r.output\);/g)].map(match => JSON.parse(match[1]));
-    assert.equal(commands.length, 31); // The bootstrap contract read is the 32nd required file.
+    assert.equal(commands.length, 7); // The bootstrap contract read is the 32nd required file.
     assert.ok(commands.every(command => command.workdir === launch.cwd && codexReadTarget(command.cmd)));
     assert.match(contract, /ONE functions.exec invocation per code block/);
     assert.ok(commands.every(command => !command.cmd.includes(launch.seatContractPath)));

@@ -297,6 +297,7 @@ for (const [label, mutate] of Object.entries({
   'wrong file URI': rows => { rows[2].content = rows[2].content.replace(/File Path: `[^`]+`/, rows[3].content.match(/File Path: `[^`]+`/)[0]); },
   'wrong native tool': rows => { rows[1].tool_calls[0].name = 'run_command'; },
   'partial request range': rows => { rows[1].tool_calls[0].args.StartLine = 2; },
+  'end-line range': rows => { rows[1].tool_calls[0].args.EndLine = 400; },
   'partial returned range': rows => { rows[2].content = rows[2].content.replace('Showing lines 1 to ', 'Showing lines 2 to '); },
   'wrong total bytes': rows => { rows[2].content = rows[2].content.replace(/Total Bytes: \d+/, 'Total Bytes: 1'); },
   'wrong complete file text': rows => { rows[2].content = rows[2].content.replace('1: ACK', '1: BAD'); },
@@ -338,3 +339,10 @@ for (const [label, extra] of Object.entries({
     assert.throws(() => verify(f, 'openai', rows), { code: 'INSTRUCTION_READ_FAIL' });
   });
 }
+
+test('Google accepts a StartLine 1 request when the result covers the whole file', t => {
+  const f = fixture(t);
+  const rows = googleRows(f);
+  rows[1].tool_calls[0].args.StartLine = 1;
+  assert.equal(verify(f, 'google', rows).status, 'PASS');
+});

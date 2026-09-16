@@ -76,8 +76,11 @@ function required(opts) {
 
 function seatContractText(opts, seatProfile, skillStage, ruleStage) {
   const contractPath = path.join(opts.evidenceDir || path.dirname(skillStage.root), 'SEAT-CONTRACT.md');
+  // The exact required read set (mirrors collectRequiredInstructionFiles): with a
+  // manifest v2 bundle the rule files collapse into one read.
+  const ruleReads = ruleStage.manifest.bundle ? [path.join(ruleStage.briefDir, ruleStage.manifest.bundle.path)] : ruleStage.manifest.files.map(file => path.join(ruleStage.briefDir, file.path));
   const instructionFiles = [path.join(ruleStage.briefDir, 'BRIEF.md'), contractPath,
-    ruleStage.manifestPath, ...ruleStage.manifest.files.map(file => path.join(ruleStage.briefDir, file.path)),
+    ruleStage.manifestPath, ...ruleReads,
     skillStage.manifestPath, ...seatProfile.skills.map(skill => path.join(skillStage.root, skill, 'SKILL.md'))];
   const openaiReadRecipe = file => `const r = await tools.exec_command(${JSON.stringify({ cmd: codexReadCommand(file), workdir: opts.cwd, max_output_tokens: 20000 })}); text(r.output);`;
   return [
@@ -133,6 +136,8 @@ function seatContractText(opts, seatProfile, skillStage, ruleStage) {
     ] : [
       'Complete all required reads with native file-read tools before any other task tool, source read, or product work. Do not inspect global skills or list directories first.',
       'Native full-file content and successful tool results are required. A claimed read list or ACK alone cannot pass.',
+      'The complete required read list, every file whole in one native read each (this contract counts as already read; nothing else counts):',
+      ...instructionFiles.filter(file => file !== contractPath).map((file, index) => `${index + 1}. ${file}`),
     ]),
     `Required proof fields: ${seatProfile.proofFields.join(', ')}`,
     ...(['verify', 'review'].includes(opts.role) ? ['',

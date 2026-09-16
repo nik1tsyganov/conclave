@@ -256,7 +256,11 @@ function googleReads(rows, required) {
         if (call.name !== 'view_file') { requireComplete(found, required); return null; }
         const key = plainPath(call.args?.AbsolutePath);
         if (!required.has(key)) { requireComplete(found, required); return null; }
-        if (batch.has(key) || Object.keys(call.args).some(name => !['AbsolutePath', 'toolAction', 'toolSummary'].includes(name))) fail('ambiguous or partial Google native file request');
+        // agy may request `StartLine: 1` (observed 2026-09-16 on a 433-line bundle); the
+        // result check still requires "Showing lines 1 to <total>", so a range that
+        // starts at 1 cannot hide a partial read. Any other range field stays illegal.
+        if (batch.has(key) || Object.keys(call.args).some(name => !['AbsolutePath', 'toolAction', 'toolSummary', 'StartLine'].includes(name)) ||
+          (call.args.StartLine !== undefined && call.args.StartLine !== 1)) fail('ambiguous or partial Google native file request');
         batch.add(key);
         const createdAt = Date.parse(row.created_at);
         if (!Number.isFinite(createdAt)) fail('Google native read request timestamp is missing');
