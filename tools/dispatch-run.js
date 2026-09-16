@@ -140,6 +140,8 @@ function seatContractText(opts, seatProfile, skillStage, ruleStage) {
       ...instructionFiles.filter(file => file !== contractPath).map((file, index) => `${index + 1}. ${file}`),
     ]),
     `Required proof fields: ${seatProfile.proofFields.join(', ')}`,
+    ...(opts.role === 'review' ? ['',
+      'Severity contract (2026-09-16): a finding is BLOCKING only when the change is wrong for the defect it was written to close, breaks a stated contract or test, or introduces a security or data-loss risk. Hardening for inputs the spec does not name, type-coercion opinions, style and test-coverage wishes are should-fix or nit, never blocking. POSITION: REJECT requires at least one blocking finding; otherwise APPROVE with the findings listed.'] : []),
     ...(['verify', 'review'].includes(opts.role) ? ['',
       'End your response with exactly one final POSITION: APPROVE, POSITION: REJECT, or POSITION: ABSTAIN line.',
       'Do not include any other POSITION line. State the evidence and blockers before the final POSITION line.'] : []),

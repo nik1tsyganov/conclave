@@ -46,6 +46,19 @@ node tools/plan-seal.js --plan <draft-plan.json> --run-dir <run-dir> --availabil
 
 The record binds each unit's brief hash; the seal refuses when the plan's class is not Jev's choice and sits below the flag gate, unless `--class-override <reason>` records the owner's decision. `--no-jev <reason>` records an explicit opt-out (test fixtures, or an engine outage the owner accepts).
 
+## Drive a run in a few commands (2026-09-16)
+
+```text
+node tools/run-drive.js --run-dir <run-dir> --phase implement        # all implement seats in parallel (cap applies)
+node tools/run-drive.js --run-dir <run-dir> --attest <id[,id]>       # after reading each response.txt named in the pending list
+node tools/run-drive.js --run-dir <run-dir> --phase evidence --tests <tests.json>   # lead-captured test output + diff into every evidenceReadDir
+node tools/run-drive.js --run-dir <run-dir> --phase verify           # then --attest for Claude seats
+node tools/run-drive.js --run-dir <run-dir> --phase review           # then --attest for Claude seats
+node tools/run-drive.js --run-dir <run-dir> --phase finalize         # run-finalize, activation-check, panel-tally and panel-tally-jev per unit
+```
+
+`tests.json` maps `unitId` to `{ "command": "..." }` run in the unit's worktree. The driver only sequences `dispatch-run`; every gate, the attestation checkpoint and the concurrency cap are unchanged. Exit 3 means seats await attestation.
+
 ## Dispatch and conclude
 
 Launch each selected entry with:

@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { readSealedRun } = require('./plan-seal.js');
-const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, assertPlainPath, compareWorkspace, hash, hashFile, inside, runtimeManifest, snapshotWorkspace, transactionKey, verifyArtifacts, verifyCommittedRow, writeJson } = require('./dispatch-evidence.js');
+const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, assertPlainPath, compareWorkspace, hash, hashFile, inside, runtimeManifest, snapshotWorkspace, transactionKey, verifyArtifacts, verifyCommittedRow, writeJson, policyPins } = require('./dispatch-evidence.js');
 const { verifyNativeProof, verifyProof } = require('./cli-proof.js');
 const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, validateClaudeResponseLaunch } = require('./vendor-native.js');
 const { tally } = require('./position-tally.js');
@@ -109,9 +109,12 @@ function verifySavedExecution(run, entry, state, pending, allowReceiptProjection
     projections.set(path.join(state.evidenceDir, 'receipt-ack.json'), state.receipt);
     projections.set(path.join(state.evidenceDir, 'handoff-envelope.json'), { ...state.receipt, telemetryLog: state.receipt?.logDestinations?.telemetryLog });
     if (!Array.isArray(state.artifacts) || state.artifacts.length < 5) throw new Error('checkpoint has incomplete evidence');
+    const pins = policyPins(state);
     for (const item of state.artifacts) {
       assertPlainPath(item.path);
       if (!projections.has(item.path)) {
+        const pinned = pins.get(path.resolve(item.path));
+        if (pinned !== undefined) { if (item.sha256 !== pinned) throw new Error(`committed policy differs from the sealed policy: ${item.path}`); continue; }
         if (hashFile(item.path) !== item.sha256) throw new Error(`committed evidence changed: ${item.path}`);
         continue;
       }

@@ -144,12 +144,32 @@ function verifyCommittedRow(row, { checkLogs = true } = {}) {
   return state;
 }
 
-function verifyArtifacts(state) {
+// Runtime policy files (dispatch-matrix.json, seat-profiles.json) are bound to the
+// SEAL at dispatch time (dispatch-run refuses a launch whose installed policy differs
+// from the sealed policy). On replay they are checked against the sealed hashes, so a
+// later policy change never invalidates history; live drift is reported, not fatal.
+function policyPins(state) {
+  try {
+    const runRoot = path.dirname(path.dirname(state.evidenceDir));
+    const seal = JSON.parse(fs.readFileSync(path.join(runRoot, 'plan-seal.json'), 'utf8'));
+    const paths = require('./runtime-paths.js').resolveRuntimePaths();
+    return new Map([[path.resolve(paths.matrixPath), seal.matrixSha256], [path.resolve(paths.profilesPath || path.join(path.dirname(paths.matrixPath), 'seat-profiles.json')), seal.profilesSha256]]);
+  } catch { return new Map(); }
+}
+function verifyArtifacts(state, { pins = policyPins(state) } = {}) {
   if (!Array.isArray(state.artifacts) || state.artifacts.length < 5) throw evidenceError('committed transaction has incomplete evidence');
+  const drift = [];
   for (const item of state.artifacts) {
     assertPlainPath(item.path);
+    const pinned = pins.get(path.resolve(item.path));
+    if (pinned !== undefined) {
+      if (item.sha256 !== pinned) throw evidenceError(`committed policy differs from the sealed policy: ${item.path}`);
+      if (fs.existsSync(item.path) && hashFile(item.path) !== item.sha256) drift.push(item.path);
+      continue;
+    }
     if (hashFile(item.path) !== item.sha256) throw evidenceError(`committed evidence changed: ${item.path}`);
   }
+  return { policyDrift: drift };
 }
 
-module.exports = { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, appendUniqueRow, assertPlainPath, compareWorkspace, hash, hashFile, inside, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, verifyArtifacts, verifyCommittedRow, writeJson };
+module.exports = { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, appendUniqueRow, policyPins, assertPlainPath, compareWorkspace, hash, hashFile, inside, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, verifyArtifacts, verifyCommittedRow, writeJson };
