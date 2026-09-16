@@ -79,7 +79,7 @@ function seatContractText(opts, seatProfile, skillStage, ruleStage) {
   const instructionFiles = [path.join(ruleStage.briefDir, 'BRIEF.md'), contractPath,
     ruleStage.manifestPath, ...ruleStage.manifest.files.map(file => path.join(ruleStage.briefDir, file.path)),
     skillStage.manifestPath, ...seatProfile.skills.map(skill => path.join(skillStage.root, skill, 'SKILL.md'))];
-  const openaiReadRecipe = file => `const r = await tools.exec_command(${JSON.stringify({ cmd: codexReadCommand(file), workdir: opts.cwd, max_output_tokens: 10000 })}); text(r.output);`;
+  const openaiReadRecipe = file => `const r = await tools.exec_command(${JSON.stringify({ cmd: codexReadCommand(file), workdir: opts.cwd, max_output_tokens: 20000 })}); text(r.output);`;
   return [
     '# MAGI CLI seat contract',
     '',
@@ -106,13 +106,14 @@ function seatContractText(opts, seatProfile, skillStage, ruleStage) {
       : []),
     '',
     'Required staged instructions: read these files in full before task work:',
+    ...(ruleStage.manifest.bundle ? [`- RULES-BUNDLE.md: ${path.join(ruleStage.briefDir, ruleStage.manifest.bundle.path)} (carries STANDING.md, VENDOR.md, RULES/INDEX.md and every R01-R22 rule verbatim; one read of it counts as reading them all. Do not read the individual files below before the bundle.)`] : []),
     `- STANDING.md: ${path.join(ruleStage.briefDir, 'STANDING.md')}`,
     `- VENDOR.md: ${path.join(ruleStage.briefDir, 'VENDOR.md')}`,
     `- RULES/INDEX.md: ${path.join(ruleStage.stagedRules, 'INDEX.md')}`,
     `Rules manifest: ${ruleStage.manifestPath}`,
     `Skill manifest: ${skillStage.manifestPath}`,
     '',
-    'Read every indexed rule file, including all R01-R22 rules, in full before task work.',
+    ...(ruleStage.manifest.bundle ? ['The bundle is the required rule read; STANDING.md, VENDOR.md and RULES/ stay staged only so relative links resolve.'] : ['Read every indexed rule file, including all R01-R22 rules, in full before task work.']),
     `Resolve relative instruction paths such as STANDING.md, VENDOR.md and RULES/... against the staged brief directory: ${ruleStage.briefDir}`,
     `Resolve relative links in RULES/INDEX.md and rule files against the staged rule directory: ${ruleStage.stagedRules}`,
     'Do not resolve instruction paths against the product working directory.',

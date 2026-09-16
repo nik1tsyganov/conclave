@@ -34,7 +34,7 @@ for (const route of require('./dispatch-matrix.js').loadMatrix().classes['test-v
         assert.equal(fs.statSync(file).isFile(), true);
         assert.ok(contract.includes(file), `missing required skill path: ${file}`);
       }
-      assert.match(contract, /Read every indexed rule file, including all R01-R22 rules, in full before task work/);
+      assert.match(contract, /RULES-BUNDLE.md: .*carries STANDING.md, VENDOR.md, RULES\/INDEX.md and every R01-R22 rule verbatim/);
       assert.match(contract, /Required staged skills: read every listed SKILL\.md in full before task work/);
       assert.match(contract, /missing or unreadable.*stop task work and report a blocker/);
       assert.match(contract, /Never waive a required read/);

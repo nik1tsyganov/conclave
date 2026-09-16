@@ -37,8 +37,13 @@ function collectRequiredInstructionFiles(options) {
     const briefDir = path.dirname(plainPath(briefPath));
     const skills = plainPath(skillRoot);
     const contract = readText(seatContractPath);
+    // Manifest v2 (2026-09-16): the staged bundle replaces the individual rule
+    // reads; the individual files stay staged and hash-checked by verifyStagedRules.
+    const ruleReads = rulesManifest.bundle
+      ? [readText(path.join(briefDir, rulesManifest.bundle.path))]
+      : rulesManifest.files.map(entry => readText(path.join(briefDir, entry.path)));
     const files = [readText(briefPath), contract, readText(path.join(briefDir, 'rules-manifest.json')),
-      ...rulesManifest.files.map(entry => readText(path.join(briefDir, entry.path))),
+      ...ruleReads,
       readText(path.join(skills, 'skills-manifest.json')),
       ...seatProfile.skills.map(skill => readText(path.join(skills, skill, 'SKILL.md')))];
     const pointers = contract.text.match(/^Allowed staged skills:\r?\n((?:- [^\r\n]+(?:\r?\n|$))*)/m);

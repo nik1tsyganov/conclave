@@ -66,7 +66,7 @@ test('all three complete native fixtures reach final approval and replay without
     const result = await completeSyntheticDispatch({ ...run.opts, dispatchId: entry.dispatchId }, native);
     assert.equal(result.receipt.instructionReadProtocol, INSTRUCTION_READ_PROTOCOL);
     const report = json(path.join(run.runDir, 'out', entry.dispatchId, 'instruction-reads.json'));
-    assert.equal(report.status, 'PASS'); assert.ok(report.files.length >= 31); assert.equal(report.applicationProven, undefined);
+    assert.equal(report.status, 'PASS'); assert.ok(report.files.length >= 7); assert.equal(report.applicationProven, undefined);
   }
   assert.equal(finalizeRun(run.runDir).ok, true);
   const noCollector = () => { throw new Error('replay called native transcript collector'); };

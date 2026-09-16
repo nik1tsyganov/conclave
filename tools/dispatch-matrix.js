@@ -75,7 +75,8 @@ function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
   // The arbiter is the Jev decision engine (2026-09-16); the host session only runs tools.
   if (plan.arbiter?.vendor !== matrix.principles.arbiterVendor) throw policyError(`arbiter vendor must be ${matrix.principles.arbiterVendor}`);
   if (plan.arbiter?.model !== matrix.principles.arbiterModel) throw policyError(`arbiter model must be ${matrix.principles.arbiterModel}`);
-  if (plan.arbiter.effort !== undefined) throw policyError('arbiter effort is not a Jev field; declare the host session in arbiter.host instead');
+  // Legacy sealed runs (pre-2026-09-16) carry an xai arbiter with an effort; their sealed matrix still names xai, so only a Jev matrix rejects the field.
+  if (matrix.principles.arbiterVendor === 'jev' && plan.arbiter.effort !== undefined) throw policyError('arbiter effort is not a Jev field; declare the host session in arbiter.host instead');
   if (plan.arbiter.host !== undefined && (typeof plan.arbiter.host !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(plan.arbiter.host))) throw policyError('arbiter.host must be a slug');
   if (!Array.isArray(plan.dispatches) || plan.dispatches.length === 0) throw policyError('plan.dispatches must be non-empty');
 

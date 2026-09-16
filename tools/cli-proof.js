@@ -136,6 +136,10 @@ function parseGoogle(captureText, logText, expectedModel) {
   if (!envelope.response || typeof envelope.response !== 'string' || envelope.response.trim() === '') throw proofError('Google/agy proof missing or whitespace response');
 
   const logStr = clean(logText);
+  // R12 (leaf seat) for agy, which has no native flag to deny sub-agents
+  // (2026-09-16): any sub-agent tool in the per-run log fails proof.
+  const fanOut = logStr.match(/\b(invoke_subagent|define_subagent|manage_subagents|browser_subagent)\b/);
+  if (fanOut) throw proofError(`Google/agy seat fanned out (${fanOut[1]}); leaf seats may not spawn sub-agents (R12)`);
   const records = [];
   const startRegex = /^(?:ERROR: logging before google\.Init: )?[IWEF]\d{4} \d{2}:\d{2}:\d{2}\.\d+\s+\d+ printmode\.go:\d+\] Print mode: starting \([^)]*model="([^"]+)"[^)]*conversationID="([^"]*)"\)/gm;
   const createRegex = /^(?:ERROR: logging before google\.Init: )?[IWEF]\d{4} \d{2}:\d{2}:\d{2}\.\d+\s+\d+ server\.go:\d+\] Created conversation ([\w-]+)/gm;

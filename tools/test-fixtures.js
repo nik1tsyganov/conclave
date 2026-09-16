@@ -142,7 +142,7 @@ function syntheticInstructionRows(launch, sessionId) {
   });
   if (launch.vendor === 'openai') return [{ type: 'session_meta', payload: { id: sessionId, cwd: launch.cwd } }, ...files.flatMap((file, index) => {
     const cmd = `Get-Content -Raw -LiteralPath '${file.path.replaceAll("'", "''")}' -Encoding UTF8`;
-    const args = { cmd, workdir: launch.cwd, max_output_tokens: 10000 }; const output = file.text + '\n'; const id = `synthetic-read-${index}`;
+    const args = { cmd, workdir: launch.cwd, max_output_tokens: 20000 }; const output = file.text + '\n'; const id = `synthetic-read-${index}`;
     return [{ type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: id,
       input: `const r = await tools.exec_command(${JSON.stringify(args)}); text(r.output);` } },
       { type: 'event_msg', payload: { type: 'item_completed', thread_id: sessionId, item: { type: 'CommandExecution', id: `synthetic-exec-${index}`,

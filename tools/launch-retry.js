@@ -6,6 +6,8 @@
 // terminal FAIL that needs a new dispatch id and a new sealed plan.
 
 const MAX_ATTEMPTS = 3; // the first launch plus two retries
+// Signature list confirmed by the owner's delegation on 2026-09-16 ("choose the best path"):
+// deliberately narrow; a new signature needs a live failure that reproduced it.
 
 const SIGNATURES = Object.freeze([
   { id: 'safeguard-refusal', re: /safeguards flagged this message/i },

@@ -39,7 +39,7 @@ function claudeRows(f) {
 function codexRows(f) {
   return [{ type: 'session_meta', payload: { id: SESSION, session_id: SESSION, cwd: f.run.cwd } }, ...f.files.flatMap((file, index) => {
     const cmd = `Get-Content -Raw -LiteralPath '${file.path.replaceAll("'", "''")}' -Encoding UTF8`;
-    const args = { cmd, workdir: f.run.cwd, max_output_tokens: 10000 };
+    const args = { cmd, workdir: f.run.cwd, max_output_tokens: 20000 };
     const output = file.text + '\n'; const callId = `read-${index}`;
     return [{ type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: callId,
       input: `const r = await tools.exec_command(${JSON.stringify(args)});\ntext(r.output);` } },
@@ -93,8 +93,10 @@ for (const [label, decorate] of Object.entries({
 
 test('trusted required set includes bound brief, contract, both manifests, every rule and every allowed SKILL.md', t => {
   const f = fixture(t);
-  assert.equal(f.files.length, 29 + f.options.seatProfile.skills.length);
-  assert.equal(f.files.filter(file => /R\d{2}-fixture.md$/.test(file.path)).length, 22);
+  // Manifest v2: brief, contract, rules-manifest, RULES-BUNDLE.md, skills-manifest + one SKILL.md per allowed skill.
+  assert.equal(f.files.length, 5 + f.options.seatProfile.skills.length);
+  assert.equal(f.files.filter(file => file.path.endsWith('RULES-BUNDLE.md')).length, 1);
+  assert.match(f.files.find(file => file.path.endsWith('RULES-BUNDLE.md')).text, /staged file: RULES\/R22-fixture\.md sha256: [a-f0-9]{64}/);
   assert.ok(f.options.seatProfile.skills.every(skill => f.files.some(file => file.path.endsWith(skill + path.sep + 'SKILL.md'))));
   assert.throws(() => collectRequiredInstructionFiles({ ...f.options, rulesManifest: undefined }), /trusted staging manifests/);
   const manifestFile = path.join(f.options.skillRoot, 'skills-manifest.json');
@@ -191,7 +193,7 @@ test('Codex native UserMessage metadata does not count as product work', t => {
 
 function relativeProductRead(f, index = 99) {
   const cmd = "Get-Content -Raw -LiteralPath 'lib\\d1-sum.js' -Encoding UTF8";
-  const args = { cmd, workdir: f.run.cwd, max_output_tokens: 10000 };
+  const args = { cmd, workdir: f.run.cwd, max_output_tokens: 20000 };
   const output = 'function sum(a, b) {\n  return a - b;\n}\n';
   const callId = `product-read-${index}`;
   return [
@@ -210,7 +212,7 @@ function relativeProductRead(f, index = 99) {
 function codexPosixRows(f) {
   return [{ type: 'session_meta', payload: { id: SESSION, session_id: SESSION, cwd: f.run.cwd } }, ...f.files.flatMap((file, index) => {
     const cmd = codexReadCommand(file.path, 'darwin');
-    const args = { cmd, workdir: f.run.cwd, max_output_tokens: 10000 };
+    const args = { cmd, workdir: f.run.cwd, max_output_tokens: 20000 };
     const output = file.text + '\n'; const callId = `read-${index}`;
     return [{ type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: callId,
       input: `const r = await tools.exec_command(${JSON.stringify(args)});\ntext(r.output);` } },

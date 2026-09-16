@@ -91,17 +91,40 @@ function stageRules({ briefPath, rulesRoot }) {
   for (const name of ruleFiles) copyFile(path.join(rules, name), path.join(stagedRules, name));
   copyFile(standing, path.join(briefDir, 'STANDING.md'));
   copyFile(vendor, path.join(briefDir, 'VENDOR.md'));
+  const files = [
+    'STANDING.md', 'VENDOR.md', 'RULES/INDEX.md', ...ruleFiles.map((name) => `RULES/${name}`),
+  ].map((rel) => ({ path: rel, sha256: sha256(path.join(briefDir, ...rel.split('/'))) }));
+  // Bundle (manifest v2, 2026-09-16): one staged file carries every rule file
+  // verbatim, so a seat performs one native read instead of twenty-five. The
+  // individual files stay staged for link resolution and hashing.
+  const bundlePath = path.join(briefDir, BUNDLE_NAME);
+  if (fs.existsSync(bundlePath) && fs.lstatSync(bundlePath).isSymbolicLink()) throw new Error('rules staging targets must not be symbolic links');
+  fs.writeFileSync(bundlePath, bundleText(briefDir, files), 'utf8');
   const manifest = {
-    version: 1,
+    version: 2,
     fingerprint: firstLine,
     sourceRoot: root,
-    files: [
-      'STANDING.md', 'VENDOR.md', 'RULES/INDEX.md', ...ruleFiles.map((name) => `RULES/${name}`),
-    ].map((rel) => ({ path: rel, sha256: sha256(path.join(briefDir, ...rel.split('/'))) })),
+    files,
+    bundle: { path: BUNDLE_NAME, sha256: sha256(bundlePath), covers: files.map((file) => file.path) },
   };
   const manifestPath = path.join(briefDir, 'rules-manifest.json');
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
   return { briefDir, rulesRoot: root, stagedRules, manifestPath, manifest };
+}
+
+const BUNDLE_NAME = 'RULES-BUNDLE.md';
+
+// Deterministic bundle text: a header, then every staged file in manifest order
+// under a marker line naming the file and its hash. Recomputed on verification
+// from the hash-checked staged files, so a bundle can never say something the
+// files do not.
+function bundleText(briefDir, files) {
+  const parts = [`<!-- MAGI staged rules bundle. Reading this file in full counts as reading every file listed below; each section is that staged file verbatim. -->`];
+  for (const file of files) {
+    const body = fs.readFileSync(path.join(briefDir, ...file.path.split('/')), 'utf8');
+    parts.push(`\n<!-- === staged file: ${file.path} sha256: ${file.sha256} === -->\n${body}${body.endsWith('\n') ? '' : '\n'}`);
+  }
+  return parts.join('\n');
 }
 
 function unsafeManifestPath(rel) {
@@ -146,6 +169,12 @@ function validateManifestShape(manifest, label) {
     if (!ruleIds.has(id)) throw new Error(`${label} is missing ${id}`);
   }
   if (manifest.fingerprint === FINGERPRINT_V2 && ruleIds.size !== 22) throw new Error(`${label} must contain exactly R01-R22`);
+  if (manifest.version === 2 || manifest.bundle !== undefined) {
+    const bundle = manifest.bundle;
+    if (!bundle || bundle.path !== BUNDLE_NAME || !/^[a-f0-9]{64}$/i.test(String(bundle.sha256 || ''))) throw new Error(`${label} has a malformed bundle entry`);
+    const covers = JSON.stringify([...(bundle.covers || [])].sort());
+    if (covers !== JSON.stringify(manifest.files.map((file) => file.path).sort())) throw new Error(`${label} bundle does not cover the staged file set`);
+  }
 }
 
 function verifyStagedRules(briefPath, expectedManifest) {
@@ -178,6 +207,13 @@ function verifyStagedRules(briefPath, expectedManifest) {
     if (!stat.isFile()) throw new Error(`staged rule is not a regular file: ${file.path}`);
     if (sha256(full) !== file.sha256) throw new Error(`staged rule hash mismatch: ${file.path}`);
   }
+  if (trusted.bundle) {
+    const bundlePath = path.join(briefDir, trusted.bundle.path);
+    const stat = fs.existsSync(bundlePath) ? fs.lstatSync(bundlePath) : null;
+    if (!stat || !stat.isFile()) throw new Error('staged rules bundle missing');
+    if (sha256(bundlePath) !== trusted.bundle.sha256) throw new Error('staged rules bundle hash mismatch');
+    if (fs.readFileSync(bundlePath, 'utf8') !== bundleText(briefDir, trusted.files)) throw new Error('staged rules bundle differs from the staged files');
+  }
   const expectedRules = trusted.files.filter((file) => file.path.startsWith('RULES/')).map((file) => file.path.slice(6)).sort();
   if (JSON.stringify(fs.readdirSync(path.join(briefDir, 'RULES')).sort()) !== JSON.stringify(expectedRules)) throw new Error('unexpected or missing staged rule files');
   if (fs.readFileSync(path.join(briefDir, 'STANDING.md'), 'utf8').split(/\r?\n/, 1)[0] !== trusted.fingerprint) throw new Error('staged STANDING fingerprint differs from manifest');
@@ -199,4 +235,4 @@ function main(argv = process.argv.slice(2), io = process) {
 }
 
 if (require.main === module) process.exitCode = main();
-module.exports = { DEFAULT_RULES_ROOT, FINGERPRINT, FINGERPRINT_V2, TRUSTED_FINGERPRINTS, listRuleFiles, prepareRulesSource, stageRules, verifyStagedRules };
+module.exports = { DEFAULT_RULES_ROOT, FINGERPRINT, FINGERPRINT_V2, TRUSTED_FINGERPRINTS, listRuleFiles, prepareRulesSource, stageRules, verifyStagedRules, BUNDLE_NAME, bundleText };
