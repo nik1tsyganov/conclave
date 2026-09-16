@@ -63,3 +63,15 @@ test('probe rejects a missing explicit cwd and runtime output before mutation',a
   await assert.rejects(probe({...f.opts,evidenceDir},{runLaunch:f.runLaunch}),/outside the runtime/);
   assert.equal(fs.existsSync(evidenceDir),false);assert.equal(f.calls(),0);
 });
+
+test('openai probe launch carries MAGI_CODEX_PROVIDER when set', async t => {
+  const prev = process.env.MAGI_CODEX_PROVIDER;
+  process.env.MAGI_CODEX_PROVIDER = 'openai';
+  t.after(() => { if (prev === undefined) delete process.env.MAGI_CODEX_PROVIDER; else process.env.MAGI_CODEX_PROVIDER = prev; });
+  const h = fixture(t);
+  let seen;
+  await probe(h.opts, { runLaunch: async launch => { seen = launch; return h.runLaunch(launch); } });
+  const i = seen.args.indexOf('model_provider=openai');
+  assert.ok(i > 0 && seen.args[i - 1] === '-c', 'provider flag missing');
+  assert.ok(seen.args.indexOf('-C') > i, 'provider flag must precede -C');
+});

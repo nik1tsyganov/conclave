@@ -116,6 +116,40 @@ function claudeReads(rows, sessionId, required) {
   return found;
 }
 
+// The Codex seat proves one whole-file read of an exact literal path, recorded
+// in its native transcript. Windows uses PowerShell; POSIX hosts have no pwsh,
+// so they use cat. Producers (cli-adapters, dispatch-run) emit these strings.
+const POWERSHELL_READ = /^Get-Content -Raw -LiteralPath '((?:[^']|'')+)' -Encoding UTF8$/;
+const POSIX_READ = /^cat -- '((?:[^']|'\\'')+)'$/;
+
+function codexReadCommand(file, platform = process.platform) {
+  return platform === 'win32'
+    ? `Get-Content -Raw -LiteralPath '${file.replaceAll("'", "''")}' -Encoding UTF8`
+    : `cat -- '${file.replaceAll("'", "'\\''")}'`;
+}
+
+function codexReadTarget(cmd) {
+  const windows = cmd.match(POWERSHELL_READ);
+  if (windows) return { shell: 'powershell', file: windows[1].replaceAll("''", "'") };
+  const posix = cmd.match(POSIX_READ);
+  if (posix) return { shell: 'cat', file: posix[1].replaceAll("'\\''", "'") };
+  return null;
+}
+
+// Both shapes bind the native command to the same literal path; stdout is still
+// compared byte-for-byte against the required file below.
+function codexNativeCommandMatches(command, pending) {
+  if (!Array.isArray(command) || command.length !== 3) return false;
+  const shell = path.basename(command[0]);
+  // Codex on POSIX runs the recipe through the login shell: ['/bin/zsh', '-lc', cmd].
+  // Accept that exact wrapper around the exact recipe string, or a bare cat.
+  if (pending.shell === 'cat') {
+    if (shell === 'cat') return command[1] === '--' && command[2] === pending.file;
+    return /^(?:zsh|bash|sh)$/.test(shell) && /^-l?c$/.test(command[1]) && command[2] === pending.args.cmd;
+  }
+  return /^(?:pwsh|powershell)(?:\.exe)?$/i.test(shell) && command[1] === '-Command' && command[2] === pending.args.cmd;
+}
+
 function codexReadCall(item) {
   if (item.type !== 'custom_tool_call' || item.name !== 'exec' || typeof item.input !== 'string') return null;
   const match = item.input.match(/^\s*const\s+([A-Za-z_]\w*)\s*=\s*await tools\.exec_command\((\{[\s\S]*\})\);\s*text\(\1\.output\);\s*$/);
@@ -125,9 +159,9 @@ function codexReadCall(item) {
   if (!args || JSON.stringify(Object.keys(args).sort()) !== JSON.stringify(['cmd', 'max_output_tokens', 'workdir']) ||
     typeof args.cmd !== 'string' || typeof args.workdir !== 'string' || !Number.isSafeInteger(args.max_output_tokens) ||
     args.max_output_tokens < 1 || args.max_output_tokens > 20000) return null;
-  const command = args.cmd.match(/^Get-Content -Raw -LiteralPath '((?:[^']|'')+)' -Encoding UTF8$/);
-  if (!command) return null;
-  return { args, file: command[1].replaceAll("''", "'") };
+  const target = codexReadTarget(args.cmd);
+  if (!target) return null;
+  return { args, ...target };
 }
 
 function codexReads(rows, sessionId, required) {
@@ -155,8 +189,8 @@ function codexReads(rows, sessionId, required) {
       if (!pending) { requireComplete(found, required); continue; }
       const command = execution.command;
       const nativeCwd = execution.cwd?.startsWith('file:') ? fileURLToPath(execution.cwd) : execution.cwd;
-      if (pending.execution || !execution.id || executions.has(execution.id) || item.thread_id !== sessionId || !Array.isArray(command) || command.length !== 3 ||
-        !/^(?:pwsh|powershell)(?:\.exe)?$/i.test(path.basename(command[0])) || command[1] !== '-Command' || command[2] !== pending.args.cmd ||
+      if (pending.execution || !execution.id || executions.has(execution.id) || item.thread_id !== sessionId ||
+        !codexNativeCommandMatches(command, pending) ||
         plainPath(nativeCwd) !== cwd || execution.status !== 'completed' || execution.exit_code !== 0 || execution.stderr !== '') fail('Codex native read failed or does not match its tool call');
       executions.add(execution.id);
       const text = normalize(required.get(pending.key).text);
@@ -258,4 +292,4 @@ function verifyInstructionReadEvidence(options) {
   }
 }
 
-module.exports = { INSTRUCTION_READ_PROTOCOL, collectRequiredInstructionFiles, verifyInstructionReadEvidence };
+module.exports = { INSTRUCTION_READ_PROTOCOL, codexReadCommand, codexReadTarget, collectRequiredInstructionFiles, verifyInstructionReadEvidence };

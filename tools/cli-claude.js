@@ -39,11 +39,11 @@ const { writePointerFile } = require('./cli-pointer.js');
 const { canonicalPlainPath } = require('./runtime-paths.js');
 const { resolveVendorBinary } = require('./vendor-binaries.js');
 
-const CLAUDE_BIN = path.join(os.homedir(), '.local', 'bin', 'claude.exe');
+const CLAUDE_BIN = path.join(os.homedir(), '.local', 'bin', process.platform === 'win32' ? 'claude.exe' : 'claude');
 const DEFAULT_MODEL = 'fable';
 // Historical default write grant. Other roots require the existing explicit
 // MAGI_ALLOWED_WORKSPACE_ROOTS setting; cwd alone never grants access.
-const MAGI_ROOT = 'C:\\src\\magi';
+const MAGI_ROOT = process.platform === 'win32' ? 'C:\\src\\magi' : path.join(os.homedir(), 'src', 'magi');
 // Where lead-written MAGI bus briefs live. A brief's parent directory must be
 // under an authorized workspace or this bus root for the pointer launch to add-dir it.
 const MAGI_BUS_ROOT = path.join(os.tmpdir(), 'magi-bus');

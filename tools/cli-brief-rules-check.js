@@ -29,7 +29,8 @@ const STRICT_MARKERS = Object.freeze([
   { id: 'vendor proof', anyOf: ['vendor-native proof', 'cli-proof', 'R18'] },
   { id: 'SLICES not vendors', anyOf: ['SLICES≠vendors', 'SLICES are not vendor', 'SLICES not vendor', 'R11'] },
   { id: 'not CONCLAVE', anyOf: ['not CONCLAVE', 'NOT CONCLAVE', 'R20'] },
-  { id: 'no vault writes', anyOf: ['C:\\src\\vault', 'R21'] },
+  // Host-neutral: the rule id, the Windows vault literal, or a POSIX vault path.
+  { id: 'no vault writes', anyOf: ['R21', 'C:\\src\\vault', '/src/vault', 'Second-Brain'] },
 ]);
 
 function usage() {

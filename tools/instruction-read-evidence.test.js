@@ -5,7 +5,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { pathToFileURL } = require('node:url');
 const test = require('node:test');
-const { collectRequiredInstructionFiles, verifyInstructionReadEvidence } = require('./instruction-read-evidence.js');
+const { codexReadCommand, codexReadTarget, collectRequiredInstructionFiles, verifyInstructionReadEvidence } = require('./instruction-read-evidence.js');
 const { createSealedRun } = require('./test-fixtures.js');
 const { stageRules } = require('./cli-rules-stage.js');
 const { stageSeatSkills } = require('./cli-skill-stage.js');
@@ -204,6 +204,59 @@ function relativeProductRead(f, index = 99) {
       output: [{ type: 'input_text', text: 'Script completed\nOutput:\n' }, { type: 'input_text', text: output }] } },
   ];
 }
+
+// POSIX seats have no pwsh; they read with `cat -- '<path>'` and the native
+// command array carries the same exact literal path.
+function codexPosixRows(f) {
+  return [{ type: 'session_meta', payload: { id: SESSION, session_id: SESSION, cwd: f.run.cwd } }, ...f.files.flatMap((file, index) => {
+    const cmd = codexReadCommand(file.path, 'darwin');
+    const args = { cmd, workdir: f.run.cwd, max_output_tokens: 10000 };
+    const output = file.text + '\n'; const callId = `read-${index}`;
+    return [{ type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: callId,
+      input: `const r = await tools.exec_command(${JSON.stringify(args)});\ntext(r.output);` } },
+    { type: 'event_msg', payload: { type: 'item_completed', thread_id: SESSION, item: { type: 'CommandExecution', id: `exec-${index}`,
+      command: ['/bin/cat', '--', file.path], cwd: pathToFileURL(f.run.cwd).href,
+      status: 'completed', exit_code: 0, stdout: output, stderr: '', formatted_output: output } } },
+    { type: 'response_item', payload: { type: 'custom_tool_call_output', call_id: callId,
+      output: [{ type: 'input_text', text: 'Script completed\nOutput:\n' }, { type: 'input_text', text: output }] } }];
+  })];
+}
+
+test('Codex read recipe round-trips both host shapes, including quoted paths', () => {
+  const tricky = "/Users/o'brien/src/it's here.md";
+  assert.equal(codexReadCommand(tricky, 'darwin'), "cat -- '/Users/o'\\''brien/src/it'\\''s here.md'");
+  assert.deepEqual(codexReadTarget(codexReadCommand(tricky, 'darwin')), { shell: 'cat', file: tricky });
+  assert.deepEqual(codexReadTarget(codexReadCommand(tricky, 'win32')), { shell: 'powershell', file: tricky });
+  assert.equal(codexReadTarget("cat -- '/a/b.md' && rm -rf /"), null);
+});
+
+test('Codex accepts the POSIX cat read recipe bound to the exact literal path', t => {
+  const f = fixture(t);
+  assert.equal(verify(f, 'openai', codexPosixRows(f)).status, 'PASS');
+  // Observed on macOS 2026-09-16: codex 0.154 wraps the recipe in the login shell.
+  const wrapped = codexPosixRows(f).map(row => {
+    const item = row.payload?.item;
+    if (item?.type !== 'CommandExecution') return row;
+    const cmd = codexReadCommand(item.command[2], 'darwin');
+    return { ...row, payload: { ...row.payload, item: { ...item, command: ['/bin/zsh', '-lc', cmd] } } };
+  });
+  assert.equal(verify(f, 'openai', wrapped).status, 'PASS');
+  const tampered = wrapped.map(row => {
+    const item = row.payload?.item;
+    if (item?.type !== 'CommandExecution') return row;
+    return { ...row, payload: { ...row.payload, item: { ...item, command: ['/bin/zsh', '-lc', `${item.command[2]} && rm -rf /`] } } };
+  });
+  assert.throws(() => verify(f, 'openai', tampered), /does not match its tool call/);
+  for (const mutate of [
+    rows => { rows[2].payload.item.command[2] += '.bak'; },
+    rows => { rows[2].payload.item.command[0] = '/bin/head'; },
+    rows => { rows[2].payload.item.command = ['/bin/cat', rows[2].payload.item.command[2]]; },
+    rows => { rows[2].payload.item.stdout = rows[2].payload.item.stdout.slice(0, -5); },
+  ]) {
+    const rows = codexPosixRows(f); mutate(rows);
+    assert.throws(() => verify(f, 'openai', rows), { code: 'INSTRUCTION_READ_FAIL' });
+  }
+});
 
 test('Codex accepts a relative product Get-Content after every required instruction read', t => {
   const f = fixture(t);

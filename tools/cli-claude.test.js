@@ -91,11 +91,11 @@ after(() => {
 });
 
 test('constants: binary path, cursor-cli overlay defaults, idle limit, magi + bus roots', () => {
-  assert.strictEqual(CLAUDE_BIN, path.join(os.homedir(), '.local', 'bin', 'claude.exe'));
+  assert.strictEqual(CLAUDE_BIN, path.join(os.homedir(), '.local', 'bin', process.platform === 'win32' ? 'claude.exe' : 'claude'));
   assert.strictEqual(DEFAULT_MODEL, 'fable');
   assert.strictEqual(DEFAULT_EFFORT, 'xhigh');
   assert.strictEqual(IDLE_LIMIT_MS, 20 * 60 * 1000);
-  assert.strictEqual(MAGI_ROOT, 'C:\\src\\magi');
+  assert.strictEqual(MAGI_ROOT, process.platform === 'win32' ? 'C:\\src\\magi' : path.join(os.homedir(), 'src', 'magi'));
   assert.strictEqual(MAGI_BUS_ROOT, path.join(os.tmpdir(), 'magi-bus'));
   assert.deepStrictEqual(CLAUDE_EFFORTS, ['low', 'medium', 'high', 'xhigh', 'max']);
   assert.ok(AUTH_NEEDLES.length >= 3);
@@ -219,7 +219,7 @@ test('buildLaunch: --add-dir cwd outside C:\\src\\magi is refused - bypass is sc
   ]) {
     assert.throws(
       () => buildClaudeLaunch({ briefPath: sharedBrief, cwd, env: {} }),
-      /pre-authorized under C:\\src\\magi only/,
+      new RegExp('pre-authorized under ' + MAGI_ROOT.replace(/[\\.]/g, '\\$&') + ' only'),
       `cwd ${cwd} must be refused`
     );
   }
@@ -254,7 +254,15 @@ test('buildLaunch: native pointer paths preserve filesystem case and POSIX separ
   } else {
     assert.ok(launch.stdinFile.startsWith('/'));
     assert.ok(!launch.stdinFile.includes('\\'));
-    assert.throws(() => buildClaudeLaunch({ ...options, cwd: root.toUpperCase() }), /pre-authorized/);
+    // APFS is case-insensitive by default, so probe the filesystem rather than assume POSIX means case-sensitive.
+    const upper = root.toUpperCase();
+    let caseSensitive = true;
+    try { caseSensitive = fs.realpathSync.native(upper) !== root; } catch { caseSensitive = true; }
+    if (caseSensitive) assert.throws(() => buildClaudeLaunch({ ...options, cwd: upper }), /pre-authorized/);
+    else {
+      const upperCaseLaunch = buildClaudeLaunch({ ...options, cwd: upper });
+      assert.strictEqual(upperCaseLaunch.args[upperCaseLaunch.args.indexOf('--add-dir') + 1], root);
+    }
     assert.throws(() => buildClaudeLaunch({ ...options, briefPath: 'C:\\src\\magi\\brief.md' }), /outside the pointer zones/);
   }
 });
@@ -460,7 +468,7 @@ test('buildLaunch: binary discovery is file-only and preserves explicit, environ
   assert.strictEqual(buildLaunch({ briefPath: sharedBrief, binary, env: { ...env, MAGI_CLAUDE_BIN: missing }, mustExistBinary: true }).binary, binary);
   assert.strictEqual(buildLaunch({ briefPath: sharedBrief, env, config: { vendors: { anthropic: { binary: missing } } } }).binary, binary);
   assert.strictEqual(buildLaunch({ briefPath: sharedBrief, config: { vendors: { anthropic: { binary } } }, mustExistBinary: true }).binary, binary);
-  assert.strictEqual(buildLaunch({ briefPath: sharedBrief, home: fixtureRoot }).binary, path.join(fixtureRoot, '.local', 'bin', 'claude.exe'));
+  assert.strictEqual(buildLaunch({ briefPath: sharedBrief, home: fixtureRoot }).binary, path.join(fixtureRoot, '.local', 'bin', process.platform === 'win32' ? 'claude.exe' : 'claude'));
   const briefPath = makeBrief(busTempDir, 'missing binary leaves no pointer\n', 'missing-binary.md');
   assert.throws(() => buildLaunch({ briefPath, binary: missing, mustExistBinary: true }), /does not exist/);
   assert.strictEqual(fs.existsSync(`${briefPath}.pointer.md`), false);

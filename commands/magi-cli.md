@@ -72,3 +72,17 @@ Run `run-finalize.js --run-dir <run-dir>`. When `MAGI_VAULT_ROOT` is set, finali
 Run `panel-tally.js --run-dir <run-dir> --unit-id <unit>` for receipt-bound panel votes. Each eligible review response must end with exactly one `POSITION: APPROVE`, `POSITION: REJECT`, or `POSITION: ABSTAIN` line. Never handwrite ballots or waive deterministic failure.
 
 The scope audit does not sandbox vendor home directories. Standalone transport smoke results cannot activate production work.
+
+## Jev decision engine (2026-09-16)
+
+`dispatch-matrix.json` carries `arbiter.decisionEngine` (engine `jev`, TypeSafe System One). Jev proposes probability distributions; code gates them. The hosting session still runs every tool. The key comes only from `TYPESAFE_API_KEY` (source `~/.config/typesafe/env.sh`); without it every call returns `NOT_RUN` and the deterministic parts still run. Each real call appends one provenance row (request and response SHA-256, usage, model, timestamp; never the key) to the JSONL you name.
+
+- `node tools/jev-arbiter.js classify --brief <file> --routing <mix-mode routing.json> [--provenance <run-dir>/jev-decisions.jsonl] [--repo-facts <text>] [--units <n>]` prints the class distribution and gate (`route` at p >= 0.6, `route-flagged` at 0.4, else `owner`). The module also exports `pickSeats` (deterministic argmax over `decisionMatrix2026-09-16`, margin rule 0.15, never an exhausted bucket from `docs/capacity-state.json`), `conveneThirdFamily` and `netBenefit` (Nouls gated at 0.6), and `tallyPositions` (Score plus one independent-evidence Noul per reply; quorum floor, evidence-less APPROVE counted as ABSTAIN, DEADLOCK rules per the deliberation protocol).
+- `node tools/jev-check.js --claims <json> | --receipt <json> [--provenance <jsonl>]` runs deterministic pre-checks first (evidence path exists, quote is a substring, recorded test exited 0), discards failures before Jev sees them, then asks per-claim Nouls and prints a verdict table (`supported`, `contradicted`, `says-nothing`). The lead runs it over seat output; seats never call Jev.
+
+## macOS host notes (2026-09-16, measured)
+
+- `source ~/.config/magi/env.sh` before any tool; it exports `MAGI_CODEX_PROVIDER=openai` (the cpa-gui proxy is normally down; the adapter also defaults to it on darwin).
+- Claude and Google checking seats cannot run commands (`read-only-tools`, `--sandbox`); agy soft-denies and returns an empty reply. Capture tests as the lead into `<run-parent>/evidence/<unit>/`, bind `evidenceReadDirs`, and say so in the brief.
+- Codex gpt-5.6-terra truncated the last of 31 sequential instruction reads twice; gpt-5.6-sol completed it. Prefer a lane with sol for Codex checking seats until measured otherwise.
+- A failed dispatch id needs a new dispatch id in a new sealed run (R22); plan retries as small verify/review-only plans with the same evidence directories.

@@ -4,14 +4,7 @@ const { spawnSync } = require('node:child_process');
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
-const {
-  copyFileSync,
-  mkdtempSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} = require('node:fs');
+const { copyFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, realpathSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 
 const helper = path.join(__dirname, 'telemetry-append.js');
@@ -36,7 +29,7 @@ function validRow(overrides = {}) {
 }
 
 function withTempDir(fn) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'telemetry-append-'));
+  const dir = realpathSync.native(mkdtempSync(path.join(tmpdir(), 'telemetry-append-')));
   try {
     fn(dir);
   } finally {

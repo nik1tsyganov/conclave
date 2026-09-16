@@ -132,6 +132,24 @@ test('structured proof still requires native model, effort, session, numeric usa
   assert.throws(() => verifyProof(options), /error result/);
 });
 
+test('structured proof accepts the macOS CLI task_summary trailer and nothing else after the result', t => {
+  const root = temporary(t);
+  const capture = path.join(root, 'capture.json');
+  const log = path.join(root, 'native.log');
+  const native = nativeCapture('anthropic', 'claude-sonnet-5', 'medium', RESPONSE);
+  const terminal = { ...JSON.parse(native.capture), structured_output: { response: RESPONSE } };
+  fs.writeFileSync(log, native.log, 'utf8');
+  const options = { vendor: 'anthropic', capture, log, expectedModel: 'sonnet', expectedObservedModel: 'claude-sonnet-5', expectedEffort: 'medium', onTopic: true, ...protocol };
+  const rows = trailer => [terminal, ...trailer].map(row => JSON.stringify(row)).join('\n');
+  // Observed 2026-09-16: Claude Code 2.1.271 emits this row after `result`.
+  fs.writeFileSync(capture, rows([{ type: 'system', subtype: 'task_summary', detail: null, session_id: terminal.session_id }]), 'utf8');
+  assert.equal(verifyProof(options).responseProtocol, CLAUDE_RESPONSE_PROTOCOL);
+  fs.writeFileSync(capture, rows([{ type: 'assistant', session_id: terminal.session_id, message: { content: [] } }]), 'utf8');
+  assert.throws(() => verifyProof(options), /final terminal result/);
+  fs.writeFileSync(capture, rows([{ type: 'system', subtype: 'init', session_id: terminal.session_id }]), 'utf8');
+  assert.throws(() => verifyProof(options), /final terminal result/);
+});
+
 const malformed = [
   ['missing payload with valid legacy text', row => { delete row.structured_output; row.result = RESPONSE; }, /structured_output/],
   ['null payload', row => { row.structured_output = null; }, /structured_output/],

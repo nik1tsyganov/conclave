@@ -14,11 +14,17 @@ function hashFile(file) { return hash(fs.readFileSync(file)); }
 function runtimeManifest() {
   return fs.readdirSync(__dirname).filter(name => name.endsWith('.js') && !name.endsWith('.test.js')).sort().map(name => ({ path: name, sha256: hashFile(path.join(__dirname, name)) }));
 }
+// Same rule as runtime-paths.canonicalPlainPath: a POSIX symlink that is a direct
+// child of the filesystem root (macOS /tmp, /var) is platform layout, so it is
+// resolved first and the rule re-asserted on the realpath. Deeper links and hard
+// links stay refused; Windows still refuses every linked ancestor.
 function assertPlainPath(file) {
-  let current = path.resolve(file);
+  const target = path.resolve(file);
+  let current = target;
   while (true) {
     try {
       const stat = fs.lstatSync(current);
+      if (stat.isSymbolicLink() && process.platform !== 'win32' && path.dirname(current) === path.parse(current).root) return assertPlainPath(path.resolve(fs.realpathSync.native(current), path.relative(current, target)));
       if (stat.isSymbolicLink() || (stat.isFile() && stat.nlink > 1)) throw evidenceError(`evidence path must not contain symlinks, junctions or hard links: ${current}`, 'SCOPE_FAIL');
     } catch (error) { if (error.code !== 'ENOENT') throw error; }
     const parent = path.dirname(current);

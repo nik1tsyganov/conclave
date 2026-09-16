@@ -46,7 +46,10 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
     writeJson(path.join(root, 'auth-status.json'), { loggedIn: true, authMethod: auth.authMethod });
   }
   let args;
-  if (vendor === 'openai') args = ['exec', '--skip-git-repo-check', '-s', 'read-only', '-m', model, '-c', `model_reasoning_effort=${effort}`, '-c', 'memories.use_memories=false', '-c', 'memories.generate_memories=false', '-C', work, '-o', capture, '-'];
+  // Same provider override as cli-adapters.openaiLaunch: headless codex otherwise
+  // routes through the host's local proxy, which is usually down on this Mac.
+  const provider = process.env.MAGI_CODEX_PROVIDER ?? (process.platform === 'darwin' ? 'openai' : undefined);
+  if (vendor === 'openai') args = ['exec', '--skip-git-repo-check', '-s', 'read-only', '-m', model, '-c', `model_reasoning_effort=${effort}`, '-c', 'memories.use_memories=false', '-c', 'memories.generate_memories=false', ...(provider ? ['-c', `model_provider=${provider}`] : []), '-C', work, '-o', capture, '-'];
   if (vendor === 'google') args = ['--model', model, '--sandbox', '--output-format', 'json', '--print-timeout', '2m', '--log-file', nativeLogPath, '--add-dir', work, '-p', prompt];
   if (vendor === 'anthropic') args = ['-p', '--safe-mode', '--model', model, '--effort', effort, '--permission-mode', 'dontAsk', '--tools', '', '--output-format', 'stream-json', '--verbose'];
   const launch = { vendor, binary, args, env, cwd: work, stdinFile, stdio: vendor === 'google' ? ['ignore', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'] };

@@ -31,10 +31,21 @@ function newestCodexInstall(home = os.homedir()) {
   return candidates[0]?.file || null;
 }
 
+// POSIX hosts install the three CLIs into ~/.local/bin; macOS also ships codex
+// inside the ChatGPT desktop app. These come before the Windows .exe defaults.
+function posixCandidates(vendor, home, platform) {
+  const name = { openai: 'codex', google: 'agy', anthropic: 'claude' }[vendor];
+  const result = [path.join(home, '.local', 'bin', name)];
+  const bundled = '/Applications/ChatGPT.app/Contents/Resources/codex';
+  if (vendor === 'openai' && platform === 'darwin' && existing(bundled)) result.push(bundled);
+  return result;
+}
+
 function candidates(vendor, options = {}) {
   if (!VENDORS.includes(vendor)) throw new Error(`unsupported vendor: ${vendor}`);
   const home = options.home || os.homedir();
   const env = options.env || process.env;
+  const platform = options.platform || process.platform;
   const result = [];
   if (options.binary) return [path.resolve(options.binary)];
 
@@ -48,6 +59,8 @@ function candidates(vendor, options = {}) {
   const config = options.config || (configPath ? readJsonFile(configPath) : {});
   const configured = config.vendors?.[vendor]?.binary;
   if (configured) return [path.resolve(configured)];
+
+  if (platform !== 'win32') result.push(...posixCandidates(vendor, home, platform));
 
   if (vendor === 'openai') {
     result.push(path.join(home, 'AppData', 'Local', 'Microsoft', 'WinGet', 'Links', 'codex.exe'));

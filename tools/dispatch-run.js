@@ -4,7 +4,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const { buildLaunch } = require('./cli-adapters.js');
+const { buildLaunch, hostSamePath } = require('./cli-adapters.js');
 const { runLaunch } = require('./cli-runner.js');
 const { DEFAULT_RULES_ROOT, FINGERPRINT_V2, prepareRulesSource, stageRules, verifyStagedRules } = require('./cli-rules-stage.js');
 const { checkBriefFile } = require('./cli-brief-rules-check.js');
@@ -16,7 +16,7 @@ const { prepareSeatSkills, stageSeatSkills, verifySeatSkills, verifySkillSource 
 const { DEFAULT_PROFILES } = require('./seat-policy.js');
 const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, appendUniqueRow, assertPlainPath, compareWorkspace, hashFile, inside, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, writeJson: atomicJson } = require('./dispatch-evidence.js');
 const { CLAUDE_RESPONSE_PROTOCOL, codexSessionTranscript, googleSessionTranscript, finalResponse, nativeLog, validateClaudeResponseLaunch } = require('./vendor-native.js');
-const { INSTRUCTION_READ_PROTOCOL, verifyInstructionReadEvidence } = require('./instruction-read-evidence.js');
+const { INSTRUCTION_READ_PROTOCOL, codexReadCommand, verifyInstructionReadEvidence } = require('./instruction-read-evidence.js');
 const { readSealedRun } = require('./plan-seal.js');
 const { validateEvidenceReadDirs, snapshotEvidenceReads, validateEvidenceReadLaunch } = require('./evidence-read-access.js');
 const { launchOverlay, loadCatalog } = require('./synara-catalog.js');
@@ -79,7 +79,7 @@ function seatContractText(opts, seatProfile, skillStage, ruleStage) {
   const instructionFiles = [path.join(ruleStage.briefDir, 'BRIEF.md'), contractPath,
     ruleStage.manifestPath, ...ruleStage.manifest.files.map(file => path.join(ruleStage.briefDir, file.path)),
     skillStage.manifestPath, ...seatProfile.skills.map(skill => path.join(skillStage.root, skill, 'SKILL.md'))];
-  const openaiReadRecipe = file => `const r = await tools.exec_command(${JSON.stringify({ cmd: `Get-Content -Raw -LiteralPath '${file.replaceAll("'", "''")}' -Encoding UTF8`, workdir: opts.cwd, max_output_tokens: 10000 })}); text(r.output);`;
+  const openaiReadRecipe = file => `const r = await tools.exec_command(${JSON.stringify({ cmd: codexReadCommand(file), workdir: opts.cwd, max_output_tokens: 10000 })}); text(r.output);`;
   return [
     '# MAGI CLI seat contract',
     '',
@@ -294,7 +294,7 @@ async function runDispatch(opts, dependencies = {}) {
   for (const file of [telemetryLog, activationLog, evidenceDir]) assertPlainPath(file);
   if (!savedState) {
     if (opts.vendor === 'openai' && opts.role !== 'implement' &&
-        path.win32.resolve(evidenceDir).toLowerCase() !== path.win32.resolve(runDir, 'out', opts.dispatchId).toLowerCase()) {
+        !hostSamePath(evidenceDir, path.join(runDir, 'out', opts.dispatchId))) {
       throw policyError('OpenAI checking roles require the standard run/out/dispatch-id evidence directory for scoped scratch');
     }
     if (seal.schemaVersion !== 2 || !seal.skillSource) throw policyError('unbound historical seal cannot launch new work; seal a new run');

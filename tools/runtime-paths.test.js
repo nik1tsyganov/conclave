@@ -74,6 +74,14 @@ test('canonical paths reject junction roots, junction ancestors, and file parent
   assert.throws(() => canonicalPlainPath(path.join(file, 'child')), /not a directory/);
 });
 
+// macOS ships /tmp and /var as root-level aliases for /private/...; the temp root
+// must stay usable through them, while deeper links keep failing (test above).
+test('a root-level platform alias resolves instead of failing the temp root', () => {
+  const root = temp();
+  assert.strictEqual(canonicalPlainPath(root), fs.realpathSync.native(root));
+  assert.strictEqual(canonicalPlainPath(os.tmpdir()), fs.realpathSync.native(os.tmpdir()));
+});
+
 test('Windows device and alternate-stream path spellings are rejected', { skip: process.platform !== 'win32' }, () => {
   const root = temp();
   for (const name of ['NUL', 'con.txt', 'COM1', 'LPT9.log', 'file:stream', 'bad.', 'bad ']) {

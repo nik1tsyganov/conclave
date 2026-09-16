@@ -7,7 +7,7 @@ const { createSealedRun, fakeVendor, completeSyntheticDispatch } = require('./te
 const { runDispatch } = require('./dispatch-run.js');
 const { finalizeRun, inspectRun } = require('./run-finalize.js');
 const { hash, hashFile, writeJson, snapshotWorkspace } = require('./dispatch-evidence.js');
-const { INSTRUCTION_READ_PROTOCOL } = require('./instruction-read-evidence.js');
+const { INSTRUCTION_READ_PROTOCOL, codexReadTarget } = require('./instruction-read-evidence.js');
 const json = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const rows = text => text.split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line));
 const encode = values => values.map(value => JSON.stringify(value)).join('\n') + '\n';
@@ -93,7 +93,7 @@ test('generated OpenAI contract carries exact unbatched reads for every staged f
     const contract = fs.readFileSync(launch.seatContractPath, 'utf8');
     const commands = [...contract.matchAll(/const r = await tools\.exec_command\((\{[^\n]+\})\); text\(r.output\);/g)].map(match => JSON.parse(match[1]));
     assert.equal(commands.length, 31); // The bootstrap contract read is the 32nd required file.
-    assert.ok(commands.every(command => command.workdir === launch.cwd && /^Get-Content -Raw -LiteralPath '.+' -Encoding UTF8$/.test(command.cmd)));
+    assert.ok(commands.every(command => command.workdir === launch.cwd && codexReadTarget(command.cmd)));
     assert.match(contract, /ONE functions.exec invocation per code block/);
     assert.ok(commands.every(command => !command.cmd.includes(launch.seatContractPath)));
   });

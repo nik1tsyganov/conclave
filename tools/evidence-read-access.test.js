@@ -46,7 +46,7 @@ test('Google checking launch grants the explicitly bound sibling evidence direct
   const launch = buildLaunch({ vendor: 'google', role: 'review', cwd: 'C:\\src\\synthetic-product',
     briefPath, seatContractPath: path.join(root, 'SEAT-CONTRACT.md'), skillRoot: path.join(root, 'skills'),
     capturePath: path.join(root, 'capture.txt'), evidenceReadDirs: [evidence],
-    env: { MAGI_AGY_BIN: process.execPath }, mustExistBinary: false });
+    env: { MAGI_AGY_BIN: process.execPath, MAGI_DEV_ROOT: 'C:\\src' }, mustExistBinary: false });
   assert.ok(granted(launch.args, evidence), 'sealed sibling evidence must be in native add-dir grants');
   assert.ok(launch.args.includes('--sandbox'));
 });
@@ -256,7 +256,7 @@ test('OpenAI evidence grants leave the exact scratch argv and environment unchan
   const evidence = path.join(root, 'evidence'); fs.mkdirSync(evidence);
   const opts = { vendor: 'openai', role: 'verify', cwd: 'C:\\src\\synthetic-product', runDir, dispatchId: 'd1', readonlyScratch: true,
     briefPath, seatContractPath: path.join(output, 'SEAT-CONTRACT.md'), skillRoot: path.join(output, 'skills'), capturePath: path.join(output, 'capture.txt'),
-    env: { MAGI_CODEX_BIN: process.execPath }, mustExistBinary: false };
+    env: { MAGI_CODEX_BIN: process.execPath, MAGI_DEV_ROOT: 'C:\\src' }, mustExistBinary: false };
   const before = buildLaunch(opts); const after = buildLaunch({ ...opts, evidenceReadDirs: [evidence] });
   assert.deepEqual(after.args, before.args); assert.deepEqual(after.env, before.env);
   assert.deepEqual(after.evidenceReadDirs, [canonicalPlainPath(evidence)]);

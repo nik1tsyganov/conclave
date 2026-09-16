@@ -5,6 +5,8 @@ const { execFileSync } = require('node:child_process');
 function sampleCpuMs(pid, options = {}) {
   if (!Number.isInteger(pid) || pid <= 0) return null;
   const platform = options.platform || process.platform;
+  // POSIX has no sampler here: `ps -o time=` reports whole seconds only, which
+  // is coarser than the idle-CPU rung needs. Returning null disables that rung.
   if (platform !== 'win32') return null;
   const exec = options.execFileSync || execFileSync;
   try {
@@ -25,7 +27,12 @@ function terminateProcessTree(pid) {
   if (!Number.isInteger(pid) || pid <= 0) throw new Error('positive child PID required');
   if (process.platform === 'win32') {
     execFileSync('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, timeout: 10000, stdio: 'ignore' });
-  } else process.kill(pid, 'SIGKILL');
+    return;
+  }
+  // The child is not spawned detached, so there is no process group to signal.
+  // Reap its direct children first, best effort, then kill the parent.
+  try { execFileSync('/usr/bin/pkill', ['-KILL', '-P', String(pid)], { timeout: 10000, stdio: 'ignore' }); } catch { /* no children, or pkill unavailable */ }
+  process.kill(pid, 'SIGKILL');
 }
 
 module.exports = { sampleCpuMs, terminateProcessTree };

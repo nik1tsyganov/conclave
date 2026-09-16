@@ -43,7 +43,7 @@ function allAvailability(root, matrix) {
   return result;
 }
 function temporary(t, prefix = 'magi-contract-') {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return root;
 }

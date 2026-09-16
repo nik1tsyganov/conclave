@@ -14,6 +14,13 @@ const CLAUDE_RESPONSE_SCHEMA = Object.freeze({
 });
 
 function responseError(message) { return Object.assign(new Error(message), { code: 'PROOF_FAIL' }); }
+// Windows paths keep their case-insensitive identity; POSIX is case-preserving.
+function windowsShaped(file) { return process.platform === 'win32' || /^[A-Za-z]:[\\/]/.test(file) || file.startsWith('\\\\'); }
+function sameHostPath(left, right) {
+  if (windowsShaped(left) !== windowsShaped(right)) return false;
+  if (windowsShaped(left)) return path.win32.resolve(left).toLowerCase() === path.win32.resolve(right).toLowerCase();
+  return path.resolve(left) === path.resolve(right);
+}
 function requireClaudeResponseProtocol(protocol) {
   if (protocol !== CLAUDE_RESPONSE_PROTOCOL) throw responseError('Claude structured response protocol is missing or unsupported');
 }
@@ -37,7 +44,11 @@ function validateClaudeStructuredResponse(records) {
   const terminals = records.filter(row => row.type === 'result');
   if (terminals.length !== 1) throw responseError('Claude structured response requires exactly one terminal result');
   const terminal = terminals[0];
-  if (terminal.subtype !== 'success' || records.at(-1) !== terminal) throw responseError('Claude structured response requires a successful final terminal result');
+  // Claude Code 2.1.27x (macOS, observed 2026-09-16) appends a `system/task_summary`
+  // row after the terminal result. Only that trailer may follow the result.
+  const trailer = records.slice(records.indexOf(terminal) + 1);
+  const trailerOk = trailer.every(row => row.type === 'system' && row.subtype === 'task_summary');
+  if (terminal.subtype !== 'success' || !trailerOk) throw responseError('Claude structured response requires a successful final terminal result');
   if (typeof terminal.session_id !== 'string' || !terminal.session_id.trim()) throw responseError('Claude structured response is missing terminal session identity');
   const nativeRows = records.filter(row => row.type === 'result' || row.type === 'assistant' || (row.type === 'system' && row.subtype === 'init'));
   if (nativeRows.some(row => Object.hasOwn(row, 'session_id') && row.session_id !== terminal.session_id)) throw responseError('Claude proof has inconsistent sessions');
@@ -90,7 +101,7 @@ function codexSessionTranscript(sessionId, { home = os.homedir(), codexHome = pr
   catch { throw responseError('Codex native session transcript is incomplete or malformed'); }
   const sessions = rows.filter(row => row.type === 'session_meta');
   if (sessions.length !== 1 || sessions[0].payload?.id !== sessionId ||
-      !cwd || path.win32.resolve(sessions[0].payload.cwd || '').toLowerCase() !== path.win32.resolve(cwd).toLowerCase()) {
+      !cwd || !sameHostPath(sessions[0].payload.cwd || '', cwd)) {
     throw responseError('Codex transcript session or workspace does not match the dispatch');
   }
   return { path: matches[0], text };

@@ -26,7 +26,14 @@ function runtimeError(message) {
   return error;
 }
 
-// Resolve existing ancestors without accepting junctions, symlinks or file parents.
+// Resolve existing ancestors, then require the RESOLVED path to be plain: no
+// junction, symlink or file parent inside it.
+// macOS ships /tmp and /var as root-level aliases for /private/..., so every
+// os.tmpdir() path has a linked ancestor. A POSIX symlink that is a direct child
+// of the filesystem root is therefore platform layout: it is resolved first and
+// the plain-path rule is re-asserted on the realpath (which is also what the
+// callers' containment checks then see). Any deeper link is run-controlled and
+// stays refused, as it does on Windows.
 // This also canonicalizes Windows short-name and case aliases before containment checks.
 function canonicalPlainPath(file) {
   if (typeof file !== 'string' || !file.trim()) throw runtimeError('a non-empty filesystem path is required');
@@ -45,7 +52,10 @@ function canonicalPlainPath(file) {
       if (error.code !== 'ENOENT') throw error;
       return path.join(fs.realpathSync.native(path.dirname(current)), path.basename(current), ...segments.slice(i));
     }
-    if (stat.isSymbolicLink()) throw runtimeError(`symlink or junction forbidden in path: ${current}`);
+    if (stat.isSymbolicLink()) {
+      if (process.platform === 'win32' || i !== 1) throw runtimeError(`symlink or junction forbidden in path: ${current}`);
+      return canonicalPlainPath(path.join(fs.realpathSync.native(current), ...segments.slice(i)));
+    }
     if (i < segments.length && !stat.isDirectory()) throw runtimeError(`filesystem parent is not a directory: ${current}`);
     if (i < segments.length) current = path.join(current, segments[i]);
   }

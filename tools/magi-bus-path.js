@@ -14,6 +14,7 @@
 
 const path = require('node:path');
 
+const { canonicalPlainPath } = require('./runtime-paths.js');
 const { MAGI_BUS_ROOT: CLAUDE_BUS_ROOT } = require('./cli-claude.js');
 
 const DEFAULT_MAGI_BUS_ROOT = CLAUDE_BUS_ROOT;
@@ -51,7 +52,9 @@ function compareKey(filePath) {
   if (looksWindowsPath(resolved) || (resolved.includes('\\') && !resolved.startsWith('/'))) {
     return resolved.replace(/\//g, '\\').toLowerCase();
   }
-  return resolved;
+  // Both the candidate and the zone roots (repo, os.tmpdir()-based bus root)
+  // go through the canonicalizer so a symlinked ancestor compares as itself.
+  return canonicalPlainPath(resolved);
 }
 
 function isUnderRoot(candidate, root) {
