@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const crypto = require('node:crypto');
@@ -58,7 +58,7 @@ function usage() {
     '  [--run-dir <dir>] [--availability <json>] [--max-wall-ms <milliseconds>]',
     '  [--rules-root <dir>] [--skill-source-root <dir>] [--on-topic --capture-sha256 <checkpoint hash>]',
     '',
-    'Runs one fail-closed MAGI CLI seat transaction. Matrix, seat policy, staged skills, rules, proof, and telemetry are enforced in code.',
+    'Runs one fail-closed CONCLAVE CLI seat transaction. Matrix, seat policy, staged skills, rules, proof, and telemetry are enforced in code.',
     'Claude first returns AWAITING_ATTESTATION (ok:false, exit 0). Inspect its response, then attest the same capture hash without relaunching.',
   ].join('\n');
 }
@@ -85,7 +85,7 @@ function seatContractText(opts, seatProfile, skillStage, ruleStage) {
     skillStage.manifestPath, ...seatProfile.skills.map(skill => path.join(skillStage.root, skill, 'SKILL.md'))];
   const openaiReadRecipe = file => `const r = await tools.exec_command(${JSON.stringify({ cmd: codexReadCommand(file), workdir: opts.cwd, max_output_tokens: 20000 })}); text(r.output);`;
   return [
-    '# MAGI CLI seat contract',
+    '# CONCLAVE CLI seat contract',
     '',
     `Dispatch: ${opts.dispatchId}`,
     `Unit: ${opts.unitId}`,
@@ -106,7 +106,7 @@ function seatContractText(opts, seatProfile, skillStage, ruleStage) {
       : []),
     'Do not stage or commit changes. Do not modify any evidence, rules, contracts, or skill files.',
     ...(Array.isArray(opts.evidenceReadDirs) && opts.evidenceReadDirs.length
-      ? ['Additional host-helper read directories (not MAGI votes, never a POSITION):', ...opts.evidenceReadDirs.map(dir => `- ${dir}`), 'These evidence directories are frozen inputs. Do not change, create or delete their contents.']
+      ? ['Additional host-helper read directories (not CONCLAVE votes, never a POSITION):', ...opts.evidenceReadDirs.map(dir => `- ${dir}`), 'These evidence directories are frozen inputs. Do not change, create or delete their contents.']
       : []),
     '',
     'Required staged instructions: read these files in full before task work:',
@@ -270,7 +270,7 @@ async function runDispatch(opts, dependencies = {}) {
   }
   const matrix = sealed.matrix;
   const availability = loadAvailability(sealed.availablePath);
-  const transactionPath = path.join(runDir, '.magi-dispatches', `${transactionKey(planEntry)}.json`);
+  const transactionPath = path.join(runDir, '.conclave-dispatches', `${transactionKey(planEntry)}.json`);
   assertPlainPath(transactionPath);
   const savedState = fs.existsSync(transactionPath) ? JSON.parse(fs.readFileSync(transactionPath, 'utf8')) : null;
   // A RETRYABLE transaction (R22 launch-failure retry) launches again as if fresh.
@@ -300,7 +300,7 @@ async function runDispatch(opts, dependencies = {}) {
   if (inside(binding.planPath, cwd)) throw policyError('dispatch plan must be outside the product worktree');
   opts = { ...opts, ...binding.entry, cwd, planHash: binding.planHash, planId: binding.plan.planId };
   const telemetryLog = path.resolve(opts.telemetryLog || path.join(runDir, 'telemetry', 'dispatches.jsonl'));
-  const activationLog = path.resolve(opts.activationLog || path.join(runDir, 'magi-dispatch-log.jsonl'));
+  const activationLog = path.resolve(opts.activationLog || path.join(runDir, 'conclave-dispatch-log.jsonl'));
   if ([telemetryLog, activationLog].some((file) => !inside(file, runDir) || inside(file, cwd))) throw policyError('dispatch logs must be inside the run directory and outside the product worktree');
   for (const file of [telemetryLog, activationLog, evidenceDir]) assertPlainPath(file);
   if (fresh) {
@@ -464,7 +464,7 @@ async function runDispatch(opts, dependencies = {}) {
   // Child exit record for observers (dashboard) and post-mortems; never proof by itself.
   atomicJson(path.join(evidenceDir, 'process-result.json'), { ok: result.ok === true, exitCode: result.exitCode ?? null, exitConfirmed: result.exitConfirmed === true, killed: result.killed === true, killReason: result.killReason || null,
     pid: result.pid ?? null, startedAt: transaction.state.startedAt, completedAt: new Date().toISOString(), ...(result.lifetime && typeof result.lifetime === 'object' ? { lifetime: result.lifetime } : {}) });
-  for (const file of [telemetryLog, activationLog, capturePath, path.join(evidenceDir, 'vendor.log'), transaction.file, path.join(runDir, '.magi-sessions'), ...(launch.nativeLogPath ? [launch.nativeLogPath] : [])]) assertPlainPath(file);
+  for (const file of [telemetryLog, activationLog, capturePath, path.join(evidenceDir, 'vendor.log'), transaction.file, path.join(runDir, '.conclave-sessions'), ...(launch.nativeLogPath ? [launch.nativeLogPath] : [])]) assertPlainPath(file);
   const after = snapshotWorkspace(cwd);
   atomicJson(path.join(evidenceDir, 'workspace-after.json'), after);
   scopeAudit = compareWorkspace(before, after, opts.writeScope);
@@ -537,7 +537,7 @@ async function runDispatch(opts, dependencies = {}) {
   }
   const proofId = hashText(JSON.stringify(proof));
   const sessionKey = `${opts.vendor}-${hashText(proof.sessionId || proof.conversationId || '')}`;
-  const sessionDir = path.join(runDir, '.magi-sessions');
+  const sessionDir = path.join(runDir, '.conclave-sessions');
   fs.mkdirSync(sessionDir, { recursive: true });
   try { fs.writeFileSync(path.join(sessionDir, `${sessionKey}.json`), JSON.stringify({ dispatchId: opts.dispatchId, proofId }), { flag: 'wx' }); }
   catch (error) { if (error.code === 'EEXIST') throw policyError('native session already belongs to another dispatch'); throw error; }

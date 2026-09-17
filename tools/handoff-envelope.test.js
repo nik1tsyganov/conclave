@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const { describe, it } = require('node:test');
@@ -46,13 +46,13 @@ function withTempDir(fn) {
 }
 
 function withBusRoot(busRoot, fn) {
-  const previous = process.env.MAGI_BUS_ROOT;
-  process.env.MAGI_BUS_ROOT = busRoot;
+  const previous = process.env.CONCLAVE_BUS_ROOT;
+  process.env.CONCLAVE_BUS_ROOT = busRoot;
   try {
     fn();
   } finally {
-    if (previous === undefined) delete process.env.MAGI_BUS_ROOT;
-    else process.env.MAGI_BUS_ROOT = previous;
+    if (previous === undefined) delete process.env.CONCLAVE_BUS_ROOT;
+    else process.env.CONCLAVE_BUS_ROOT = previous;
   }
 }
 
@@ -67,16 +67,16 @@ function seedBrief(dir, name = 'brief.md', body = 'HANDOFF-FIRST\nbody\n') {
 }
 
 describe('handoff-envelope', () => {
-  it('maps hostMode to magi / magi-cli and keeps dispatch schema untouched', () => {
-    assert.strictEqual(systemFromHostMode('cursor'), 'magi');
-    assert.strictEqual(systemFromHostMode('cursor-cli'), 'magi-cli');
-    assert.strictEqual(systemFromHostMode('synara'), 'magi-cli');
-    assert.deepStrictEqual(SYSTEMS, ['magi', 'magi-cli']);
+  it('maps hostMode to conclave / conclave-cli and keeps dispatch schema untouched', () => {
+    assert.strictEqual(systemFromHostMode('cursor'), 'conclave');
+    assert.strictEqual(systemFromHostMode('cursor-cli'), 'conclave-cli');
+    assert.strictEqual(systemFromHostMode('synara'), 'conclave-cli');
+    assert.deepStrictEqual(SYSTEMS, ['conclave', 'conclave-cli']);
     assert.deepStrictEqual(STATUSES, ['accepted', 'blocked', 'done', 'failed']);
     assert.ok(DEFAULT_LOG.endsWith(path.join('telemetry', 'handoffs.jsonl')));
 
     const schema = loadSchema();
-    assert.strictEqual(schema.$id, 'https://github.com/nik1tsyganov/magi/telemetry/schema.json');
+    assert.strictEqual(schema.$id, 'https://github.com/nik1tsyganov/conclave/telemetry/schema.json');
     assert.deepStrictEqual(schema.required, ['vendor', 'role', 'hostMode', 'routedBy']);
     const dispatchRow = {
       vendor: 'openai',
@@ -108,7 +108,7 @@ describe('handoff-envelope', () => {
         ts,
       });
       assert.strictEqual(envelope.schema, SCHEMA_ID);
-      assert.strictEqual(envelope.system, 'magi');
+      assert.strictEqual(envelope.system, 'conclave');
       assert.strictEqual(envelope.briefSha256, hash);
       assert.deepStrictEqual(envelope.outputPaths, [path.resolve(outputPath)]);
       assert.strictEqual(envelope.outputSha256s[path.resolve(outputPath)], sha256('artifact\n'));
@@ -142,19 +142,19 @@ describe('handoff-envelope', () => {
     assert.doesNotMatch(src, /function captureTask/);
   });
 
-  it('accepts magi-cli system and empty outputs for a blocked handoff', () => {
+  it('accepts conclave-cli system and empty outputs for a blocked handoff', () => {
     withTempDir((dir) => {
       const { briefPath } = seedBrief(dir, 'cli-brief.md', 'CLI-HANDOFF\n');
       const envelope = buildHandoff({
         dispatchId: 'h-cli',
-        system: 'magi-cli',
+        system: 'conclave-cli',
         seat: 'codex-implementer',
         status: 'blocked',
         briefPath,
         nextOwner: 'arbiter',
         ts: '2026-09-04T09:01:00.000Z',
       });
-      assert.strictEqual(envelope.system, 'magi-cli');
+      assert.strictEqual(envelope.system, 'conclave-cli');
       assert.deepStrictEqual(envelope.outputPaths, []);
       assert.deepStrictEqual(envelope.outputSha256s, {});
       assert.deepStrictEqual(envelope.uncertainties, []);
@@ -168,7 +168,7 @@ describe('handoff-envelope', () => {
       assert.throws(() => {
         buildHandoff({
           dispatchId: 'bad-status',
-          system: 'magi',
+          system: 'conclave',
           seat: 'implementer',
           status: 'shipped',
           briefPath,
@@ -179,7 +179,7 @@ describe('handoff-envelope', () => {
       assert.throws(() => {
         buildHandoff({
           dispatchId: 'join',
-          system: 'magi',
+          system: 'conclave',
           seat: 'implementer',
           status: 'accepted',
           briefPath,
@@ -193,7 +193,7 @@ describe('handoff-envelope', () => {
       assert.throws(() => {
         buildHandoff({
           dispatchId: 'hash',
-          system: 'magi',
+          system: 'conclave',
           seat: 'implementer',
           status: 'done',
           briefPath,
@@ -204,13 +204,13 @@ describe('handoff-envelope', () => {
       }, /outputSha256s mismatch/);
     });
 
-    const outsider = mkdtempSync(path.join(tmpdir(), 'magi-handoff-out-'));
+    const outsider = mkdtempSync(path.join(tmpdir(), 'conclave-handoff-out-'));
     try {
       writeFileSync(path.join(outsider, 'brief.md'), 'outside\n');
       assert.throws(() => {
         buildHandoff({
           dispatchId: 'jail',
-          system: 'magi',
+          system: 'conclave',
           seat: 'implementer',
           status: 'accepted',
           briefPath: path.join(outsider, 'brief.md'),
@@ -222,8 +222,8 @@ describe('handoff-envelope', () => {
     }
   });
 
-  it('allows MAGI_BUS_ROOT outputs and refuses a prefix-trap bus path', () => {
-    const bus = mkdtempSync(path.join(tmpdir(), 'magi-handoff-bus-'));
+  it('allows CONCLAVE_BUS_ROOT outputs and refuses a prefix-trap bus path', () => {
+    const bus = mkdtempSync(path.join(tmpdir(), 'conclave-handoff-bus-'));
     try {
       withBusRoot(bus, () => {
         const briefPath = path.join(bus, 'brief.md');
@@ -240,13 +240,13 @@ describe('handoff-envelope', () => {
           nextOwner: 'verifier',
           ts: '2026-09-04T09:02:00.000Z',
         });
-        assert.strictEqual(envelope.system, 'magi-cli');
+        assert.strictEqual(envelope.system, 'conclave-cli');
         assert.strictEqual(envelope.outputSha256s[path.resolve(outputPath)], sha256('bus-out\n'));
 
         assert.throws(() => {
           buildHandoff({
             dispatchId: 'trap',
-            system: 'magi',
+            system: 'conclave',
             seat: 'implementer',
             status: 'failed',
             briefPath: `${bus}-evil${path.sep}brief.md`,
@@ -266,7 +266,7 @@ describe('handoff-envelope', () => {
       assert.strictEqual(inspectBrief(briefPath).firstLine, 'HANDOFF-CRLF\r');
       const envelope = buildHandoff({
         dispatchId: 'crlf-h',
-        system: 'magi',
+        system: 'conclave',
         seat: 'implementer',
         status: 'accepted',
         briefPath,
@@ -285,7 +285,7 @@ describe('handoff-envelope', () => {
       writeFileSync(outputPath, Buffer.from([0x6f, 0x6b, 0x0a, 0xff]));
       const envelope = buildHandoff({
         dispatchId: 'utf8-out',
-        system: 'magi',
+        system: 'conclave',
         seat: 'implementer',
         status: 'done',
         briefPath,

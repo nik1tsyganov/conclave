@@ -1,4 +1,4 @@
-name: MAGI verification
+name: CONCLAVE verification
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: magi-check-${{ github.workflow }}-${{ github.ref }}
+  group: conclave-check-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

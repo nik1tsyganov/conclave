@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const assert = require('node:assert');
@@ -14,14 +14,14 @@ const { buildSeatProfile, loadProfiles } = require('./seat-policy.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const TEMPLATE_PATHS = [
-  path.join(ROOT, '.cursor', 'skills', 'magi', 'references', 'brief-rules-block.md'),
-  path.join(ROOT, '.cursor', 'skills', 'magi-cli', 'references', 'brief-rules-block.md'),
+  path.join(ROOT, '.cursor', 'skills', 'conclave', 'references', 'brief-rules-block.md'),
+  path.join(ROOT, '.cursor', 'skills', 'conclave-cli', 'references', 'brief-rules-block.md'),
   path.join(ROOT, 'tools', 'templates', 'brief-rules-block.md'),
 ];
 const ALL_MARKER_IDS = [
-  'RULES/INDEX|magi-cli-rules|STANDING', 'SEAT-CONTRACT', 'skills-manifest', 'WRITE AUDIT|R07',
+  'RULES/INDEX|conclave-cli-rules|STANDING', 'SEAT-CONTRACT', 'skills-manifest', 'WRITE AUDIT|R07',
 ];
-const V2_FINGERPRINT = 'MAGI-CLI-STANDING v2 — Read this file and RULES/INDEX.md in full before task work.';
+const V2_FINGERPRINT = 'CONCLAVE-CLI-STANDING v2 — Read this file and RULES/INDEX.md in full before task work.';
 
 function legalBrief({ role = 'implement', vendor = 'openai' } = {}) {
   return [
@@ -39,7 +39,7 @@ function legalBrief({ role = 'implement', vendor = 'openai' } = {}) {
 }
 
 function makeBrief(t, body) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-brief-rules-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-brief-rules-'));
   const briefPath = path.join(directory, 'BRIEF.md');
   fs.writeFileSync(briefPath, body, 'utf8');
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
@@ -67,7 +67,7 @@ function stagedBrief(t, { role = 'implement', vendor = 'openai', v2 = false } = 
   const skillStage = stageSeatSkills({ skills: seatProfile.skills, sourceRoot, destinationRoot: path.join(root, 'skills') });
   const seatContractPath = path.join(root, 'SEAT-CONTRACT.md');
   fs.writeFileSync(seatContractPath, [
-    '# MAGI CLI seat contract',
+    '# CONCLAVE CLI seat contract',
     `Vendor: ${vendor}`, `Role: ${role}`, `Class: ${seatProfile.class}`,
     `Permission profile: ${seatProfile.permissionProfile}`,
     'This is a leaf seat. Do not sub-dispatch.',
@@ -108,7 +108,7 @@ for (const [needle, id] of [
 }
 
 test('pack aliases and R07 remain supported by the basic marker check', () => {
-  for (const pack of ['STANDING.md', 'RULES\\INDEX.md', 'magi-cli-rules']) {
+  for (const pack of ['STANDING.md', 'RULES\\INDEX.md', 'conclave-cli-rules']) {
     const body = legalBrief().replace('STANDING.md and RULES/INDEX.md', pack).replace('WRITE AUDIT (R07)', 'R07');
     assert.deepStrictEqual(checkBriefText(body), { ok: true, missing: [] });
   }
@@ -275,7 +275,7 @@ test('caller-held skill hashes reject a rewritten on-disk manifest', (t) => {
 
 test('an arbiter skill added to the profile is rejected', (t) => {
   const fixture = stagedBrief(t);
-  const seatProfile = { ...fixture.seatProfile, skills: [...fixture.seatProfile.skills, 'magi-mode'] };
+  const seatProfile = { ...fixture.seatProfile, skills: [...fixture.seatProfile.skills, 'conclave-mode'] };
   fs.writeFileSync(path.join(fixture.root, 'seat-profile.json'), JSON.stringify(seatProfile), 'utf8');
   const result = checkBriefFile(fixture.briefPath, { ...fixture.opts, seatProfile });
   assert.strictEqual(result.ok, false);
@@ -323,13 +323,13 @@ test('main prints JSON for a valid basic brief and rejects a malformed brief', (
   assert.strictEqual(main(['--brief', makeBrief(t, legalBrief())], io), 0, io.stderrText);
   assert.strictEqual(JSON.parse(io.stdoutText).ok, true);
   const bad = capture();
-  assert.strictEqual(main(['--brief', makeBrief(t, 'magi-mode only')], bad), 1);
+  assert.strictEqual(main(['--brief', makeBrief(t, 'conclave-mode only')], bad), 1);
   assert.match(bad.stderrText, /^RULES_FAIL:/);
   for (const marker of ALL_MARKER_IDS) assert.ok(bad.stderrText.includes(marker));
 });
 
 test('missing inputs and unsupported role/vendor are argument errors', () => {
-  for (const args of [[], ['--brief', path.join(os.tmpdir(), 'magi-no-such-brief.md')], ['--role', 'arbiter'], ['--vendor', 'xai']]) {
+  for (const args of [[], ['--brief', path.join(os.tmpdir(), 'conclave-no-such-brief.md')], ['--role', 'arbiter'], ['--vendor', 'xai']]) {
     const io = capture();
     assert.strictEqual(main(args, io), 2, io.stderrText);
     assert.match(io.stderrText, /^ARGUMENT_ERROR:/);

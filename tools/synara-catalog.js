@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const fs = require('node:fs');
@@ -120,7 +120,7 @@ function launchOverlay(catalog, vendor, model, effort) {
   return {
     synaraProvider: map.provider,
     synaraOptionKey: map.optionKey,
-    magiEffort: effort,
+    conclaveEffort: effort,
     synaraModelSlugs: match?.slugs || [],
   };
 }

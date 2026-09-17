@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const fs = require('node:fs');
@@ -15,7 +15,7 @@ const VENDOR_MD = 'VENDOR.md';
 const RULES_INDEX = 'RULES/INDEX.md';
 
 const REQUIRED_MARKERS = Object.freeze([
-  { id: 'RULES/INDEX|magi-cli-rules|STANDING', anyOf: ['RULES/INDEX.md', 'RULES/INDEX', 'RULES\\INDEX.md', 'magi-cli-rules', 'STANDING.md', 'STANDING'] },
+  { id: 'RULES/INDEX|conclave-cli-rules|STANDING', anyOf: ['RULES/INDEX.md', 'RULES/INDEX', 'RULES\\INDEX.md', 'conclave-cli-rules', 'STANDING.md', 'STANDING'] },
   { id: 'SEAT-CONTRACT', anyOf: ['SEAT-CONTRACT.md', 'seat contract'] },
   { id: 'skills-manifest', anyOf: ['skills-manifest.json', 'staged skills'] },
   { id: 'WRITE AUDIT|R07', anyOf: ['WRITE AUDIT', 'R07'] },

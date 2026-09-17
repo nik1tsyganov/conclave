@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const { describe, it } = require('node:test');
@@ -45,13 +45,13 @@ function withTempDir(fn) {
 }
 
 function withBusRoot(busRoot, fn) {
-  const previous = process.env.MAGI_BUS_ROOT;
-  process.env.MAGI_BUS_ROOT = busRoot;
+  const previous = process.env.CONCLAVE_BUS_ROOT;
+  process.env.CONCLAVE_BUS_ROOT = busRoot;
   try {
     fn();
   } finally {
-    if (previous === undefined) delete process.env.MAGI_BUS_ROOT;
-    else process.env.MAGI_BUS_ROOT = previous;
+    if (previous === undefined) delete process.env.CONCLAVE_BUS_ROOT;
+    else process.env.CONCLAVE_BUS_ROOT = previous;
   }
 }
 
@@ -71,7 +71,7 @@ describe('receipt-ack', () => {
       for (const hostMode of ['cursor', 'cursor-cli']) {
         const receipt = buildReceipt({
           dispatchId: `fix-comms-${hostMode}`,
-          seat: 'balthasar-2',
+          seat: 'scrutator-2',
           briefPath,
           firstLineEcho: 'FIRST-LINE-ECHO-MARKER',
           ts,
@@ -79,7 +79,7 @@ describe('receipt-ack', () => {
         });
         assert.strictEqual(receipt.schema, SCHEMA_ID);
         assert.strictEqual(receipt.dispatchId, `fix-comms-${hostMode}`);
-        assert.strictEqual(receipt.seat, 'balthasar-2');
+        assert.strictEqual(receipt.seat, 'scrutator-2');
         assert.strictEqual(receipt.briefPath, path.resolve(briefPath));
         assert.strictEqual(receipt.briefSha256, expectedHash);
         assert.strictEqual(receipt.firstLineEcho, 'FIRST-LINE-ECHO-MARKER');
@@ -99,7 +99,7 @@ describe('receipt-ack', () => {
       const destPath = path.join(dir, 'ack.json');
       const { receipt, receiptPath } = acknowledgeReceipt({
         dispatchId: 'd-write',
-        seat: 'melchior-2',
+        seat: 'ponens-2',
         briefPath,
         ts: '2026-09-04T08:01:00.000Z',
         hostMode: 'cursor',
@@ -117,9 +117,9 @@ describe('receipt-ack', () => {
     assert.match(src, /no Task capture/);
     assert.match(src, /explicit disk/);
     assert.doesNotMatch(src, /function captureTask/);
-    const host = readFileSync(path.join(ROOT, '.cursor/skills/magi/references/cursor-host.md'), 'utf8');
+    const host = readFileSync(path.join(ROOT, '.cursor/skills/conclave/references/cursor-host.md'), 'utf8');
     assert.match(host, /should `acknowledgeReceipt`/);
-    const arbiterRule = readFileSync(path.join(ROOT, '.cursor/rules/magi-arbiter.mdc'), 'utf8');
+    const arbiterRule = readFileSync(path.join(ROOT, '.cursor/rules/conclave-arbiter.mdc'), 'utf8');
     assert.doesNotMatch(arbiterRule, /acknowledgeReceipt/);
   });
 
@@ -130,7 +130,7 @@ describe('receipt-ack', () => {
       assert.throws(() => {
         buildReceipt({
           dispatchId: 'd1',
-          seat: 'casper-2',
+          seat: 'advocatus-2',
           briefPath,
           firstLineEcho: 'wrong-line',
         });
@@ -139,13 +139,13 @@ describe('receipt-ack', () => {
       const emptyPath = path.join(dir, 'empty.md');
       writeFileSync(emptyPath, '');
       assert.throws(() => {
-        buildReceipt({ dispatchId: 'd1', seat: 'casper-2', briefPath: emptyPath });
+        buildReceipt({ dispatchId: 'd1', seat: 'advocatus-2', briefPath: emptyPath });
       }, /empty/);
 
       assert.throws(() => {
         buildReceipt({
           dispatchId: 'd1',
-          seat: 'casper-2',
+          seat: 'advocatus-2',
           briefPath,
           conclaveId: 'forged',
         });
@@ -153,9 +153,9 @@ describe('receipt-ack', () => {
     });
   });
 
-  it('jails brief and receipt paths to the repo or MAGI_BUS_ROOT', () => {
-    const bus = mkdtempSync(path.join(tmpdir(), 'magi-receipt-bus-'));
-    const outsider = mkdtempSync(path.join(tmpdir(), 'magi-receipt-out-'));
+  it('jails brief and receipt paths to the repo or CONCLAVE_BUS_ROOT', () => {
+    const bus = mkdtempSync(path.join(tmpdir(), 'conclave-receipt-bus-'));
+    const outsider = mkdtempSync(path.join(tmpdir(), 'conclave-receipt-out-'));
     try {
       withBusRoot(bus, () => {
         const busBrief = path.join(bus, 'bus-brief.md');

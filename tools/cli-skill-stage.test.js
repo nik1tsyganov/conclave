@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const assert = require('node:assert/strict');
@@ -11,7 +11,7 @@ const { bindSkillSource, stageSeatSkills, verifySeatSkills, verifySkillSource } 
 const { resolveRuntimePaths } = require('./runtime-paths.js');
 
 function temp(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-skill-stage-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-skill-stage-'));
   t.after(() => {
     assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
     fs.rmSync(root, { recursive: true, force: true });
@@ -97,7 +97,7 @@ test('missing SKILL.md refuses before creating a destination', t => {
 
 test('forbidden and invalid skills fail closed', t => {
   const f = fixture(t);
-  for (const skills of [[], ['magi-mode'], ['../testing'], ['testing/child'], [null]]) {
+  for (const skills of [[], ['conclave-mode'], ['../testing'], ['testing/child'], [null]]) {
     assert.throws(() => stageSeatSkills({ sourceRoot: f.source, destinationRoot: f.out, skills }), { code: 'SKILL_STAGE_FAIL' });
   }
   assert.equal(fs.existsSync(f.out), false);

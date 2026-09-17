@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const crypto = require('node:crypto');
@@ -7,10 +7,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { canonicalPlainPath, resolveRulesRoot } = require('./runtime-paths.js');
 
-const FINGERPRINT = 'MAGI-CLI-STANDING v1 — Read this file in full; repeat this line verbatim before any other work.';
+const FINGERPRINT = 'CONCLAVE-CLI-STANDING v1 — Read this file in full; repeat this line verbatim before any other work.';
 // Trusted, version-adaptable: parent adds each new pack's exact fingerprint line
 // here as the standing-rules pack revs; never widen this to a pattern/regex.
-const FINGERPRINT_V2 = 'MAGI-CLI-STANDING v2 — Read this file and RULES/INDEX.md in full before task work.';
+const FINGERPRINT_V2 = 'CONCLAVE-CLI-STANDING v2 — Read this file and RULES/INDEX.md in full before task work.';
 const TRUSTED_FINGERPRINTS = Object.freeze([FINGERPRINT, FINGERPRINT_V2]);
 const DEFAULT_RULES_ROOT = null;
 
@@ -50,7 +50,7 @@ function prepareRulesSource({ rulesRoot }) {
   for (const required of [standing, vendor, path.join(rules, 'INDEX.md')]) {
     if (!fs.existsSync(required)) {
       const error = new Error(
-        `standing-rules pack missing ${required}; set MAGI_RULES_ROOT (or pass rulesRoot) to an external standing-rules pack, currently resolved to ${root}`,
+        `standing-rules pack missing ${required}; set CONCLAVE_RULES_ROOT (or pass rulesRoot) to an external standing-rules pack, currently resolved to ${root}`,
       );
       error.code = 'RULES_SOURCE_MISSING';
       throw error;
@@ -120,7 +120,7 @@ const BUNDLE_NAME = 'RULES-BUNDLE.md';
 // from the hash-checked staged files, so a bundle can never say something the
 // files do not.
 function bundleText(briefDir, files) {
-  const parts = [`<!-- MAGI staged rules bundle. Reading this file in full counts as reading every file listed below; each section is that staged file verbatim. -->`];
+  const parts = [`<!-- CONCLAVE staged rules bundle. Reading this file in full counts as reading every file listed below; each section is that staged file verbatim. -->`];
   for (const file of files) {
     const body = fs.readFileSync(path.join(briefDir, ...file.path.split('/')), 'utf8');
     parts.push(`\n<!-- === staged file: ${file.path} sha256: ${file.sha256} === -->\n${body}${body.endsWith('\n') ? '' : '\n'}`);

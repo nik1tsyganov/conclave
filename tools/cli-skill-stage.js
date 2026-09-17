@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const crypto = require('node:crypto');
@@ -9,7 +9,7 @@ const { isDeepStrictEqual } = require('node:util');
 const { canonicalPlainPath, pathsOverlap, resolveRuntimePaths } = require('./runtime-paths.js');
 
 const FORBIDDEN_ARBITER_SKILLS = Object.freeze([
-  'engineering-orchestrator', 'graph-engineering', 'magi-mode', 'magi-dispatch',
+  'engineering-orchestrator', 'graph-engineering', 'conclave-mode', 'conclave-dispatch',
   'mix-mode', 'dispatch-efficiency', 'dispatch-assessment', 'task-retrospective',
   'codex-bridge', 'gemini-bridge', 'claude-bridge',
 ]);

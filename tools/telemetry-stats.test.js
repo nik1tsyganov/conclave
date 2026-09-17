@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 const test = require('node:test');
 const assert = require('node:assert');
 const { spawnSync } = require('node:child_process');
@@ -18,7 +18,7 @@ test('missing log file exits with 2', (t) => {
 });
 
 test('three implement rows openai/google/anthropic print ~33% each and null totalTokens is not counted as 0', (t) => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-test-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-test-'));
   const logFile = path.join(tmpDir, 'test-log.jsonl');
   
   const rows = [
@@ -52,7 +52,7 @@ test('three implement rows openai/google/anthropic print ~33% each and null tota
 });
 
 test('null tokens output mean as null and count 0', (t) => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-test-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-test-'));
   const logFile = path.join(tmpDir, 'test-log.jsonl');
   
   const rows = [

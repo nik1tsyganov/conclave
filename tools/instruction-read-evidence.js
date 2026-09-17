@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const fs = require('node:fs');
@@ -10,7 +10,7 @@ const { canonicalPlainPath } = require('./runtime-paths.js');
 const { verifyStagedRules } = require('./cli-rules-stage.js');
 const { verifySeatSkills } = require('./cli-skill-stage.js');
 
-const INSTRUCTION_READ_PROTOCOL = 'magi-native-instruction-reads-v1';
+const INSTRUCTION_READ_PROTOCOL = 'conclave-native-instruction-reads-v1';
 function fail(message, code = 'INSTRUCTION_READ_FAIL') { throw Object.assign(new Error(message), { code }); }
 function hash(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
 function normalize(text) { return text.replaceAll('\r\n', '\n'); }

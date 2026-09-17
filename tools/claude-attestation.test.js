@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const assert = require('node:assert/strict');
@@ -21,7 +21,7 @@ function command(run, extra = []) {
 }
 function saved(run, id = 'd1') {
   const entry = run.dispatches.find(row => row.dispatchId === id);
-  const file = path.join(run.runDir, '.magi-dispatches', `${transactionKey(entry)}.json`);
+  const file = path.join(run.runDir, '.conclave-dispatches', `${transactionKey(entry)}.json`);
   return { file, state: JSON.parse(fs.readFileSync(file, 'utf8')) };
 }
 function accept(run, result, native) {
@@ -172,7 +172,7 @@ test('attestation requires unchanged runtime bytes from the recorded launch', as
   const run = claudeRun(t);
   const runtime = path.join(run.root, 'runtime');
   fs.cpSync(__dirname, path.join(runtime, 'tools'), { recursive: true });
-  const refs = '.cursor/skills/magi-cli/references';
+  const refs = '.cursor/skills/conclave-cli/references';
   fs.mkdirSync(path.join(runtime, refs), { recursive: true });
   for (const name of ['dispatch-matrix.json', 'seat-profiles.json']) fs.copyFileSync(path.join(__dirname, '..', refs, name), path.join(runtime, refs, name));
   const isolatedDispatch = require(path.join(runtime, 'tools/dispatch-run.js')).runDispatch;
@@ -311,7 +311,7 @@ test('custom and shared log destinations stay bound through acceptance replay an
       assert.deepEqual(rows, [accepted.telemetry]);
     }
     assert.equal(fs.existsSync(path.join(run.runDir, 'telemetry', 'dispatches.jsonl')), false);
-    assert.equal(fs.existsSync(path.join(run.runDir, 'magi-dispatch-log.jsonl')), false);
+    assert.equal(fs.existsSync(path.join(run.runDir, 'conclave-dispatch-log.jsonl')), false);
     assert.equal(native.calls(), 1);
   }
 });
@@ -380,8 +380,8 @@ test('initial log destinations cannot overwrite evidence directories run control
     run => path.join(run.runDir, 'out', 'd1'),
     run => path.join(run.runDir, 'out'),
     run => path.join(run.runDir, 'out', 'd2', 'future.log'),
-    run => path.join(run.runDir, '.magi-dispatches', `${transactionKey(run.dispatches[0])}.json`),
-    run => path.join(run.runDir, '.magi-sessions', 'session.json'),
+    run => path.join(run.runDir, '.conclave-dispatches', `${transactionKey(run.dispatches[0])}.json`),
+    run => path.join(run.runDir, '.conclave-sessions', 'session.json'),
     run => run.opts.plan,
     run => path.join(run.runDir, 'plan-seal.json'),
     run => path.join(run.runDir, 'availability.json'),
@@ -414,9 +414,9 @@ test('environment rules resolve before initial destination validation creates ev
   const run = claudeRun(t);
   const rulesRoot = path.join(run.runDir, 'environment-rules');
   fs.cpSync(run.opts.rulesRoot, rulesRoot, { recursive: true });
-  const previous = process.env.MAGI_RULES_ROOT;
-  process.env.MAGI_RULES_ROOT = rulesRoot;
-  t.after(() => { if (previous === undefined) delete process.env.MAGI_RULES_ROOT; else process.env.MAGI_RULES_ROOT = previous; });
+  const previous = process.env.CONCLAVE_RULES_ROOT;
+  process.env.CONCLAVE_RULES_ROOT = rulesRoot;
+  t.after(() => { if (previous === undefined) delete process.env.CONCLAVE_RULES_ROOT; else process.env.CONCLAVE_RULES_ROOT = previous; });
   const { rulesRoot: explicitRules, ...opts } = command(run);
   const native = fakeVendor();
   const before = snapshotWorkspace(run.runDir);
@@ -430,7 +430,7 @@ test('default bundled skills resolve before initial destination validation creat
   const runDir = path.join(run.root, 'bound-run');
   const runtime = path.join(runDir, 'runtime');
   fs.cpSync(__dirname, path.join(runtime, 'tools'), { recursive: true });
-  const refs = '.cursor/skills/magi-cli/references';
+  const refs = '.cursor/skills/conclave-cli/references';
   fs.mkdirSync(path.join(runtime, refs), { recursive: true });
   for (const name of ['dispatch-matrix.json', 'seat-profiles.json']) fs.copyFileSync(path.join(__dirname, '..', refs, name), path.join(runtime, refs, name));
   fs.cpSync(run.opts.skillSourceRoot, path.join(runtime, 'seat-skills'), { recursive: true });

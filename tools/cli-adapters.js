@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const fs = require('node:fs');
@@ -18,7 +18,7 @@ const DEFAULTS = Object.freeze({
   anthropic: { model: 'fable', effort: 'xhigh' },
 });
 const READ_ONLY_ROLES = new Set(['review', 'verify', 'plan', 'research']);
-const OPENAI_SCRATCH_PROTOCOL = 'magi-openai-readonly-scratch-v1';
+const OPENAI_SCRATCH_PROTOCOL = 'conclave-openai-readonly-scratch-v1';
 
 function roleSandbox(role) {
   if (role === 'implement') return 'workspace-write';
@@ -45,7 +45,7 @@ function openaiScratchPolicy({ runDir, dispatchId, role, cwd, capturePath }) {
   if (!cwd || inside(scratchPath, cwd) || inside(cwd, scratchPath) || hostResolve(scratchPath) === hostResolve(cwd)) {
     throw new Error('OpenAI scratch must not overlap the product workspace');
   }
-  return { protocol: OPENAI_SCRATCH_PROTOCOL, profile: 'magi_readonly_scratch', scratchPath };
+  return { protocol: OPENAI_SCRATCH_PROTOCOL, profile: 'conclave_readonly_scratch', scratchPath };
 }
 
 function openaiScratchEnv(policy) {
@@ -65,10 +65,10 @@ function openaiArgs({ role, model, effort, cwd, capturePath }, policy) {
   ] : ['-s', roleSandbox(role)];
   // Headless codex otherwise routes through the host's local proxy. Read from
   // process.env so the launch and its later scratch re-validation agree.
-  // Default on darwin: MAGI_CODEX_PROVIDER=openai.
+  // Default on darwin: CONCLAVE_CODEX_PROVIDER=openai.
   // An explicit value wins (empty string = no flag); the darwin default keeps
   // launch and replay in agreement when a later session forgets the export.
-  const provider = process.env.MAGI_CODEX_PROVIDER ?? (process.platform === 'darwin' ? 'openai' : undefined);
+  const provider = process.env.CONCLAVE_CODEX_PROVIDER ?? (process.platform === 'darwin' ? 'openai' : undefined);
   return ['exec', '--skip-git-repo-check', ...permissionArgs, '-m', model,
     '-c', `model_reasoning_effort=${effort}`,
     '-c', 'memories.use_memories=false', '-c', 'memories.generate_memories=false',
@@ -123,14 +123,14 @@ function defaultDevRoot() {
 }
 
 function allowedWorkspace(cwd, env = process.env) {
-  const devRoot = env.MAGI_DEV_ROOT || defaultDevRoot();
-  const roots = [devRoot, ...(env.MAGI_ALLOWED_WORKSPACE_ROOTS || '').split(path.delimiter).filter(Boolean)];
+  const devRoot = env.CONCLAVE_DEV_ROOT || defaultDevRoot();
+  const roots = [devRoot, ...(env.CONCLAVE_ALLOWED_WORKSPACE_ROOTS || '').split(path.delimiter).filter(Boolean)];
   const resolved = hostResolve(cwd);
   // Compare the literal and the realpath on both sides: macOS reaches the same
   // workspace through /tmp and /private/tmp.
   const tried = [...new Set([resolved, hostRealpath(cwd)])];
   if (!roots.some((root) => [root, hostRealpath(root)].some((r) => tried.some((c) => hostUnder(c, r))))) {
-    const error = new Error(`workspace ${resolved} is outside MAGI allowed roots: ${roots.join(', ')}`);
+    const error = new Error(`workspace ${resolved} is outside CONCLAVE allowed roots: ${roots.join(', ')}`);
     error.code = 'WORKSPACE_FORBIDDEN';
     throw error;
   }
@@ -179,12 +179,12 @@ function seatContextText(ctx) {
   const open = ctx.vendor === 'anthropic'
     ? `Use the Read tool on ${ctx.seatContractPath} in full before doing any task work. Do not use Bash or cat for instruction files.`
     : `Read ${ctx.seatContractPath} in full before doing any task work.`;
-  return `${open} Complete every required instruction read in that contract before product work. Do not read global skills or use other tools before that coverage. If any required instruction is missing or unreadable, stop and report a blocker. Use only the MAGI-authorized staged skills listed there. Your FINAL response must start with the brief's exact first line, with nothing before it. Then follow the brief's response format.`;
+  return `${open} Complete every required instruction read in that contract before product work. Do not read global skills or use other tools before that coverage. If any required instruction is missing or unreadable, stop and report a blocker. Use only the CONCLAVE-authorized staged skills listed there. Your FINAL response must start with the brief's exact first line, with nothing before it. Then follow the brief's response format.`;
 }
 
 // Claude's system prompt. Same obligations as seatContextText (which still rides the
 // user-turn pointer), in compact wording: the prescriptive "Do not use Bash or cat ...
-// Do not read global skills or use other tools ... MAGI-authorized" block, placed in a
+// Do not read global skills or use other tools ... CONCLAVE-authorized" block, placed in a
 // system prompt, tripped Opus 5's safeguard classifier ([reasoning_extraction]) on every
 // launch on 2026-09-16 (bisected against the exact launch; this wording passed 3/3).
 function anthropicSystemText(ctx) {
@@ -266,7 +266,7 @@ function googleLaunch(opts) {
 
 function anthropicLaunch(opts) {
   const ctx = base({ ...opts, vendor: 'anthropic' });
-  if (ctx.role !== 'implement' && ((opts.reviewPermissionMode && opts.reviewPermissionMode !== 'dontAsk') || (process.env.MAGI_CLAUDE_REVIEW_PERMISSION_MODE && process.env.MAGI_CLAUDE_REVIEW_PERMISSION_MODE !== 'dontAsk'))) throw new Error('read-only Claude roles require dontAsk with read-only tools');
+  if (ctx.role !== 'implement' && ((opts.reviewPermissionMode && opts.reviewPermissionMode !== 'dontAsk') || (process.env.CONCLAVE_CLAUDE_REVIEW_PERMISSION_MODE && process.env.CONCLAVE_CLAUDE_REVIEW_PERMISSION_MODE !== 'dontAsk'))) throw new Error('read-only Claude roles require dontAsk with read-only tools');
   const pointerFile = seatPointerFile(ctx);
   const permissionMode = ctx.role === 'implement'
     ? 'bypassPermissions'

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
-// Run driver (2026-09-16): executes one phase of a sealed run so a MAGI run is a
+// Run driver (2026-09-16): executes one phase of a sealed run so a CONCLAVE run is a
 // few commands instead of a hand-written script. It never widens policy: every
 // seat still goes through dispatch-run with its gates, Claude output still
 // stops at AWAITING_ATTESTATION until the host reads the response and passes
@@ -24,7 +24,7 @@ const { transactionKey, AWAITING_ATTESTATION } = require('./dispatch-evidence.js
 const PHASES = ['implement', 'verify', 'review', 'evidence', 'finalize'];
 
 function transaction(run, entry) {
-  const file = path.join(run.root, '.magi-dispatches', `${transactionKey(entry)}.json`);
+  const file = path.join(run.root, '.conclave-dispatches', `${transactionKey(entry)}.json`);
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
 }
 
@@ -105,7 +105,7 @@ async function main(argv = process.argv.slice(2)) {
       opts[argv[i].slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = argv[i + 1];
     }
     if (!opts.runDir) throw new Error('--run-dir is required');
-    const rulesRoot = opts.rulesRoot || process.env.MAGI_RULES_ROOT;
+    const rulesRoot = opts.rulesRoot || process.env.CONCLAVE_RULES_ROOT;
     let result;
     if (opts.attest) result = await attest({ runDir: opts.runDir, dispatchIds: opts.attest.split(','), rulesRoot, availability: opts.availability, skillSourceRoot: opts.skillSourceRoot });
     else if (opts.phase === 'evidence') { if (!opts.tests) throw new Error('--tests <json> is required for the evidence phase'); result = captureEvidence({ runDir: opts.runDir, tests: opts.tests }); }

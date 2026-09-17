@@ -2,24 +2,24 @@
   "schemaVersion": 1,
   "updated": "2026-09-10",
   "decision": "keep-separate",
-  "reason": "field-library, vault-skills, ai-ops-vault, and MAGI have different write targets. Merging them mixes Obsidian ingest, MAGI telemetry, and host field modules.",
+  "reason": "field-library, vault-skills, ai-ops-vault, and CONCLAVE have different write targets. Merging them mixes Obsidian ingest, CONCLAVE telemetry, and host field modules.",
   "sources": [
     {
-      "id": "magi-seats",
+      "id": "conclave-seats",
       "role": "leaf-runtime",
       "stageToSeats": true,
-      "git": "nik1tsyganov/magi",
+      "git": "nik1tsyganov/conclave",
       "path": "seat-skills",
-      "job": "Lean leaf cards staged by dispatch-run. Executable MAGI skill source."
+      "job": "Lean leaf cards staged by dispatch-run. Executable CONCLAVE skill source."
     },
     {
       "id": "ai-ops-vault",
-      "role": "magi-data",
+      "role": "conclave-data",
       "stageToSeats": false,
-      "env": "MAGI_VAULT_ROOT",
+      "env": "CONCLAVE_VAULT_ROOT",
       "git": "nik1tsyganov/ai-ops-vault",
-      "path": "projects/magi",
-      "job": "Durable MAGI telemetry, lean skill mirror, inbox, analysis, and the skill-web catalog."
+      "path": "projects/conclave",
+      "job": "Durable CONCLAVE telemetry, lean skill mirror, inbox, analysis, and the skill-web catalog."
     },
     {
       "id": "ai-ops-methods",
@@ -32,27 +32,27 @@
       "id": "field-library",
       "role": "host-field",
       "stageToSeats": false,
-      "env": "MAGI_FIELD_LIBRARY_ROOT",
+      "env": "CONCLAVE_FIELD_LIBRARY_ROOT",
       "git": "nik1tsyganov/field-library",
       "path": "modules",
-      "job": "Host field modules (study, writing, stats, tutoring, research-orchestration). Mirror to ~/.claude and ~/.codex. Not MAGI leaf cards."
+      "job": "Host field modules (study, writing, stats, tutoring, research-orchestration). Mirror to ~/.claude and ~/.codex. Not CONCLAVE leaf cards."
     },
     {
       "id": "vault-skills",
       "role": "obsidian-ingest-methods",
       "stageToSeats": false,
-      "env": "MAGI_VAULT_SKILLS_ROOT",
+      "env": "CONCLAVE_VAULT_SKILLS_ROOT",
       "git": "nik1tsyganov/vault-skills",
       "path": "skills",
-      "job": "Technique for ingesting into the personal Obsidian vault. Not MAGI data and not ai-ops-ingest."
+      "job": "Technique for ingesting into the personal Obsidian vault. Not CONCLAVE data and not ai-ops-ingest."
     },
     {
       "id": "host-store",
       "role": "arbiter-live",
       "stageToSeats": false,
-      "env": "MAGI_HOST_SKILLS_ROOT",
+      "env": "CONCLAVE_HOST_SKILLS_ROOT",
       "path": "~/.claude/skills",
-      "job": "Live host/arbiter store: engineering-orchestrator, MAGI/CONCLAVE bridges, and mirrored field modules. Do not stage this tree onto leaf seats."
+      "job": "Live host/arbiter store: engineering-orchestrator, CONCLAVE/CONCLAVE bridges, and mirrored field modules. Do not stage this tree onto leaf seats."
     }
   ],
   "relatedNames": {
@@ -65,12 +65,12 @@
     "statistics": ["field-library", "host-store"],
     "study-efficiency": ["field-library", "host-store"],
     "verified-tutoring": ["field-library", "host-store"],
-    "implement": ["magi-seats", "host-store"],
-    "testing": ["magi-seats", "host-store"],
-    "code-minimalism": ["magi-seats", "host-store"],
-    "evaluation-engineering": ["magi-seats", "host-store"],
-    "context-engineering": ["magi-seats", "host-store"],
-    "auth-security": ["magi-seats", "host-store"]
+    "implement": ["conclave-seats", "host-store"],
+    "testing": ["conclave-seats", "host-store"],
+    "code-minimalism": ["conclave-seats", "host-store"],
+    "evaluation-engineering": ["conclave-seats", "host-store"],
+    "context-engineering": ["conclave-seats", "host-store"],
+    "auth-security": ["conclave-seats", "host-store"]
   },
   "neverStageToSeats": ["field-library", "vault-skills", "ai-ops-methods", "host-store"]
 }

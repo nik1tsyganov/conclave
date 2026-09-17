@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 const fs = require('node:fs');
 const os = require('node:os');
@@ -6,7 +6,7 @@ const path = require('node:path');
 const { hashFile, writeJson } = require('./dispatch-evidence.js');
 
 const SESSION = '10000000-0000-4000-8000-000000000001';
-const CHALLENGE = 'MAGI_PROBE_1234567890abcdef1234567890abcdef';
+const CHALLENGE = 'CONCLAVE_PROBE_1234567890abcdef1234567890abcdef';
 function nativeCapture(vendor, model, effort, response, sandbox = 'read-only') {
   if (vendor === 'openai') return {
     capture: response,
@@ -43,7 +43,7 @@ function allAvailability(root, matrix) {
   }
   return result;
 }
-function temporary(t, prefix = 'magi-contract-') {
+function temporary(t, prefix = 'conclave-contract-') {
   const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return root;
@@ -57,7 +57,7 @@ function briefFixture(root, role = 'implement') {
 function ruleFixture(root) {
   const rulesRoot = path.join(root, 'rules-source');
   fs.mkdirSync(path.join(rulesRoot, 'RULES'), { recursive: true });
-  fs.writeFileSync(path.join(rulesRoot, 'STANDING.md'), 'MAGI-CLI-STANDING v2 — Read this file and RULES/INDEX.md in full before task work.\n');
+  fs.writeFileSync(path.join(rulesRoot, 'STANDING.md'), 'CONCLAVE-CLI-STANDING v2 — Read this file and RULES/INDEX.md in full before task work.\n');
   fs.writeFileSync(path.join(rulesRoot, 'VENDOR.md'), 'openai Codex; anthropic Claude; google agy; xai arbiter only.\n');
   const names = [];
   for (let i = 1; i <= 22; i++) { const name = `R${String(i).padStart(2, '0')}-fixture.md`; names.push(name); fs.writeFileSync(path.join(rulesRoot, 'RULES', name), `Fixture R${i}\n`); }
@@ -72,7 +72,7 @@ function skillFixture(root, skills) {
 module.exports = { allAvailability, briefFixture, nativeCapture, probeRecord, ruleFixture, skillFixture, temporary };
 
 function createSealedRun(t, entries = [{}], options = {}) {
-  const root = temporary(t, 'magi-run-');
+  const root = temporary(t, 'conclave-run-');
   const cwd = path.join(root, 'work'); fs.mkdirSync(cwd);
   const matrix = require('./dispatch-matrix.js').loadMatrix();
   const available = allAvailability(path.join(root, 'probes'), matrix);

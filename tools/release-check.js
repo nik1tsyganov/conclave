@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const fs = require('node:fs');
@@ -11,13 +11,13 @@ const { checkBriefFile } = require('./cli-brief-rules-check.js');
 const ROOT = path.resolve(__dirname, '..');
 const REQUIRED = [
   '.cursor-plugin/plugin.json',
-  '.cursor/skills/magi-cli/SKILL.md',
-  '.cursor/skills/magi-cli/references/dispatch-matrix.json',
-  '.cursor/skills/magi-cli/references/seat-profiles.json',
-  '.cursor/skills/magi-cli/references/brief-rules-block.md',
-  '.cursor/skills/magi-cli/references/project-runs.md',
-  '.cursor/rules/magi-arbiter.mdc',
-  'commands/magi-cli.md',
+  '.cursor/skills/conclave-cli/SKILL.md',
+  '.cursor/skills/conclave-cli/references/dispatch-matrix.json',
+  '.cursor/skills/conclave-cli/references/seat-profiles.json',
+  '.cursor/skills/conclave-cli/references/brief-rules-block.md',
+  '.cursor/skills/conclave-cli/references/project-runs.md',
+  '.cursor/rules/conclave-arbiter.mdc',
+  'commands/conclave-cli.md',
   'tools/cli-adapters.js',
   'tools/cli-proof.js',
   'tools/cli-rules-stage.js',
@@ -35,10 +35,10 @@ const REQUIRED = [
   'tools/panel-tally.js',
   'tools/runtime-paths.js',
   'tools/dispatch-schema.js',
-  'tools/magi-cli-preflight.js',
-  'tools/magi-vault.js',
-  'tools/magi-vault-link.js',
-  'tools/magi-vault-sync.js',
+  'tools/conclave-cli-preflight.js',
+  'tools/conclave-vault.js',
+  'tools/conclave-vault-link.js',
+  'tools/conclave-vault-sync.js',
   'tools/jev-client.js',
   'tools/jev-arbiter.js',
   'tools/jev-plan-classify.js',
@@ -46,16 +46,16 @@ const REQUIRED = [
   'tools/run-drive.js',
   'tools/launch-retry.js',
   'tools/ledger-row.js',
-  'tools/magi-dashboard.js',
-  'tools/magi-vault-analyze.js',
-  'tools/magi-skill-web.js',
+  'tools/conclave-dashboard.js',
+  'tools/conclave-vault-analyze.js',
+  'tools/conclave-skill-web.js',
   'skill-sources.json',
   'tools/model-availability.js',
   'tools/seat-policy.js',
   'tools/vendor-binaries.js',
   'site/index.html',
   'site/styles.css',
-  'site/magi-core.svg',
+  'site/conclave-core.svg',
   'site/architecture.svg',
 ];
 
@@ -99,7 +99,7 @@ function main(io = process) {
     io.stderr.write(`RELEASE_CHECK_FAIL brief template: ${check.missing.join(', ')}\n`);
     return 1;
   }
-  io.stdout.write('MAGI CLI RELEASE CHECK HOLDS\n');
+  io.stdout.write('CONCLAVE CLI RELEASE CHECK HOLDS\n');
   return 0;
 }
 

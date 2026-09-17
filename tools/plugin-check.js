@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 /**
- * Verify the MAGI plugin layout from the repo root.
+ * Verify the CONCLAVE plugin layout from the repo root.
  *
  * Static packaging and documentation checks. This cannot authorize a dispatch.
  */
@@ -13,8 +13,8 @@ const path = require('path');
 const { checkBriefText } = require('./cli-brief-rules-check.js');
 const {
   SOURCE_SURFACE,
-  INSTALLED_MAGI_SURFACE,
-  INSTALLED_MAGI_CLI_SURFACE,
+  INSTALLED_CONCLAVE_SURFACE,
+  INSTALLED_CONCLAVE_CLI_SURFACE,
   checkManifestSurface,
 } = require('./plugin-surface.js');
 
@@ -50,20 +50,20 @@ function check() {
     'README.md',
     '.gitignore',
     '.cursor-plugin/plugin.json',
-    '.cursor/skills/magi/SKILL.md',
-    '.cursor/skills/magi/references/cursor-host.md',
-    '.cursor/skills/magi/references/cursor-cli.md',
-    '.cursor/skills/magi/references/brief-rules-block.md',
-    '.cursor/skills/magi/references/run-local-skill-bundle.md',
-    '.cursor/skills/magi-cli/SKILL.md',
-    '.cursor/skills/magi-cli/references/brief-rules-block.md',
-    '.cursor/rules/magi-arbiter.mdc',
-    '.cursor/rules/magi-activation.mdc',
-    '.cursor/rules/magi-orchestrator.mdc',
+    '.cursor/skills/conclave/SKILL.md',
+    '.cursor/skills/conclave/references/cursor-host.md',
+    '.cursor/skills/conclave/references/cursor-cli.md',
+    '.cursor/skills/conclave/references/brief-rules-block.md',
+    '.cursor/skills/conclave/references/run-local-skill-bundle.md',
+    '.cursor/skills/conclave-cli/SKILL.md',
+    '.cursor/skills/conclave-cli/references/brief-rules-block.md',
+    '.cursor/rules/conclave-arbiter.mdc',
+    '.cursor/rules/conclave-activation.mdc',
+    '.cursor/rules/conclave-orchestrator.mdc',
     '.cursor/rules/live-check.mdc',
-    'commands/magi.md',
-    'commands/magi-cli.md',
-    'claude-commands/magi.md',
+    'commands/conclave.md',
+    'commands/conclave-cli.md',
+    'claude-commands/conclave.md',
     'tools/install-plugin.js',
     'tools/install-plugin.test.js',
     'tools/plugin-surface.js',
@@ -79,13 +79,13 @@ function check() {
     'tools/telemetry-stats.js',
     'tools/telemetry-stats.test.js',
     'tools/telemetry-selftest.test.js',
-    'tools/magi-vault.js',
-    'tools/magi-vault-link.js',
-    'tools/magi-vault-sync.js',
-    'tools/magi-vault-analyze.js',
-    'tools/magi-vault.test.js',
-    'tools/magi-skill-web.js',
-    'tools/magi-skill-web.test.js',
+    'tools/conclave-vault.js',
+    'tools/conclave-vault-link.js',
+    'tools/conclave-vault-sync.js',
+    'tools/conclave-vault-analyze.js',
+    'tools/conclave-vault.test.js',
+    'tools/conclave-skill-web.js',
+    'tools/conclave-skill-web.test.js',
     'skill-sources.json',
     'tools/validate-telemetry.js',
     'tools/validate-telemetry.test.js',
@@ -103,8 +103,8 @@ function check() {
     'tools/task-delivery.test.js',
     'tools/position-tally.js',
     'tools/position-tally.test.js',
-    'tools/magi-bus-path.js',
-    'tools/magi-bus-path.test.js',
+    'tools/conclave-bus-path.js',
+    'tools/conclave-bus-path.test.js',
     'tools/receipt-ack.js',
     'tools/receipt-ack.test.js',
     'tools/handoff-envelope.js',
@@ -153,24 +153,24 @@ function check() {
     }
   }
 
-  const { magiCursorManifest, magiCliManifest } = require('./install-plugin.js');
-  const installedMagi = checkManifestSurface(magiCursorManifest(), INSTALLED_MAGI_SURFACE);
-  if (!installedMagi.ok) {
-    console.error(`install-plugin magi ${installedMagi.error}`);
+  const { conclaveCursorManifest, conclaveCliManifest } = require('./install-plugin.js');
+  const installedConclave = checkManifestSurface(conclaveCursorManifest(), INSTALLED_CONCLAVE_SURFACE);
+  if (!installedConclave.ok) {
+    console.error(`install-plugin conclave ${installedConclave.error}`);
     return 1;
   }
-  const installedCli = checkManifestSurface(magiCliManifest(), INSTALLED_MAGI_CLI_SURFACE);
+  const installedCli = checkManifestSurface(conclaveCliManifest(), INSTALLED_CONCLAVE_CLI_SURFACE);
   if (!installedCli.ok) {
-    console.error(`install-plugin magi-cursor-cli ${installedCli.error}`);
+    console.error(`install-plugin conclave-cursor-cli ${installedCli.error}`);
     return 1;
   }
 
-  const skill = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi/SKILL.md'), 'utf8');
+  const skill = fs.readFileSync(path.join(ROOT, '.cursor/skills/conclave/SKILL.md'), 'utf8');
   const skillStrings = [
-    'magi-whoami',
+    'conclave-whoami',
     'engineering-orchestrator',
-    'magi-mode',
-    'magi-dispatch',
+    'conclave-mode',
+    'conclave-dispatch',
     'mix-mode',
     'dispatch-efficiency',
     'task-retrospective',
@@ -188,56 +188,56 @@ function check() {
     }
   }
 
-  const magiCliSkill = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi-cli/SKILL.md'), 'utf8');
-  if (!magiCliSkill.includes('references/cursor-cli.md')) {
-    console.error('magi-cli SKILL.md missing required co-located reference: references/cursor-cli.md');
+  const conclaveCliSkill = fs.readFileSync(path.join(ROOT, '.cursor/skills/conclave-cli/SKILL.md'), 'utf8');
+  if (!conclaveCliSkill.includes('references/cursor-cli.md')) {
+    console.error('conclave-cli SKILL.md missing required co-located reference: references/cursor-cli.md');
     return 1;
   }
-  if (!magiCliSkill.includes('references/brief-rules-block.md')) {
-    console.error('magi-cli SKILL.md missing required co-located reference: references/brief-rules-block.md');
+  if (!conclaveCliSkill.includes('references/brief-rules-block.md')) {
+    console.error('conclave-cli SKILL.md missing required co-located reference: references/brief-rules-block.md');
     return 1;
   }
-  if (magiCliSkill.includes('.cursor/skills/magi/references/cursor-cli.md')) {
-    console.error('magi-cli SKILL.md contains stale required-reading path: .cursor/skills/magi/references/cursor-cli.md');
+  if (conclaveCliSkill.includes('.cursor/skills/conclave/references/cursor-cli.md')) {
+    console.error('conclave-cli SKILL.md contains stale required-reading path: .cursor/skills/conclave/references/cursor-cli.md');
     return 1;
   }
-  for (const s of ['cursor-cli', 'magi-whoami']) {
-    if (!magiCliSkill.includes(s)) {
-      console.error(`magi-cli SKILL.md missing required string: ${s}`);
+  for (const s of ['cursor-cli', 'conclave-whoami']) {
+    if (!conclaveCliSkill.includes(s)) {
+      console.error(`conclave-cli SKILL.md missing required string: ${s}`);
       return 1;
     }
   }
 
-  const cursorCli = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi/references/cursor-cli.md'), 'utf8');
-  const magiCliRef = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi-cli/references/cursor-cli.md'), 'utf8');
+  const cursorCli = fs.readFileSync(path.join(ROOT, '.cursor/skills/conclave/references/cursor-cli.md'), 'utf8');
+  const conclaveCliRef = fs.readFileSync(path.join(ROOT, '.cursor/skills/conclave-cli/references/cursor-cli.md'), 'utf8');
 
-  if (cursorCli !== magiCliRef) {
-    console.error('cursor-cli.md copies diverge: .cursor/skills/magi/references/cursor-cli.md != .cursor/skills/magi-cli/references/cursor-cli.md');
+  if (cursorCli !== conclaveCliRef) {
+    console.error('cursor-cli.md copies diverge: .cursor/skills/conclave/references/cursor-cli.md != .cursor/skills/conclave-cli/references/cursor-cli.md');
     return 1;
   }
 
-  const briefRulesMagi = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi/references/brief-rules-block.md'), 'utf8');
-  const briefRulesCli = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi-cli/references/brief-rules-block.md'), 'utf8');
+  const briefRulesConclave = fs.readFileSync(path.join(ROOT, '.cursor/skills/conclave/references/brief-rules-block.md'), 'utf8');
+  const briefRulesCli = fs.readFileSync(path.join(ROOT, '.cursor/skills/conclave-cli/references/brief-rules-block.md'), 'utf8');
   const briefRulesTemplate = fs.readFileSync(path.join(ROOT, 'tools/templates/brief-rules-block.md'), 'utf8');
-  if (briefRulesMagi !== briefRulesCli) {
-    console.error('brief-rules-block.md copies diverge: magi/references != magi-cli/references');
+  if (briefRulesConclave !== briefRulesCli) {
+    console.error('brief-rules-block.md copies diverge: conclave/references != conclave-cli/references');
     return 1;
   }
-  if (briefRulesMagi !== briefRulesTemplate) {
-    console.error('brief-rules-block.md copies diverge: magi/references != tools/templates');
+  if (briefRulesConclave !== briefRulesTemplate) {
+    console.error('brief-rules-block.md copies diverge: conclave/references != tools/templates');
     return 1;
   }
-  const templateCheck = checkBriefTemplate(briefRulesMagi);
+  const templateCheck = checkBriefTemplate(briefRulesConclave);
   if (!templateCheck.ok) {
     console.error(`brief-rules-block.md violates leaf-seat template contract: ${templateCheck.missing.join(', ')}`);
     return 1;
   }
 
   const skillBundleDesign = fs.readFileSync(
-    path.join(ROOT, '.cursor/skills/magi/references/run-local-skill-bundle.md'),
+    path.join(ROOT, '.cursor/skills/conclave/references/run-local-skill-bundle.md'),
     'utf8',
   );
-  for (const s of ['DESIGN', 'BackendEng', 'HANDOFF', 'not implemented', 'Magi#4', '~/.local/bin/agy']) {
+  for (const s of ['DESIGN', 'BackendEng', 'HANDOFF', 'not implemented', 'Conclave#4', '~/.local/bin/agy']) {
     if (!skillBundleDesign.includes(s)) {
       console.error(`run-local-skill-bundle.md missing required string: ${s}`);
       return 1;
@@ -245,12 +245,12 @@ function check() {
   }
 
 
-  for (const ref of [cursorCli, magiCliRef]) {
+  for (const ref of [cursorCli, conclaveCliRef]) {
     for (const s of [
       'cursor-cli', 'synara', 'join-manifest', 'dispatch-run.js', '--plan', '--run-dir', '--dispatch-id',
       'dispatch-matrix', 'seat-profiles', 'SEAT-CONTRACT.md', 'skills-manifest.json',
       'rules-manifest.json', 'cli-brief-rules-check.js', 'cli-proof',
-      'MAGI_RULES_ROOT', 'MAGI_VAULT_ROOT', 'MAGI_FIELD_LIBRARY_ROOT', 'RULES/INDEX.md', 'casper_via=agy',
+      'CONCLAVE_RULES_ROOT', 'CONCLAVE_VAULT_ROOT', 'CONCLAVE_FIELD_LIBRARY_ROOT', 'RULES/INDEX.md', 'casper_via=agy',
     ]) {
       if (!ref.includes(s)) {
         console.error(`cursor-cli.md missing required string: ${s}`);
@@ -263,43 +263,43 @@ function check() {
     }
   }
 
-  const cmd = fs.readFileSync(path.join(ROOT, 'commands/magi.md'), 'utf8');
-  if (!cmd.includes('magi-whoami')) {
-    console.error('commands/magi.md missing magi-whoami');
+  const cmd = fs.readFileSync(path.join(ROOT, 'commands/conclave.md'), 'utf8');
+  if (!cmd.includes('conclave-whoami')) {
+    console.error('commands/conclave.md missing conclave-whoami');
     return 1;
   }
   if (!cmd.includes('--mode cursor')) {
-    console.error('commands/magi.md missing --mode cursor');
+    console.error('commands/conclave.md missing --mode cursor');
     return 1;
   }
 
-  const cmdCli = fs.readFileSync(path.join(ROOT, 'commands/magi-cli.md'), 'utf8');
-  if (!cmdCli.includes('magi-whoami')) {
-    console.error('commands/magi-cli.md missing magi-whoami');
+  const cmdCli = fs.readFileSync(path.join(ROOT, 'commands/conclave-cli.md'), 'utf8');
+  if (!cmdCli.includes('conclave-whoami')) {
+    console.error('commands/conclave-cli.md missing conclave-whoami');
     return 1;
   }
   if (!cmdCli.includes('--mode cursor-cli')) {
-    console.error('commands/magi-cli.md missing --mode cursor-cli');
+    console.error('commands/conclave-cli.md missing --mode cursor-cli');
     return 1;
   }
 
-  const claudeCmd = fs.readFileSync(path.join(ROOT, 'claude-commands/magi.md'), 'utf8');
-  if (!claudeCmd.includes('magi-whoami')) {
-    console.error('claude-commands/magi.md missing magi-whoami');
+  const claudeCmd = fs.readFileSync(path.join(ROOT, 'claude-commands/conclave.md'), 'utf8');
+  if (!claudeCmd.includes('conclave-whoami')) {
+    console.error('claude-commands/conclave.md missing conclave-whoami');
     return 1;
   }
   if (!claudeCmd.includes('claude-code')) {
-    console.error('claude-commands/magi.md missing claude-code');
+    console.error('claude-commands/conclave.md missing claude-code');
     return 1;
   }
 
-  const cursorHost = fs.readFileSync(path.join(ROOT, '.cursor/skills/magi/references/cursor-host.md'), 'utf8');
+  const cursorHost = fs.readFileSync(path.join(ROOT, '.cursor/skills/conclave/references/cursor-host.md'), 'utf8');
   if (!cursorHost.includes('.claude/agents') && !cursorHost.includes('.claude\\agents\\')) {
     console.error('cursor-host.md missing .claude/agents path');
     return 1;
   }
-  if (!cursorHost.includes('plugins/local/magi/agents') && !cursorHost.includes('plugins\\local\\magi\\agents')) {
-    console.error('cursor-host.md missing plugins/local/magi/agents path');
+  if (!cursorHost.includes('plugins/local/conclave/agents') && !cursorHost.includes('plugins\\local\\conclave\\agents')) {
+    console.error('cursor-host.md missing plugins/local/conclave/agents path');
     return 1;
   }
   for (const s of [
@@ -318,9 +318,9 @@ function check() {
   }
 
   const ruleFiles = [
-    '.cursor/rules/magi-arbiter.mdc',
-    '.cursor/rules/magi-activation.mdc',
-    '.cursor/rules/magi-orchestrator.mdc',
+    '.cursor/rules/conclave-arbiter.mdc',
+    '.cursor/rules/conclave-activation.mdc',
+    '.cursor/rules/conclave-orchestrator.mdc',
     '.cursor/rules/live-check.mdc',
   ];
   for (const rel of ruleFiles) {
@@ -352,13 +352,13 @@ function check() {
     'until claude auth login'
   ];
 
-  const cueDocsTargetA = ['README.md', '.cursor/skills/magi/SKILL.md'];
+  const cueDocsTargetA = ['README.md', '.cursor/skills/conclave/SKILL.md'];
   const cueDocsTargetB = [
-    '.cursor/skills/magi-cli/SKILL.md',
-    '.cursor/skills/magi/references/cursor-cli.md',
-    '.cursor/skills/magi-cli/references/cursor-cli.md',
-    'commands/magi-cli.md',
-    'claude-commands/magi.md'
+    '.cursor/skills/conclave-cli/SKILL.md',
+    '.cursor/skills/conclave/references/cursor-cli.md',
+    '.cursor/skills/conclave-cli/references/cursor-cli.md',
+    'commands/conclave-cli.md',
+    'claude-commands/conclave.md'
   ];
 
   for (const rel of [...cueDocsTargetA, ...cueDocsTargetB]) {

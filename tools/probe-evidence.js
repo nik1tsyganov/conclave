@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 const fs = require('node:fs');
 const { hashFile } = require('./dispatch-evidence.js');
@@ -6,7 +6,7 @@ const { verifyProof } = require('./cli-proof.js');
 const { finalResponse } = require('./vendor-native.js');
 
 function challengeMatches(response, challenge) {
-  if (typeof challenge !== 'string' || !/^MAGI_PROBE_[a-f0-9]{32}$/.test(challenge)) return false;
+  if (typeof challenge !== 'string' || !/^CONCLAVE_PROBE_[a-f0-9]{32}$/.test(challenge)) return false;
   // agy can apply its native ANSWER wrapper. Match one complete response line,
   // never prompt text or an arbitrary substring containing the challenge.
   const lines = response.split(/\r?\n/).map((line) => line.trim());

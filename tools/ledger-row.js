@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 // Emits the engineering-ledger row (schema v1.1) for a finalized run from its
 // run-row.json and units.jsonl, so the ledger and the vault agree without hand
@@ -20,7 +20,7 @@ function ledgerRow(runDir, { task, size = 'medium', lead = 'claude', notes = '' 
   const panels = units.map((u) => u.panel?.verdict).filter(Boolean);
   const tokens = Object.entries(run.tokensByVendor || {}).map(([v, t]) => `${v} ${Math.round(t / 1000)}k`).join(', ');
   const wall = run.wallMs ? `${Math.round(run.wallMs / 60000)} min` : 'n/a';
-  const cells = [run.date, task || `MAGI run ${run.planId}`, size, lead, 'yes',
+  const cells = [run.date, task || `CONCLAVE run ${run.planId}`, size, lead, 'yes',
     `${run.dispatches} dispatches / ${units.length} units`, String(units.filter((u) => u.approval === 'FAIL').length),
     'sealed plan, evidence dirs, scope audit, native proof', `${run.pass} native proofs; panels ${panels.join('/') || 'n/a'}${units.some((u) => u.jev) ? '; jev tally' : ''}`,
     run.jevClassify ? `jev classify ${run.jevClassify.status}` : '1',

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 /**
- * Validate MAGI telemetry rows against telemetry/schema.json.
+ * Validate CONCLAVE telemetry rows against telemetry/schema.json.
  *
  *   node tools/validate-telemetry.js --row '<json>'
  *   node tools/validate-telemetry.js --file <row.json>
@@ -20,7 +20,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const SCHEMA_PATH = path.resolve(__dirname, '..', 'telemetry', 'schema.json');
-const SCHEMA_ID = 'magi-dispatch/v1';
+const SCHEMA_ID = 'conclave-dispatch/v1';
 
 function fail(reason, status = 1) {
   console.error(String(reason).replace(/[\r\n]+/g, ' '));
@@ -167,10 +167,10 @@ function validateRow(row, schema) {
   return { ok: true, error: null };
 }
 
-function adaptMagiRow(row) {
+function adaptConclaveRow(row) {
   return {
     schemaId: SCHEMA_ID,
-    sourceSystem: 'magi',
+    sourceSystem: 'conclave',
     correlationPolicy: 'none',
     joinKeys: [],
     payload: row,
@@ -217,7 +217,7 @@ function main(argv) {
       if (!result.ok) fail(`line ${line}: ${result.error}`);
     }
     if (adapt) {
-      console.log(JSON.stringify(rows.map(({ row }) => adaptMagiRow(row)), null, 2));
+      console.log(JSON.stringify(rows.map(({ row }) => adaptConclaveRow(row)), null, 2));
     } else {
       console.log(`TELEMETRY VALID ${rows.length}`);
     }
@@ -228,7 +228,7 @@ function main(argv) {
   const result = validateRow(row, schema);
   if (!result.ok) fail(result.error);
   if (adapt) {
-    console.log(JSON.stringify(adaptMagiRow(row), null, 2));
+    console.log(JSON.stringify(adaptConclaveRow(row), null, 2));
   } else {
     console.log(`TELEMETRY VALID ${row.vendor}/${row.role}`);
   }
@@ -244,6 +244,6 @@ module.exports = {
   SCHEMA_ID,
   loadSchema,
   validateRow,
-  adaptMagiRow,
+  adaptConclaveRow,
   isValidCalendarDate,
 };

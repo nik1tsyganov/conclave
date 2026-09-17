@@ -1,18 +1,18 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const {createSealedRun,fakeVendor}=require('./test-fixtures.js');
-const {installMagiCursorCli}=require('./install-plugin.js');
+const {installConclaveCursorCli}=require('./install-plugin.js');
 
 test('installed CLI completes Claude checkpoint, foreign checks, activation, tally and diagnostic export',async t=>{
   const run=createSealedRun(t,[
     {unitId:'u1',vendor:'anthropic',model:'fable',effort:'medium'},
     {unitId:'u1',role:'verify',class:'test-verification',vendor:'openai',model:'gpt-5.6-sol',effort:'medium',authorVendor:'anthropic'},
     {unitId:'u1',role:'review',class:'review-adversarial',vendor:'google',model:'gemini-3.1-pro-high',effort:'fused-high',authorVendor:'anthropic'},
-  ],{magiConvened:true});
+  ],{conclaveConvened:true});
   const installed=path.join(run.root,'runtime ü & [copy]');
-  installMagiCursorCli({destination:installed});
+  installConclaveCursorCli({destination:installed});
   const tools=path.join(installed,'tools');
   // Only external vendor transport is synthetic. Installed command parsing,
   // staging, proof, transactions, checkpoints and subsequent CLI gates are real.
@@ -51,7 +51,7 @@ test('installed CLI completes Claude checkpoint, foreign checks, activation, tal
     assert.equal(r.status,expected,r.stderr);assert.equal(r.error,undefined);
     return r.stdout;
   }
-  command('magi-whoami.js',['--mode','cursor-cli','--slug','grok-4.6']);
+  command('conclave-whoami.js',['--mode','cursor-cli','--slug','grok-4.6']);
   const pending=await dispatch('d1');
   assert.equal(pending.status,'AWAITING_ATTESTATION');assert.equal(pending.ok,false);assert.equal(native.calls(),1);
   const pendingAgain=await dispatch('d1');

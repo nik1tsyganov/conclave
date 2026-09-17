@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const fs = require('node:fs');
@@ -34,12 +34,12 @@ function candidates(vendor, options = {}) {
   if (options.binary) return [path.resolve(options.binary)];
 
   const override = {
-    openai: env.MAGI_CODEX_BIN,
-    google: env.MAGI_AGY_BIN,
-    anthropic: env.MAGI_CLAUDE_BIN,
+    openai: env.CONCLAVE_CODEX_BIN,
+    google: env.CONCLAVE_AGY_BIN,
+    anthropic: env.CONCLAVE_CLAUDE_BIN,
   }[vendor];
   if (override) return [path.resolve(override)];
-  const configPath = options.configFile || env.MAGI_VENDOR_CONFIG;
+  const configPath = options.configFile || env.CONCLAVE_VENDOR_CONFIG;
   const config = options.config || (configPath ? readJsonFile(configPath) : {});
   const configured = config.vendors?.[vendor]?.binary;
   if (configured) return [path.resolve(configured)];
@@ -51,7 +51,7 @@ function candidates(vendor, options = {}) {
 function resolveVendorBinary(vendor, options = {}) {
   const list = candidates(vendor, options);
   const env = options.env || process.env;
-  const explicit = options.binary || ({ openai: env.MAGI_CODEX_BIN, google: env.MAGI_AGY_BIN, anthropic: env.MAGI_CLAUDE_BIN })[vendor];
+  const explicit = options.binary || ({ openai: env.CONCLAVE_CODEX_BIN, google: env.CONCLAVE_AGY_BIN, anthropic: env.CONCLAVE_CLAUDE_BIN })[vendor];
   if (explicit && options.mustExist !== false && !existing(path.resolve(explicit))) {
     throw Object.assign(new Error(`Configured ${vendor} CLI does not exist: ${explicit}`), { code: 'BINARY_MISSING' });
   }
@@ -60,7 +60,7 @@ function resolveVendorBinary(vendor, options = {}) {
   if (options.mustExist === false) return list[0] || null;
   const error = new Error(
     `No ${vendor} CLI binary found. Checked: ${list.join(', ')}. ` +
-    `Set ${vendor === 'openai' ? 'MAGI_CODEX_BIN' : vendor === 'google' ? 'MAGI_AGY_BIN' : 'MAGI_CLAUDE_BIN'} to override.`,
+    `Set ${vendor === 'openai' ? 'CONCLAVE_CODEX_BIN' : vendor === 'google' ? 'CONCLAVE_AGY_BIN' : 'CONCLAVE_CLAUDE_BIN'} to override.`,
   );
   error.code = 'BINARY_MISSING';
   error.vendor = vendor;

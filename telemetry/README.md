@@ -1,8 +1,8 @@
-# MAGI Telemetry
+# CONCLAVE Telemetry
 
-This directory holds the self-evaluation telemetry log for MAGI Cursor CLI dispatches.
+This directory holds the self-evaluation telemetry log for CONCLAVE Cursor CLI dispatches.
 
-Because Cursor has no capture hook, the Grok arbiter lead-writes a row to `dispatches.jsonl` after every CLI/Task dispatch using `tools/telemetry-append.js`. Sealed CLI runs keep a fail-closed copy inside the run directory. When `MAGI_VAULT_ROOT` is set, `run-finalize.js` also links those rows into `ai-ops-vault/projects/magi/telemetry/dispatches.jsonl` and writes `projects/magi/analysis/latest.md`. That vault copy is the durable MAGI analysis log. Do not treat a disposable run directory as the only copy.
+Because Cursor has no capture hook, the Grok arbiter lead-writes a row to `dispatches.jsonl` after every CLI/Task dispatch using `tools/telemetry-append.js`. Sealed CLI runs keep a fail-closed copy inside the run directory. When `CONCLAVE_VAULT_ROOT` is set, `run-finalize.js` also links those rows into `ai-ops-vault/projects/conclave/telemetry/dispatches.jsonl` and writes `projects/conclave/analysis/latest.md`. That vault copy is the durable CONCLAVE analysis log. Do not treat a disposable run directory as the only copy.
 
 The formal row contract is `telemetry/schema.json`. Validate a row or JSONL log with:
 
@@ -11,7 +11,7 @@ node tools/validate-telemetry.js --row '<json>'
 node tools/validate-telemetry.js --log telemetry/dispatches.jsonl
 ```
 
-`--adapt` wraps a valid Magi row in the ingest envelope below. It does not rewrite Magi fields into Conclave names.
+`--adapt` wraps a valid Conclave row in the ingest envelope below. It does not rewrite Conclave fields into Conclave names.
 
 ## Required Fields
 
@@ -23,27 +23,27 @@ As per `cursor-host.md`, each log row must include:
 
 ## Adapter contract toward Conclave / unified AI-ops ingest
 
-Magi rows and Claude-host hook rows are **different schemas**. Magi is lead-written (`routedBy: arbiter`, optional `capturedBy: lead`). Conclave's hook-fed file is `~/.claude/docs/telemetry/dispatch-telemetry.jsonl` and is not dual-written here.
+Conclave rows and Claude-host hook rows are **different schemas**. Conclave is lead-written (`routedBy: arbiter`, optional `capturedBy: lead`). Conclave's hook-fed file is `~/.claude/docs/telemetry/dispatch-telemetry.jsonl` and is not dual-written here.
 
 Do **not** invent a join key. `vendor`, `role`, `date`, `dispatchId`, `proofId`, token fields, and host mode do not identify a Conclave hook row. Correlating on those values forges a session that was never shared.
 
-| Magi field | Unified ingest | Safe join to Conclave? |
+| Conclave field | Unified ingest | Safe join to Conclave? |
 |---|---|---|
-| `vendor` | stay on the Magi payload as `magi.vendor` | No. Same vendor string is not a shared session. |
-| `role` | stay as `magi.role` | No. Role vocabulary is Magi-native (`implement`/`verify`/`review`). |
-| `hostMode` | Magi-only (`cursor` / `cursor-cli`) | No Conclave equivalent in this repo. |
-| `routedBy` | Magi-only (`arbiter`) | No. Conclave capture is hook-fed, not arbiter-routed. |
-| `capturedBy` | Magi-only (`lead` if present) | No. `lead` and hook capture are different writers. |
-| `vendorSideTokens` / `totalTokens` | Magi measured tokens or `null` | No. Missing Magi tokens stay absent/`null`, never `0`, and are not Conclave hook tokens. |
+| `vendor` | stay on the Conclave payload as `conclave.vendor` | No. Same vendor string is not a shared session. |
+| `role` | stay as `conclave.role` | No. Role vocabulary is Conclave-native (`implement`/`verify`/`review`). |
+| `hostMode` | Conclave-only (`cursor` / `cursor-cli`) | No Conclave equivalent in this repo. |
+| `routedBy` | Conclave-only (`arbiter`) | No. Conclave capture is hook-fed, not arbiter-routed. |
+| `capturedBy` | Conclave-only (`lead` if present) | No. `lead` and hook capture are different writers. |
+| `vendorSideTokens` / `totalTokens` | Conclave measured tokens or `null` | No. Missing Conclave tokens stay absent/`null`, never `0`, and are not Conclave hook tokens. |
 | `date` | UTC calendar date if present | No. A shared calendar day is not a shared run. |
-| extra properties (`task`, `dispatchId`, `proofId`, `note`, …) | preserved on the Magi payload | No. Extra keys are Magi-local unless a later owner map names them. |
+| extra properties (`task`, `dispatchId`, `proofId`, `note`, …) | preserved on the Conclave payload | No. Extra keys are Conclave-local unless a later owner map names them. |
 
 Adapter envelope (`validate-telemetry.js --adapt`):
 
 ```json
 {
-  "schemaId": "magi-dispatch/v1",
-  "sourceSystem": "magi",
+  "schemaId": "conclave-dispatch/v1",
+  "sourceSystem": "conclave",
   "correlationPolicy": "none",
   "joinKeys": [],
   "payload": { "vendor": "openai", "role": "implement", "hostMode": "cursor-cli", "routedBy": "arbiter" }
@@ -56,7 +56,7 @@ Unified ingest stores this envelope next to Conclave rows keyed by `schemaId` + 
 
 Seat-to-seat durability uses `handoff-envelope.v1` via `tools/handoff-envelope.js`, appended to `handoffs.jsonl` (gitignored). `telemetry/schema.json` stays the dispatch-row contract only; do not validate handoff rows with `validate-telemetry.js`.
 
-Cursor Task returns via chat reply only. There is no Task capture module (unlike Magi CLI `--capture`). Receipt ACKs and handoff rows exist only because `acknowledgeReceipt` / `recordHandoff` write a file. Do not invent a Task capture hook.
+Cursor Task returns via chat reply only. There is no Task capture module (unlike Conclave CLI `--capture`). Receipt ACKs and handoff rows exist only because `acknowledgeReceipt` / `recordHandoff` write a file. Do not invent a Task capture hook.
 
 Receipt ACKs (`receipt.v1`, `tools/receipt-ack.js`) prove a seat opened the pointer brief (first-line echo + SHA-256) for hostMode `cursor` and `cursor-cli`. They are not dispatch rows and are not Conclave join keys. Pointer delivery remains `cli-pointer.js` / `task-delivery.js`.
 
@@ -72,5 +72,5 @@ This telemetry exists to answer these self-eval questions:
 
 ## Critical Notes
 
-- **NOT the Claude-host log:** This log is strictly for MAGI Cursor self-eval and is NOT the Claude-host file `~/.claude/docs/telemetry/dispatch-telemetry.jsonl`. Do not dual-write to that file (it is hook-fed).
+- **NOT the Claude-host log:** This log is strictly for CONCLAVE Cursor self-eval and is NOT the Claude-host file `~/.claude/docs/telemetry/dispatch-telemetry.jsonl`. Do not dual-write to that file (it is hook-fed).
 - **Operational Status:** Do not claim operational status (logged in, quota) from memory. `Live-check.mdc` applies.

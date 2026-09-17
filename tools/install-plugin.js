@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const fs = require('node:fs');
@@ -8,18 +8,18 @@ const path = require('node:path');
 const { CLI_RUNTIME_TOOLS, canonicalPlainPath, pathsOverlap, resolveRuntimePaths } = require('./runtime-paths.js');
 const { regularFiles } = require('./cli-skill-stage.js');
 const {
-  INSTALLED_MAGI_SURFACE,
-  INSTALLED_MAGI_CLI_SURFACE,
+  INSTALLED_CONCLAVE_SURFACE,
+  INSTALLED_CONCLAVE_CLI_SURFACE,
   applySurfaceFields,
   checkManifestSurface,
 } = require('./plugin-surface.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const PLUGINS_DIR = path.join(os.homedir(), '.cursor', 'plugins', 'local');
-const MAGI_DEST = path.join(PLUGINS_DIR, 'magi');
-const MAGI_CLI_DEST = path.join(PLUGINS_DIR, 'magi-cursor-cli');
-const USER_SKILL_MAGI = path.join(os.homedir(), '.cursor', 'skills', 'magi');
-const USER_SKILL_MAGI_CLI = path.join(os.homedir(), '.cursor', 'skills', 'magi-cli');
+const CONCLAVE_DEST = path.join(PLUGINS_DIR, 'conclave');
+const CONCLAVE_CLI_DEST = path.join(PLUGINS_DIR, 'conclave-cursor-cli');
+const USER_SKILL_CONCLAVE = path.join(os.homedir(), '.cursor', 'skills', 'conclave');
+const USER_SKILL_CONCLAVE_CLI = path.join(os.homedir(), '.cursor', 'skills', 'conclave-cli');
 const USER_RULES_DIR = path.join(os.homedir(), '.cursor', 'rules');
 const CLAUDE_CMD_DIR = path.join(os.homedir(), '.claude', 'commands');
 
@@ -62,7 +62,7 @@ function prepareInstall(sourceRoot, destination, manifest, sources, validateFile
     const existingFiles = regularFiles(target, target, [], existingDirectories);
     if (existingFiles.length || existingDirectories.length) {
       const installed = readInstalledManifest(target);
-      const surface = manifest.name === 'magi-cursor-cli' ? INSTALLED_MAGI_CLI_SURFACE : INSTALLED_MAGI_SURFACE;
+      const surface = manifest.name === 'conclave-cursor-cli' ? INSTALLED_CONCLAVE_CLI_SURFACE : INSTALLED_CONCLAVE_SURFACE;
       if (!installed.ok || installed.manifest.name !== manifest.name || installed.manifest.repository !== manifest.repository ||
           !checkManifestSurface(installed.manifest, surface).ok) {
         throw new Error(`refusing to replace unrelated directory: ${target}`);
@@ -89,22 +89,22 @@ function writeInstall(prepared) {
   return prepared.target;
 }
 
-function magiCursorManifest() {
+function conclaveCursorManifest() {
   return applySurfaceFields({
-    name: 'magi', displayName: 'MAGI Cursor',
-    description: 'Original MAGI tri-seat (Claude + Codex + Gemini). Cursor Grok arbiter routes; it does not implement. Not CONCLAVE.',
-    version: '0.1.0', author: { name: 'Nikita Tsyganov' }, repository: 'https://github.com/nik1tsyganov/magi.git',
-    license: 'MIT', keywords: ['magi', 'multi-vendor', 'cursor', 'dispatch'],
-  }, INSTALLED_MAGI_SURFACE);
+    name: 'conclave', displayName: 'CONCLAVE Cursor',
+    description: 'Original CONCLAVE tri-seat (Claude + Codex + Gemini). Cursor Grok arbiter routes; it does not implement. Not CONCLAVE.',
+    version: '0.1.0', author: { name: 'Nikita Tsyganov' }, repository: 'https://github.com/nik1tsyganov/conclave.git',
+    license: 'MIT', keywords: ['conclave', 'multi-vendor', 'cursor', 'dispatch'],
+  }, INSTALLED_CONCLAVE_SURFACE);
 }
 
-function magiCliManifest() {
+function conclaveCliManifest() {
   return applySurfaceFields({
-    name: 'magi-cursor-cli', displayName: 'MAGI Cursor CLI',
+    name: 'conclave-cursor-cli', displayName: 'CONCLAVE Cursor CLI',
     description: 'Grok arbiter + vendor CLIs with fail-closed matrix/seat/rules/proof/telemetry enforcement. Not CONCLAVE.',
-    version: '0.1.0', author: { name: 'Nikita Tsyganov' }, repository: 'https://github.com/nik1tsyganov/magi.git',
-    license: 'MIT', keywords: ['magi', 'magi-cli', 'multi-vendor', 'cursor', 'cli'],
-  }, INSTALLED_MAGI_CLI_SURFACE);
+    version: '0.1.0', author: { name: 'Nikita Tsyganov' }, repository: 'https://github.com/nik1tsyganov/conclave.git',
+    license: 'MIT', keywords: ['conclave', 'conclave-cli', 'multi-vendor', 'cursor', 'cli'],
+  }, INSTALLED_CONCLAVE_CLI_SURFACE);
 }
 
 function readInstalledManifest(dest) {
@@ -114,21 +114,21 @@ function readInstalledManifest(dest) {
   catch (error) { return { ok: false, error: `invalid .cursor-plugin/plugin.json: ${error.message}` }; }
 }
 
-function installMagiCursor() {
-  return writeInstall(prepareInstall(ROOT, MAGI_DEST, magiCursorManifest(), [
+function installConclaveCursor() {
+  return writeInstall(prepareInstall(ROOT, CONCLAVE_DEST, conclaveCursorManifest(), [
     ['.cursor/skills', 'skills'], ['.cursor/rules', 'rules'], ['agents', 'agents'],
     ['tools', 'tools'], ['seat-skills', 'seat-skills'],
-    ['commands/magi.md', 'commands/magi.md'], ['commands/magi-cli.md', 'commands/magi-cli.md'],
+    ['commands/conclave.md', 'commands/conclave.md'], ['commands/conclave-cli.md', 'commands/conclave-cli.md'],
   ]));
 }
 
 function validateCliFiles(files) {
-  for (const required of ['skills/magi-cli/SKILL.md', 'skills/magi-cli/references/cursor-cli.md',
-    'skills/magi-cli/references/dispatch-matrix.json', 'skills/magi-cli/references/seat-profiles.json',
-    'rules/magi-arbiter.mdc']) {
+  for (const required of ['skills/conclave-cli/SKILL.md', 'skills/conclave-cli/references/cursor-cli.md',
+    'skills/conclave-cli/references/dispatch-matrix.json', 'skills/conclave-cli/references/seat-profiles.json',
+    'rules/conclave-arbiter.mdc']) {
     if (!files.has(required)) throw new Error(`installer source missing required file: ${required}`);
   }
-  const profiles = JSON.parse(files.get('skills/magi-cli/references/seat-profiles.json').toString('utf8'));
+  const profiles = JSON.parse(files.get('skills/conclave-cli/references/seat-profiles.json').toString('utf8'));
   const skills = new Set(['baseSkills', 'roleSkills', 'classSkills'].flatMap(key => Object.values(profiles[key] || {}).flat()));
   for (const skill of skills) {
     if (typeof skill !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(skill) || !files.has(`seat-skills/${skill}/SKILL.md`)) {
@@ -137,10 +137,10 @@ function validateCliFiles(files) {
   }
 }
 
-function installMagiCursorCli({ destination = MAGI_CLI_DEST, sourceRoot = ROOT } = {}) {
-  const prepared = prepareInstall(sourceRoot, destination, magiCliManifest(), [
-    ['.cursor/skills/magi-cli', 'skills/magi-cli'], ['.cursor/rules', 'rules'],
-    ['commands/magi-cli.md', 'commands/magi-cli.md'], ['tools/templates', 'tools/templates'],
+function installConclaveCursorCli({ destination = CONCLAVE_CLI_DEST, sourceRoot = ROOT } = {}) {
+  const prepared = prepareInstall(sourceRoot, destination, conclaveCliManifest(), [
+    ['.cursor/skills/conclave-cli', 'skills/conclave-cli'], ['.cursor/rules', 'rules'],
+    ['commands/conclave-cli.md', 'commands/conclave-cli.md'], ['tools/templates', 'tools/templates'],
     ['seat-skills', 'seat-skills'], ['skill-sources.json', 'skill-sources.json'],
     ...CLI_RUNTIME_TOOLS.map(tool => [`tools/${tool}`, `tools/${tool}`]),
   ], validateCliFiles);
@@ -149,12 +149,12 @@ function installMagiCursorCli({ destination = MAGI_CLI_DEST, sourceRoot = ROOT }
 
 function installUserGlobals() {
   fs.mkdirSync(USER_RULES_DIR, { recursive: true });
-  for (const rule of ['magi-arbiter.mdc', 'magi-activation.mdc', 'magi-orchestrator.mdc', 'live-check.mdc']) copyFile(path.join(ROOT, '.cursor', 'rules', rule), path.join(USER_RULES_DIR, rule));
-  copyFile(path.join(ROOT, 'claude-commands', 'magi.md'), path.join(CLAUDE_CMD_DIR, 'magi.md'));
-  if (fs.existsSync(USER_SKILL_MAGI)) fs.rmSync(USER_SKILL_MAGI, { recursive: true, force: true });
-  copyDir(path.join(ROOT, '.cursor', 'skills', 'magi'), USER_SKILL_MAGI);
-  if (fs.existsSync(USER_SKILL_MAGI_CLI)) fs.rmSync(USER_SKILL_MAGI_CLI, { recursive: true, force: true });
-  copyDir(path.join(ROOT, '.cursor', 'skills', 'magi-cli'), USER_SKILL_MAGI_CLI);
+  for (const rule of ['conclave-arbiter.mdc', 'conclave-activation.mdc', 'conclave-orchestrator.mdc', 'live-check.mdc']) copyFile(path.join(ROOT, '.cursor', 'rules', rule), path.join(USER_RULES_DIR, rule));
+  copyFile(path.join(ROOT, 'claude-commands', 'conclave.md'), path.join(CLAUDE_CMD_DIR, 'conclave.md'));
+  if (fs.existsSync(USER_SKILL_CONCLAVE)) fs.rmSync(USER_SKILL_CONCLAVE, { recursive: true, force: true });
+  copyDir(path.join(ROOT, '.cursor', 'skills', 'conclave'), USER_SKILL_CONCLAVE);
+  if (fs.existsSync(USER_SKILL_CONCLAVE_CLI)) fs.rmSync(USER_SKILL_CONCLAVE_CLI, { recursive: true, force: true });
+  copyDir(path.join(ROOT, '.cursor', 'skills', 'conclave-cli'), USER_SKILL_CONCLAVE_CLI);
 }
 
 function checkSurface(dest, expected, label) {
@@ -163,37 +163,37 @@ function checkSurface(dest, expected, label) {
   const surface = checkManifestSurface(written.manifest, expected);
   if (!surface.ok) throw new Error(`${label} ${surface.error}`);
 }
-function checkMagi() {
-  const required = ['skills/magi/SKILL.md', 'rules/magi-arbiter.mdc', 'commands/magi.md', 'agents/implementer.md'];
-  const missing = required.filter((rel) => !fs.existsSync(path.join(MAGI_DEST, rel)));
-  if (missing.length) throw new Error(`magi missing: ${missing.join(', ')}`);
-  checkSurface(MAGI_DEST, INSTALLED_MAGI_SURFACE, 'magi');
+function checkConclave() {
+  const required = ['skills/conclave/SKILL.md', 'rules/conclave-arbiter.mdc', 'commands/conclave.md', 'agents/implementer.md'];
+  const missing = required.filter((rel) => !fs.existsSync(path.join(CONCLAVE_DEST, rel)));
+  if (missing.length) throw new Error(`conclave missing: ${missing.join(', ')}`);
+  checkSurface(CONCLAVE_DEST, INSTALLED_CONCLAVE_SURFACE, 'conclave');
 }
-function checkMagiCli(destination = MAGI_CLI_DEST) {
+function checkConclaveCli(destination = CONCLAVE_CLI_DEST) {
   const paths = resolveRuntimePaths({ root: canonicalPlainPath(destination) });
   const files = new Set(regularFiles(paths.root));
   const required = [
-    'skills/magi-cli/SKILL.md',
-    'skills/magi-cli/references/cursor-cli.md',
-    'skills/magi-cli/references/dispatch-matrix.json',
-    'skills/magi-cli/references/seat-profiles.json',
-    'rules/magi-arbiter.mdc',
-    'commands/magi-cli.md',
+    'skills/conclave-cli/SKILL.md',
+    'skills/conclave-cli/references/cursor-cli.md',
+    'skills/conclave-cli/references/dispatch-matrix.json',
+    'skills/conclave-cli/references/seat-profiles.json',
+    'rules/conclave-arbiter.mdc',
+    'commands/conclave-cli.md',
     ...CLI_RUNTIME_TOOLS.map((name) => `tools/${name}`),
     'skill-sources.json',
   ];
   const missing = required.filter((rel) => !files.has(path.join(paths.root, rel)));
-  if (missing.length) throw new Error(`magi-cursor-cli missing: ${missing.join(', ')}`);
+  if (missing.length) throw new Error(`conclave-cursor-cli missing: ${missing.join(', ')}`);
   for (const directory of [paths.templatesDir, paths.seatSkillsRoot]) {
-    if (!fs.existsSync(directory) || !fs.lstatSync(directory).isDirectory()) throw new Error(`magi-cursor-cli missing directory: ${directory}`);
+    if (!fs.existsSync(directory) || !fs.lstatSync(directory).isDirectory()) throw new Error(`conclave-cursor-cli missing directory: ${directory}`);
   }
-  if (fs.existsSync(path.join(paths.root, 'agents'))) throw new Error('magi-cursor-cli must not have an agents/ directory');
-  checkSurface(paths.root, INSTALLED_MAGI_CLI_SURFACE, 'magi-cursor-cli');
+  if (fs.existsSync(path.join(paths.root, 'agents'))) throw new Error('conclave-cursor-cli must not have an agents/ directory');
+  checkSurface(paths.root, INSTALLED_CONCLAVE_CLI_SURFACE, 'conclave-cursor-cli');
   const profiles = JSON.parse(fs.readFileSync(paths.seatProfilesPath, 'utf8'));
   const skills = new Set(['baseSkills', 'roleSkills', 'classSkills'].flatMap(key => Object.values(profiles[key] || {}).flat()));
   for (const skill of skills) {
     if (typeof skill !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(skill) || !files.has(path.join(paths.seatSkillsRoot, skill, 'SKILL.md'))) {
-      throw new Error(`magi-cursor-cli bundled seat skill missing or invalid: ${skill}`);
+      throw new Error(`conclave-cursor-cli bundled seat skill missing or invalid: ${skill}`);
     }
   }
 }
@@ -207,23 +207,23 @@ function main(argv = process.argv.slice(2)) {
     else throw new Error(`unknown, duplicate or incomplete installer option: ${argv[i]}`);
   }
   if (destination !== undefined) {
-    if (!checkOnly) installMagiCursorCli({ destination });
-    checkMagiCli(destination);
-    console.log(`MAGI Cursor CLI ${checkOnly ? 'checked' : 'installed and checked'} at ${path.resolve(destination)}`);
+    if (!checkOnly) installConclaveCursorCli({ destination });
+    checkConclaveCli(destination);
+    console.log(`CONCLAVE Cursor CLI ${checkOnly ? 'checked' : 'installed and checked'} at ${path.resolve(destination)}`);
     return;
   }
   if (checkOnly) throw new Error('--check requires --destination; no global installation was attempted');
   fs.mkdirSync(PLUGINS_DIR, { recursive: true });
-  installMagiCursor();
-  installMagiCursorCli();
+  installConclaveCursor();
+  installConclaveCursorCli();
   installUserGlobals();
-  checkMagi();
-  checkMagiCli();
-  console.log(`MAGI Cursor installed at ${MAGI_DEST}`);
-  console.log(`MAGI Cursor CLI installed at ${MAGI_CLI_DEST}`);
-  console.log('MAGI CLI runtime is installed-relative; the source checkout is not required merely to launch seats.');
-  console.log('Set MAGI_RULES_ROOT to the external standing-rules pack.');
-  console.log('Set MAGI_VAULT_ROOT to the ai-ops-vault checkout for MAGI telemetry and skill sync.');
+  checkConclave();
+  checkConclaveCli();
+  console.log(`CONCLAVE Cursor installed at ${CONCLAVE_DEST}`);
+  console.log(`CONCLAVE Cursor CLI installed at ${CONCLAVE_CLI_DEST}`);
+  console.log('CONCLAVE CLI runtime is installed-relative; the source checkout is not required merely to launch seats.');
+  console.log('Set CONCLAVE_RULES_ROOT to the external standing-rules pack.');
+  console.log('Set CONCLAVE_VAULT_ROOT to the ai-ops-vault checkout for CONCLAVE telemetry and skill sync.');
   console.log('Reload Cursor and enable both plugins.');
 }
 
@@ -234,12 +234,12 @@ if (require.main === module) {
 module.exports = {
   ROOT,
   CLI_RUNTIME_TOOLS,
-  magiCursorManifest,
-  magiCliManifest,
+  conclaveCursorManifest,
+  conclaveCliManifest,
   writeManifest,
   readInstalledManifest,
-  checkMagi,
-  checkMagiCli,
-  installMagiCursorCli,
+  checkConclave,
+  checkConclaveCli,
+  installConclaveCursorCli,
   main,
 };

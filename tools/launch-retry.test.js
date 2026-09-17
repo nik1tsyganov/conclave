@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -38,7 +38,7 @@ test('a classified launch failure keeps its evidence, marks the transaction RETR
   const native = failingOnce('openai', 'ERROR: Reconnecting... waiting for network');
   const opts = { ...run.opts, dispatchId: run.dispatches[0].dispatchId };
   await assert.rejects(runDispatch(opts, native), (error) => error.code === 'LAUNCH_RETRYABLE' && error.attempt === 1 && error.signature === 'network-reconnect');
-  const file = path.join(run.runDir, '.magi-dispatches');
+  const file = path.join(run.runDir, '.conclave-dispatches');
   const state = JSON.parse(fs.readFileSync(path.join(file, fs.readdirSync(file)[0]), 'utf8'));
   assert.equal(state.status, 'RETRYABLE');
   assert.equal(state.attempts.length, 1);
@@ -56,7 +56,7 @@ test('an unclassified failure stays terminal and retries are capped at two', asy
   const run = createSealedRun(t, [{ vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium', role: 'implement', class: 'standard-feature' }]);
   const opts = { ...run.opts, dispatchId: run.dispatches[0].dispatchId };
   await assert.rejects(runDispatch(opts, failingOnce('openai', 'exit 1 for an unknown reason')), (error) => error.code === 'LAUNCH_FAIL');
-  const file = path.join(run.runDir, '.magi-dispatches');
+  const file = path.join(run.runDir, '.conclave-dispatches');
   assert.equal(JSON.parse(fs.readFileSync(path.join(file, fs.readdirSync(file)[0]), 'utf8')).status, 'FAIL');
   await assert.rejects(runDispatch(opts, fakeVendor()), /use a new dispatch ID/);
 
@@ -66,7 +66,7 @@ test('an unclassified failure stays terminal and retries are capped at two', asy
   await assert.rejects(runDispatch(opts2, always), (error) => error.code === 'LAUNCH_RETRYABLE' && error.attempt === 1);
   await assert.rejects(runDispatch(opts2, always), (error) => error.code === 'LAUNCH_RETRYABLE' && error.attempt === 2);
   await assert.rejects(runDispatch(opts2, always), (error) => error.code === 'LAUNCH_FAIL');
-  const file2 = path.join(run2.runDir, '.magi-dispatches');
+  const file2 = path.join(run2.runDir, '.conclave-dispatches');
   const final = JSON.parse(fs.readFileSync(path.join(file2, fs.readdirSync(file2)[0]), 'utf8'));
   assert.deepEqual([final.status, final.attempts.length], ['FAIL', 2]);
   await assert.rejects(runDispatch(opts2, always), /use a new dispatch ID/);
@@ -76,7 +76,7 @@ test('a run refuses a launch beyond principles.maxConcurrentDispatches while ear
   const run = createSealedRun(t, [{ vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium', role: 'implement', class: 'standard-feature' }]);
   const cap = require('./dispatch-matrix.js').loadMatrix().principles.maxConcurrentDispatches;
   assert.equal(cap, 3);
-  const dir = path.join(run.runDir, '.magi-dispatches'); fs.mkdirSync(dir, { recursive: true });
+  const dir = path.join(run.runDir, '.conclave-dispatches'); fs.mkdirSync(dir, { recursive: true });
   for (let i = 0; i < cap; i++) fs.writeFileSync(path.join(dir, `fake-running-${i}.json`), JSON.stringify({ status: 'RUNNING', startedAt: new Date().toISOString() }));
   const opts = { ...run.opts, dispatchId: run.dispatches[0].dispatchId };
   await assert.rejects(runDispatch(opts, fakeVendor()), /concurrent dispatch cap reached: 3 RUNNING of 3/);

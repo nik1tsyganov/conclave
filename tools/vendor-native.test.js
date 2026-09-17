@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -9,7 +9,7 @@ const { nativeLog } = require('./vendor-native.js');
 const { parseGoogle } = require('./cli-proof.js');
 
 test('Google collector uses the dispatch log when simultaneous native home logs collide', (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-native-log-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-native-log-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const homeLogs = path.join(root, '.gemini', 'antigravity-cli', 'log'); fs.mkdirSync(homeLogs, { recursive: true });
   const id = 'current-native-conversation';
@@ -27,7 +27,7 @@ test('Google collector uses the dispatch log when simultaneous native home logs 
 });
 
 test('Google collection preserves conflicting native conversation creation evidence', (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-native-conflict-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-native-conflict-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const nativeLogPath = path.join(root, 'native-cli.log');
   const id = '10000000-0000-4000-8000-000000000001';
@@ -45,7 +45,7 @@ test('Google collection preserves conflicting native conversation creation evide
 });
 
 test('Google collection deduplicates only the same complete native identity sequence across channels', t => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-native-mirror-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-native-mirror-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const nativeLogPath = path.join(root, 'native-cli.log');
   const id = '10000000-0000-4000-8000-000000000001';

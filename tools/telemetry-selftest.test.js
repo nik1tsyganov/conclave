@@ -1,9 +1,9 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 /**
  * Round-trip selftest for the lead-written telemetry contract
- * (.cursor/skills/magi/references/cursor-host.md, "Lead-written telemetry").
+ * (.cursor/skills/conclave/references/cursor-host.md, "Lead-written telemetry").
  *
  * The sibling tools land in separate seat dispatches:
  *   tools/telemetry-append.js  (Codex seat)
@@ -42,7 +42,7 @@ const ROWS = [
 ];
 
 function withTempDir(fn) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-telemetry-selftest-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-telemetry-selftest-'));
   try {
     return fn(dir);
   } finally {

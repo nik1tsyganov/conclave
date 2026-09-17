@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const assert = require('node:assert');
@@ -20,7 +20,7 @@ function uniqueBody() {
 }
 
 function makeBrief(t, body) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-smoke-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-smoke-'));
   const briefPath = path.join(directory, 'BRIEF.md');
   fs.writeFileSync(briefPath, body, 'utf8');
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
@@ -40,7 +40,7 @@ function stagedBrief(t) {
   fs.writeFileSync(path.join(root, 'seat-profile.json'), JSON.stringify(profile), 'utf8');
   const seatContractPath = path.join(root, 'SEAT-CONTRACT.md');
   fs.writeFileSync(seatContractPath, [
-    '# MAGI CLI seat contract', 'Vendor: openai', 'Role: review', 'Class: review-adversarial',
+    '# CONCLAVE CLI seat contract', 'Vendor: openai', 'Role: review', 'Class: review-adversarial',
     `Permission profile: ${profile.permissionProfile}`,
     'Read-only leaf seat.',
     'Allowed staged skills:',
@@ -68,7 +68,7 @@ test('offline smoke checks current adapters with every child-process API forbidd
     '}',
   ].join('\n'), 'utf8');
   const result = spawnSync(process.execPath, ['--require', noSpawn, smokePath, '--brief', fixture.briefPath, '--cwd', fixture.root], {
-    encoding: 'utf8', env: { ...process.env, MAGI_ALLOWED_WORKSPACE_ROOTS: fixture.root },
+    encoding: 'utf8', env: { ...process.env, CONCLAVE_ALLOWED_WORKSPACE_ROOTS: fixture.root },
   });
   assert.strictEqual(result.status, 0, result.stderr);
   const report = JSON.parse(result.stdout);
@@ -88,7 +88,7 @@ test('the CLI accepts an explicit staged contract outside the brief directory', 
   const result = spawnSync(process.execPath, [
     smokePath, '--brief', briefPath, '--cwd', fixture.root,
     '--skill-root', fixture.staged.root, '--seat-contract', fixture.seatContractPath,
-  ], { encoding: 'utf8', env: { ...process.env, MAGI_ALLOWED_WORKSPACE_ROOTS: fixture.root } });
+  ], { encoding: 'utf8', env: { ...process.env, CONCLAVE_ALLOWED_WORKSPACE_ROOTS: fixture.root } });
   assert.strictEqual(result.status, 0, result.stderr);
   assert.strictEqual(JSON.parse(result.stdout).activationEligible, false);
 });
@@ -98,7 +98,7 @@ test('offline smoke still rejects a workspace outside its explicit grant', (t) =
   const allowedRoot = path.join(fixture.root, 'allowed');
   const result = spawnSync(process.execPath, [smokePath, '--brief', fixture.briefPath, '--cwd', fixture.root], {
     encoding: 'utf8',
-    env: { ...process.env, MAGI_DEV_ROOT: allowedRoot, MAGI_ALLOWED_WORKSPACE_ROOTS: allowedRoot },
+    env: { ...process.env, CONCLAVE_DEV_ROOT: allowedRoot, CONCLAVE_ALLOWED_WORKSPACE_ROOTS: allowedRoot },
   });
   assert.strictEqual(result.status, 1, result.stdout);
   assert.match(result.stderr, /WORKSPACE_FORBIDDEN/);
@@ -108,7 +108,7 @@ test('offline smoke still rejects a workspace outside its explicit grant', (t) =
 test('empty, missing, and omitted briefs are argument errors', async (t) => {
   for (const args of [
     ['--brief', makeBrief(t, ''), '--cwd', ROOT],
-    ['--brief', path.join(os.tmpdir(), 'magi-smoke-no-such-brief.md'), '--cwd', ROOT],
+    ['--brief', path.join(os.tmpdir(), 'conclave-smoke-no-such-brief.md'), '--cwd', ROOT],
     ['--cwd', ROOT],
   ]) {
     const io = capture();
@@ -123,7 +123,7 @@ test('missing basic markers fail before launch planning', async (t) => {
   const code = await main(['--brief', briefPath, '--cwd', ROOT], io);
   assert.strictEqual(code, 1);
   assert.strictEqual(fs.existsSync(`${briefPath}.pointer.md`), false);
-  for (const marker of ['RULES/INDEX|magi-cli-rules|STANDING', 'SEAT-CONTRACT', 'skills-manifest', 'WRITE AUDIT|R07']) {
+  for (const marker of ['RULES/INDEX|conclave-cli-rules|STANDING', 'SEAT-CONTRACT', 'skills-manifest', 'WRITE AUDIT|R07']) {
     assert.ok(io.stderrText.includes(marker));
   }
 });

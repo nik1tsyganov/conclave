@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
-// Asks the Jev decision engine (the MAGI arbiter since 2026-09-16) for a routing
+// Asks the Jev decision engine (the CONCLAVE arbiter since 2026-09-16) for a routing
 // class distribution per unit of a draft plan and writes a record bound to each
 // brief's hash. plan-seal reads the record with --jev-classification and gates
 // it; this tool proposes, the seal decides. One batched request per unit.
@@ -12,7 +12,7 @@ const { loadMatrix } = require('./dispatch-matrix.js');
 const { readJsonFile } = require('./json-file.js');
 const { hashFile, writeJson } = require('./dispatch-evidence.js');
 
-const PROTOCOL = 'magi-jev-plan-classify-v1';
+const PROTOCOL = 'conclave-jev-plan-classify-v1';
 
 function routingFromMatrix(matrix) {
   const gates = matrix.arbiter?.decisionEngine?.gates || {};

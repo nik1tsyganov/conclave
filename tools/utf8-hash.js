@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 /**
@@ -13,7 +13,7 @@
  * This is the Conclave-aligned hash. Do not hash the raw Buffer here —
  * `cli-pointer.js` still hashes raw bytes for pointer identity (BOM
  * bytes stay in that digest). Receipt and handoff hashes must go
- * through this helper so Magi raw-buffer vs Conclave UTF-8 does not
+ * through this helper so Conclave raw-buffer vs Conclave UTF-8 does not
  * diverge when cross-hashing.
  */
 

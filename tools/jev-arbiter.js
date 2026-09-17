@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 /**
- * MAGI arbiter judgments as Jev (TypeSafe System One) requests.
+ * CONCLAVE arbiter judgments as Jev (TypeSafe System One) requests.
  *
  * The chair stays a deterministic driver; Jev proposes, code gates. Each
  * judgment is one batched request. routing is mix-mode's routing.json
- * (keys: classes, decisionMatrix2026-09-16, magiConveneByClass2026-09-16).
+ * (keys: classes, decisionMatrix2026-09-16, conclaveConveneByClass2026-09-16).
  * capacityState is ~/.claude/docs/capacity-state.json passed in as data.
  *
  *   classifyTask({briefText, repoFacts, unitCount}, routing, opts)
@@ -27,7 +27,7 @@ const fs = require('node:fs');
 const client = require('./jev-client.js');
 
 const DM_KEY = 'decisionMatrix2026-09-16';
-const CONVENE_KEY = 'magiConveneByClass2026-09-16';
+const CONVENE_KEY = 'conclaveConveneByClass2026-09-16';
 const CONVENE_GATE = 0.6;
 const EVIDENCE_GATE = 0.6;
 const ROLES = ['implement', 'verify', 'review'];

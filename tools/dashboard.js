@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 // Animation admission is shared with the regression tests. History never pulses.
 function newHandoffIds(edges, seen, { continuous = false, nowMs = Date.now() } = {}) {
@@ -10,7 +10,7 @@ if (typeof document !== 'undefined') (() => {
   const $ = id => document.getElementById(id);
   const token = new URLSearchParams(location.hash.slice(1)).get('token') || '';
   const vendors = ['openai', 'anthropic', 'google'];
-  const names = { openai: 'Melchior', anthropic: 'Balthasar', google: 'Casper' };
+  const names = { openai: 'Ponens', anthropic: 'Scrutator', google: 'Advocatus' };
   let data = null, selected = 'all', paused = false, connected = false, pending = false, timer, selectedDispatch = null, fingerprint = '';
   let selectedHandoff = null, followHandoffs = true, seenHandoffs = new Set(), pulsing = new Set(), pulseTimer, observationEpoch = 0;
   const text = value => value === null || value === undefined || value === '' ? '—' : String(value);

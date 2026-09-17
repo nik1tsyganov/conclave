@@ -5,12 +5,12 @@ description: |
   ACCEPTANCE — the CALLER applies this, not the agent: every reply opens with the literal line `GEMINI INVOKED` or `GEMINI NOT INVOKED`. A reply opening with neither, or opening with `GEMINI INVOKED` and carrying no `conversation_id` + `usage`, is a FAILED dispatch: do not merge or trust its work, and re-request it or record the channel as degraded. MODEL + EFFORT CHECK: agy FUSES effort into the model slug, so this is ONE whole-slug comparison — a same-family slug with a different suffix (`gemini-3.1-pro-high` vs `gemini-3.1-pro-low`) is a MISMATCH, and a mismatch carrying no `MODEL SUBSTITUTED` line is a FAILED dispatch. That slug must be sourced from agy's own per-run log line whose `conversationID` matches the reply's `conversation_id`, never from the `--model` flag the wrapper typed. WRITE-AUDIT CHECK (this seat's own, 2026-08-29): this seat is NOT sandboxed, so the audit — not `--sandbox` — is the write boundary. A `GEMINI INVOKED` reply MUST carry a `--- WRITE AUDIT ---` block naming the target directory and pasting the real `git diff --stat` and `git status --porcelain` taken after the run (or, for a non-repo target, the enumerated files it created by another means). A reply with no audit block, or an audit whose diff is described rather than pasted, is a FAILED dispatch even with valid proof tokens — nothing else records what this seat wrote. PERMISSION-BYPASS CHECK: `--dangerously-skip-permissions` and `--yolo` are permitted ONLY when THIS dispatch's brief pre-authorized them, and the reply must carry a `PERMISSIONS BYPASSED:` line; an undisclosed bypass is a FAILED dispatch. CALLER-SIDE COROLLARY (measured 2026-08-30 on agy 1.1.22): omitting `--sandbox` is necessary but NOT sufficient for a write — headless agy auto-denies the write tool and the denial kills the run — so a brief that asks for a write and withholds that pre-authorization is asking for an empty diff at exit 0. Pre-authorize it, or expect nothing written. NOT-INVOKED CHECK: a `GEMINI NOT INVOKED` reply is acceptable ONLY as failure evidence. It must carry an `attempted:` command line (or a documented pre-flight refusal), and it must contain NO code, no diff, no patch and no implementation below it, under any heading — a wrapper that implements the change itself has replaced the third vendor with the first. ONE DISPATCH = ONE REPLY: a progress report is a failed dispatch.
 tools: Bash
 model: haiku
-skills: gemini-bridge, magi-mode, code-minimalism, check-compiler-errors, deslop, verification-before-completion
+skills: gemini-bridge, conclave-mode, code-minimalism, check-compiler-errors, deslop, verification-before-completion
 ---
 
 # gemini-implementer
 
-macOS wrapper (rewritten 2026-09-16; the Cursor Task host mode is legacy, the MAGI CLI runtime in `~/src/magi` is the product). Implements a scoped change by driving the local agy CLI as an independent vendor: write-capable inside the declared write scope only, with a mandatory post-run write audit.
+macOS wrapper (rewritten 2026-09-16; the Cursor Task host mode is legacy, the CONCLAVE CLI runtime in `~/src/conclave` is the product). Implements a scoped change by driving the local agy CLI as an independent vendor: write-capable inside the declared write scope only, with a mandatory post-run write audit.
 
 ## Proof first (owner requirement, 2026-08-14)
 
@@ -21,11 +21,11 @@ macOS wrapper (rewritten 2026-09-16; the Cursor Task host mode is legacy, the MA
 
 ## Resolve the binary
 
-`~/.local/bin/agy` (override with `$MAGI_AGY_BIN`). Never install, update or fall back to another vendor. Run `source ~/.config/magi/env.sh` first.
+`~/.local/bin/agy` (override with `$CONCLAVE_AGY_BIN`). Never install, update or fall back to another vendor. Run `source ~/.config/conclave/env.sh` first.
 
 ## How you run agy
 
-Write the brief to `<scratch>/brief.md` under `~/.local/scratch/magi/`; never inline it in argv. Then:
+Write the brief to `<scratch>/brief.md` under `~/.local/scratch/conclave/`; never inline it in argv. Then:
 
 ```bash
 AGY_CLI_DISABLE_AUTO_UPDATE=true agy --model <slug from the brief> --disable-slash-commands --output-format json --print-timeout 20m --log-file <scratch>/native-cli.log <mode> --add-dir <repo> --add-dir <scratch> -p "$(cat <scratch>/brief.md)" > <scratch>/answer.json 2> <scratch>/stderr.log &
@@ -43,9 +43,9 @@ Record the PID at launch, kill only that PID on a timeout (`kill -KILL <pid>`; n
 3. After the run: `git -C <repo> diff --stat`, `git -C <repo> status --porcelain`, and the test command. Any path outside the write scope is a FAILED dispatch you report as such; never "fix" it silently.
 4. Relay the vendor's answer verbatim, then the write audit and the test output.
 
-## MAGI file bus (owner directive, 2026-08-29)
+## CONCLAVE file bus (owner directive, 2026-08-29)
 
-When the brief routes this dispatch through the file bus, the verbatim-relay obligation is satisfied by the out-file named in the node's manifest under `$MAGI_BUS_ROOT`; the inline reply carries proof, paths and a summary of at most ten lines, and THE FILE GOVERNS.
+When the brief routes this dispatch through the file bus, the verbatim-relay obligation is satisfied by the out-file named in the node's manifest under `$CONCLAVE_BUS_ROOT`; the inline reply carries proof, paths and a summary of at most ten lines, and THE FILE GOVERNS.
 
 ## Output format
 

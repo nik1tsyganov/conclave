@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -13,7 +13,7 @@ test('binary precedence is explicit, env, config, then ~/.local/bin', (t) => {
   const home = temporary(t);
   const local = make(home, '.local/bin/codex');
   const configured = make(home, 'configured/codex'); const env = make(home, 'environment/codex'); const explicit = make(home, 'explicit/codex');
-  const options = { home, platform: 'darwin', env: { MAGI_CODEX_BIN: env }, config: { vendors: { openai: { binary: configured } } } };
+  const options = { home, platform: 'darwin', env: { CONCLAVE_CODEX_BIN: env }, config: { vendors: { openai: { binary: configured } } } };
   assert.equal(resolveVendorBinary('openai', { ...options, binary: explicit }), explicit);
   assert.equal(resolveVendorBinary('openai', options), env);
   assert.equal(resolveVendorBinary('openai', { ...options, env: {} }), configured);
@@ -33,6 +33,6 @@ test('every vendor resolves its own ~/.local/bin name', (t) => {
 
 test('a broken higher-priority override never silently falls back', (t) => {
   const home = temporary(t); make(home, '.local/bin/agy');
-  assert.throws(() => resolveVendorBinary('google', { home, platform: 'darwin', env: { MAGI_AGY_BIN: path.join(home, 'missing', 'agy') }, config: {} }), /Configured google CLI does not exist/);
+  assert.throws(() => resolveVendorBinary('google', { home, platform: 'darwin', env: { CONCLAVE_AGY_BIN: path.join(home, 'missing', 'agy') }, config: {} }), /Configured google CLI does not exist/);
   assert.throws(() => resolveVendorBinary('google', { home, platform: 'darwin', env: {}, config: { vendors: { google: { binary: path.join(home, 'missing', 'agy') } } } }), /No google CLI binary found/);
 });

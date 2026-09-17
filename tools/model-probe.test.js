@@ -1,18 +1,18 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {probe}=require('./model-probe.js');
 const {temporary,nativeCapture}=require('./test-fixtures.js');
 
 function fixture(t) {
-  const root=temporary(t,'magi-probe-edge-');
-  const original=process.env.MAGI_CODEX_BIN;process.env.MAGI_CODEX_BIN=process.execPath;
-  t.after(()=>{if(original===undefined)delete process.env.MAGI_CODEX_BIN;else process.env.MAGI_CODEX_BIN=original;});
+  const root=temporary(t,'conclave-probe-edge-');
+  const original=process.env.CONCLAVE_CODEX_BIN;process.env.CONCLAVE_CODEX_BIN=process.execPath;
+  t.after(()=>{if(original===undefined)delete process.env.CONCLAVE_CODEX_BIN;else process.env.CONCLAVE_CODEX_BIN=original;});
   let calls=0;
   const runLaunch=async launch=>{
     calls++;
     const prompt=fs.readFileSync(launch.stdinFile,'utf8');
-    const challenge=prompt.match(/MAGI_PROBE_[a-f0-9]{32}/)[0];
+    const challenge=prompt.match(/CONCLAVE_PROBE_[a-f0-9]{32}/)[0];
     const native=nativeCapture('openai','gpt-5.6-sol','medium',challenge);
     fs.writeFileSync(launch.args[launch.args.indexOf('-o')+1],native.capture);
     return {ok:true,exitCode:0,exitConfirmed:true,stdout:'',stderr:native.log};
@@ -65,10 +65,10 @@ test('probe rejects a missing explicit cwd and runtime output before mutation',a
   assert.equal(fs.existsSync(evidenceDir),false);assert.equal(f.calls(),0);
 });
 
-test('openai probe launch carries MAGI_CODEX_PROVIDER when set', async t => {
-  const prev = process.env.MAGI_CODEX_PROVIDER;
-  process.env.MAGI_CODEX_PROVIDER = 'openai';
-  t.after(() => { if (prev === undefined) delete process.env.MAGI_CODEX_PROVIDER; else process.env.MAGI_CODEX_PROVIDER = prev; });
+test('openai probe launch carries CONCLAVE_CODEX_PROVIDER when set', async t => {
+  const prev = process.env.CONCLAVE_CODEX_PROVIDER;
+  process.env.CONCLAVE_CODEX_PROVIDER = 'openai';
+  t.after(() => { if (prev === undefined) delete process.env.CONCLAVE_CODEX_PROVIDER; else process.env.CONCLAVE_CODEX_PROVIDER = prev; });
   const h = fixture(t);
   let seen;
   await probe(h.opts, { runLaunch: async launch => { seen = launch; return h.runLaunch(launch); } });

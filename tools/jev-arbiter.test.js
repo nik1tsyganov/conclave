@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const { describe, it } = require('node:test');
@@ -11,7 +11,7 @@ function dist(entries) {
   return Object.fromEntries(entries);
 }
 
-// A routing.json subset shaped like mix-mode's (classes, decisionMatrix2026-09-16, magiConveneByClass2026-09-16).
+// A routing.json subset shaped like mix-mode's (classes, decisionMatrix2026-09-16, conclaveConveneByClass2026-09-16).
 const ROUTING = {
   classes: Object.fromEntries(CLASS_IDS.map((id) => [id, { title: `Title of ${id}` }])),
   'decisionMatrix2026-09-16': {
@@ -40,7 +40,7 @@ const ROUTING = {
       },
     },
   },
-  'magiConveneByClass2026-09-16': { 'hard-risky': 0.68, planning: 0.25, 'standard-feature': 0.32 },
+  'conclaveConveneByClass2026-09-16': { 'hard-risky': 0.68, planning: 0.25, 'standard-feature': 0.32 },
 };
 
 function ledger(statusById) {

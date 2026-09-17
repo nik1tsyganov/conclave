@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 /**
- * MAGI receipt ACK (receipt.v1).
+ * CONCLAVE receipt ACK (receipt.v1).
  *
  * Conclave-aligned ACK that a seat opened the pointer brief: dispatchId,
  * seat, briefPath, briefSha256, firstLineEcho, ts. No Conclave join key.
  *
  * Cursor Task returns via chat reply only — there is no Task capture
- * module (unlike Magi CLI --capture). Persistence is the explicit disk
+ * module (unlike Conclave CLI --capture). Persistence is the explicit disk
  * write from acknowledgeReceipt / writeReceipt. Do not invent a hook.
  *
  * briefSha256 is UTF-8 SHA-256 (tools/utf8-hash.js), not the raw-buffer
@@ -26,7 +26,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { inspectBrief } = require('./cli-pointer.js');
-const { assertHostMode, assertInJail } = require('./magi-bus-path.js');
+const { assertHostMode, assertInJail } = require('./conclave-bus-path.js');
 const { firstLineUtf8, firstLineUtf8File, sha256Utf8File } = require('./utf8-hash.js');
 
 const SCHEMA_ID = 'receipt.v1';

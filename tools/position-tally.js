@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 /**
- * MAGI POSITION tally (FIX-MATH-002).
+ * CONCLAVE POSITION tally (FIX-MATH-002).
  *
- * Enforces the documented MAGI passage arithmetic so the arbiter does not
+ * Enforces the documented CONCLAVE passage arithmetic so the arbiter does not
  * hand-count panel ballots. Canonical sources in this repo:
- *   README.md, .cursor/skills/magi/SKILL.md, cursor-cli.md,
+ *   README.md, .cursor/skills/conclave/SKILL.md, cursor-cli.md,
  *   agents/gemini-reviewer.md + agents/gemini-verifier.md (protocol 6 scope).
- * magi-mode SKILL lives at ~/.claude and is not vendored here.
+ * conclave-mode SKILL lives at ~/.claude and is not vendored here.
  *
  * Passage: >=2 APPROVE among eligible electors.
  * ABSTAIN never counts toward passage.
@@ -25,7 +25,7 @@
  *
  * Protocol 6 author-vendor recusal applies to POSITION only: that elector
  * is ineligible. Degraded duo is the cursor-cli Claude fail path only
- * (anthropic ineligible; Codex+Gemini remain). Idle Casper is an
+ * (anthropic ineligible; Codex+Gemini remain). Idle Advocatus is an
  * activation failure, not a duo — this tool refuses to mark google
  * degraded.
  */
@@ -142,7 +142,7 @@ function resolveEligible(options) {
     const vendor = normalizeElector(options.degradedVendor);
     if (vendor !== DEGRADED_VENDOR) {
       throw new TallyError(
-        `degraded duo is the cursor-cli Claude fail path only; cannot mark ${vendor} degraded (idle Casper is FAILED activation, not a duo)`
+        `degraded duo is the cursor-cli Claude fail path only; cannot mark ${vendor} degraded (idle Advocatus is FAILED activation, not a duo)`
       );
     }
   }

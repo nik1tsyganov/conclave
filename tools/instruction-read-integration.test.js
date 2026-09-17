@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -33,7 +33,7 @@ for (const route of routes) {
     assert.equal(json(path.join(evidence, 'receipt-ack.json')).status, 'FAIL');
     assert.equal(json(path.join(evidence, 'instruction-reads.json')).status, 'FAIL');
     assert.ok(fs.statSync(path.join(evidence, 'native-instructions.jsonl')).size > 0);
-    assert.equal(fs.existsSync(path.join(run.runDir, '.magi-sessions')), false);
+    assert.equal(fs.existsSync(path.join(run.runDir, '.conclave-sessions')), false);
     assert.equal(fs.existsSync(path.join(run.runDir, 'telemetry/dispatches.jsonl')), false);
     assert.equal(native.calls(), 1);
   });

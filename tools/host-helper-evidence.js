@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const crypto = require('node:crypto');
@@ -53,7 +53,7 @@ function stageHelperEvidence({ runDir, label, from }) {
     source,
     destination,
     files,
-    note: 'Non-voting Synara/browser helper evidence. Never count as a MAGI POSITION.',
+    note: 'Non-voting Synara/browser helper evidence. Never count as a CONCLAVE POSITION.',
   };
   writeJson(path.join(destination, 'host-helper-manifest.json'), manifest);
   return manifest;

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/nik1tsyganov/magi/telemetry/schema.json",
-  "title": "MAGI dispatch telemetry row",
-  "description": "Lead-written MAGI Cursor dispatch row (tools/telemetry-append.js). This is not the Conclave/Claude-host hook log. See telemetry/README.md for the adapter contract; no join key is defined.",
+  "$id": "https://github.com/nik1tsyganov/conclave/telemetry/schema.json",
+  "title": "CONCLAVE dispatch telemetry row",
+  "description": "Lead-written CONCLAVE Cursor dispatch row (tools/telemetry-append.js). This is not the Conclave/Claude-host hook log. See telemetry/README.md for the adapter contract; no join key is defined.",
   "type": "object",
   "required": ["vendor", "role", "hostMode", "routedBy"],
   "additionalProperties": true,

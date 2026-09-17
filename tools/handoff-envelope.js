@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 /**
- * MAGI handoff envelope (handoff-envelope.v1).
+ * CONCLAVE handoff envelope (handoff-envelope.v1).
  *
  * Append-only seat handoff rows for telemetry/handoffs.jsonl. This is not
  * the dispatch-row contract in telemetry/schema.json. No Conclave join key.
  *
  * Cursor Task returns via chat reply only — there is no Task capture
- * module (unlike Magi CLI --capture). Persistence is the explicit
+ * module (unlike Conclave CLI --capture). Persistence is the explicit
  * appendFile from recordHandoff / appendHandoff. Do not invent a hook.
  *
  * briefSha256 and outputSha256s are UTF-8 SHA-256 (tools/utf8-hash.js).
@@ -22,11 +22,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { inspectBrief } = require('./cli-pointer.js');
-const { assertHostMode, assertInJail } = require('./magi-bus-path.js');
+const { assertHostMode, assertInJail } = require('./conclave-bus-path.js');
 const { firstLineUtf8File, sha256Utf8File } = require('./utf8-hash.js');
 
 const SCHEMA_ID = 'handoff-envelope.v1';
-const SYSTEMS = Object.freeze(['magi', 'magi-cli']);
+const SYSTEMS = Object.freeze(['conclave', 'conclave-cli']);
 const STATUSES = Object.freeze(['accepted', 'blocked', 'done', 'failed']);
 const REQUIRED = Object.freeze([
   'dispatchId',
@@ -121,8 +121,8 @@ function rejectJoinKeys(row) {
 
 function systemFromHostMode(hostMode) {
   assertHostMode(hostMode);
-  if (hostMode === 'cursor') return 'magi';
-  if (hostMode === 'cursor-cli' || hostMode === 'synara' || hostMode === 'claude-code') return 'magi-cli';
+  if (hostMode === 'cursor') return 'conclave';
+  if (hostMode === 'cursor-cli' || hostMode === 'synara' || hostMode === 'claude-code') return 'conclave-cli';
   const _exhaustive = hostMode;
   throw new HandoffError(`unhandled hostMode: ${_exhaustive}`);
 }

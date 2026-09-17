@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 // Diagnostic output only. This tool never writes run evidence or grants approval.
@@ -59,7 +59,7 @@ function createReport({ runDir, outputDir, phase = 'finalize', errorFile, projec
     dispatches = run.outcomes.map(outcome => {
       const entry = run.plan.dispatches.find(row => row.dispatchId === outcome.dispatchId);
       const execution = run.executions.find(row => row.entry.dispatchId === outcome.dispatchId);
-      const transactionPath = path.join(root, '.magi-dispatches', `${transactionKey(entry)}.json`);
+      const transactionPath = path.join(root, '.conclave-dispatches', `${transactionKey(entry)}.json`);
       return { ...outcome, modelRequested: entry.model, effortRequested: entry.effort,
         modelObserved: execution?.proof.modelObserved ?? null,
         nativeId: execution?.proof.sessionId || execution?.proof.conversationId || null,
@@ -82,7 +82,7 @@ function createReport({ runDir, outputDir, phase = 'finalize', errorFile, projec
     executionStatus: assessment?.executionStatus ?? 'UNVERIFIED', approvalStatus: assessment?.approvalStatus ?? 'UNVERIFIED',
     dispatches, issues, commandFailure,
     interpretation: 'Diagnostic snapshot, not activation evidence. NOT_RUN/RUNNING/AWAITING_ATTESTATION do not establish a defect or provider outage. Reproduce and classify each failure before fixing it.' };
-  const lines = ['# MAGI project run report', '', `Status: **${report.status}**`, '',
+  const lines = ['# CONCLAVE project run report', '', `Status: **${report.status}**`, '',
     `Recorded: ${report.recordedAt}`, `Phase: ${phase}`, `Run: ${root}`, `Plan: ${report.planId || 'unverified'}`,
     `Execution: ${report.executionStatus}; approval: ${report.approvalStatus}`, '', report.interpretation, '',
     '## Findings', '', ...issues.map((issue, index) => `${index + 1}. [${issue.status}] ${issue.dispatchId || issue.unitId || issue.kind}: ${issue.message}`),

@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const assert = require('node:assert/strict');
@@ -51,7 +51,7 @@ function capabilitiesFixture() {
   };
 }
 
-test('catalog overlay maps MAGI vendors and keeps Google fused effort', () => {
+test('catalog overlay maps CONCLAVE vendors and keeps Google fused effort', () => {
   const catalog = normalizeCapabilities(capabilitiesFixture());
   assert.equal(catalog.vendorMap.openai.optionKey, 'reasoningEffort');
   assert.equal(catalog.vendorMap.anthropic.optionKey, 'effort');
@@ -62,7 +62,7 @@ test('catalog overlay maps MAGI vendors and keeps Google fused effort', () => {
   const overlay = launchOverlay(catalog, 'openai', 'gpt-5.6-sol', 'high');
   assert.equal(overlay.synaraProvider, 'codex');
   assert.equal(overlay.synaraOptionKey, 'reasoningEffort');
-  assert.equal(overlay.magiEffort, 'high');
+  assert.equal(overlay.conclaveEffort, 'high');
 });
 
 test('narrowing drops unlisted routes and never invents new ones', () => {
@@ -114,7 +114,7 @@ test('plan-seal requires a catalog for synara and rejects banana', (t) => {
 });
 
 test('synara-catalog CLI imports a capabilities snapshot', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-catalog-cli-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-catalog-cli-'));
   test.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const input = path.join(root, 'caps.json');
   const output = path.join(root, 'catalog.json');

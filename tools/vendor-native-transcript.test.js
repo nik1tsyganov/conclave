@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -12,7 +12,7 @@ function fixture(t) {
   const directory = path.join(codexHome, 'sessions', '2026', '09', '07');
   fs.mkdirSync(directory, { recursive: true });
   const file = path.join(directory, `rollout-2026-09-07T12-00-00-${id}.jsonl`);
-  const cwd = '/opt/magi/src/product';
+  const cwd = '/opt/conclave/src/product';
   const text = `${JSON.stringify({ type: 'session_meta', payload: { id, cwd } })}\n${JSON.stringify({ type: 'event_msg', payload: { type: 'item_completed', thread_id: id } })}\n`;
   fs.writeFileSync(file, text);
   return { file, directory, codexHome, cwd, text };
@@ -21,7 +21,7 @@ test('native transcript selection binds exact session and workspace without choo
   const f = fixture(t);
   fs.writeFileSync(path.join(f.directory, 'rollout-newest-unrelated.jsonl'), 'not our session');
   assert.deepEqual(codexSessionTranscript(id, f), { path: f.file, text: f.text });
-  assert.throws(() => codexSessionTranscript(id, { ...f, cwd: '/opt/magi/src/other' }), /does not match/);
+  assert.throws(() => codexSessionTranscript(id, { ...f, cwd: '/opt/conclave/src/other' }), /does not match/);
 });
 test('native transcript rejects missing, duplicate and malformed captures', t => {
   const f = fixture(t);

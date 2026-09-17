@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 const fs = require('node:fs');
 const os = require('node:os');
@@ -10,7 +10,7 @@ const { runDispatch } = require('./dispatch-run.js');
 const { createReport, main } = require('./project-run-report.js');
 
 function output(t) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-report-test-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-report-test-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   return path.join(dir, 'report');
 }
@@ -25,7 +25,7 @@ function panel(t) {
     { unitId: 'u1' },
     { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'opus', effort: 'medium', authorVendor: 'openai' },
     { unitId: 'u1', role: 'review', class: 'review-adversarial', vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', authorVendor: 'openai' },
-  ], { magiConvened: true });
+  ], { conclaveConvened: true });
 }
 
 test('report revalidates successful evidence without changing any run bytes', async t => {

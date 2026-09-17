@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const assert = require('node:assert');
@@ -10,7 +10,7 @@ const { allowedWorkspace, anthropicLaunch, googleLaunch, openaiLaunch } = requir
 const { CLAUDE_RESPONSE_PROTOCOL, CLAUDE_RESPONSE_SCHEMA, validateClaudeResponseLaunch } = require('./vendor-native.js');
 
 function fixture(t) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-adapter-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-adapter-'));
   const briefPath = path.join(dir, 'BRIEF.md');
   const seatContractPath = path.join(dir, 'SEAT-CONTRACT.md');
   const skillRoot = path.join(dir, 'skills');
@@ -22,28 +22,28 @@ function fixture(t) {
 }
 
 const fakeBins = {
-  MAGI_CODEX_BIN: '/opt/magi/bin/codex',
-  MAGI_AGY_BIN: '/opt/magi/bin/agy',
-  MAGI_CLAUDE_BIN: '/opt/magi/bin/claude',
-  MAGI_DEV_ROOT: '/opt/magi/src',
+  CONCLAVE_CODEX_BIN: '/opt/conclave/bin/codex',
+  CONCLAVE_AGY_BIN: '/opt/conclave/bin/agy',
+  CONCLAVE_CLAUDE_BIN: '/opt/conclave/bin/claude',
+  CONCLAVE_DEV_ROOT: '/opt/conclave/src',
 };
 
-test('workspace authorization is project-root based rather than magi-repo based', () => {
-  assert.strictEqual(allowedWorkspace('/opt/magi/src/product-a', fakeBins), '/opt/magi/src/product-a');
-  assert.throws(() => allowedWorkspace('/private/elsewhere', fakeBins), /outside MAGI allowed roots/);
+test('workspace authorization is project-root based rather than conclave-repo based', () => {
+  assert.strictEqual(allowedWorkspace('/opt/conclave/src/product-a', fakeBins), '/opt/conclave/src/product-a');
+  assert.throws(() => allowedWorkspace('/private/elsewhere', fakeBins), /outside CONCLAVE allowed roots/);
 });
 
 test('workspace authorization keeps host-native POSIX paths', (t) => {
-  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'magi-posix-ws-')));
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-posix-ws-')));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  assert.strictEqual(allowedWorkspace(root, { MAGI_DEV_ROOT: root }), path.resolve(root));
+  assert.strictEqual(allowedWorkspace(root, { CONCLAVE_DEV_ROOT: root }), path.resolve(root));
 });
 
 test('OpenAI non-implement roles are read-only while implementer is workspace-write', (t) => {
   const f = fixture(t);
   const common = {
     briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
-    cwd: '/opt/magi/src/product-a', model: 'gpt-5.6-sol', effort: 'high', capturePath: path.join(f.dir, 'capture.txt'),
+    cwd: '/opt/conclave/src/product-a', model: 'gpt-5.6-sol', effort: 'high', capturePath: path.join(f.dir, 'capture.txt'),
     env: fakeBins, mustExistBinary: false,
   };
   for (const role of ['review', 'verify', 'plan', 'research']) assert.ok(openaiLaunch({ ...common, role }).args.includes('read-only'));
@@ -54,7 +54,7 @@ test('Google non-implement roles use sandbox while implementer uses write bypass
   const f = fixture(t);
   const common = {
     briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
-    cwd: '/opt/magi/src/product-a', model: 'gemini-3.1-pro-high', env: fakeBins, home: '/Users/test', mustExistBinary: false,
+    cwd: '/opt/conclave/src/product-a', model: 'gemini-3.1-pro-high', env: fakeBins, home: '/Users/test', mustExistBinary: false,
   };
   for (const role of ['review', 'verify', 'plan', 'research']) assert.ok(googleLaunch({ ...common, role }).args.includes('--sandbox'));
   assert.ok(googleLaunch({ ...common, role: 'implement' }).args.includes('--dangerously-skip-permissions'));
@@ -64,7 +64,7 @@ test('Claude non-implement roles do not inherit implement bypassPermissions', (t
   const f = fixture(t);
   const common = {
     briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
-    cwd: '/opt/magi/src/product-a', model: 'fable', effort: 'xhigh', env: fakeBins, mustExistBinary: false,
+    cwd: '/opt/conclave/src/product-a', model: 'fable', effort: 'xhigh', env: fakeBins, mustExistBinary: false,
   };
   for (const role of ['implement', 'review', 'verify', 'plan', 'research']) {
     const launch = anthropicLaunch({ ...common, role });
@@ -99,7 +99,7 @@ test('every adapter keeps even a single-line brief body out of launch arguments 
   const body = 'PRIVATE_BRIEF_CONTENT_727e4df5';
   fs.writeFileSync(f.briefPath, body);
   for (const build of [openaiLaunch, googleLaunch, anthropicLaunch]) {
-    const launch = build({ ...f, cwd: '/opt/magi/src/product-a', model: 'fixture', effort: 'high', role: 'implement',
+    const launch = build({ ...f, cwd: '/opt/conclave/src/product-a', model: 'fixture', effort: 'high', role: 'implement',
       capturePath: path.join(f.dir, 'capture.txt'), env: fakeBins, mustExistBinary: false });
     assert.ok(!launch.args.some(arg => String(arg).includes(body)));
     if (launch.stdinFile) assert.ok(!fs.readFileSync(launch.stdinFile, 'utf8').includes(body));
@@ -110,7 +110,7 @@ test('Claude pointer and system prompt require a FIRST native Read of the seat c
   const f = fixture(t);
   const launch = anthropicLaunch({
     briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
-    cwd: '/opt/magi/src/product-a', model: 'fable', effort: 'xhigh', role: 'implement',
+    cwd: '/opt/conclave/src/product-a', model: 'fable', effort: 'xhigh', role: 'implement',
     env: fakeBins, mustExistBinary: false,
   });
   const pointer = fs.readFileSync(launch.stdinFile, 'utf8');
@@ -126,7 +126,7 @@ test('Claude pointer and system prompt require a FIRST native Read of the seat c
 test('every adapter requires contract-listed reads before product work and treats missing instructions as blockers', (t) => {
   const f = fixture(t);
   for (const build of [openaiLaunch, googleLaunch, anthropicLaunch]) {
-    const launch = build({ ...f, cwd: '/opt/magi/src/product-a', model: 'fixture', effort: 'high', role: 'verify',
+    const launch = build({ ...f, cwd: '/opt/conclave/src/product-a', model: 'fixture', effort: 'high', role: 'verify',
       capturePath: path.join(f.dir, 'capture.txt'), env: fakeBins, mustExistBinary: false });
     const pointer = launch.stdinFile ? fs.readFileSync(launch.stdinFile, 'utf8') : launch.args[launch.args.indexOf('-p') + 1];
     assert.ok(pointer.includes('Complete every required instruction read in that contract before product work.'));
@@ -144,7 +144,7 @@ test('every adapter requires contract-listed reads before product work and treat
 test('oversized seat pointers fail before a pointer file is written', (t) => {
   const f = fixture(t);
   for (const build of [openaiLaunch, googleLaunch, anthropicLaunch]) {
-    assert.throws(() => build({ ...f, seatContractPath: '/opt/magi/src/' + 'x'.repeat(2100), cwd: '/opt/magi/src/product-a',
+    assert.throws(() => build({ ...f, seatContractPath: '/opt/conclave/src/' + 'x'.repeat(2100), cwd: '/opt/conclave/src/product-a',
       model: 'fixture', effort: 'high', role: 'implement', capturePath: path.join(f.dir, 'capture.txt'),
       env: fakeBins, mustExistBinary: false }), /2000-character delivery limit/);
     assert.ok(!fs.existsSync(f.briefPath + '.pointer.md'));
@@ -155,11 +155,11 @@ test('Google and Claude launchers mount only staged seat skill root, not full gl
   const f = fixture(t);
   const google = googleLaunch({
     briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
-    cwd: '/opt/magi/src/product-a', model: 'gemini-3.1-pro-high', role: 'research', env: fakeBins, mustExistBinary: false,
+    cwd: '/opt/conclave/src/product-a', model: 'gemini-3.1-pro-high', role: 'research', env: fakeBins, mustExistBinary: false,
   });
   const claude = anthropicLaunch({
     briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
-    cwd: '/opt/magi/src/product-a', model: 'fable', effort: 'xhigh', role: 'review', env: fakeBins, mustExistBinary: false,
+    cwd: '/opt/conclave/src/product-a', model: 'fable', effort: 'xhigh', role: 'review', env: fakeBins, mustExistBinary: false,
   });
   assert.ok(google.args.includes(path.resolve(f.skillRoot)));
   assert.strictEqual(google.args[google.args.indexOf('--log-file') + 1], path.join(f.dir, 'native-cli.log'));
@@ -172,7 +172,7 @@ test('Google launches drop inherited Synara Antigravity capture environment', (t
   const f = fixture(t);
   const launch = googleLaunch({
     briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
-    cwd: '/opt/magi/src/product-a', model: 'gemini-3.1-pro-high', role: 'research', mustExistBinary: false,
+    cwd: '/opt/conclave/src/product-a', model: 'gemini-3.1-pro-high', role: 'research', mustExistBinary: false,
     env: {
       ...fakeBins,
       SYNARA_ANTIGRAVITY_EVENTS: '/tmp/synara-events.ndjson',

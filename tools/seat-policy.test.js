@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const assert = require('node:assert');
@@ -13,7 +13,7 @@ test('standard OpenAI implementer receives only implementation/testing skills', 
   const profile = buildSeatProfile(profiles, { vendor: 'openai', role: 'implement', class: 'standard-feature' });
   assert.deepStrictEqual(profile.skills, ['seat-openai', 'implement', 'testing']);
   assert.strictEqual(profile.permissionProfile, 'workspace-write');
-  for (const forbidden of ['magi-mode', 'magi-dispatch', 'mix-mode', 'codex-bridge', 'engineering-orchestrator']) {
+  for (const forbidden of ['conclave-mode', 'conclave-dispatch', 'mix-mode', 'codex-bridge', 'engineering-orchestrator']) {
     assert.ok(!profile.skills.includes(forbidden));
   }
 });

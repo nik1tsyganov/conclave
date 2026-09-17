@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 // Jev tally (2026-09-16): the typed counterpart of panel-tally. Reads the unit's
 // committed PASS verify/review transactions, extracts each native response and
@@ -22,7 +22,7 @@ async function tallyUnit({ runDir, unitId, systemOne, provenancePath }) {
   const author = run.plan.dispatches.find(d => d.unitId === unitId && d.role === 'implement')?.vendor || null;
   const replies = [];
   for (const entry of run.plan.dispatches.filter(d => d.unitId === unitId && ['verify', 'review'].includes(d.role))) {
-    const file = path.join(run.root, '.magi-dispatches', `${transactionKey(entry)}.json`);
+    const file = path.join(run.root, '.conclave-dispatches', `${transactionKey(entry)}.json`);
     if (!fs.existsSync(file)) { replies.push({ seat: null, dispatchId: entry.dispatchId, vendor: entry.vendor, role: entry.role, position: null, reason: 'NOT_RUN' }); continue; }
     const state = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (state.status !== 'PASS') { replies.push({ seat: null, dispatchId: entry.dispatchId, vendor: entry.vendor, role: entry.role, position: null, reason: state.status }); continue; }

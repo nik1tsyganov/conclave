@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const { spawnSync } = require('node:child_process');
@@ -28,7 +28,7 @@ describe('hog-check', () => {
   });
 
   it('rejects anonymous implement rows that would skip uniqueness', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-hog-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-hog-'));
     const file = path.join(dir, 'anon.jsonl');
     fs.writeFileSync(file, '{"vendor":"openai","role":"implement"}\n{"vendor":"google","role":"implement"}\n{"vendor":"anthropic","role":"implement"}\n');
     const r = run(file);

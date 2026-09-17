@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const assert = require('node:assert/strict');
@@ -21,7 +21,7 @@ const mixed = key => key.toLowerCase().replace(/(^|_)([a-z])/g, (_, prefix, lett
 const allAliases = Object.fromEntries(prohibited.flatMap(key => [key, key.toLowerCase(), mixed(key)]).map(key => [key, 'synthetic']));
 const allowed = {
   Path: 'synthetic-path', HOME: '/synthetic-home',
-  CODEX_HOME: '/synthetic-codex', CLAUDE_CODE_OAUTH_TOKEN: 'synthetic-oauth', MAGI_DEV_ROOT: '/opt/magi/src',
+  CODEX_HOME: '/synthetic-codex', CLAUDE_CODE_OAUTH_TOKEN: 'synthetic-oauth', CONCLAVE_DEV_ROOT: '/opt/conclave/src',
   OPENAI_API_KEY_BACKUP: 'synthetic-near-match', MY_GOOGLE_API_KEY: 'synthetic-near-match',
 };
 
@@ -68,18 +68,18 @@ test('default source sanitizes inherited process variables without changing the 
 for (const vendor of ['openai', 'anthropic', 'google']) {
   for (const role of ['implement', 'verify']) {
     test(`${vendor} ${role} launch receives sanitized subscription environment`, t => {
-      const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-env-'));
+      const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-env-'));
       t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
       const briefPath = path.join(directory, 'brief.md');
       fs.writeFileSync(briefPath, 'SYNTHETIC ENV TEST\nNo native call.\n');
       const source = {
         ...allAliases, ...allowed,
-        MAGI_CODEX_BIN: path.join(directory, 'codex'),
-        MAGI_CLAUDE_BIN: path.join(directory, 'claude'),
-        MAGI_AGY_BIN: path.join(directory, 'agy'),
+        CONCLAVE_CODEX_BIN: path.join(directory, 'codex'),
+        CONCLAVE_CLAUDE_BIN: path.join(directory, 'claude'),
+        CONCLAVE_AGY_BIN: path.join(directory, 'agy'),
       };
       const launch = buildLaunch({
-        vendor, role, cwd: '/opt/magi/src/synthetic-work', briefPath,
+        vendor, role, cwd: '/opt/conclave/src/synthetic-work', briefPath,
         seatContractPath: path.join(directory, 'SEAT-CONTRACT.md'),
         skillRoot: path.join(directory, 'skills'),
         capturePath: path.join(directory, 'capture.txt'),
@@ -90,9 +90,9 @@ for (const vendor of ['openai', 'anthropic', 'google']) {
       for (const [key, value] of Object.entries(allowed)) assert.equal(launch.env[key], value);
       assert.deepEqual(source, {
         ...allAliases, ...allowed,
-        MAGI_CODEX_BIN: path.join(directory, 'codex'),
-        MAGI_CLAUDE_BIN: path.join(directory, 'claude'),
-        MAGI_AGY_BIN: path.join(directory, 'agy'),
+        CONCLAVE_CODEX_BIN: path.join(directory, 'codex'),
+        CONCLAVE_CLAUDE_BIN: path.join(directory, 'claude'),
+        CONCLAVE_AGY_BIN: path.join(directory, 'agy'),
       });
     });
   }

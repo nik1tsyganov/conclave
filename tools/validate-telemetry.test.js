@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const { spawnSync } = require('node:child_process');
@@ -7,7 +7,7 @@ const assert = require('node:assert');
 const path = require('node:path');
 const { mkdtempSync, writeFileSync, rmSync, readFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
-const { SCHEMA_PATH, SCHEMA_ID, loadSchema, validateRow, adaptMagiRow } = require('./validate-telemetry.js');
+const { SCHEMA_PATH, SCHEMA_ID, loadSchema, validateRow, adaptConclaveRow } = require('./validate-telemetry.js');
 
 const node = process.execPath;
 const helper = path.join(__dirname, 'validate-telemetry.js');
@@ -37,9 +37,9 @@ function withTempDir(fn) {
 }
 
 describe('validate-telemetry', () => {
-  it('schema required fields match the Magi append contract', () => {
+  it('schema required fields match the Conclave append contract', () => {
     const schema = loadSchema();
-    assert.strictEqual(schema.$id, 'https://github.com/nik1tsyganov/magi/telemetry/schema.json');
+    assert.strictEqual(schema.$id, 'https://github.com/nik1tsyganov/conclave/telemetry/schema.json');
     assert.deepStrictEqual(schema.required, ['vendor', 'role', 'hostMode', 'routedBy']);
     assert.deepStrictEqual(schema.properties.vendor.enum, ['anthropic', 'openai', 'google']);
     assert.strictEqual(schema.properties.routedBy.const, 'arbiter');
@@ -84,11 +84,11 @@ describe('validate-telemetry', () => {
     assert.strictEqual(date.stderr.trim(), 'invalid date');
   });
 
-  it('adapter envelope names Magi and emits no join key', () => {
+  it('adapter envelope names Conclave and emits no join key', () => {
     const row = validRow({ vendorSideTokens: null });
-    const envelope = adaptMagiRow(row);
+    const envelope = adaptConclaveRow(row);
     assert.strictEqual(envelope.schemaId, SCHEMA_ID);
-    assert.strictEqual(envelope.sourceSystem, 'magi');
+    assert.strictEqual(envelope.sourceSystem, 'conclave');
     assert.strictEqual(envelope.correlationPolicy, 'none');
     assert.deepStrictEqual(envelope.joinKeys, []);
     assert.deepStrictEqual(envelope.payload, row);

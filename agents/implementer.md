@@ -3,7 +3,7 @@ name: implementer
 description: |
   Implements changes using Context7 for library basics and the installed skills for repo-specific patterns.
 tools: Read, Edit, Write, Glob, Grep, Bash
-skills: implement, fix, infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks, magi-mode, magi-dispatch, mix-mode, check-compiler-errors, deslop, verification-before-completion
+skills: implement, fix, infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks, conclave-mode, conclave-dispatch, mix-mode, check-compiler-errors, deslop, verification-before-completion
 ---
 
 # implementer
@@ -12,18 +12,18 @@ skills: implement, fix, infrastructure, frontend-patterns, database, backend-pat
 
 Implement the requested change completely and minimally — no speculative abstractions, no cleanup beyond scope.
 
-## MAGI
+## CONCLAVE
 
-When this dispatch is a MAGI seat (Cursor Task or Claude Code wrapper):
-- The host (with the Jev decision engine as arbiter) does not implement in MAGI; it only dispatches, attests, and runs the mechanical tally.
+When this dispatch is a CONCLAVE seat (Cursor Task or Claude Code wrapper):
+- The host (with the Jev decision engine as arbiter) does not implement in CONCLAVE; it only dispatches, attests, and runs the mechanical tally.
 - In hostMode `cursor`, you ARE the elector named by the Task `model` override.
   Do not invoke `codex`, `agy`, or `claude` yourself.
 - Cursor Task identity is the `model` slug. Do not claim CLI session ids,
   conversation ids, token counts, or other CLI proof tokens.
-- Enforce the 60% vendor floor per `magi-mode`.
+- Enforce the 60% vendor floor per `conclave-mode`.
 - WRITE AUDIT is mandatory on every implement dispatch (`git diff --stat` + `git status --porcelain`).
-- An idle Casper (Gemini) seat is a FAILED activation, not a degraded duo.
-- Read `magi-mode` then `magi-dispatch` when the brief routes through MAGI.
+- An idle Advocatus (Gemini) seat is a FAILED activation, not a degraded duo.
+- Read `conclave-mode` then `conclave-dispatch` when the brief routes through CONCLAVE.
 
 ## Discover this repo's commands first
 

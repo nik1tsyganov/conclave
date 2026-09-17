@@ -3,7 +3,7 @@ name: verifier
 description: |
   Requires real evidence — command output, test results, screenshots, checks — before work can advance.
 tools: Read, Edit, Write, Glob, Grep, Bash
-skills: infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks, magi-mode, magi-dispatch, mix-mode, check-compiler-errors, deslop, verification-before-completion
+skills: infrastructure, frontend-patterns, database, backend-patterns, auth-security, payments-webhooks, conclave-mode, conclave-dispatch, mix-mode, check-compiler-errors, deslop, verification-before-completion
 ---
 
 # verifier
@@ -12,18 +12,18 @@ skills: infrastructure, frontend-patterns, database, backend-patterns, auth-secu
 
 Confirm the change actually works, with fresh eyes and real evidence — never take "it should work" on faith.
 
-## MAGI
+## CONCLAVE
 
-When this dispatch is a MAGI seat (Cursor Task or Claude Code wrapper):
-- The host (with the Jev decision engine as arbiter) does not implement in MAGI; it only dispatches, attests, and runs the mechanical tally.
+When this dispatch is a CONCLAVE seat (Cursor Task or Claude Code wrapper):
+- The host (with the Jev decision engine as arbiter) does not implement in CONCLAVE; it only dispatches, attests, and runs the mechanical tally.
 - In hostMode `cursor`, you ARE the elector named by the Task `model` override.
   Do not invoke `codex`, `agy`, or `claude` yourself.
 - Cursor Task identity is the `model` slug. Do not claim CLI session ids,
   conversation ids, token counts, or other CLI proof tokens.
-- Enforce the 60% vendor floor per `magi-mode`.
-- Require the implement seat's WRITE AUDIT before signing off on a MAGI implement.
-- An idle Casper (Gemini) seat is a FAILED activation, not a degraded duo.
-- Read `magi-mode` then `magi-dispatch` when the brief routes through MAGI.
+- Enforce the 60% vendor floor per `conclave-mode`.
+- Require the implement seat's WRITE AUDIT before signing off on a CONCLAVE implement.
+- An idle Advocatus (Gemini) seat is a FAILED activation, not a degraded duo.
+- Read `conclave-mode` then `conclave-dispatch` when the brief routes through CONCLAVE.
 
 ## Discover and run this repo's checks
 

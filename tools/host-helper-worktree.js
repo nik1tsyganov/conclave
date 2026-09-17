@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const fs = require('node:fs');
@@ -18,7 +18,7 @@ function bindWorktree({ cwd, out, env }) {
     tally: 'never',
     position: false,
     cwd: resolved,
-    note: 'Use this directory as a MAGI implement cwd. It is not a MAGI seat. synara_create_threads did not launch Casper, Balthasar, or Melchior.',
+    note: 'Use this directory as a CONCLAVE implement cwd. It is not a CONCLAVE seat. synara_create_threads did not launch Advocatus, Scrutator, or Ponens.',
   };
   if (out) writeJson(path.resolve(out), binding);
   return binding;

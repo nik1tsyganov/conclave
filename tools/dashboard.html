@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>MAGI · Run observatory</title>
+  <title>CONCLAVE · Run observatory</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/dashboard.css">
   <script src="/dashboard.js" defer></script>
@@ -12,16 +12,16 @@
 <body>
   <a class="skip" href="#work">Skip to dispatches</a>
   <header class="masthead">
-    <div class="brand"><span class="sigil" aria-hidden="true">Ⅲ</span> MAGI <span class="edition">OBSERVATORY</span></div>
+    <div class="brand"><span class="sigil" aria-hidden="true">Ⅲ</span> CONCLAVE <span class="edition">OBSERVATORY</span></div>
     <span class="connection" id="connection" role="status"><i class="dot"></i><span>Connecting</span></span>
   </header>
   <div class="shell">
     <aside class="rail" aria-label="Seat filters">
       <div class="rail-caption">THE COUNCIL</div>
       <button class="seat-filter selected" data-vendor="all" aria-pressed="true"><span>All seats</span><b id="all-count">—</b></button>
-      <button class="seat-filter" data-vendor="openai" aria-pressed="false"><span><strong>Melchior</strong><small>OpenAI · correctness</small></span><b id="openai-count">—</b></button>
-      <button class="seat-filter" data-vendor="anthropic" aria-pressed="false"><span><strong>Balthasar</strong><small>Anthropic · scrutiny</small></span><b id="anthropic-count">—</b></button>
-      <button class="seat-filter" data-vendor="google" aria-pressed="false"><span><strong>Casper</strong><small>Google · perspective</small></span><b id="google-count">—</b></button>
+      <button class="seat-filter" data-vendor="openai" aria-pressed="false"><span><strong>Ponens</strong><small>OpenAI · correctness</small></span><b id="openai-count">—</b></button>
+      <button class="seat-filter" data-vendor="anthropic" aria-pressed="false"><span><strong>Scrutator</strong><small>Anthropic · scrutiny</small></span><b id="anthropic-count">—</b></button>
+      <button class="seat-filter" data-vendor="google" aria-pressed="false"><span><strong>Advocatus</strong><small>Google · perspective</small></span><b id="google-count">—</b></button>
       <div class="rail-note"><span class="small-label">OBSERVER MODE</span><p>Follow the work.<br>Keep the gates intact.</p><small>This view reads recorded activity. It does not dispatch seats or approve their work.</small></div>
     </aside>
     <main id="main">
@@ -49,9 +49,9 @@
           </svg>
           <div class="arbiter"><span class="small-label">ARBITER</span><strong>Coordinator</strong><small>Routes work · does not vote</small></div>
           <div class="map-seats">
-            <button class="map-seat" data-vendor="openai" aria-pressed="false"><span class="node-top"><span class="small-label">OPENAI</span><span class="node-signal">No activity</span></span><strong>Melchior</strong><span class="node-model">Awaiting plan</span><span class="node-bottom">—</span></button>
-            <button class="map-seat" data-vendor="anthropic" aria-pressed="false"><span class="node-top"><span class="small-label">ANTHROPIC</span><span class="node-signal">No activity</span></span><strong>Balthasar</strong><span class="node-model">Awaiting plan</span><span class="node-bottom">—</span></button>
-            <button class="map-seat" data-vendor="google" aria-pressed="false"><span class="node-top"><span class="small-label">GOOGLE</span><span class="node-signal">No activity</span></span><strong>Casper</strong><span class="node-model">Awaiting plan</span><span class="node-bottom">—</span></button>
+            <button class="map-seat" data-vendor="openai" aria-pressed="false"><span class="node-top"><span class="small-label">OPENAI</span><span class="node-signal">No activity</span></span><strong>Ponens</strong><span class="node-model">Awaiting plan</span><span class="node-bottom">—</span></button>
+            <button class="map-seat" data-vendor="anthropic" aria-pressed="false"><span class="node-top"><span class="small-label">ANTHROPIC</span><span class="node-signal">No activity</span></span><strong>Scrutator</strong><span class="node-model">Awaiting plan</span><span class="node-bottom">—</span></button>
+            <button class="map-seat" data-vendor="google" aria-pressed="false"><span class="node-top"><span class="small-label">GOOGLE</span><span class="node-signal">No activity</span></span><strong>Advocatus</strong><span class="node-model">Awaiting plan</span><span class="node-bottom">—</span></button>
           </div>
         </div>
         <p class="map-note">Select a handoff to trace its route through the arbiter. New launch records briefly pulse; history stays still.</p>

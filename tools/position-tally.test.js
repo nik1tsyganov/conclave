@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const { describe, it } = require('node:test');
@@ -166,12 +166,12 @@ describe('position-tally degraded duo (cursor-cli Claude fail)', () => {
     assert.strictEqual(result.rejectCount, 1);
   });
 
-  it('refuses to treat idle Casper as the degraded path', () => {
+  it('refuses to treat idle Advocatus as the degraded path', () => {
     assert.throws(
       () => tally({ ballots: trio('APPROVE', 'APPROVE', 'APPROVE'), degradedVendor: 'google' }),
       (error) => {
         assert.ok(error instanceof TallyError);
-        assert.match(error.message, /idle Casper/);
+        assert.match(error.message, /idle Advocatus/);
         return true;
       },
     );

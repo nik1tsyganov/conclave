@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const assert = require('node:assert/strict');
@@ -17,7 +17,7 @@ function panel(t, extra = []) { return createSealedRun(t, [{ unitId: 'u1' }, ver
 function dispatch(run, id, native) { return completeSyntheticDispatch({ ...run.opts, dispatchId: id }, native); }
 function transaction(run, id) {
   const entry = run.dispatches.find(row => row.dispatchId === id);
-  const file = path.join(run.runDir, '.magi-dispatches', `${transactionKey(entry)}.json`);
+  const file = path.join(run.runDir, '.conclave-dispatches', `${transactionKey(entry)}.json`);
   return { file, state: JSON.parse(fs.readFileSync(file, 'utf8')) };
 }
 function rewriteArtifact(run, id, name, change) {

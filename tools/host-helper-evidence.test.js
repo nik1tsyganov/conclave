@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const assert = require('node:assert/strict');
@@ -9,7 +9,7 @@ const test = require('node:test');
 const { stageHelperEvidence } = require('./host-helper-evidence.js');
 
 test('host helper evidence is staged as a non-voting read directory', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-host-helper-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-host-helper-'));
   test.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const from = path.join(root, 'browser');
   fs.mkdirSync(from);

@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const assert = require('node:assert');
@@ -10,7 +10,7 @@ const { loadMatrix, routeAllowed, validatePlan: strictPlan } = require('./dispat
 const { allAvailability, probeRecord } = require('./test-fixtures.js');
 
 const matrix = loadMatrix();
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-matrix-evidence-'));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-matrix-evidence-'));
 test.after(() => fs.rmSync(root, { recursive: true, force: true }));
 const evidence = allAvailability(root, matrix);
 function validatePlan(plan, policy, available = evidence) {
@@ -72,20 +72,20 @@ test('every CLI hostMode is legal and banana is not', () => {
   const { CLI_HOST_MODES } = require('./dispatch-schema.js');
   for (const hostMode of CLI_HOST_MODES) {
     assert.deepStrictEqual(validatePlan({
-      hostMode, arbiter: arbiter(), magiConvened: true,
+      hostMode, arbiter: arbiter(), conclaveConvened: true,
       dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }],
     }, matrix), { ok: true, dispatches: 1, implementUnits: 1 }, hostMode);
   }
   assert.ok(CLI_HOST_MODES.includes('droppy'), 'Droppy Code is a host');
   assert.throws(() => validatePlan({
-    hostMode: 'banana', arbiter: arbiter(), magiConvened: true,
+    hostMode: 'banana', arbiter: arbiter(), conclaveConvened: true,
     dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }],
   }, matrix), /hostMode must be one of/);
 });
 
 test('implement cannot take evidenceReadDirs', () => {
   assert.throws(() => validatePlan({
-    hostMode: 'synara', arbiter: arbiter(), magiConvened: true,
+    hostMode: 'synara', arbiter: arbiter(), conclaveConvened: true,
     dispatches: [{
       unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium',
       evidenceReadDirs: [root],
@@ -95,21 +95,21 @@ test('implement cannot take evidenceReadDirs', () => {
 
 test('Grok cannot occupy a seat', () => {
   assert.throws(() => validatePlan({
-    hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: false,
+    hostMode: 'cursor-cli', arbiter: arbiter(), conclaveConvened: false,
     dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'xai', model: 'grok-4.6', effort: 'high' }],
   }, matrix), /may not occupy a seat/);
 });
 
 test('single implementation unit is not rejected by the 60 percent floor', () => {
   assert.deepStrictEqual(validatePlan({
-    hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true,
+    hostMode: 'cursor-cli', arbiter: arbiter(), conclaveConvened: true,
     dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }],
   }, matrix), { ok: true, dispatches: 1, implementUnits: 1 });
 });
 
-test('two implementation units in convened MAGI require two vendors', () => {
+test('two implementation units in convened CONCLAVE require two vendors', () => {
   assert.throws(() => validatePlan({
-    hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true,
+    hostMode: 'cursor-cli', arbiter: arbiter(), conclaveConvened: true,
     dispatches: [
       { unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' },
       { unitId: 'u2', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' },
@@ -117,10 +117,10 @@ test('two implementation units in convened MAGI require two vendors', () => {
   }, matrix), /requires 2 implement vendors|distribution floor/);
 });
 
-test('three implementation units in convened MAGI require all three vendors', () => {
+test('three implementation units in convened CONCLAVE require all three vendors', () => {
   const availability = evidence;
   assert.doesNotThrow(() => validatePlan({
-    hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true,
+    hostMode: 'cursor-cli', arbiter: arbiter(), conclaveConvened: true,
     dispatches: [
       { unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' },
       { unitId: 'u2', class: 'standard-feature', role: 'implement', vendor: 'anthropic', model: 'fable', effort: 'medium' },
@@ -129,9 +129,9 @@ test('three implementation units in convened MAGI require all three vendors', ()
   }, matrix, availability));
 });
 
-test('review-only MAGI panel is legal without fake implementation rows', () => {
+test('review-only CONCLAVE panel is legal without fake implementation rows', () => {
   assert.doesNotThrow(() => validatePlan({
-    hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true,
+    hostMode: 'cursor-cli', arbiter: arbiter(), conclaveConvened: true,
     dispatches: [
       { unitId: 'r1', class: 'review-adversarial', role: 'review', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'high', authorVendor: 'anthropic' },
       { unitId: 'r1', class: 'review-adversarial', role: 'review', vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', authorVendor: 'anthropic' },
@@ -150,7 +150,7 @@ test('review-only ballots cannot disagree about the author of one unit', () => {
   const rows = reviewOnlyRows();
   rows[1].authorVendor = 'openai';
   for (const dispatches of [rows, [...rows].reverse()]) {
-    assert.throws(() => validatePlan({ hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true, dispatches }, matrix), /conflicting authorVendor/);
+    assert.throws(() => validatePlan({ hostMode: 'cursor-cli', arbiter: arbiter(), conclaveConvened: true, dispatches }, matrix), /conflicting authorVendor/);
   }
 });
 
@@ -158,19 +158,19 @@ test('review-only ballots cannot combine different product worktrees', () => {
   const rows = reviewOnlyRows();
   rows[1].cwd = path.join(root, 'different-product');
   for (const dispatches of [rows, [...rows].reverse()]) {
-    assert.throws(() => validatePlan({ hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true, dispatches }, matrix), /check worktrees differ/);
+    assert.throws(() => validatePlan({ hostMode: 'cursor-cli', arbiter: arbiter(), conclaveConvened: true, dispatches }, matrix), /check worktrees differ/);
   }
 });
 
 test('separate review-only units may have different authors and worktrees', () => {
   const rows = reviewOnlyRows();
   rows[1] = { ...rows[1], unitId: 'r2', authorVendor: 'openai', cwd: path.join(root, 'another-product') };
-  assert.doesNotThrow(() => validatePlan({ hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: true, dispatches: rows }, matrix));
+  assert.doesNotThrow(() => validatePlan({ hostMode: 'cursor-cli', arbiter: arbiter(), conclaveConvened: true, dispatches: rows }, matrix));
 });
 
 test('same-vendor review of authored work is rejected', () => {
   assert.throws(() => validatePlan({
-    hostMode: 'cursor-cli', arbiter: arbiter(), magiConvened: false,
+    hostMode: 'cursor-cli', arbiter: arbiter(), conclaveConvened: false,
     dispatches: [{
       unitId: 'u1', class: 'review-adversarial', role: 'review', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'high', authorVendor: 'openai',
     }],
@@ -178,7 +178,7 @@ test('same-vendor review of authored work is rejected', () => {
 });
 
 test('availability loader record supports exact proof format', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-matrix-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-matrix-'));
   const file = path.join(dir, 'availability.json');
   fs.writeFileSync(file, JSON.stringify(availabilityFor('openai', 'gpt-6-astra')), 'utf8');
   const loaded = JSON.parse(fs.readFileSync(file, 'utf8'));

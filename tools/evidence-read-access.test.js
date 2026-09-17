@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -27,7 +27,7 @@ function accessFixture(t, vendor = 'google') {
 function nativeFixture(action) {
   const native = fakeVendor(action, 'ACK fixture\nDone.\nPOSITION: APPROVE');
   native.buildLaunch = opts => ({ ...opts, ...buildLaunch({ ...opts, mustExistBinary: false,
-    env: { MAGI_ALLOWED_WORKSPACE_ROOTS: opts.cwd, MAGI_CLAUDE_BIN: process.execPath, MAGI_AGY_BIN: process.execPath, MAGI_CODEX_BIN: process.execPath } }) });
+    env: { CONCLAVE_ALLOWED_WORKSPACE_ROOTS: opts.cwd, CONCLAVE_CLAUDE_BIN: process.execPath, CONCLAVE_AGY_BIN: process.execPath, CONCLAVE_CODEX_BIN: process.execPath } }) });
   return native;
 }
 function inputs(run) { fs.mkdirSync(run.evidence); fs.writeFileSync(path.join(run.evidence, 'browser.json'), '{"case":"synthetic"}'); }
@@ -41,13 +41,13 @@ async function complete(run, native) {
 }
 
 test('Google checking launch grants the explicitly bound sibling evidence directory', t => {
-  const root = temporary(t, 'magi-read-access-');
+  const root = temporary(t, 'conclave-read-access-');
   const briefPath = path.join(root, 'BRIEF.md'); fs.writeFileSync(briefPath, 'ACK evidence\n');
   const evidence = path.join(root, 'evidence'); fs.mkdirSync(evidence);
-  const launch = buildLaunch({ vendor: 'google', role: 'review', cwd: '/opt/magi/src/synthetic-product',
+  const launch = buildLaunch({ vendor: 'google', role: 'review', cwd: '/opt/conclave/src/synthetic-product',
     briefPath, seatContractPath: path.join(root, 'SEAT-CONTRACT.md'), skillRoot: path.join(root, 'skills'),
     capturePath: path.join(root, 'capture.txt'), evidenceReadDirs: [evidence],
-    env: { MAGI_AGY_BIN: process.execPath, MAGI_DEV_ROOT: '/opt/magi/src' }, mustExistBinary: false });
+    env: { CONCLAVE_AGY_BIN: process.execPath, CONCLAVE_DEV_ROOT: '/opt/conclave/src' }, mustExistBinary: false });
   assert.ok(granted(launch.args, evidence), 'sealed sibling evidence must be in native add-dir grants');
   assert.ok(launch.args.includes('--sandbox'));
 });
@@ -85,7 +85,7 @@ function authorlessChecks(t) {
 test('forged minimal PASS from an authorless verifier cannot authorize a review child', async t => {
   const run = authorlessChecks(t); const native = nativeFixture(); const dir = path.join(run.runDir, 'out/d1');
   fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, 'fake.txt'), 'not native evidence');
-  writeJson(path.join(run.runDir, '.magi-dispatches', `${transactionKey(run.dispatches[0])}.json`), {
+  writeJson(path.join(run.runDir, '.conclave-dispatches', `${transactionKey(run.dispatches[0])}.json`), {
     status: 'PASS', completedAt: new Date().toISOString(), evidenceDir: dir,
   });
   await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd2' }, native));
@@ -104,7 +104,7 @@ test('authorless review can read a fully verified earlier same-unit APPROVE outp
 for (const [label, mutate] of Object.entries({
   'changed predecessor capture': run => fs.appendFileSync(path.join(run.runDir, 'out/d1/capture.txt'), 'changed'),
   'future committed timestamp': run => {
-    const file = path.join(run.runDir, '.magi-dispatches', `${transactionKey(run.dispatches[0])}.json`);
+    const file = path.join(run.runDir, '.conclave-dispatches', `${transactionKey(run.dispatches[0])}.json`);
     const state = JSON.parse(fs.readFileSync(file)); state.completedAt = new Date(Date.now() + 60000).toISOString(); writeJson(file, state);
   },
 })) {
@@ -207,7 +207,7 @@ test('exact same-unit prerequisite output requires completed PASS evidence, not 
   const plan = { ...run.planObject, dispatches: [prior, entry] };
   assert.deepEqual(validateEvidenceReadDirs(entry, { plan, runDir: run.runDir }), [canonicalPlainPath(dir)]);
   fs.mkdirSync(dir, { recursive: true });
-  const stateFile = path.join(run.runDir, '.magi-dispatches', `${transactionKey(prior)}.json`);
+  const stateFile = path.join(run.runDir, '.conclave-dispatches', `${transactionKey(prior)}.json`);
   for (const status of ['RUNNING', 'AWAITING_ATTESTATION', 'FAIL']) {
     writeJson(stateFile, { status, evidenceDir: dir, completedAt: new Date().toISOString() });
     assert.throws(() => validateEvidenceReadDirs(entry, { plan, runDir: run.runDir, requireExisting: true }), /not complete/);
@@ -251,13 +251,13 @@ test('complete prior author evidence is available to both checking seats through
 });
 
 test('OpenAI evidence grants leave the exact scratch argv and environment unchanged', t => {
-  const root = temporary(t, 'magi-evidence-scratch-'); const runDir = path.join(root, 'run');
+  const root = temporary(t, 'conclave-evidence-scratch-'); const runDir = path.join(root, 'run');
   const output = path.join(runDir, 'out/d1'); fs.mkdirSync(output, { recursive: true });
   const briefPath = path.join(output, 'BRIEF.md'); fs.writeFileSync(briefPath, 'ACK evidence\n');
   const evidence = path.join(root, 'evidence'); fs.mkdirSync(evidence);
-  const opts = { vendor: 'openai', role: 'verify', cwd: '/opt/magi/src/synthetic-product', runDir, dispatchId: 'd1', readonlyScratch: true,
+  const opts = { vendor: 'openai', role: 'verify', cwd: '/opt/conclave/src/synthetic-product', runDir, dispatchId: 'd1', readonlyScratch: true,
     briefPath, seatContractPath: path.join(output, 'SEAT-CONTRACT.md'), skillRoot: path.join(output, 'skills'), capturePath: path.join(output, 'capture.txt'),
-    env: { MAGI_CODEX_BIN: process.execPath, MAGI_DEV_ROOT: '/opt/magi/src' }, mustExistBinary: false };
+    env: { CONCLAVE_CODEX_BIN: process.execPath, CONCLAVE_DEV_ROOT: '/opt/conclave/src' }, mustExistBinary: false };
   const before = buildLaunch(opts); const after = buildLaunch({ ...opts, evidenceReadDirs: [evidence] });
   assert.deepEqual(after.args, before.args); assert.deepEqual(after.env, before.env);
   assert.deepEqual(after.evidenceReadDirs, [canonicalPlainPath(evidence)]);
@@ -265,7 +265,7 @@ test('OpenAI evidence grants leave the exact scratch argv and environment unchan
 
 test('replay checks sealed directory grants even after a launch artifact hash is refreshed', async t => {
   const run = accessFixture(t); inputs(run); const native = nativeFixture(); await complete(run, native);
-  const stateFile = path.join(run.runDir, '.magi-dispatches', `${transactionKey(run.dispatches[0])}.json`);
+  const stateFile = path.join(run.runDir, '.conclave-dispatches', `${transactionKey(run.dispatches[0])}.json`);
   const state = JSON.parse(fs.readFileSync(stateFile)); const file = path.join(run.runDir, 'out/d1/launch.json');
   const launch = JSON.parse(fs.readFileSync(file)); launch.args.push('--add-dir', run.root); writeJson(file, launch);
   state.artifacts.find(item => item.path === file).sha256 = hashFile(file); writeJson(stateFile, state);
@@ -275,7 +275,7 @@ test('replay checks sealed directory grants even after a launch artifact hash is
 
 test('replay rejects rewritten evidence snapshots after their artifact hashes are refreshed', async t => {
   const run = accessFixture(t); inputs(run); const native = nativeFixture(); await complete(run, native);
-  const stateFile = path.join(run.runDir, '.magi-dispatches', `${transactionKey(run.dispatches[0])}.json`);
+  const stateFile = path.join(run.runDir, '.conclave-dispatches', `${transactionKey(run.dispatches[0])}.json`);
   const state = JSON.parse(fs.readFileSync(stateFile));
   fs.writeFileSync(path.join(run.evidence, 'browser.json'), 'rewritten');
   for (const name of ['evidence-reads-before.json', 'evidence-reads-after.json']) {

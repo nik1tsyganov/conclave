@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const fs = require('node:fs');
@@ -130,17 +130,17 @@ function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
     const checks = plan.dispatches.filter((row) => row.unitId === author.unitId && ['review', 'verify'].includes(row.role));
     if (checks.some((row) => path.resolve(row.cwd) !== path.resolve(author.cwd))) throw policyError(`check worktree differs from implementation for ${author.unitId}`);
     if (policy.requiresPanel) {
-      if (plan.magiConvened !== true) throw policyError(`class ${author.class} requires a panel`);
+      if (plan.conclaveConvened !== true) throw policyError(`class ${author.class} requires a panel`);
       const vendors = new Set(checks.map((row) => row.vendor));
       if (vendors.size < (policy.minimumReviewVendors || 2)) throw policyError(`class ${author.class} requires two independent review vendors`);
     }
   }
 
-  if (plan.magiConvened === true && implement.length > 0) {
+  if (plan.conclaveConvened === true && implement.length > 0) {
     const vendors = new Set(implement.map((r) => r.vendor));
     const minimumDistinct = Math.min(3, implement.length);
     if (vendors.size < minimumDistinct) {
-      throw policyError(`MAGI implementation split requires ${minimumDistinct} implement vendors for ${implement.length} units, got ${vendors.size}`);
+      throw policyError(`CONCLAVE implementation split requires ${minimumDistinct} implement vendors for ${implement.length} units, got ${vendors.size}`);
     }
   }
 

@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const { describe, it } = require('node:test');
@@ -10,24 +10,24 @@ const path = require('node:path');
 const { mkdtempSync, readFileSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const {
-  magiCursorManifest,
-  magiCliManifest,
+  conclaveCursorManifest,
+  conclaveCliManifest,
   writeManifest,
   readInstalledManifest,
   CLI_RUNTIME_TOOLS,
-  installMagiCursorCli,
-  checkMagiCli,
+  installConclaveCursorCli,
+  checkConclaveCli,
 } = require('./install-plugin.js');
 const {
-  INSTALLED_MAGI_SURFACE,
-  INSTALLED_MAGI_CLI_SURFACE,
+  INSTALLED_CONCLAVE_SURFACE,
+  INSTALLED_CONCLAVE_CLI_SURFACE,
   checkManifestSurface,
 } = require('./plugin-surface.js');
 
 describe('install-plugin manifests', () => {
-  it('writes Conclave-style surface paths for the installed magi plugin', () => {
-    const manifest = magiCursorManifest();
-    const surface = checkManifestSurface(manifest, INSTALLED_MAGI_SURFACE);
+  it('writes Conclave-style surface paths for the installed conclave plugin', () => {
+    const manifest = conclaveCursorManifest();
+    const surface = checkManifestSurface(manifest, INSTALLED_CONCLAVE_SURFACE);
     assert.strictEqual(surface.ok, true, surface.error);
     assert.strictEqual(manifest.skills, './skills/');
     assert.strictEqual(manifest.rules, './rules/');
@@ -35,22 +35,22 @@ describe('install-plugin manifests', () => {
     assert.strictEqual(manifest.commands, './commands/');
   });
 
-  it('writes skills/rules/commands and omits agents for magi-cursor-cli', () => {
-    const manifest = magiCliManifest();
-    const surface = checkManifestSurface(manifest, INSTALLED_MAGI_CLI_SURFACE);
+  it('writes skills/rules/commands and omits agents for conclave-cursor-cli', () => {
+    const manifest = conclaveCliManifest();
+    const surface = checkManifestSurface(manifest, INSTALLED_CONCLAVE_CLI_SURFACE);
     assert.strictEqual(surface.ok, true, surface.error);
     assert.strictEqual(Object.hasOwn(manifest, 'agents'), false);
   });
 
   it('fails the surface check when an installer-written field is missing', () => {
-    const stripped = { ...magiCursorManifest() };
+    const stripped = { ...conclaveCursorManifest() };
     delete stripped.skills;
-    const surface = checkManifestSurface(stripped, INSTALLED_MAGI_SURFACE);
+    const surface = checkManifestSurface(stripped, INSTALLED_CONCLAVE_SURFACE);
     assert.strictEqual(surface.ok, false);
     assert.match(surface.error, /skills/);
 
-    const withAgents = { ...magiCliManifest(), agents: './agents/' };
-    const cli = checkManifestSurface(withAgents, INSTALLED_MAGI_CLI_SURFACE);
+    const withAgents = { ...conclaveCliManifest(), agents: './agents/' };
+    const cli = checkManifestSurface(withAgents, INSTALLED_CONCLAVE_CLI_SURFACE);
     assert.strictEqual(cli.ok, false);
     assert.match(cli.error, /agents/);
   });
@@ -58,13 +58,13 @@ describe('install-plugin manifests', () => {
   it('persists surface fields into the dest plugin.json', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'install-plugin-'));
     try {
-      writeManifest(dir, magiCursorManifest());
+      writeManifest(dir, conclaveCursorManifest());
       const written = readInstalledManifest(dir);
       assert.strictEqual(written.ok, true, written.error);
-      assert.deepStrictEqual(written.manifest, magiCursorManifest());
+      assert.deepStrictEqual(written.manifest, conclaveCursorManifest());
       assert.strictEqual(
         readFileSync(path.join(dir, '.cursor-plugin', 'plugin.json'), 'utf8'),
-        `${JSON.stringify(magiCursorManifest(), null, 2)}\n`,
+        `${JSON.stringify(conclaveCursorManifest(), null, 2)}\n`,
       );
     } finally {
       assert.strictEqual(path.dirname(path.resolve(dir)), path.resolve(tmpdir()));
@@ -74,7 +74,7 @@ describe('install-plugin manifests', () => {
 });
 
 function disposable(t) {
-  const root = mkdtempSync(path.join(tmpdir(), 'magi-install-safety-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'conclave-install-safety-'));
   t.after(() => {
     assert.strictEqual(path.dirname(path.resolve(root)), path.resolve(tmpdir()));
     fs.rmSync(root, { recursive: true, force: true });
@@ -90,7 +90,7 @@ function sourceFixture(t) {
   const source = path.join(root, 'source');
   const installed = path.join(root, 'installed');
   const repo = path.resolve(__dirname, '..');
-  const entries = ['.cursor/skills/magi-cli', '.cursor/rules', 'commands/magi-cli.md', 'seat-skills',
+  const entries = ['.cursor/skills/conclave-cli', '.cursor/rules', 'commands/conclave-cli.md', 'seat-skills',
     'skill-sources.json', 'tools/templates', 'tools/install-plugin.js', ...CLI_RUNTIME_TOOLS.map(name => `tools/${name}`)];
   for (const relative of entries) {
     const from = path.join(repo, relative);
@@ -101,7 +101,7 @@ function sourceFixture(t) {
   put(path.join(source, 'sentinel.txt'), 'source must survive');
   return { root, source, installed };
 }
-function install(f, destination = f.installed) { return installMagiCursorCli({ sourceRoot: f.source, destination }); }
+function install(f, destination = f.installed) { return installConclaveCursorCli({ sourceRoot: f.source, destination }); }
 function snapshot(root, prefix = '') {
   if (!fs.existsSync(root)) return [];
   const entries = [];
@@ -135,7 +135,7 @@ test('installer refuses source junctions and unrelated existing directories befo
   assert.deepStrictEqual(snapshot(f.root), before);
   const link = path.join(f.root, 'source-link');
   fs.symlinkSync(f.source, link, 'junction');
-  assert.throws(() => installMagiCursorCli({ sourceRoot: link, destination: path.join(f.root, 'new') }), /symlink|junction/);
+  assert.throws(() => installConclaveCursorCli({ sourceRoot: link, destination: path.join(f.root, 'new') }), /symlink|junction/);
   assert.strictEqual(fs.existsSync(path.join(f.root, 'new')), false);
 });
 
@@ -143,11 +143,11 @@ test('CLI installs into an empty directory and safely reinstalls known plugin co
   const f = sourceFixture(t);
   fs.mkdirSync(f.installed);
   assert.strictEqual(install(f), fs.realpathSync.native(f.installed));
-  checkMagiCli(f.installed);
-  put(path.join(f.source, 'commands', 'magi-cli.md'), '# changed command\n');
+  checkConclaveCli(f.installed);
+  put(path.join(f.source, 'commands', 'conclave-cli.md'), '# changed command\n');
   install(f);
-  checkMagiCli(f.installed);
-  assert.strictEqual(fs.readFileSync(path.join(f.installed, 'commands', 'magi-cli.md'), 'utf8'), '# changed command\n');
+  checkConclaveCli(f.installed);
+  assert.strictEqual(fs.readFileSync(path.join(f.installed, 'commands', 'conclave-cli.md'), 'utf8'), '# changed command\n');
   assert.strictEqual(fs.existsSync(path.join(f.installed, 'sentinel.txt')), false);
   for (const name of ['plan-seal.js', 'model-probe.js', 'probe-evidence.js', 'vendor-native.js', 'run-finalize.js', 'panel-tally.js', 'plugin-surface.js']) {
     assert.deepStrictEqual(fs.readFileSync(path.join(f.installed, 'tools', name)), fs.readFileSync(path.join(f.source, 'tools', name)));
@@ -161,14 +161,14 @@ for (const added of ['file', 'empty-directory', 'nested-junction', 'malformed-ma
     if (added === 'file') put(path.join(f.installed, 'my-notes.txt'), 'keep');
     else if (added === 'empty-directory') fs.mkdirSync(path.join(f.installed, 'my-empty-directory'));
     else if (added === 'nested-junction') fs.symlinkSync(f.source, path.join(f.installed, 'tools', 'link'), 'junction');
-    else put(path.join(f.installed, '.cursor-plugin', 'plugin.json'), JSON.stringify({ name: 'magi-cursor-cli', repository: magiCliManifest().repository }));
+    else put(path.join(f.installed, '.cursor-plugin', 'plugin.json'), JSON.stringify({ name: 'conclave-cursor-cli', repository: conclaveCliManifest().repository }));
     const before = snapshot(f.root);
     assert.throws(() => install(f), /unrelated|symlink|junction/);
     assert.deepStrictEqual(snapshot(f.root), before);
   });
 }
 
-for (const missing of ['tools/run-finalize.js', 'seat-skills/testing/SKILL.md', '.cursor/skills/magi-cli/references/seat-profiles.json']) {
+for (const missing of ['tools/run-finalize.js', 'seat-skills/testing/SKILL.md', '.cursor/skills/conclave-cli/references/seat-profiles.json']) {
   test(`missing source ${missing} preserves a previous install`, t => {
     const f = sourceFixture(t);
     install(f);
@@ -176,7 +176,7 @@ for (const missing of ['tools/run-finalize.js', 'seat-skills/testing/SKILL.md', 
     const before = snapshot(f.root);
     assert.throws(() => install(f), /ENOENT|missing required|missing bundled/);
     assert.deepStrictEqual(snapshot(f.root), before);
-    checkMagiCli(f.installed);
+    checkConclaveCli(f.installed);
   });
 }
 
@@ -186,7 +186,7 @@ test('check rejects a bundled SKILL.md directory', t => {
   const skill = path.join(f.installed, 'seat-skills', 'testing', 'SKILL.md');
   fs.unlinkSync(skill);
   fs.mkdirSync(skill);
-  assert.throws(() => checkMagiCli(f.installed), /bundled seat skill/);
+  assert.throws(() => checkConclaveCli(f.installed), /bundled seat skill/);
 });
 
 test('--destination install and --check affect only the requested plugin directory', t => {
@@ -202,7 +202,7 @@ test('--destination install and --check affect only the requested plugin directo
     const result = run(args);
     assert.strictEqual(result.status, 0, result.stderr || result.error?.message);
     assert.deepStrictEqual(snapshot(home), before);
-    checkMagiCli(f.installed);
+    checkConclaveCli(f.installed);
   }
   const installedBefore = snapshot(f.installed);
   for (const args of [['--check'], ['--destination'], ['--destination', f.installed, '--unexpected']]) {
@@ -240,7 +240,7 @@ test('installed runtime loads contracts, all entry-point dependencies, and bundl
       }
       return found;
     };
-    const names = ['dispatch-matrix', 'seat-policy', 'dispatch-run', 'cli-skill-stage', 'plan-seal', 'model-probe', 'probe-evidence', 'vendor-native', 'run-finalize', 'panel-tally', 'magi-cli-preflight', 'plugin-surface'];
+    const names = ['dispatch-matrix', 'seat-policy', 'dispatch-run', 'cli-skill-stage', 'plan-seal', 'model-probe', 'probe-evidence', 'vendor-native', 'run-finalize', 'panel-tally', 'conclave-cli-preflight', 'plugin-surface'];
     for (const name of names) require(path.join(process.cwd(), 'tools', name + '.js'));
     const runtime = require('./tools/runtime-paths.js').resolveRuntimePaths();
     assert.equal(runtime.layout, 'installed');
@@ -292,7 +292,7 @@ test('documented startup command works without source or home policy in an isola
     for (const name of ['exec', 'execSync', 'execFile', 'execFileSync', 'spawn', 'spawnSync', 'fork']) child[name] = () => { throw new Error('child calls forbidden'); };
   `);
   const before = snapshot(f.installed);
-  const command = 'node tools/magi-whoami.js --mode cursor-cli --slug cursor-grok-4.6-high-fast';
+  const command = 'node tools/conclave-whoami.js --mode cursor-cli --slug cursor-grok-4.6-high-fast';
   const result = spawnSync(process.execPath, command.split(' ').slice(1), {
     cwd: f.installed, env: { ...process.env, HOME: home, USERPROFILE: home, NODE_OPTIONS: `--require "${guard.replaceAll('\\', '/')}"` },
     input: '', encoding: 'utf8', timeout: 30000, shell: false,
@@ -300,7 +300,7 @@ test('documented startup command works without source or home policy in an isola
   assert.strictEqual(result.status, 0, result.stderr || result.error?.message);
   assert.match(result.stdout, /^LEGAL\b/);
   assert.match(result.stdout, /declaration only.*not proof of the actual picker/i);
-  const guide = fs.readFileSync(path.join(f.installed, 'skills/magi-cli/references/cursor-cli.md'), 'utf8');
+  const guide = fs.readFileSync(path.join(f.installed, 'skills/conclave-cli/references/cursor-cli.md'), 'utf8');
   assert.ok(guide.includes(command), 'the tested startup command must appear literally in the installed guide');
   assert.deepStrictEqual(snapshot(f.installed), before);
   assert.deepStrictEqual(snapshot(home), []);

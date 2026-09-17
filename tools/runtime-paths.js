@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const fs = require('node:fs');
@@ -11,16 +11,16 @@ const CLI_RUNTIME_TOOLS = Object.freeze([
   'activation-check.js', 'hog-check.js', 'host-resolver.js', 'position-tally.js',
   'cli-adapters.js', 'cli-brief-rules-check.js', 'cli-idle.js', 'cli-pointer.js',
   'cli-process.js', 'cli-proof.js', 'cli-rules-stage.js', 'cli-runner.js', 'cli-skill-stage.js',
-  'dispatch-evidence.js', 'dispatch-matrix.js', 'dispatch-run.js', 'dispatch-schema.js', 'magi-cli-preflight.js', 'magi-whoami.js',
+  'dispatch-evidence.js', 'dispatch-matrix.js', 'dispatch-run.js', 'dispatch-schema.js', 'conclave-cli-preflight.js', 'conclave-whoami.js',
   'model-availability.js', 'model-probe.js', 'plan-seal.js', 'probe-evidence.js', 'vendor-native.js',
   'run-finalize.js', 'panel-tally.js', 'project-run-report.js', 'plugin-surface.js',
   'runtime-paths.js', 'seat-policy.js', 'telemetry-append.js', 'vendor-binaries.js', 'json-file.js',
-  'synara-catalog.js', 'magi-synara-watch.js', 'host-helper-evidence.js', 'host-helper-worktree.js',
+  'synara-catalog.js', 'conclave-synara-watch.js', 'host-helper-evidence.js', 'host-helper-worktree.js',
   'instruction-read-evidence.js', 'evidence-read-access.js',
-  'magi-vault.js', 'magi-vault-link.js', 'magi-vault-sync.js', 'magi-vault-analyze.js', 'magi-skill-web.js',
+  'conclave-vault.js', 'conclave-vault-link.js', 'conclave-vault-sync.js', 'conclave-vault-analyze.js', 'conclave-skill-web.js',
   'dispatch-log.pass.jsonl', 'dispatch-log.fail.jsonl',
   // Added 2026-09-16 (macOS): Jev arbiter, run driver, dashboard, retry, telemetry rows.
-  'jev-client.js', 'jev-arbiter.js', 'jev-check.js', 'jev-plan-classify.js', 'panel-tally-jev.js', 'run-drive.js', 'launch-retry.js', 'ledger-row.js', 'magi-dashboard.js', 'dashboard.html', 'dashboard.css', 'dashboard.js',
+  'jev-client.js', 'jev-arbiter.js', 'jev-check.js', 'jev-plan-classify.js', 'panel-tally-jev.js', 'run-drive.js', 'launch-retry.js', 'ledger-row.js', 'conclave-dashboard.js', 'dashboard.html', 'dashboard.css', 'dashboard.js',
 ]);
 
 function runtimeError(message) {
@@ -75,30 +75,30 @@ function hasReferenceFiles(referencesDir) {
   });
 }
 
-// Source checkouts keep contracts under .cursor/skills/magi-cli/references;
-// installer output flattens that to skills/magi-cli/references (see install-plugin.js).
+// Source checkouts keep contracts under .cursor/skills/conclave-cli/references;
+// installer output flattens that to skills/conclave-cli/references (see install-plugin.js).
 function detectLayout(root) {
-  const sourceReferences = path.join(root, '.cursor', 'skills', 'magi-cli', 'references');
-  const installedReferences = path.join(root, 'skills', 'magi-cli', 'references');
+  const sourceReferences = path.join(root, '.cursor', 'skills', 'conclave-cli', 'references');
+  const installedReferences = path.join(root, 'skills', 'conclave-cli', 'references');
   const sourceOk = hasReferenceFiles(sourceReferences);
   const installedOk = hasReferenceFiles(installedReferences);
   if (sourceOk && installedOk) {
     throw runtimeError(
-      `ambiguous MAGI CLI runtime layout under ${root}: both ${sourceReferences} and ${installedReferences} contain reference contracts`,
+      `ambiguous CONCLAVE CLI runtime layout under ${root}: both ${sourceReferences} and ${installedReferences} contain reference contracts`,
     );
   }
   if (sourceOk) return { layout: 'source', referencesDir: canonicalPlainPath(sourceReferences) };
   if (installedOk) return { layout: 'installed', referencesDir: canonicalPlainPath(installedReferences) };
   throw runtimeError(
-    `cannot locate MAGI CLI reference contracts under ${root}; checked ${sourceReferences} and ${installedReferences}`,
+    `cannot locate CONCLAVE CLI reference contracts under ${root}; checked ${sourceReferences} and ${installedReferences}`,
   );
 }
 
 function resolveRuntimePaths(options = {}) {
   const root = canonicalPlainPath(options.root || DEFAULT_ROOT);
-  if (!fs.existsSync(root)) throw runtimeError(`MAGI CLI runtime root does not exist: ${root}`);
+  if (!fs.existsSync(root)) throw runtimeError(`CONCLAVE CLI runtime root does not exist: ${root}`);
   const toolsDir = path.join(root, 'tools');
-  if (!fs.existsSync(toolsDir) || !fs.lstatSync(toolsDir).isDirectory()) throw runtimeError(`MAGI CLI runtime tools directory missing: ${toolsDir}`);
+  if (!fs.existsSync(toolsDir) || !fs.lstatSync(toolsDir).isDirectory()) throw runtimeError(`CONCLAVE CLI runtime tools directory missing: ${toolsDir}`);
   canonicalPlainPath(toolsDir);
   const { layout, referencesDir } = detectLayout(root);
   return {
@@ -113,12 +113,12 @@ function resolveRuntimePaths(options = {}) {
   };
 }
 
-// Standing rules are never bundled; MAGI_RULES_ROOT (or an explicit rulesRoot)
+// Standing rules are never bundled; CONCLAVE_RULES_ROOT (or an explicit rulesRoot)
 // must point at an external pack. This never falls back to a different source.
 function resolveRulesRoot(options = {}) {
-  const rulesRoot = options.rulesRoot || (options.env || process.env).MAGI_RULES_ROOT || options.defaultRulesRoot;
+  const rulesRoot = options.rulesRoot || (options.env || process.env).CONCLAVE_RULES_ROOT || options.defaultRulesRoot;
   if (!rulesRoot) {
-    throw runtimeError('no rules root supplied: set MAGI_RULES_ROOT or pass an explicit rulesRoot/defaultRulesRoot');
+    throw runtimeError('no rules root supplied: set CONCLAVE_RULES_ROOT or pass an explicit rulesRoot/defaultRulesRoot');
   }
   return path.resolve(rulesRoot);
 }

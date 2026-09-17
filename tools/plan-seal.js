@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const fs = require('node:fs');
@@ -32,7 +32,7 @@ function jevClassifyPlan(plan, matrix, { noJev, classOverride, jevClassification
   }
   if (!jevClassification) throw new Error('Jev classification is required: run tools/jev-plan-classify.js and pass --jev-classification <file>, or record an opt-out with --no-jev <reason>');
   const classified = readJevRecord(jevClassification);
-  if (classified.protocol !== 'magi-jev-plan-classify-v1' || !classified.units || typeof classified.units !== 'object') throw new Error('Jev classification record is malformed');
+  if (classified.protocol !== 'conclave-jev-plan-classify-v1' || !classified.units || typeof classified.units !== 'object') throw new Error('Jev classification record is malformed');
   const units = new Map();
   for (const entry of plan.dispatches) {
     const unit = units.get(entry.unitId) || { classes: new Set(), briefSha256: null };

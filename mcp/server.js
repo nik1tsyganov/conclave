@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
-// MAGI as an MCP server: one plug, every host that speaks the protocol.
+// CONCLAVE as an MCP server: one plug, every host that speaks the protocol.
 //
 // Droppy Code reimplements the protocol natively because it wants seats to be chats a person
 // can watch. Most hosts want no such thing; they want to call a panel and read the verdict.
@@ -12,8 +12,8 @@
 // THE SHAPE, AND WHY IT IS NOT ONE CALL
 //
 // A panel takes minutes to tens of minutes. An MCP call is request and response, and hosts
-// time out long before that. So convening is not a call that waits: `magi_seal` prepares a
-// run and returns its directory, `magi_drive` runs one phase and returns what happened, and
+// time out long before that. So convening is not a call that waits: `conclave_seal` prepares a
+// run and returns its directory, `conclave_drive` runs one phase and returns what happened, and
 // the caller comes back for the next one. Droppy solved the same problem by making a seat a
 // chat and reporting back later; here the run directory is what persists between calls.
 //
@@ -36,7 +36,7 @@ const TOOLS_DIR = path.join(ROOT, 'tools');
 const { CLI_HOST_MODES, HOST_MODES, ROLES, VENDORS, validateDispatchRow } = require(path.join(TOOLS_DIR, 'dispatch-schema.js'));
 const { tally, VERDICT } = require(path.join(TOOLS_DIR, 'position-tally.js'));
 
-const SERVER_NAME = 'magi-mcp';
+const SERVER_NAME = 'conclave-mcp';
 const SERVER_VERSION = '0.1.0';
 const LATEST_PROTOCOL = '2025-11-25';
 const SUPPORTED_PROTOCOLS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
@@ -127,7 +127,7 @@ function runTool(script, argv, { timeout = 120000 } = {}) {
 
 const TOOLS = [
   {
-    name: 'magi_hosts',
+    name: 'conclave_hosts',
     title: 'Legal hosts and what each one has to prove',
     description:
       'Lists the host modes a run may declare, and the vendors and roles a dispatch may name. ' +
@@ -135,7 +135,7 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
-    name: 'magi_validate_row',
+    name: 'conclave_validate_row',
     title: 'Check a telemetry row against the schema',
     description:
       'Validates one dispatch row, the JSON a host writes per seat. Answers whether it would be accepted, and why not when it would not. ' +
@@ -151,7 +151,7 @@ const TOOLS = [
     },
   },
   {
-    name: 'magi_tally',
+    name: 'conclave_tally',
     title: 'Count positions into a verdict',
     description:
       'Counts checker ballots the way the runtime does: two approvals carry a unit, an approval with no evidence of its own does not count as one, ' +
@@ -170,7 +170,7 @@ const TOOLS = [
     },
   },
   {
-    name: 'magi_run_report',
+    name: 'conclave_run_report',
     title: 'Read what a run did',
     description:
       'Reads a run directory and reports its dispatches, their proof and its verdict. Diagnostic only: it writes no evidence and grants no approval. Spends nothing.',
@@ -186,7 +186,7 @@ const TOOLS = [
     },
   },
   {
-    name: 'magi_seal',
+    name: 'conclave_seal',
     title: 'Seal a plan into a run',
     description:
       'Checks a plan against the dispatch matrix and seals it into a run directory. Nothing runs yet, and no vendor is called. ' +
@@ -203,12 +203,12 @@ const TOOLS = [
     },
   },
   {
-    name: 'magi_drive',
+    name: 'conclave_drive',
     title: 'Run one phase of a sealed run',
     description:
       'SPENDS SUBSCRIPTION CAPACITY. Runs one phase of a sealed run: implement, verify, review, evidence or finalize. ' +
       'One phase per call, because a whole panel takes minutes to tens of minutes and no host waits that long for one tool call. ' +
-      'A Claude seat stops at AWAITING_ATTESTATION: read its answer and call magi_attest before driving the next phase. ' +
+      'A Claude seat stops at AWAITING_ATTESTATION: read its answer and call conclave_attest before driving the next phase. ' +
       'Requires "spend": true.',
     inputSchema: {
       type: 'object',
@@ -223,7 +223,7 @@ const TOOLS = [
     },
   },
   {
-    name: 'magi_attest',
+    name: 'conclave_attest',
     title: 'Attest that the host read a seat answer',
     description:
       'Passes the host attestation for one or more dispatches, which is what lets a Claude seat move past AWAITING_ATTESTATION. ' +
@@ -243,7 +243,7 @@ const TOOLS = [
 async function callTool(name, rawArgs) {
   const args = rawArgs && typeof rawArgs === 'object' && !Array.isArray(rawArgs) ? rawArgs : {};
   switch (name) {
-    case 'magi_hosts':
+    case 'conclave_hosts':
       return text({
         hostModes: HOST_MODES,
         cliHostModes: CLI_HOST_MODES,
@@ -254,7 +254,7 @@ async function callTool(name, rawArgs) {
           'cursor-cli and synara must also route by an arbiter; claude-code and droppy need not.',
       });
 
-    case 'magi_validate_row': {
+    case 'conclave_validate_row': {
       if (!args.row || typeof args.row !== 'object' || Array.isArray(args.row)) fail('"row" must be a JSON object.');
       const strict = args.requireProof !== false;
       try {
@@ -270,7 +270,7 @@ async function callTool(name, rawArgs) {
       }
     }
 
-    case 'magi_tally': {
+    case 'conclave_tally': {
       if (!Array.isArray(args.ballots)) fail('"ballots" must be an array.');
       try {
         const result = tally({ ballots: args.ballots });
@@ -280,7 +280,7 @@ async function callTool(name, rawArgs) {
       }
     }
 
-    case 'magi_run_report': {
+    case 'conclave_run_report': {
       const runDir = requireDirectory(args.runDir, 'runDir');
       const outputDir = path.resolve(requireString(args.outputDir, 'outputDir'));
       const argv = ['--run-dir', runDir, '--output-dir', outputDir];
@@ -289,7 +289,7 @@ async function callTool(name, rawArgs) {
       return text({ ok: run.ok, stdout: run.stdout, stderr: run.stderr, outputDir });
     }
 
-    case 'magi_seal': {
+    case 'conclave_seal': {
       const plan = requireString(args.plan, 'plan');
       if (!fs.existsSync(path.resolve(plan))) fail(`plan not found: ${plan}`);
       const runDir = path.resolve(requireString(args.runDir, 'runDir'));
@@ -299,8 +299,8 @@ async function callTool(name, rawArgs) {
       return text({ ok: run.ok, runDir, stdout: run.stdout, stderr: run.stderr });
     }
 
-    case 'magi_drive': {
-      requireSpend(args, 'magi_drive');
+    case 'conclave_drive': {
+      requireSpend(args, 'conclave_drive');
       const runDir = requireDirectory(args.runDir, 'runDir');
       const phase = requireString(args.phase, 'phase');
       const argv = ['--run-dir', runDir, '--phase', phase];
@@ -314,12 +314,12 @@ async function callTool(name, rawArgs) {
         stderr: run.stderr,
         next:
           run.stdout.includes('AWAITING_ATTESTATION')
-            ? 'A seat is waiting on the host. Read its answer, then call magi_attest with its dispatch id.'
-            : 'Drive the next phase, or call magi_run_report to read what happened.',
+            ? 'A seat is waiting on the host. Read its answer, then call conclave_attest with its dispatch id.'
+            : 'Drive the next phase, or call conclave_run_report to read what happened.',
       });
     }
 
-    case 'magi_attest': {
+    case 'conclave_attest': {
       const runDir = requireDirectory(args.runDir, 'runDir');
       if (!Array.isArray(args.dispatchIds) || args.dispatchIds.length === 0) fail('"dispatchIds" must be a non-empty array.');
       const ids = args.dispatchIds.map((id, index) => requireString(id, `dispatchIds[${index}]`));
@@ -344,12 +344,12 @@ async function handleRequest(message) {
       sendResult(id, {
         protocolVersion: negotiateProtocol(params && params.protocolVersion),
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: SERVER_NAME, title: 'MAGI tri-vendor review panel', version: SERVER_VERSION },
+        serverInfo: { name: SERVER_NAME, title: 'CONCLAVE tri-vendor review panel', version: SERVER_VERSION },
         instructions:
           'Runs a tri-vendor review panel: one seat builds, two others check it in sessions of their own, and the votes are counted in code. ' +
           'Convening is not one call. Seal a plan, drive one phase at a time, attest what a seat said when it asks, then read the report. ' +
           'A vote counts only from a seat that proved its vendor session, its tokens and the model that answered. ' +
-          'magi_drive spends subscription capacity and refuses to run without "spend": true.',
+          'conclave_drive spends subscription capacity and refuses to run without "spend": true.',
       });
       return;
 

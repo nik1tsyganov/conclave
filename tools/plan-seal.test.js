@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -69,7 +69,7 @@ test('legacy unbound plans stay readable but cannot launch new work or rewrite t
   assert.equal(readSealedRun(run.runDir).seal.schemaVersion, 1);
   await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1' }, native), /unbound historical seal/);
   assert.equal(native.calls(), 0); assert.equal(hashFile(file), original);
-  assert.equal(fs.existsSync(path.join(run.runDir, '.magi-dispatches')), false);
+  assert.equal(fs.existsSync(path.join(run.runDir, '.conclave-dispatches')), false);
   seal.profilesSha256 = 'a'.repeat(64); writeJson(file, seal);
   assert.throws(() => readSealedRun(run.runDir), /unsupported historical policy/);
 });
@@ -81,7 +81,7 @@ function jevRecord(run, overrides = {}) {
   const unitId = entry.unitId;
   const row = { briefSha256: entry.briefSha256, classId: entry.class, p: 0.9, confidence: 0.9, gate: 'route', distribution: { [entry.class]: 0.9 }, ...overrides };
   const file = path.join(run.root, `jev-${Math.random().toString(16).slice(2)}.json`);
-  writeJson(file, { protocol: 'magi-jev-plan-classify-v1', planId: run.planObject.planId, units: { [unitId]: row } });
+  writeJson(file, { protocol: 'conclave-jev-plan-classify-v1', planId: run.planObject.planId, units: { [unitId]: row } });
   return { file, unitId, entry };
 }
 
@@ -120,7 +120,7 @@ test('a Jev record bound to another brief, or missing a unit, cannot seal', t =>
   const stale = jevRecord(run, { briefSha256: 'a'.repeat(64) });
   assert.throws(() => sealPlan({ ...base, runDir: path.join(run.root, 'stale'), jevClassification: stale.file }), /bound to a different brief/);
   const missing = path.join(run.root, 'jev-missing.json');
-  writeJson(missing, { protocol: 'magi-jev-plan-classify-v1', units: {} });
+  writeJson(missing, { protocol: 'conclave-jev-plan-classify-v1', units: {} });
   assert.throws(() => sealPlan({ ...base, runDir: path.join(run.root, 'missing'), jevClassification: missing }), /no row for/);
   writeJson(missing, { protocol: 'other', units: {} });
   assert.throws(() => sealPlan({ ...base, runDir: path.join(run.root, 'malformed'), jevClassification: missing }), /malformed/);

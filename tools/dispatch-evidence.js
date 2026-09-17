@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const fs = require('node:fs');
@@ -6,7 +6,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync, spawnSync } = require('node:child_process');
 
-const ATTESTATION_PROTOCOL = 'magi-claude-post-run-attestation-v1';
+const ATTESTATION_PROTOCOL = 'conclave-claude-post-run-attestation-v1';
 const AWAITING_ATTESTATION = 'AWAITING_ATTESTATION';
 
 function evidenceError(message, code = 'EVIDENCE_FAIL') { return Object.assign(new Error(message), { code }); }
@@ -90,7 +90,7 @@ function compareWorkspace(before, after, scope = []) {
 }
 function transactionKey(entry) { return hash(JSON.stringify([entry.dispatchId, entry.unitId, entry.role])); }
 function reserveTransaction(binding, evidenceDir, attestationProtocol) {
-  const root = path.join(path.dirname(binding.planPath), '.magi-dispatches');
+  const root = path.join(path.dirname(binding.planPath), '.conclave-dispatches');
   assertPlainPath(root);
   fs.mkdirSync(root, { recursive: true });
   const file = path.join(root, `${transactionKey(binding.entry)}.json`);

@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const assert = require('node:assert/strict');
@@ -14,22 +14,22 @@ const { FINGERPRINT, FINGERPRINT_V2 } = require('./cli-rules-stage.js');
 function write(file, body) { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, body, 'utf8'); }
 function json(file, value) { write(file, JSON.stringify(value, null, 2)); }
 function fixture(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'magi-cross-contract-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-cross-contract-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const runtimeRoot = path.join(root, 'runtime');
   const kitRoot = path.join(root, 'kit');
   const vaultRoot = path.join(root, 'rules');
   const profiles = loadProfiles();
-  const profilePath = path.join(runtimeRoot, '.cursor/skills/magi-cli/references/seat-profiles.json');
+  const profilePath = path.join(runtimeRoot, '.cursor/skills/conclave-cli/references/seat-profiles.json');
   json(profilePath, profiles);
   json(path.join(path.dirname(profilePath), 'dispatch-matrix.json'), { classes: Object.fromEntries(Object.keys(profiles.classSkills).map((name) => [name, {}])) });
   fs.mkdirSync(path.join(runtimeRoot, 'tools'), { recursive: true });
-  const kit = { schemaVersion: 4, sharedStageSource: 'magi/skills', baseSkills: profiles.baseSkills, roles: profiles.roleSkills, classes: profiles.classSkills, arbiterOnly: profiles.forbiddenSeatSkills };
-  const kitPath = path.join(kitRoot, 'magi/seat-skills.json');
+  const kit = { schemaVersion: 4, sharedStageSource: 'conclave/skills', baseSkills: profiles.baseSkills, roles: profiles.roleSkills, classes: profiles.classSkills, arbiterOnly: profiles.forbiddenSeatSkills };
+  const kitPath = path.join(kitRoot, 'conclave/seat-skills.json');
   json(kitPath, kit);
   const skills = [...new Set([...Object.values(profiles.baseSkills).flat(), ...Object.values(profiles.roleSkills).flat(), ...Object.values(profiles.classSkills).flat()])];
   for (const skill of skills) {
-    for (const base of [path.join(runtimeRoot, 'seat-skills'), path.join(kitRoot, 'magi/skills')]) write(path.join(base, skill, 'SKILL.md'), `# ${skill}\nBound leaf skill.\n`);
+    for (const base of [path.join(runtimeRoot, 'seat-skills'), path.join(kitRoot, 'conclave/skills')]) write(path.join(base, skill, 'SKILL.md'), `# ${skill}\nBound leaf skill.\n`);
   }
   const rules = Array.from({ length: 22 }, (_, i) => `R${String(i + 1).padStart(2, '0')}-fixture.md`);
   write(path.join(vaultRoot, 'STANDING.md'), `${FINGERPRINT_V2}\nBound BRIEF acknowledgment.\n`);
@@ -49,7 +49,7 @@ test('matching explicit roots include exact v2 rules and identical lean skill fi
 });
 
 test('external roots must be explicit instead of falling back to a machine checkout', () => {
-  assert.throws(() => check({ env: {} }), /MAGI_KIT_ROOT|kit.root/i);
+  assert.throws(() => check({ env: {} }), /CONCLAVE_KIT_ROOT|kit.root/i);
 });
 
 test('all vendor base cards must match the kit', (t) => {
@@ -82,7 +82,7 @@ test('duplicate skill names and asymmetric forbidden skills fail', (t) => {
 
 test('a forbidden skill in matching role maps still fails separation', (t) => {
   const f = fixture(t);
-  f.profiles.roleSkills.review.push('magi-mode');
+  f.profiles.roleSkills.review.push('conclave-mode');
   json(f.profilePath, f.profiles);
   f.kit.roles = f.profiles.roleSkills;
   json(f.kitPath, f.kit);
@@ -91,7 +91,7 @@ test('a forbidden skill in matching role maps still fails separation', (t) => {
 
 test('skill-name prose cannot replace an actual kit skill file', (t) => {
   const f = fixture(t);
-  fs.unlinkSync(path.join(f.kitRoot, 'magi/skills', f.skills[0], 'SKILL.md'));
+  fs.unlinkSync(path.join(f.kitRoot, 'conclave/skills', f.skills[0], 'SKILL.md'));
   assert.equal(check(f.opts).ok, false);
 });
 
@@ -102,7 +102,7 @@ test('missing, changed, or extra bundled skill files fail the mirror check', (t)
     if (mutation === 'missing' || mutation === 'directory') fs.unlinkSync(file);
     if (mutation === 'directory') fs.mkdirSync(file);
     if (mutation === 'changed') fs.appendFileSync(file, 'different\n', 'utf8');
-    if (mutation === 'extra') write(path.join(f.runtimeRoot, 'seat-skills', 'magi-mode', 'SKILL.md'), 'forbidden\n');
+    if (mutation === 'extra') write(path.join(f.runtimeRoot, 'seat-skills', 'conclave-mode', 'SKILL.md'), 'forbidden\n');
     assert.equal(check(f.opts).ok, false, mutation);
   }
 });

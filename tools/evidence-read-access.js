@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 const fs = require('node:fs');
 const os = require('node:os');
@@ -35,7 +35,7 @@ function validateEvidenceReadDirs(entry, { plan, runDir, requireExisting = false
       identity(canonicalPlainPath(path.join(run, 'out', row.dispatchId))) === identity(dir));
     if (!prior && !(inside(dir, external) && !pathsOverlap(dir, run))) fail('must be a dedicated attempt/evidence directory or an exact same-unit prerequisite output');
     if (prior && requireExisting) {
-      const file = path.join(run, '.magi-dispatches', `${transactionKey(prior)}.json`);
+      const file = path.join(run, '.conclave-dispatches', `${transactionKey(prior)}.json`);
       assertPlainPath(file);
       const state = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
       if (state?.status !== 'PASS' || !Number.isFinite(Date.parse(state.completedAt)) || identity(canonicalPlainPath(state.evidenceDir)) !== identity(dir)) fail('prerequisite evidence is not complete');

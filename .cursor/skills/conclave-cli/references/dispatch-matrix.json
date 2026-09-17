@@ -1,0 +1,492 @@
+{
+  "schemaVersion": 3,
+  "updated": "2026-09-16",
+  "arbiter": {
+    "decisionEngine": {
+      "engine": "jev",
+      "added": "2026-09-16",
+      "model": "jev-latest",
+      "endpoint": "https://api.typesafe.ai/v1/systemone",
+      "keyEnv": "TYPESAFE_API_KEY",
+      "tools": [
+        "tools/jev-client.js",
+        "tools/jev-arbiter.js",
+        "tools/jev-check.js"
+      ],
+      "gates": {
+        "classifyRoute": 0.6,
+        "classifyRouteFlagged": 0.4,
+        "seatRoute": 0.6,
+        "seatRouteFlagged": 0.4,
+        "seatMinMarginToFlip": 0.15,
+        "convene": 0.6,
+        "netBenefit": 0.6,
+        "independentEvidence": 0.6,
+        "claimSupported": 0.6,
+        "claimContradicted": 0.4
+      },
+      "policy": "Jev proposes distributions; deterministic code gates. The hosting session stays the driver and runs the tools; Jev reads no files and dispatches nothing. Seat picks come from mix-mode routing.json decisionMatrix2026-09-16 under the margin rule and never name a model whose capacity bucket is exhausted (docs/capacity-state.json). A missing TYPESAFE_API_KEY yields a NOT_RUN result, never a throw; every real call appends a provenance row (request and response sha256, usage, model, timestamp) and never the key. Seats do not call Jev; only the lead runs tools/jev-check.js over seat output, after deterministic pre-checks.",
+      "provenance": "jev-decisions.jsonl in the run directory",
+      "note": "The principles.arbiter* rows above are unchanged by this block; wiring the Jev classify result into plan-seal and retiring the xai arbiter check in tools/dispatch-matrix.js is a separate, owner-approved step."
+    }
+  },
+  "principles": {
+    "arbiterVendor": "jev",
+    "arbiterModel": "jev-latest",
+    "arbiterNeverSeat": true,
+    "arbiterNeverImplements": true,
+    "arbiterNeverReviews": true,
+    "arbiterNeverVerifies": true,
+    "arbiterNeverVotes": true,
+    "deterministicRulesOutrankModels": true,
+    "distributionFloor": 0.6,
+    "distributionFloorMinimumImplementUnits": 2,
+    "maxConcurrentDispatches": 3,
+    "maxConcurrentDispatchesNote": "Owner question 2026-09-16 (\"adapt the head count max so we do not fan out too many agents once seats are active\"): at most this many RUNNING dispatches per sealed run at once, one per vendor by default; dispatch-run refuses a launch beyond it. Stale RUNNING transactions older than the wall-clock ceiling are ignored. Seats themselves cannot fan out: Claude seats launch with --disallowedTools Agent,Task and Codex seats with features.multi_agent=false (R12 enforced natively); agy has no equivalent flag, so a Gemini seat is bound by its contract and the scope audit only.",
+    "requireCrossVendorReview": true,
+    "requireObservedModelProof": true,
+    "unknownAvailabilityIsUnavailable": true,
+    "frontierEscalationOnly": true,
+    "arbiterRetired2026-09-16": "xai/grok-4.6 retired as arbiter by owner instruction. The arbiter is the Jev decision engine (arbiter.decisionEngine); the hosting session (hostMode cursor-cli, synara or claude-code, declared by conclave-whoami) runs the tools and holds no vote. A plan declares arbiter {vendor: \"jev\", model: \"jev-latest\", host: \"<session slug>\"}; plan-seal records the Jev classification per unit and refuses a plan whose class Jev cannot support unless an owner override reason is recorded.",
+    "catalogCulled2026-09-16": "Owner instruction: keep Astra and Sol (Codex), Fable and Opus (Claude), Gemini 3.1 Pro and Gemini 3.8 Flash (agy). Terra, Luna and Sonnet removed from every lane; Astra stays escalation-only where marked."
+  },
+  "vendors": {
+    "openai": {
+      "models": {
+        "gpt-5.6-sol": {
+          "efforts": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "tier": "frontier"
+        },
+        "gpt-6-astra": {
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "tier": "frontier-plus",
+          "availability": "probe-required"
+        }
+      },
+      "note": "Catalog culled 2026-09-16 (owner): Sol is the standing Codex seat model; Astra is the escalation tier (probe-required, escalationOnly where marked). Terra retired after truncating the instruction-read sequence on 3 of 5 launches; Luna retired as outdated."
+    },
+    "anthropic": {
+      "models": {
+        "opus": {
+          "canonical": "claude-opus-5",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "tier": "judgment"
+        },
+        "fable": {
+          "canonical": "claude-fable-5-1",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "tier": "agentic-frontier"
+        }
+      },
+      "note": "Catalog culled 2026-09-16 (owner): Fable (agentic frontier) and Opus (judgment/review). Sonnet retired."
+    },
+    "google": {
+      "models": {
+        "gemini-3.1-pro-high": {
+          "efforts": [
+            "fused-high"
+          ],
+          "tier": "deep",
+          "availability": "proven-agy"
+        },
+        "gemini-3.8-flash-high": {
+          "efforts": [
+            "fused-high"
+          ],
+          "tier": "agentic",
+          "availability": "probe-required"
+        },
+        "gemini-3.8-flash-medium": {
+          "efforts": [
+            "fused-medium"
+          ],
+          "tier": "balanced",
+          "availability": "probe-required"
+        },
+        "gemini-3.8-flash-low": {
+          "efforts": [
+            "fused-low"
+          ],
+          "tier": "throughput",
+          "availability": "probe-required"
+        }
+      },
+      "note": "Catalog culled 2026-09-16 (owner): Gemini 3.1 Pro (deep) and Gemini 3.8 Flash (agentic/balanced/throughput). agy uses whole-slug effort; probe-required entries are illegal until a live agy probe records that exact observed slug."
+    }
+  },
+  "classes": {
+    "architecture-planning": {
+      "title": "Architecture or system design planning: decide structure, interfaces, trade-offs before code",
+      "plan": [
+        {
+          "vendor": "anthropic",
+          "model": "opus",
+          "effort": "high",
+          "priority": 1
+        },
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "high",
+          "priority": 2
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 3
+        },
+        {
+          "vendor": "openai",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "priority": 4,
+          "requiresProbe": true,
+          "escalationOnly": true
+        }
+      ]
+    },
+    "standard-feature": {
+      "title": "Standard feature or bounded bug fix in a known codebase, one to a few files, existing tests",
+      "implement": [
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "medium",
+          "priority": 1
+        },
+        {
+          "vendor": "anthropic",
+          "model": "fable",
+          "effort": "medium",
+          "priority": 2
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.8-flash-medium",
+          "effort": "fused-medium",
+          "priority": 3,
+          "requiresProbe": true
+        }
+      ],
+      "verify": [
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "medium",
+          "priority": 1
+        },
+        {
+          "vendor": "anthropic",
+          "model": "opus",
+          "effort": "medium",
+          "priority": 2
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 3
+        }
+      ]
+    },
+    "bulk-mechanical": {
+      "title": "Bulk mechanical edits: renames, migrations, formatting, repetitive changes with low judgment",
+      "implement": [
+        {
+          "vendor": "google",
+          "model": "gemini-3.8-flash-low",
+          "effort": "fused-low",
+          "priority": 1,
+          "requiresProbe": true
+        },
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low",
+          "priority": 2
+        },
+        {
+          "vendor": "anthropic",
+          "model": "fable",
+          "effort": "low",
+          "priority": 3
+        }
+      ],
+      "verify": [
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "medium",
+          "priority": 1
+        },
+        {
+          "vendor": "anthropic",
+          "model": "opus",
+          "effort": "medium",
+          "priority": 2
+        }
+      ]
+    },
+    "debug-mystery": {
+      "title": "Debugging an unexplained failure: reproduce, hypothesise, bisect, root-cause",
+      "implement": [
+        {
+          "vendor": "anthropic",
+          "model": "fable",
+          "effort": "xhigh",
+          "priority": 1
+        },
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "high",
+          "priority": 2
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 3
+        },
+        {
+          "vendor": "openai",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "priority": 4,
+          "requiresProbe": true,
+          "escalationOnly": true
+        }
+      ]
+    },
+    "long-context-analysis": {
+      "title": "Reading and analysing a large corpus or codebase; answer from many files",
+      "research": [
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 1
+        },
+        {
+          "vendor": "openai",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "priority": 2,
+          "requiresProbe": true
+        },
+        {
+          "vendor": "anthropic",
+          "model": "fable",
+          "effort": "high",
+          "priority": 3
+        },
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "high",
+          "priority": 4
+        }
+      ]
+    },
+    "agentic-long-run": {
+      "title": "Long-horizon autonomous work across many steps and tools with self-verification",
+      "implement": [
+        {
+          "vendor": "anthropic",
+          "model": "fable",
+          "effort": "xhigh",
+          "priority": 1
+        },
+        {
+          "vendor": "openai",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "priority": 2,
+          "requiresProbe": true
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.8-flash-high",
+          "effort": "fused-high",
+          "priority": 3,
+          "requiresProbe": true
+        },
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "high",
+          "priority": 4
+        }
+      ]
+    },
+    "security-sensitive": {
+      "title": "Security-sensitive code: auth, secrets, permissions, crypto, input trust boundaries",
+      "implement": [
+        {
+          "vendor": "anthropic",
+          "model": "opus",
+          "effort": "xhigh",
+          "priority": 1
+        },
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "xhigh",
+          "priority": 2
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 3
+        },
+        {
+          "vendor": "openai",
+          "model": "gpt-6-astra",
+          "effort": "xhigh",
+          "priority": 4,
+          "requiresProbe": true,
+          "escalationOnly": true
+        }
+      ],
+      "minimumReviewVendors": 2,
+      "requiresPanel": true
+    },
+    "review-adversarial": {
+      "title": "Adversarial review of existing changes to find latent defects",
+      "review": [
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "high",
+          "priority": 1
+        },
+        {
+          "vendor": "anthropic",
+          "model": "opus",
+          "effort": "high",
+          "priority": 2
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 3
+        },
+        {
+          "vendor": "openai",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "priority": 4,
+          "requiresProbe": true,
+          "escalationOnly": true
+        }
+      ]
+    },
+    "test-verification": {
+      "title": "Verify a change against its tests and evidence; run or inspect tests, no product edits",
+      "verify": [
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "medium",
+          "priority": 1
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.8-flash-medium",
+          "effort": "fused-medium",
+          "priority": 2,
+          "requiresProbe": true
+        },
+        {
+          "vendor": "anthropic",
+          "model": "opus",
+          "effort": "medium",
+          "priority": 3
+        }
+      ]
+    },
+    "research-synthesis": {
+      "title": "Research and synthesis from sources into a written conclusion",
+      "research": [
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 1
+        },
+        {
+          "vendor": "openai",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "priority": 2,
+          "requiresProbe": true
+        },
+        {
+          "vendor": "anthropic",
+          "model": "fable",
+          "effort": "high",
+          "priority": 3
+        },
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "high",
+          "priority": 4
+        }
+      ]
+    },
+    "extreme-end-to-end": {
+      "title": "Extreme end-to-end delivery: build, verify and ship a whole capability with a panel",
+      "implement": [
+        {
+          "vendor": "openai",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "priority": 1,
+          "requiresProbe": true
+        },
+        {
+          "vendor": "anthropic",
+          "model": "fable",
+          "effort": "xhigh",
+          "priority": 2
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 3
+        }
+      ],
+      "requiresPanel": true
+    }
+  }
+}

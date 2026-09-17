@@ -1,15 +1,15 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 /**
  * Cursor plugin.json surface path fields (skills/rules/agents/commands).
  *
  * Conclave declares these fields so discovery does not depend on default
- * folder scanning. Magi must declare them too, with values that match
+ * folder scanning. Conclave must declare them too, with values that match
  * files actually shipped:
  *   - source repo: skills/rules live under .cursor/, agents/commands at root
- *   - installed magi: installer copies those trees to skills/rules/agents/commands
- *   - installed magi-cursor-cli: no agents/ directory (and must not declare one)
+ *   - installed conclave: installer copies those trees to skills/rules/agents/commands
+ *   - installed conclave-cursor-cli: no agents/ directory (and must not declare one)
  */
 
 const SOURCE_SURFACE = Object.freeze({
@@ -19,14 +19,14 @@ const SOURCE_SURFACE = Object.freeze({
   commands: './commands/',
 });
 
-const INSTALLED_MAGI_SURFACE = Object.freeze({
+const INSTALLED_CONCLAVE_SURFACE = Object.freeze({
   skills: './skills/',
   rules: './rules/',
   agents: './agents/',
   commands: './commands/',
 });
 
-const INSTALLED_MAGI_CLI_SURFACE = Object.freeze({
+const INSTALLED_CONCLAVE_CLI_SURFACE = Object.freeze({
   skills: './skills/',
   rules: './rules/',
   commands: './commands/',
@@ -96,8 +96,8 @@ function applySurfaceFields(manifest, requiredFields) {
 
 module.exports = {
   SOURCE_SURFACE,
-  INSTALLED_MAGI_SURFACE,
-  INSTALLED_MAGI_CLI_SURFACE,
+  INSTALLED_CONCLAVE_SURFACE,
+  INSTALLED_CONCLAVE_CLI_SURFACE,
   SURFACE_FIELD_NAMES,
   normalizeSurfacePath,
   isUnsafeSurfacePath,

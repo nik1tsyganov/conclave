@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const crypto = require('node:crypto');
@@ -40,16 +40,16 @@ function skillInventory(root, required) {
 
 function check(options = {}) {
   const env = options.env || process.env;
-  const kitOption = options.kitRoot || env.MAGI_KIT_ROOT;
-  const vaultOption = options.vaultRoot || env.MAGI_RULES_ROOT;
-  if (!kitOption) fail('explicit kit root required: --kit-root or MAGI_KIT_ROOT');
-  if (!vaultOption) fail('explicit rules root required: --vault-root or MAGI_RULES_ROOT');
+  const kitOption = options.kitRoot || env.CONCLAVE_KIT_ROOT;
+  const vaultOption = options.vaultRoot || env.CONCLAVE_RULES_ROOT;
+  if (!kitOption) fail('explicit kit root required: --kit-root or CONCLAVE_KIT_ROOT');
+  if (!vaultOption) fail('explicit rules root required: --vault-root or CONCLAVE_RULES_ROOT');
   const kitRoot = path.resolve(kitOption);
   const vaultRoot = path.resolve(vaultOption);
   const runtime = resolveRuntimePaths({ root: options.runtimeRoot });
   const profiles = loadProfiles(options.seatProfiles || runtime.seatProfilesPath);
   const matrix = readJson(runtime.matrixPath);
-  const kit = readJson(path.join(kitRoot, 'magi', 'seat-skills.json'));
+  const kit = readJson(path.join(kitRoot, 'conclave', 'seat-skills.json'));
   const findings = [];
   function record(name, ok, observed) { findings.push({ check: name, ok: Boolean(ok), ...(observed === undefined ? {} : { observed }) }); }
   function checked(name, fn) {
@@ -71,10 +71,10 @@ function check(options = {}) {
     .flatMap((map) => keys(map).flatMap((key) => skills(map[key]) ? map[key] : [])))].sort();
   const overlap = selected.filter((skill) => profiles.forbiddenSeatSkills?.includes(skill) || kit.arbiterOnly?.includes(skill));
   record('kit-arbiter-separation', selected.length > 0 && overlap.length === 0, overlap);
-  record('kit-shared-stage-source', kit.sharedStageSource === 'magi/skills', kit.sharedStageSource);
+  record('kit-shared-stage-source', kit.sharedStageSource === 'conclave/skills', kit.sharedStageSource);
   let sourceFiles;
   checked('kit-skill-files', () => {
-    sourceFiles = skillInventory(path.join(kitRoot, 'magi', 'skills'), selected);
+    sourceFiles = skillInventory(path.join(kitRoot, 'conclave', 'skills'), selected);
     return { ok: true, observed: sourceFiles.length };
   });
   checked('runtime-kit-skill-files', () => {

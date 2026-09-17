@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const crypto = require('node:crypto');
@@ -33,7 +33,7 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
   const binary = resolveVendorBinary(vendor);
   fs.mkdirSync(root, { recursive: true });
   fs.mkdirSync(work, { recursive: true });
-  const challenge = `MAGI_PROBE_${crypto.randomBytes(16).toString('hex')}`;
+  const challenge = `CONCLAVE_PROBE_${crypto.randomBytes(16).toString('hex')}`;
   const prompt = `Reply with exactly ${challenge} in your final response. Do not use tools. Do not modify any files.\n`;
   const stdinFile = path.join(root, 'challenge.txt');
   fs.writeFileSync(stdinFile, prompt, 'utf8');
@@ -49,7 +49,7 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
   let args;
   // Same provider override as cli-adapters.openaiLaunch: headless codex otherwise
   // routes through the host's local proxy, which is usually down on this Mac.
-  const provider = process.env.MAGI_CODEX_PROVIDER ?? (process.platform === 'darwin' ? 'openai' : undefined);
+  const provider = process.env.CONCLAVE_CODEX_PROVIDER ?? (process.platform === 'darwin' ? 'openai' : undefined);
   if (vendor === 'openai') args = ['exec', '--skip-git-repo-check', '-s', 'read-only', '-m', model, '-c', `model_reasoning_effort=${effort}`, '-c', 'memories.use_memories=false', '-c', 'memories.generate_memories=false', ...(provider ? ['-c', `model_provider=${provider}`] : []), '-C', work, '-o', capture, '-'];
   if (vendor === 'google') args = ['--model', model, '--sandbox', '--output-format', 'json', '--print-timeout', '2m', '--log-file', nativeLogPath, '--add-dir', work, '-p', prompt];
   if (vendor === 'anthropic') args = ['-p', '--safe-mode', '--model', model, '--effort', effort, '--permission-mode', 'dontAsk', '--tools', '', '--output-format', 'stream-json', '--verbose'];

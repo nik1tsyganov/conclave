@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const assert = require('node:assert/strict');
@@ -25,7 +25,7 @@ function fixture(t) {
   const opts = { runDir, dispatchId: 'verify-one', cwd, briefPath, seatContractPath, skillRoot,
     capturePath: path.join(evidence, 'capture.txt'), role: 'verify', model: 'gpt-5.6-sol', effort: 'medium',
     readonlyScratch: true, mustExistBinary: false,
-    env: { MAGI_DEV_ROOT: root, MAGI_CODEX_BIN: '/opt/magi/bin/codex', temp: 'unsafe', TMP: 'unsafe', NPM_CONFIG_CACHE: 'unsafe' } };
+    env: { CONCLAVE_DEV_ROOT: root, CONCLAVE_CODEX_BIN: '/opt/conclave/bin/codex', temp: 'unsafe', TMP: 'unsafe', NPM_CONFIG_CACHE: 'unsafe' } };
   return { root, evidence, opts };
 }
 
@@ -48,9 +48,9 @@ test('scratch opt-in binds one write directory and replaces the whole profile', 
   assert.equal(launch.env.npm_config_cache, path.join(scratch, 'npm-cache'));
   assert.equal(launch.env.temp, undefined);
   assert.equal(launch.env.NPM_CONFIG_CACHE, undefined);
-  assert.ok(launch.args.includes('default_permissions="magi_readonly_scratch"'));
+  assert.ok(launch.args.includes('default_permissions="conclave_readonly_scratch"'));
   const profile = launch.args.find(arg => arg.startsWith('permissions.'));
-  assert.ok(profile.startsWith('permissions.magi_readonly_scratch={'), 'whole table replaces inherited named-profile grants');
+  assert.ok(profile.startsWith('permissions.conclave_readonly_scratch={'), 'whole table replaces inherited named-profile grants');
   assert.match(profile, /extends = ":read-only"/);
   assert.match(profile, /network = \{ enabled = false \}/);
   assert.equal((profile.match(/"write"/g) || []).length, 1);
@@ -97,10 +97,10 @@ test('custom banner alone and altered scratch launch evidence never suffice', t 
   assert.throws(() => parseCodex(banner, f.opts.model), /bound scratch launch/);
   assert.throws(() => parseCodex(banner, f.opts.model, { ...options, launch: undefined }), /scratch launch validation/);
   for (const mutate of [
-    copy => copy.args.push('-c', 'permissions.magi_readonly_scratch.filesystem={ ":root" = "write" }'),
+    copy => copy.args.push('-c', 'permissions.conclave_readonly_scratch.filesystem={ ":root" = "write" }'),
     copy => copy.args.push('-c', 'default_permissions=":danger-full-access"'),
     copy => copy.args.push('--dangerously-bypass-approvals-and-sandbox'),
-    copy => { copy.args[copy.args.findIndex(arg => arg.startsWith('permissions.'))] = 'permissions.magi_readonly_scratch={ extends = ":workspace" }'; },
+    copy => { copy.args[copy.args.findIndex(arg => arg.startsWith('permissions.'))] = 'permissions.conclave_readonly_scratch={ extends = ":workspace" }'; },
     copy => { copy.scratchPermissions.scratchPath = f.root; },
     copy => { copy.scratchEnv.TEMP = f.root; },
     copy => { copy.env.tmp = f.root; },

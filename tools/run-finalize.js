@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 
 const fs = require('node:fs');
@@ -14,10 +14,10 @@ const { canonicalPlainPath, pathsOverlap } = require('./runtime-paths.js');
 const { INSTRUCTION_READ_PROTOCOL, verifyInstructionReadEvidence } = require('./instruction-read-evidence.js');
 const { buildSeatProfile, loadProfiles } = require('./seat-policy.js');
 const { validateEvidenceReadDirs, snapshotEvidenceReads, validateEvidenceReadLaunch } = require('./evidence-read-access.js');
-const { resolveVaultRoot } = require('./magi-vault.js');
-const { linkRunToVault } = require('./magi-vault-link.js');
+const { resolveVaultRoot } = require('./conclave-vault.js');
+const { linkRunToVault } = require('./conclave-vault-link.js');
 
-const SEQUENCE_PROTOCOL = 'magi-unit-sequence-v1';
+const SEQUENCE_PROTOCOL = 'conclave-unit-sequence-v1';
 
 function readJson(file) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
 function compatible(committed, fresh, label) {
@@ -28,11 +28,11 @@ function compatible(committed, fresh, label) {
 function same(a, b, label) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${label} disagrees with committed evidence`); }
 function validateLogDestinations(run, logs, evidenceDir, protectedPaths = []) {
   const reserved = [evidenceDir, run.planPath, run.sealPath, run.availablePath,
-    ...['.magi-dispatches', '.magi-sessions', 'run-summary.json', 'telemetry.jsonl', 'implementation.jsonl'].map(name => path.join(run.root, name)),
+    ...['.conclave-dispatches', '.conclave-sessions', 'run-summary.json', 'telemetry.jsonl', 'implementation.jsonl'].map(name => path.join(run.root, name)),
     ...protectedPaths];
   for (const entry of run.plan.dispatches) {
     reserved.push(entry.brief, path.join(run.root, 'out', entry.dispatchId));
-    const file = path.join(run.root, '.magi-dispatches', `${transactionKey(entry)}.json`);
+    const file = path.join(run.root, '.conclave-dispatches', `${transactionKey(entry)}.json`);
     assertPlainPath(file);
     if (fs.existsSync(file)) {
       const state = readJson(file);
@@ -62,7 +62,7 @@ function verifyPrerequisites(run, entry, before, startedAt) {
   const start = Date.parse(startedAt);
   if (!Number.isFinite(start)) throw new Error('sequence start time is missing or invalid');
   return [...(author ? [author] : []), ...verifiers].map(dependency => {
-    const file = path.join(run.root, '.magi-dispatches', `${transactionKey(dependency)}.json`);
+    const file = path.join(run.root, '.conclave-dispatches', `${transactionKey(dependency)}.json`);
     const unfinished = dependency.role === 'implement' ? 'implementation must finish before its review or verification' : 'verification must finish before review';
     assertPlainPath(file);
     if (!fs.existsSync(file)) throw new Error(`${unfinished}: ${dependency.dispatchId}`);
@@ -108,7 +108,7 @@ function verifyCheckpoint(run, entry, state, { current = false, allowReceiptProj
 function verifySavedExecution(run, entry, state, pending, allowReceiptProjections = false) {
   same(state.entry, entry, 'plan entry');
   if (state.planHash !== run.seal.planHash || state.planId !== run.plan.planId || state.requestHash !== hash(JSON.stringify({ planHash: run.seal.planHash, entry }))) throw new Error('transaction belongs to a different plan');
-  const transactionPath = path.join(run.root, '.magi-dispatches', `${transactionKey(entry)}.json`);
+  const transactionPath = path.join(run.root, '.conclave-dispatches', `${transactionKey(entry)}.json`);
   if (state.telemetry?.transactionPath !== transactionPath || !inside(state.evidenceDir, run.root)) throw new Error('transaction evidence is outside its sealed run');
   const projections = new Map();
   if (pending && allowReceiptProjections) {
@@ -285,7 +285,7 @@ function inspectRun(runDir) {
   const outcomes = [];
   const sessions = new Set();
   for (const entry of run.plan.dispatches) {
-    const file = path.join(run.root, '.magi-dispatches', `${transactionKey(entry)}.json`);
+    const file = path.join(run.root, '.conclave-dispatches', `${transactionKey(entry)}.json`);
     const outcome = { dispatchId: entry.dispatchId, unitId: entry.unitId, role: entry.role, vendor: entry.vendor, class: entry.class, planId: run.plan.planId, planHash: run.seal.planHash, status: 'NOT_RUN' };
     if (fs.existsSync(file)) {
       try {
@@ -367,7 +367,7 @@ function assessRun(run) {
 }
 
 function shouldLinkVault(runDir, env = process.env) {
-  if (!env.MAGI_VAULT_ROOT || env.MAGI_VAULT_LINK === '0') return false;
+  if (!env.CONCLAVE_VAULT_ROOT || env.CONCLAVE_VAULT_LINK === '0') return false;
   return !inside(path.resolve(runDir), path.resolve(os.tmpdir()));
 }
 
@@ -451,7 +451,7 @@ function main(argv = process.argv.slice(2)) {
     if (argv.length !== 2 || argv[0] !== '--run-dir') throw new Error('Usage: run-finalize --run-dir <sealed run directory>');
     const result = finalizeRun(argv[1]);
     if (shouldLinkVault(argv[1])) {
-      if (!resolveVaultRoot()) throw new Error('MAGI_VAULT_ROOT is set but is not an ai-ops-vault');
+      if (!resolveVaultRoot()) throw new Error('CONCLAVE_VAULT_ROOT is set but is not an ai-ops-vault');
       result.vault = linkRunToVault({ runDir: argv[1] });
     }
     process.stdout.write(`${JSON.stringify(result)}\n`); return result.ok ? 0 : 1;

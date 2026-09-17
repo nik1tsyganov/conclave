@@ -1,4 +1,4 @@
-// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
+// CONCLAVE, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with additional terms; see LICENSE and ADDITIONAL-TERMS.md.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -30,7 +30,7 @@ test('invalid timeout leaves the dispatch available for a corrected command', as
   for (const maxWallMs of ['oops',0,-1,Infinity,2700001,1.5]) {
     await assert.rejects(runDispatch({...run.opts,dispatchId:'d1',maxWallMs},native),/max-wall-ms/);
     assert.equal(native.calls(),0);
-    assert.equal(fs.existsSync(path.join(run.runDir,'.magi-dispatches')),false);
+    assert.equal(fs.existsSync(path.join(run.runDir,'.conclave-dispatches')),false);
   }
   assert.equal((await runDispatch({...run.opts,dispatchId:'d1',maxWallMs:'120000'},native)).ok,true);
   assert.equal(native.calls(),1);
@@ -77,7 +77,7 @@ test('probe and availability commands reject ambiguous options before I/O', () =
 
 test('sealing cannot place run evidence inside its installed runtime', t => {
   const run=createSealedRun(t),destination=path.join(run.root,'installed-runtime');
-  require('./install-plugin.js').installMagiCursorCli({destination});
+  require('./install-plugin.js').installConclaveCursorCli({destination});
   const runDir=path.join(destination,'saved-run');
   assert.throws(()=>require(path.join(destination,'tools/plan-seal.js')).sealPlan({ noJev: 'test fixture', plan:run.planSource,availability:run.availability,runDir}),/runtime.*overlap|overlap.*runtime/i);
   assert.equal(fs.existsSync(runDir),false);
