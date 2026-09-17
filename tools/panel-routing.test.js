@@ -103,6 +103,44 @@ test('a panel that cannot run drops every unit with the reason', () => {
   assert.match(out.dropped[0].reason, /needs all three seats ready/);
 });
 
+// The Swift harness used to brute-force every arrangement of three seats over every class.
+// That sweep belongs wherever the routing lives, so it lives here now.
+test('every arrangement of three seats, over every class, routes soundly', () => {
+  const vendors = ['openai', 'anthropic', 'google'];
+  let arrangements = 0;
+  for (const a of vendors) for (const b of vendors) for (const c of vendors) {
+    const seats = [{ slot: 'ponens', vendor: a }, { slot: 'scrutator', vendor: b }, { slot: 'advocatus', vendor: c }];
+    const ready = [...new Set([a, b, c])];
+    for (const unitClass of routing.CLASSES) {
+      arrangements += 1;
+      const out = routing.route({ units: [unit('U1', { class: unitClass })], seats, readyVendors: ready });
+      const routed = out.units[0];
+      const where = `${a}/${b}/${c} ${unitClass}`;
+      assert.ok(routed, `${where}: a panel of ready seats always routes`);
+      assert.ok(!routed.checkers.slice(0, 2).some((c2) => c2.slot === routed.builder), `${where}: the builder never checks its own work`);
+      assert.equal(new Set([routed.builder, ...routed.checkers.map((c2) => c2.slot)]).size, 3, `${where}: all three seats sit`);
+      assert.equal(routed.checkers.length, routing.isCritical(unitClass) ? 3 : 2, `${where}: the right number of checks`);
+      assert.deepEqual(routed.checkers.slice(0, 2).map((c2) => c2.role), ['verify', 'review'], `${where}: one verify then one review`);
+      // A panel on one vendor still runs; it is the verdict that says what that cost.
+      assert.equal(out.readiness.canRun, true, `${where}: it runs`);
+      assert.equal(out.readiness.crossVendor, new Set([a, b, c]).size === 3, `${where}: and says how independent it is`);
+    }
+  }
+  assert.equal(arrangements, 27 * routing.CLASSES.length, 'every arrangement of three seats over every class');
+});
+
+// The same sweep for how a block of several units is spread, which is where the load counting
+// shows: one seat must not author a whole block while the other two sit idle.
+test('a block of three spreads across the seats in every arrangement', () => {
+  const vendors = ['openai', 'anthropic', 'google'];
+  for (const a of vendors) for (const b of vendors) for (const c of vendors) {
+    const seats = [{ slot: 'ponens', vendor: a }, { slot: 'scrutator', vendor: b }, { slot: 'advocatus', vendor: c }];
+    const units = ['A', 'B', 'C'].map((id) => unit(id, { files: [`${id}.swift`] }));
+    const builders = routing.route({ units, seats, readyVendors: [...new Set([a, b, c])] }).units.map((u) => u.builder);
+    assert.equal(new Set(builders).size, 3, `${a}/${b}/${c}: three units, three builders`);
+  }
+});
+
 test('a class nobody recognises is ordinary feature work', () => {
   assert.equal(routing.classNamed('security-sensitive'), 'security-sensitive');
   assert.equal(routing.classNamed('Security Sensitive'), 'security-sensitive', 'however it is spelled');
