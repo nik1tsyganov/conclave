@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="MAGI coordinates AI engineering across three vendors through sealed plans, native evidence, and independent review.">
+  <meta name="description" content="MAGI coordinates AI engineering across three vendors through sealed plans, native evidence, and independent review. Runs on macOS, from a terminal session, a native app or any MCP host.">
   <title>MAGI — Multi-Agent General Intelligence</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -16,6 +16,7 @@
         <a href="#system">System</a>
         <a href="#matrix">Matrix</a>
         <a href="#enforcement">Enforcement</a>
+        <a href="#hosts">Hosts</a>
         <a href="#principles">Principles</a>
         <a href="https://github.com/nik1tsyganov/magi">GitHub</a>
       </nav>
@@ -112,6 +113,47 @@
       </div>
     </section>
 
+    <section id="hosts" aria-labelledby="hosts-title">
+      <div class="wrap">
+        <div class="kicker">Hosts <span class="jp" lang="ja" aria-hidden="true">母艦</span></div>
+        <h2 id="hosts-title">The host runs the tools.<br>It holds no vote.</h2>
+        <p class="lead">A panel is three vendor seats and a count. Whatever convenes it is a host, and a host is not a seat: it dispatches, it captures, it attests what it read, and it never supplies a position. That is why more than one kind of host can exist at all.</p>
+        <div class="table-scroll">
+          <table class="matrix">
+            <caption>Host modes · every seat is a native vendor CLI</caption>
+            <thead>
+              <tr><th scope="col">Host</th><th scope="col">What it is</th><th scope="col">Arbiter</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">cursor-cli</th><td>A Cursor chat driving the CLI runtime</td><td>Jev</td></tr>
+              <tr><th scope="row">synara</th><td>Synara driving the same runtime</td><td>Jev</td></tr>
+              <tr><th scope="row">claude-code</th><td>A Claude Code session driving it</td><td>none required</td></tr>
+              <tr><th scope="row">droppy</th><td>Droppy Code, a native macOS app, as its Three Brains panel</td><td>none; counted in code</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="matrix-note">Droppy Code is the first host that is not a terminal session. It reimplements the protocol in Swift against its own provider sessions, so each seat is a chat a person can watch work. It shares no code with this runtime and does not need to: it writes the same telemetry rows, which is what makes one set of tools read runs from either.</p>
+        <div class="grid3">
+          <article class="card blue">
+            <div class="seat-label">MCP</div>
+            <h3>One plug, not one plugin per editor.</h3>
+            <p>A stdio MCP server exposes the panel to any host that speaks the protocol: VS Code, Cursor, Zed, Claude Desktop, the JetBrains IDEs. No extension has to be written for each one.</p>
+          </article>
+          <article class="card amber">
+            <div class="seat-label">Not one call</div>
+            <h3>A panel outlives a tool call.</h3>
+            <p>Minutes to tens of minutes, against a host that times out in seconds. So the run directory persists between calls: seal a plan, drive one phase, attest what a seat said, read the report.</p>
+          </article>
+          <article class="card green">
+            <div class="seat-label">Native</div>
+            <h3>Where the panel needs a window.</h3>
+            <p>MCP cannot draw a seat you watch, a verdict card or a seat arrangement. A host that wants those implements the protocol itself, the way Droppy Code did. The row format is what keeps them one system.</p>
+          </article>
+        </div>
+        <p class="boundary-note">One call spends subscription capacity, and it refuses to run unless the caller confirms it. Reading a tool list should not be able to start a nine-seat run.</p>
+      </div>
+    </section>
+
     <section id="principles" aria-labelledby="principles-title">
       <div class="wrap">
         <div class="kicker">Standing design <span class="jp" lang="ja" aria-hidden="true">運用原則</span></div>
@@ -130,7 +172,8 @@
   </main>
   <footer class="footer">
     <div class="wrap">
-      <div><strong>M.A.G.I.</strong><br>Multi-Agent General Intelligence</div>
+      <div><strong>M.A.G.I.</strong><br>Multi-Agent General Intelligence<br>Copyright &copy; 2026 Nikita Tsyganov</div>
+      <div>Free software under the <a href="https://github.com/nik1tsyganov/magi/blob/main/LICENSE">GNU Affero General Public License v3</a>, with additional terms for attribution, origin and marks. Anyone running a modified MAGI as a network service must offer that modified source to its users.</div>
       <div>Project artwork and system diagrams. Independent fan project inspired by Evangelion; no official affiliation or endorsement.</div>
     </div>
   </footer>
