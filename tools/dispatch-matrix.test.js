@@ -65,15 +65,22 @@ test('standard feature rejects frontier over-routing not listed by policy', () =
   assert.match(result.reason, /route not in matrix/);
 });
 
-test('synara is a legal CLI hostMode and banana is not', () => {
-  assert.deepStrictEqual(validatePlan({
-    hostMode: 'synara', arbiter: arbiter(), magiConvened: true,
-    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }],
-  }, matrix), { ok: true, dispatches: 1, implementUnits: 1 });
+// Every CLI host mode is legal and anything else is not. Asserting against the list rather
+// than a frozen sentence: the message names the hosts, so a new host used to fail this test
+// for saying the right thing.
+test('every CLI hostMode is legal and banana is not', () => {
+  const { CLI_HOST_MODES } = require('./dispatch-schema.js');
+  for (const hostMode of CLI_HOST_MODES) {
+    assert.deepStrictEqual(validatePlan({
+      hostMode, arbiter: arbiter(), magiConvened: true,
+      dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }],
+    }, matrix), { ok: true, dispatches: 1, implementUnits: 1 }, hostMode);
+  }
+  assert.ok(CLI_HOST_MODES.includes('droppy'), 'Droppy Code is a host');
   assert.throws(() => validatePlan({
     hostMode: 'banana', arbiter: arbiter(), magiConvened: true,
     dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }],
-  }, matrix), /hostMode must be cursor-cli, synara or claude-code/);
+  }, matrix), /hostMode must be one of/);
 });
 
 test('implement cannot take evidenceReadDirs', () => {

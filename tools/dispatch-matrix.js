@@ -5,7 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { isCliHostMode, ROLES } = require('./dispatch-schema.js');
+const { CLI_HOST_MODES, isCliHostMode, ROLES } = require('./dispatch-schema.js');
 const { verifyProbe } = require('./probe-evidence.js');
 const { parseJsonBytes, readJsonFile } = require('./json-file.js');
 const { validateEvidenceReadDirs } = require('./evidence-read-access.js');
@@ -72,7 +72,7 @@ function routeAllowed(matrix, route, availability = {}, nowMs = Date.now()) {
 
 function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
   if (!plan || typeof plan !== 'object' || Array.isArray(plan)) throw policyError('plan must be an object');
-  if (!isCliHostMode(plan.hostMode)) throw policyError('hostMode must be cursor-cli, synara or claude-code');
+  if (!isCliHostMode(plan.hostMode)) throw policyError(`hostMode must be one of ${CLI_HOST_MODES.join(', ')}`);
   // The arbiter is the Jev decision engine (2026-09-16); the host session only runs tools.
   if (plan.arbiter?.vendor !== matrix.principles.arbiterVendor) throw policyError(`arbiter vendor must be ${matrix.principles.arbiterVendor}`);
   if (plan.arbiter?.model !== matrix.principles.arbiterModel) throw policyError(`arbiter model must be ${matrix.principles.arbiterModel}`);

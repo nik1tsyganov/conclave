@@ -115,6 +115,21 @@ The dependency-free explainer is in [site/](site/); open `site/index.html`. `too
 
 Sibling repositories, indexed rather than merged: [ai-ops-vault](https://github.com/nik1tsyganov/ai-ops-vault) `projects/magi/` (telemetry, analysis, rules-pack copy), [field-library](https://github.com/nik1tsyganov/field-library), [vault-skills](https://github.com/nik1tsyganov/vault-skills). Run `node tools/magi-vault-sync.js --index` after setting the three roots.
 
+## Hosts
+
+The hosting session runs the tools and holds no vote, so any host is legal. Four exist:
+
+| Host | What it is | Arbiter |
+|---|---|---|
+| `cursor-cli` | A Cursor chat driving the CLI runtime | Jev |
+| `synara` | Synara driving the same runtime | Jev |
+| `claude-code` | A Claude Code session driving it | none required |
+| `droppy` | Droppy Code's "Three Brains", a native Swift reimplementation | none; counted in code |
+
+`droppy` is the first host that is not a terminal session. It shares the row format and
+nothing else: see [droppy-host.md](.cursor/skills/magi-cli/references/droppy-host.md) for what
+is the same, what is different and why its rows carry no `jev` block.
+
 ## Licence
 
 MAGI by Nikita Tsyganov. Copyright (c) 2026 Nikita Tsyganov.

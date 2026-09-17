@@ -93,7 +93,7 @@ test('plan-seal requires a catalog for synara and rejects banana', (t) => {
   const plan = JSON.parse(fs.readFileSync(run.planSource, 'utf8'));
   plan.hostMode = 'banana';
   fs.writeFileSync(run.planSource, JSON.stringify(plan), 'utf8');
-  assert.throws(() => sealPlan({ noJev: 'test fixture', plan: run.planSource, runDir: path.join(run.root, 'banana-run'), availability: run.availability }), /hostMode must be cursor-cli, synara or claude-code/);
+  assert.throws(() => sealPlan({ noJev: 'test fixture', plan: run.planSource, runDir: path.join(run.root, 'banana-run'), availability: run.availability }), /hostMode must be one of/);
 
   const synaraPlan = JSON.parse(fs.readFileSync(run.planSource, 'utf8'));
   synaraPlan.hostMode = 'synara';
