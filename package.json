@@ -3,8 +3,11 @@
   "version": "0.1.0",
   "type": "commonjs",
   "description": "Code-enforced MAGI tri-vendor Cursor and CLI runtime",
+  "bin": {
+    "magi-mcp": "mcp/server.js"
+  },
   "scripts": {
-    "test": "node --test \"tools/*.test.js\"",
+    "test": "node --test \"tools/*.test.js\" \"mcp/*.test.js\"",
     "check": "npm test && node tools/release-check.js",
     "check:cross-repo": "node tools/cross-repo-check.js",
     "dashboard": "node tools/magi-dashboard.js",

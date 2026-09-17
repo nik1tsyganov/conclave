@@ -130,6 +130,17 @@ The hosting session runs the tools and holds no vote, so any host is legal. Four
 nothing else: see [droppy-host.md](.cursor/skills/magi-cli/references/droppy-host.md) for what
 is the same, what is different and why its rows carry no `jev` block.
 
+## MCP
+
+```bash
+node mcp/server.js
+```
+
+A stdio MCP server, so any host that speaks MCP can convene a panel without a plugin written
+for it: VS Code, Cursor, Zed, Claude Desktop, the JetBrains IDEs. Convening is not one call,
+because a panel outlives any tool call: seal, drive a phase, attest, read the report. See
+[mcp/README.md](mcp/README.md).
+
 ## Licence
 
 MAGI by Nikita Tsyganov. Copyright (c) 2026 Nikita Tsyganov.
