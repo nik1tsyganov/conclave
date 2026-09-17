@@ -114,3 +114,20 @@ The dependency-free explainer is in [site/](site/); open `site/index.html`. `too
 | `site/` | Visual explainer |
 
 Sibling repositories, indexed rather than merged: [ai-ops-vault](https://github.com/nik1tsyganov/ai-ops-vault) `projects/magi/` (telemetry, analysis, rules-pack copy), [field-library](https://github.com/nik1tsyganov/field-library), [vault-skills](https://github.com/nik1tsyganov/vault-skills). Run `node tools/magi-vault-sync.js --index` after setting the three roots.
+
+## Licence
+
+MAGI by Nikita Tsyganov. Copyright (c) 2026 Nikita Tsyganov.
+
+GNU Affero General Public License, version 3, with additional terms under section 7 for
+attribution, origin and marks. The whole text is in [LICENSE](LICENSE).
+
+Section 13 is why this licence and not a permissive one: anyone who runs a modified MAGI as
+a network service has to offer that modified source to its users. A copy that is closed and
+sold on is not allowed.
+
+The licence covers the expression, not the idea. Anyone may build a tri-vendor review panel
+of their own; what they may not do is take this one, close it and call it theirs.
+
+Third-party skills and host runtimes named in [skill-sources.json](skill-sources.json) and
+in the agent wrappers keep their own licences.

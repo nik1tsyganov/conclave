@@ -1,3 +1,4 @@
+// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with section 7 terms; see LICENSE.
 'use strict';
 // Launch-failure retry classifier (adopted from Droppy Code Hydra, 2026-09-16;
 // R22 amendment of the same date). A dispatch may be re-run under its own id

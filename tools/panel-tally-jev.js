@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with section 7 terms; see LICENSE.
 'use strict';
 // Jev tally (2026-09-16): the typed counterpart of panel-tally. Reads the unit's
 // committed PASS verify/review transactions, extracts each native response and

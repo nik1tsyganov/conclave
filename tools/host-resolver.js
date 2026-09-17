@@ -1,3 +1,4 @@
+// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with section 7 terms; see LICENSE.
 const fs = require('fs');
 
 function parseArgs(argv) {

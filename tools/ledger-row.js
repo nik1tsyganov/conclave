@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with section 7 terms; see LICENSE.
 'use strict';
 // Emits the engineering-ledger row (schema v1.1) for a finalized run from its
 // run-row.json and units.jsonl, so the ledger and the vault agree without hand

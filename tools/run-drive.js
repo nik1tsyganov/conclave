@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with section 7 terms; see LICENSE.
 'use strict';
 // Run driver (2026-09-16): executes one phase of a sealed run so a MAGI run is a
 // few commands instead of a hand-written script. It never widens policy: every

@@ -12,6 +12,6 @@
   },
   "keywords": ["magi", "multi-vendor", "cursor", "dispatch"],
   "author": "Nikita Tsyganov",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "repository": "https://github.com/nik1tsyganov/magi.git"
 }

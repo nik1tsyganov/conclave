@@ -1,3 +1,4 @@
+// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with section 7 terms; see LICENSE.
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

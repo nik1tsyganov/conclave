@@ -1,3 +1,4 @@
+// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with section 7 terms; see LICENSE.
 'use strict';
 // WRITE tests: all run/fixture mutations use disposable temporary directories.
 // Native vendor calls are forbidden; the one runner integration uses fakeVendor.

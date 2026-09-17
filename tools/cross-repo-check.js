@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with section 7 terms; see LICENSE.
 'use strict';
 
 const crypto = require('node:crypto');

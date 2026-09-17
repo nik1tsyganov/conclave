@@ -1,3 +1,4 @@
+// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with section 7 terms; see LICENSE.
 'use strict';
 // Animation admission is shared with the regression tests. History never pulses.
 function newHandoffIds(edges, seen, { continuous = false, nowMs = Date.now() } = {}) {

@@ -1,3 +1,4 @@
+// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with section 7 terms; see LICENSE.
 const test = require('node:test');
 const assert = require('node:assert');
 const { execSync } = require('node:child_process');

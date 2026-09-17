@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// MAGI, copyright (c) 2026 Nikita Tsyganov. GNU AGPL v3 with section 7 terms; see LICENSE.
 'use strict';
 
 // Declares which session hosts a MAGI run. Since 2026-09-16 the arbiter is the
