@@ -1,32 +1,3 @@
-MAGI
-Copyright (c) 2026 Nikita Tsyganov
-
-This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, version 3 of the License.
-
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License below for more details.
-
-ADDITIONAL TERMS UNDER SECTION 7 OF THE GNU AFFERO GENERAL PUBLIC LICENSE
-
-In accordance with section 7 of the License, the following additional terms apply to this program and to any covered work based on it:
-
-(a) Attribution (section 7(b)): every copy, modified version and covered work must preserve the attribution "MAGI by Nikita Tsyganov, https://github.com/nik1tsyganov/magi" in its README or equivalent documentation, in any user-visible credits, and in the copyright notices of its source files.
-
-(b) Origin (section 7(c)): modified versions must be marked as modified and must not be presented as the original MAGI or as endorsed by, made by or affiliated with Nikita Tsyganov.
-
-(c) Names and marks (section 7(e)): this License grants no rights to use the name "MAGI" or any other mark used by this project, except as required to preserve the attribution above.
-
-WHAT THIS COVERS
-
-This License covers the runtime in this repository: the dispatch tools, the policy and
-matrix files, the seat skills, the agent and command definitions, the telemetry schemas and
-the site. It covers the expression, not the idea. Anyone is free to build a tri-vendor
-review panel of their own.
-
-Section 13 of this License is the reason it was chosen. Anyone who runs a modified MAGI as
-a network service must offer that modified source to its users.
-
-------------------------------------------------------------------------
-
                     GNU AFFERO GENERAL PUBLIC LICENSE
                        Version 3, 19 November 2007
 

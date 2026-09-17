@@ -145,8 +145,10 @@ because a panel outlives any tool call: seal, drive a phase, attest, read the re
 
 MAGI by Nikita Tsyganov. Copyright (c) 2026 Nikita Tsyganov.
 
-GNU Affero General Public License, version 3, with additional terms under section 7 for
-attribution, origin and marks. The whole text is in [LICENSE](LICENSE).
+GNU Affero General Public License, version 3: the whole text is in [LICENSE](LICENSE), kept
+verbatim so that GitHub and other tools recognise it. The additional terms under section 7,
+for attribution, origin and marks, are in
+[ADDITIONAL-TERMS.md](ADDITIONAL-TERMS.md) and bind alongside it.
 
 Section 13 is why this licence and not a permissive one: anyone who runs a modified MAGI as
 a network service has to offer that modified source to its users. A copy that is closed and
