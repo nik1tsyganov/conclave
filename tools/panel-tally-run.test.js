@@ -17,7 +17,7 @@ function panel(t, extra, critical = false) {
 const dispatch = (run, id, native) => completeSyntheticDispatch({ ...run.opts, dispatchId: id }, native);
 function cliTally(run) {
   const result = spawnSync(process.execPath, [path.join(__dirname, 'panel-tally.js'), '--run-dir', run.runDir, '--unit-id', 'u1'], {
-    cwd: run.cwd, shell: false, windowsHide: true, encoding: 'utf8', timeout: 10000,
+    cwd: run.cwd, shell: false, encoding: 'utf8', timeout: 10000,
   });
   assert.equal(result.error, undefined);
   return result;

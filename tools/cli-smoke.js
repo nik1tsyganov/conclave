@@ -48,7 +48,7 @@ function parseArgs(argv) {
 function samePath(a, b) {
   const left = path.resolve(a);
   const right = path.resolve(b);
-  return process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
+  return left === right;
 }
 
 function assertNoBodyLeak(vendor, plan, body) {

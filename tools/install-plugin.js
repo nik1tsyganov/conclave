@@ -220,7 +220,7 @@ function main(argv = process.argv.slice(2)) {
   checkMagiCli();
   console.log(`MAGI Cursor installed at ${MAGI_DEST}`);
   console.log(`MAGI Cursor CLI installed at ${MAGI_CLI_DEST}`);
-  console.log('MAGI CLI runtime is installed-relative; C:\\src\\magi is no longer required merely to launch seats.');
+  console.log('MAGI CLI runtime is installed-relative; the source checkout is not required merely to launch seats.');
   console.log('Set MAGI_RULES_ROOT to the external standing-rules pack.');
   console.log('Set MAGI_VAULT_ROOT to the ai-ops-vault checkout for MAGI telemetry and skill sync.');
   console.log('Reload Cursor and enable both plugins.');

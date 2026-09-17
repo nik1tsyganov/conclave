@@ -14,11 +14,8 @@ const CLAUDE_RESPONSE_SCHEMA = Object.freeze({
 });
 
 function responseError(message) { return Object.assign(new Error(message), { code: 'PROOF_FAIL' }); }
-// Windows paths keep their case-insensitive identity; POSIX is case-preserving.
-function windowsShaped(file) { return process.platform === 'win32' || /^[A-Za-z]:[\\/]/.test(file) || file.startsWith('\\\\'); }
+// Paths keep their case-preserving identity.
 function sameHostPath(left, right) {
-  if (windowsShaped(left) !== windowsShaped(right)) return false;
-  if (windowsShaped(left)) return path.win32.resolve(left).toLowerCase() === path.win32.resolve(right).toLowerCase();
   return path.resolve(left) === path.resolve(right);
 }
 function requireClaudeResponseProtocol(protocol) {

@@ -117,8 +117,8 @@ function createSnapshot(runDir, { nowMs = Date.now() } = {}) {
     const identity = bound && state.schemaVersion === 1 && state.planId === plan.planId && state.planHash === seal.planHash && isDeepStrictEqual(state.entry, entry) && state.requestHash === digest(JSON.stringify({ planHash: seal.planHash, entry }));
     const expectedDir = path.join(read.root, evidenceRelative);
     let allowedEvidence = false;
-    // Reject network/device paths before lookup. Compare plain identities because
-    // Windows producers can retain case or 8.3 aliases that native realpath expands.
+    // Reject network/device paths before lookup. Compare plain identities so case
+    // aliases that native realpath expands still match.
     if (typeof state.evidenceDir === 'string' && !/^[\\/]{2}/.test(state.evidenceDir) && path.isAbsolute(state.evidenceDir) && !state.evidenceDir.split(/[\\/]/).some(part => part === '.' || part === '..')) {
       try { allowedEvidence = canonicalPlainPath(state.evidenceDir) === canonicalPlainPath(expectedDir); }
       catch { /* Nonplain or unreadable evidence paths remain untrusted. */ }
@@ -158,8 +158,7 @@ function createSnapshot(runDir, { nowMs = Date.now() } = {}) {
       }
       const processResult = read.json(`${evidenceRelative}/process-result.json`, true)?.value;
       // Child exit evidence: the runtime's process-result.json records exitConfirmed and
-      // completedAt (macOS runtime, 2026-09-16); an optional lifetime block from the
-      // Windows-era runner is honoured when present.
+      // completedAt (2026-09-16); an optional lifetime block is honoured when present.
       const lifetime = object(processResult?.lifetime) ? processResult.lifetime : null;
       const exitAt = timestamp(lifetime?.endedAt) || timestamp(processResult?.completedAt);
       const exitConfirmed = Boolean(processResult) && processResult.exitConfirmed === true && (lifetime ? lifetime.exitConfirmed === true && lifetime.exitEvidence === 'child-close-event' : true) && Boolean(exitAt);

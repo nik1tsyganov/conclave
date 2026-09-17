@@ -126,37 +126,6 @@ for (const relation of ['same', 'child', 'parent', 'normalized']) {
   });
 }
 
-test('installer rejects Windows case alias of source', { skip: process.platform !== 'win32' }, t => {
-  const f = sourceFixture(t);
-  const before = snapshot(f.root);
-  assert.throws(() => install(f, f.source.toUpperCase()), /overlap/);
-  assert.deepStrictEqual(snapshot(f.root), before);
-});
-
-for (const suffix of ['.', ' ', '.\\new-child', ' \\new-child']) {
-  test(`installer refuses ambiguous Windows destination suffix ${JSON.stringify(suffix)} before writes`, { skip: process.platform !== 'win32' }, t => {
-    const f = sourceFixture(t);
-    const before = snapshot(f.root);
-    assert.throws(() => install(f, f.source + suffix), /ambiguous or unsafe Windows path/);
-    assert.deepStrictEqual(snapshot(f.root), before);
-  });
-}
-
-for (const target of ['source', 'unrelated']) {
-  for (const place of ['destination', 'ancestor']) {
-    test(`installer rejects ${place} junction to ${target} before writes`, t => {
-      const f = sourceFixture(t);
-      const unrelated = path.join(f.root, 'unrelated');
-      put(path.join(unrelated, 'sentinel'), 'keep');
-      const link = path.join(f.root, 'link');
-      fs.symlinkSync(target === 'source' ? f.source : unrelated, link, 'junction');
-      const before = snapshot(f.root);
-      assert.throws(() => install(f, place === 'destination' ? link : path.join(link, 'child')), /symlink|junction/);
-      assert.deepStrictEqual(snapshot(f.root), before);
-    });
-  }
-}
-
 test('installer refuses source junctions and unrelated existing directories before writes', t => {
   const f = sourceFixture(t);
   put(path.join(f.installed, 'sentinel'), 'keep');
@@ -226,7 +195,7 @@ test('--destination install and --check affect only the requested plugin directo
   const before = snapshot(home);
   const run = args => spawnSync(process.execPath, [path.join(f.source, 'tools', 'install-plugin.js'), ...args], {
     cwd: f.root, env: { ...process.env, HOME: home, USERPROFILE: home },
-    input: '', encoding: 'utf8', timeout: 30000, windowsHide: true, shell: false,
+    input: '', encoding: 'utf8', timeout: 30000, shell: false,
   });
   for (const args of [['--destination', f.installed], ['--destination', f.installed, '--check']]) {
     const result = run(args);
@@ -288,7 +257,7 @@ test('installed runtime loads contracts, all entry-point dependencies, and bundl
   `;
   const result = spawnSync(process.execPath, ['-e', script], {
     cwd: f.installed, env: { ...process.env, HOME: home, USERPROFILE: home, TEST_STAGE: staged },
-    input: '', encoding: 'utf8', timeout: 30000, windowsHide: true, shell: false,
+    input: '', encoding: 'utf8', timeout: 30000, shell: false,
   });
   assert.strictEqual(result.status, 0, result.stderr || result.error?.message);
   const evidence = JSON.parse(result.stdout);
@@ -325,7 +294,7 @@ test('documented startup command works without source or home policy in an isola
   const command = 'node tools/magi-whoami.js --mode cursor-cli --slug cursor-grok-4.6-high-fast';
   const result = spawnSync(process.execPath, command.split(' ').slice(1), {
     cwd: f.installed, env: { ...process.env, HOME: home, USERPROFILE: home, NODE_OPTIONS: `--require "${guard.replaceAll('\\', '/')}"` },
-    input: '', encoding: 'utf8', timeout: 30000, windowsHide: true, shell: false,
+    input: '', encoding: 'utf8', timeout: 30000, shell: false,
   });
   assert.strictEqual(result.status, 0, result.stderr || result.error?.message);
   assert.match(result.stdout, /^LEGAL\b/);

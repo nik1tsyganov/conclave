@@ -46,7 +46,7 @@ test('installed CLI completes Claude checkpoint, foreign checks, activation, tal
     return JSON.parse(stdout);
   }
   function command(tool,args,expected=0) {
-    const r=spawnSync(process.execPath,[path.join(tools,tool),...args],{cwd:installed,encoding:'utf8',windowsHide:true,timeout:15000});
+    const r=spawnSync(process.execPath,[path.join(tools,tool),...args],{cwd:installed,encoding:'utf8',timeout:15000});
     assert.equal(r.status,expected,r.stderr);assert.equal(r.error,undefined);
     return r.stdout;
   }

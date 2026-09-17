@@ -7,7 +7,7 @@ const { canonicalPlainPath, pathsOverlap, DEFAULT_ROOT } = require('./runtime-pa
 const { assertPlainPath, inside, snapshotWorkspace, transactionKey } = require('./dispatch-evidence.js');
 
 function fail(message) { throw Object.assign(new Error(`evidenceReadDirs: ${message}`), { code: 'POLICY_FAIL' }); }
-function identity(file) { return process.platform === 'win32' ? file.toLowerCase() : file; }
+function identity(file) { return file; }
 
 // Plan paths can precede their producer. Contents and completion are checked at launch/replay.
 function validateEvidenceReadDirs(entry, { plan, runDir, requireExisting = false, forbiddenRoots = [] } = {}) {

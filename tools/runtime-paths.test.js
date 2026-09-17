@@ -82,14 +82,6 @@ test('a root-level platform alias resolves instead of failing the temp root', ()
   assert.strictEqual(canonicalPlainPath(os.tmpdir()), fs.realpathSync.native(os.tmpdir()));
 });
 
-test('Windows device and alternate-stream path spellings are rejected', { skip: process.platform !== 'win32' }, () => {
-  const root = temp();
-  for (const name of ['NUL', 'con.txt', 'COM1', 'LPT9.log', 'file:stream', 'bad.', 'bad ']) {
-    assert.throws(() => canonicalPlainPath(path.join(root, name)), /ambiguous or unsafe Windows path/);
-  }
-  assert.deepStrictEqual(fs.readdirSync(root), []);
-});
-
 test('reference contracts must be regular files', () => {
   const root = temp();
   fs.mkdirSync(path.join(root, 'tools'));
@@ -157,10 +149,10 @@ test('resolveRulesRoot never falls back to a source checkout: it needs an explic
   delete process.env.MAGI_RULES_ROOT;
   try {
     assert.throws(() => resolveRulesRoot({}), /MAGI_RULES_ROOT/);
-    assert.strictEqual(resolveRulesRoot({ defaultRulesRoot: 'C:\\default\\rules' }), path.resolve('C:\\default\\rules'));
-    assert.strictEqual(resolveRulesRoot({ rulesRoot: 'C:\\explicit\\rules', defaultRulesRoot: 'C:\\default\\rules' }), path.resolve('C:\\explicit\\rules'));
-    process.env.MAGI_RULES_ROOT = 'C:\\env\\rules';
-    assert.strictEqual(resolveRulesRoot({ defaultRulesRoot: 'C:\\default\\rules' }), path.resolve('C:\\env\\rules'));
+    assert.strictEqual(resolveRulesRoot({ defaultRulesRoot: '/opt/default/rules' }), path.resolve('/opt/default/rules'));
+    assert.strictEqual(resolveRulesRoot({ rulesRoot: '/opt/explicit/rules', defaultRulesRoot: '/opt/default/rules' }), path.resolve('/opt/explicit/rules'));
+    process.env.MAGI_RULES_ROOT = '/opt/env/rules';
+    assert.strictEqual(resolveRulesRoot({ defaultRulesRoot: '/opt/default/rules' }), path.resolve('/opt/env/rules'));
   } finally {
     if (previous === undefined) delete process.env.MAGI_RULES_ROOT;
     else process.env.MAGI_RULES_ROOT = previous;

@@ -41,56 +41,6 @@ function requiredSeatSkills(profiles) {
   ]);
 }
 
-// File-only syntax check. This is not a native schema or sandbox-shell probe.
-function checkWindowsSandboxState(home, env, platform) {
-  const scope = 'Native state syntax only; sandbox shell and staged-file access remain untested';
-  if (platform !== 'win32') return { status: 'not-applicable', scope };
-  let codexHome = path.join(home, '.codex');
-  if (env.CODEX_HOME) {
-    // Native Codex resolves relative overrides at its cwd; MAGI dispatch cwd can differ.
-    const root = path.parse(env.CODEX_HOME).root;
-    if (!path.isAbsolute(env.CODEX_HOME) || (path.sep === '\\' && root.length === 1)) {
-      throw new Error('MAGI preflight requires an absolute, fully qualified CODEX_HOME; dispatch working directories can differ');
-    }
-    try {
-      if (!fs.statSync(env.CODEX_HOME).isDirectory()) throw new Error('must be an existing directory');
-      codexHome = fs.realpathSync.native(env.CODEX_HOME);
-    } catch (error) { throw new Error(`Invalid CODEX_HOME ${env.CODEX_HOME}: ${error.code || error.message}`); }
-  }
-  const file = path.join(codexHome, '.sandbox', 'deny_read_acl_state.json');
-  let stat;
-  try { stat = fs.lstatSync(file); }
-  catch (error) {
-    if (error.code === 'ENOENT') return { value: file, status: 'uninitialized', scope };
-    throw new Error(`Cannot inspect native sandbox state ${file}: ${error.code || 'read error'}`);
-  }
-  if (!stat.isFile()) throw new Error(`Native sandbox state must be a regular file: ${file}`);
-  const limit = 1024 * 1024;
-  let fd;
-  try {
-    fd = fs.openSync(file, 'r');
-    stat = fs.fstatSync(fd);
-    if (!stat.isFile()) throw new Error('must be a regular file');
-    if (stat.size > limit) throw new Error('exceeds the 1 MiB preflight read limit');
-    const bytes = Buffer.alloc(limit + 1);
-    let length = 0;
-    while (length < bytes.length) {
-      const count = fs.readSync(fd, bytes, length, bytes.length - length, null);
-      if (count === 0) break;
-      length += count;
-    }
-    if (length > limit) throw new Error('exceeds the 1 MiB preflight read limit');
-    try {
-      const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes.subarray(0, length));
-      JSON.parse(text);
-    } catch { throw new Error('must contain strict UTF-8 JSON (no BOM, NUL, empty or malformed input)'); }
-  } catch (error) {
-    throw new Error(`Invalid or unreadable native sandbox state ${file}: ${error.code || error.message}`);
-  } finally {
-    if (fd !== undefined) fs.closeSync(fd);
-  }
-  return { value: file, status: 'syntax-valid', scope };
-}
 
 function check(options = {}) {
   const home = options.home || os.homedir();
@@ -118,8 +68,6 @@ function check(options = {}) {
   for (const vendor of ['openai', 'google', 'anthropic']) {
     record(`binary:${vendor}`, () => ({ value: resolveVendorBinary(vendor, { home, env: options.env }) }));
   }
-
-  record('sandbox:openai-state', () => checkWindowsSandboxState(home, options.env || process.env, options.platform || process.platform));
 
   const arbiterSkills = unique(profiles?.arbiterSkills || []);
   const seatSkills = profiles ? requiredSeatSkills(profiles) : [];

@@ -98,30 +98,16 @@ function validateOpenaiScratchLaunch(launch, expected) {
   return policy;
 }
 
-function windowsShaped(file) {
-  return process.platform === 'win32' || /^[A-Za-z]:[\\/]/.test(file) || file.startsWith('\\\\');
-}
-
 function hostResolve(file) {
-  if (windowsShaped(file)) return path.win32.resolve(file);
   return path.resolve(file);
 }
 
-// Windows keeps its case-insensitive compare; POSIX is case-preserving and
-// compares on segment boundaries so /a/b never contains /a/bc.
+// Case-preserving compare on segment boundaries, so /a/b never contains /a/bc.
 function hostSamePath(left, right) {
-  if (windowsShaped(left) !== windowsShaped(right)) return false;
-  if (windowsShaped(left)) return path.win32.resolve(left).toLowerCase() === path.win32.resolve(right).toLowerCase();
   return path.resolve(left) === path.resolve(right);
 }
 
 function hostUnder(candidate, root) {
-  if (windowsShaped(candidate) !== windowsShaped(root)) return false;
-  if (windowsShaped(candidate)) {
-    const c = path.win32.resolve(candidate).toLowerCase();
-    const r = path.win32.resolve(root).toLowerCase();
-    return c === r || c.startsWith(r.endsWith('\\') ? r : `${r}\\`);
-  }
   const c = path.resolve(candidate);
   const r = path.resolve(root);
   return c === r || c.startsWith(r.endsWith(path.sep) ? r : `${r}${path.sep}`);
@@ -132,7 +118,7 @@ function hostRealpath(file) {
 }
 
 function defaultDevRoot() {
-  return process.platform === 'win32' ? 'C:\\src' : path.join(os.homedir(), 'src');
+  return path.join(os.homedir(), 'src');
 }
 
 function allowedWorkspace(cwd, env = process.env) {

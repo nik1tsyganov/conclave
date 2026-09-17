@@ -20,7 +20,7 @@ test('runner preserves buffered UTF-8, records one PID and waits for native exit
   child.emit('close', 0); const done = await result;
   assert.equal(done.stdout, '結果'); assert.equal(done.ok, true); assert.equal(done.exitConfirmed, true);
   assert.equal(fs.readFileSync(path.join(root, 'child.pid'), 'utf8').trim(), '4123');
-  assert.equal(spawnOptions.shell, false); assert.equal(spawnOptions.windowsHide, true);
+  assert.equal(spawnOptions.shell, false);
 });
 test('wall timeout kills only the recorded process and confirms its exit', async () => {
   const child = childFixture(); const killed = [];

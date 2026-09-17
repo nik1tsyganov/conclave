@@ -34,9 +34,7 @@ test('decide: anthropic cpu frozen past idleCpuMs alone does not kill (idle-cpu 
     assert.deepStrictEqual(decide({ ...sample, idleActivityMs: 1500, lastActivityAtMs: 1900 }), { action: 'continue', reason: null, killMethod: 'pid-only' });
 });
 
-test('forbiddenKill: matches taskkill /IM, pkill <name>, killall', () => {
-    assert.strictEqual(forbiddenKill('taskkill /IM claude.exe'), true);
-    assert.strictEqual(forbiddenKill('taskkill /im node.exe'), true);
+test('forbiddenKill: matches pkill <name> and killall', () => {
     assert.strictEqual(forbiddenKill('killall node'), true);
     assert.strictEqual(forbiddenKill('pkill node'), true);
     

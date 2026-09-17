@@ -40,11 +40,10 @@ for (const target of ['probe', 'capture', 'log', 'path alias', 'directory alias'
     let file = { probe, capture: native.capture, log: native.log }[target];
     if (target === 'path alias') {
       file = `${path.dirname(probe)}${path.sep}..${path.sep}${path.basename(path.dirname(probe))}${path.sep}${path.basename(probe)}`;
-      if (process.platform === 'win32') file = file.toUpperCase();
     }
     if (target === 'directory alias') {
       const alias = path.join(root, 'alias');
-      fs.symlinkSync(path.dirname(probe), alias, process.platform === 'win32' ? 'junction' : 'dir');
+      fs.symlinkSync(path.dirname(probe), alias, 'dir');
       file = path.join(alias, path.basename(probe));
     }
     if (target === 'hard link') {
@@ -54,7 +53,7 @@ for (const target of ['probe', 'capture', 'log', 'path alias', 'directory alias'
     const files = [probe, native.capture, native.log, file];
     const before = files.map(hashFile);
     const result = spawnSync(process.execPath, [path.join(__dirname, 'model-availability.js'), '--file', file, '--probe', probe], {
-      cwd: root, shell: false, windowsHide: true, encoding: 'utf8', timeout: 10000,
+      cwd: root, shell: false, encoding: 'utf8', timeout: 10000,
     });
     assert.equal(result.error, undefined);
     assert.equal(result.status, 1, result.stdout);
@@ -72,7 +71,7 @@ test('availability CLI preserves probe evidence when it creates and updates a se
   const file = path.join(root, 'new output', 'availability.json');
   for (let i = 0; i < 2; i++) {
     const result = spawnSync(process.execPath, [path.join(__dirname, 'model-availability.js'), '--file', file, '--probe', probe], {
-      cwd: root, shell: false, windowsHide: true, encoding: 'utf8', timeout: 10000,
+      cwd: root, shell: false, encoding: 'utf8', timeout: 10000,
     });
     assert.equal(result.error, undefined);
     assert.equal(result.status, 0, result.stderr);

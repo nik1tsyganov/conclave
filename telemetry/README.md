@@ -23,7 +23,7 @@ As per `cursor-host.md`, each log row must include:
 
 ## Adapter contract toward Conclave / unified AI-ops ingest
 
-Magi rows and Conclave/Claude-host hook rows are **different schemas**. Magi is lead-written (`routedBy: arbiter`, optional `capturedBy: lead`). Conclave's hook-fed file is `C:\Users\YESSIR\.claude\docs\telemetry\dispatch-telemetry.jsonl` and is not dual-written here.
+Magi rows and Claude-host hook rows are **different schemas**. Magi is lead-written (`routedBy: arbiter`, optional `capturedBy: lead`). Conclave's hook-fed file is `~/.claude/docs/telemetry/dispatch-telemetry.jsonl` and is not dual-written here.
 
 Do **not** invent a join key. `vendor`, `role`, `date`, `dispatchId`, `proofId`, token fields, and host mode do not identify a Conclave hook row. Correlating on those values forges a session that was never shared.
 
@@ -72,5 +72,5 @@ This telemetry exists to answer these self-eval questions:
 
 ## Critical Notes
 
-- **NOT the Claude-host log:** This log is strictly for MAGI Cursor self-eval and is NOT the Claude-host file `C:\Users\YESSIR\.claude\docs\telemetry\dispatch-telemetry.jsonl`. Do not dual-write to that file (it is hook-fed).
+- **NOT the Claude-host log:** This log is strictly for MAGI Cursor self-eval and is NOT the Claude-host file `~/.claude/docs/telemetry/dispatch-telemetry.jsonl`. Do not dual-write to that file (it is hook-fed).
 - **Operational Status:** Do not claim operational status (logged in, quota) from memory. `Live-check.mdc` applies.

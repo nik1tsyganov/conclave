@@ -17,14 +17,14 @@ function runtimeManifest() {
 // Same rule as runtime-paths.canonicalPlainPath: a POSIX symlink that is a direct
 // child of the filesystem root (macOS /tmp, /var) is platform layout, so it is
 // resolved first and the rule re-asserted on the realpath. Deeper links and hard
-// links stay refused; Windows still refuses every linked ancestor.
+// links stay refused.
 function assertPlainPath(file) {
   const target = path.resolve(file);
   let current = target;
   while (true) {
     try {
       const stat = fs.lstatSync(current);
-      if (stat.isSymbolicLink() && process.platform !== 'win32' && path.dirname(current) === path.parse(current).root) return assertPlainPath(path.resolve(fs.realpathSync.native(current), path.relative(current, target)));
+      if (stat.isSymbolicLink() && path.dirname(current) === path.parse(current).root) return assertPlainPath(path.resolve(fs.realpathSync.native(current), path.relative(current, target)));
       if (stat.isSymbolicLink() || (stat.isFile() && stat.nlink > 1)) throw evidenceError(`evidence path must not contain symlinks, junctions or hard links: ${current}`, 'SCOPE_FAIL');
     } catch (error) { if (error.code !== 'ENOENT') throw error; }
     const parent = path.dirname(current);
@@ -65,7 +65,7 @@ function snapshotWorkspace(root) {
   walk(root);
   let git = null;
   if (fs.existsSync(path.join(root, '.git'))) {
-    const opts = { encoding: 'utf8', windowsHide: true, timeout: 15000, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } };
+    const opts = { encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } };
     const readGit = (args) => execFileSync('git', ['-C', root, ...args], opts);
     const head = spawnSync('git', ['-C', root, 'rev-parse', '--verify', '--quiet', 'HEAD'], opts);
     if (head.error || ![0, 1].includes(head.status)) throw evidenceError('cannot read workspace git HEAD');
@@ -82,9 +82,7 @@ function compareWorkspace(before, after, scope = []) {
   const names = [...new Set([...Object.keys(before.files), ...Object.keys(after.files)])].sort();
   const changedFiles = names.filter((name) => JSON.stringify(before.files[name]) !== JSON.stringify(after.files[name])).map((name) => ({
     path: name, before: before.files[name] || null, after: after.files[name] || null,
-    allowed: scope.some((allowed) => process.platform === 'win32'
-      ? name.toLowerCase() === allowed.toLowerCase() || name.toLowerCase().startsWith(`${allowed.toLowerCase()}/`)
-      : name === allowed || name.startsWith(`${allowed}/`)),
+    allowed: scope.some((allowed) => name === allowed || name.startsWith(`${allowed}/`)),
   }));
   const gitChanged = before.git?.head !== after.git?.head || before.git?.staged !== after.git?.staged || JSON.stringify(before.git?.controls) !== JSON.stringify(after.git?.controls);
   return { ok: !gitChanged && changedFiles.every((file) => file.allowed), changedFiles, gitChanged, coverage: after.coverage };

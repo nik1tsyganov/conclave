@@ -29,8 +29,8 @@ const STRICT_MARKERS = Object.freeze([
   { id: 'vendor proof', anyOf: ['vendor-native proof', 'cli-proof', 'R18'] },
   { id: 'SLICES not vendors', anyOf: ['SLICES≠vendors', 'SLICES are not vendor', 'SLICES not vendor', 'R11'] },
   { id: 'not CONCLAVE', anyOf: ['not CONCLAVE', 'NOT CONCLAVE', 'R20'] },
-  // Host-neutral: the rule id, the Windows vault literal, or a POSIX vault path.
-  { id: 'no vault writes', anyOf: ['R21', 'C:\\src\\vault', '/src/vault', 'Second-Brain'] },
+  // The rule id or a vault path.
+  { id: 'no vault writes', anyOf: ['R21', '/src/vault', 'Second-Brain'] },
 ]);
 
 function usage() {
@@ -106,8 +106,7 @@ function verifyStagedSeat(briefPath, opts = {}) {
   if (profile.permissionProfile !== validated.permissionProfile) throw new Error('seat permission profile does not match role policy');
   if (!isDeepStrictEqual(profile.proofFields, validated.proofFields)) throw new Error('seat proof fields do not match vendor policy');
 
-  // Staging writes canonical pointers, including the long name of Windows
-  // 8.3 paths. Compare against that same root without accepting junctions.
+  // Staging writes canonical pointers. Compare against that same root without accepting symlinks.
   const skillRoot = canonicalPlainPath(opts.skillRoot || path.join(path.dirname(seatContractPath), 'skills'));
   const contract = readRegularFile(seatContractPath);
   for (const [label, value] of Object.entries({

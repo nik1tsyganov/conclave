@@ -141,12 +141,12 @@ function syntheticInstructionRows(launch, sessionId) {
       tool_use_result: { type: 'text', file: { filePath: file.path, content: text, startLine: 1, numLines: lines.length, totalLines: lines.length } } }];
   });
   if (launch.vendor === 'openai') return [{ type: 'session_meta', payload: { id: sessionId, cwd: launch.cwd } }, ...files.flatMap((file, index) => {
-    const cmd = `Get-Content -Raw -LiteralPath '${file.path.replaceAll("'", "''")}' -Encoding UTF8`;
+    const cmd = require('./instruction-read-evidence.js').codexReadCommand(file.path);
     const args = { cmd, workdir: launch.cwd, max_output_tokens: 20000 }; const output = file.text + '\n'; const id = `synthetic-read-${index}`;
     return [{ type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: id,
       input: `const r = await tools.exec_command(${JSON.stringify(args)}); text(r.output);` } },
       { type: 'event_msg', payload: { type: 'item_completed', thread_id: sessionId, item: { type: 'CommandExecution', id: `synthetic-exec-${index}`,
-        command: ['powershell.exe', '-Command', cmd], cwd: launch.cwd, status: 'completed', exit_code: 0, stdout: output, stderr: '', formatted_output: output } } },
+        command: ['/bin/zsh', '-lc', cmd], cwd: launch.cwd, status: 'completed', exit_code: 0, stdout: output, stderr: '', formatted_output: output } } },
       { type: 'response_item', payload: { type: 'custom_tool_call_output', call_id: id, output: [{ type: 'input_text', text: output }] } }];
   })];
   if (launch.vendor === 'google') {

@@ -34,24 +34,12 @@ test('known seal destination collisions do not leave a partial plan', t => {
   assert.deepEqual(snapshot(run.root), before);
 });
 
-test('ordinary Windows case aliases use the same plain worktree without changing plan bytes', t => {
-  const run = createSealedRun(t);
-  const plan = JSON.parse(fs.readFileSync(run.planSource, 'utf8'));
-  if (process.platform === 'win32') plan.dispatches[0].cwd = plan.dispatches[0].cwd.toUpperCase();
-  const original = JSON.stringify(plan);
-  fs.writeFileSync(run.planSource, original, 'utf8');
-  const runDir = path.join(run.root, 'alias-run');
-  const result = sealPlan({ noJev: 'test fixture', plan: run.planSource, runDir, availability: run.availability });
-  assert.equal(fs.readFileSync(result.planPath, 'utf8'), original);
-  assert.equal(fs.realpathSync.native(plan.dispatches[0].cwd), fs.realpathSync.native(run.cwd));
-});
-
 test('invalid plan seal options fail before a destination write', t => {
   const run = createSealedRun(t);
   for (const extra of [['--run-dir', path.join(run.root, 'second-run')], ['--availability', '--plan']]) {
     const runDir = path.join(run.root, 'unstarted');
     const before = snapshot(run.root);
-    const result = spawnSync(process.execPath, [path.join(__dirname, 'plan-seal.js'), '--plan', run.planSource, '--run-dir', runDir, '--availability', run.availability, ...extra], { encoding: 'utf8', shell: false, windowsHide: true });
+    const result = spawnSync(process.execPath, [path.join(__dirname, 'plan-seal.js'), '--plan', run.planSource, '--run-dir', runDir, '--availability', run.availability, ...extra], { encoding: 'utf8', shell: false });
     assert.notEqual(result.status, 0);
     assert.deepEqual(snapshot(run.root), before);
   }

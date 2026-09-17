@@ -11,7 +11,7 @@ function fixture(t) {
   const directory = path.join(codexHome, 'sessions', '2026', '09', '07');
   fs.mkdirSync(directory, { recursive: true });
   const file = path.join(directory, `rollout-2026-09-07T12-00-00-${id}.jsonl`);
-  const cwd = 'C:\\src\\product';
+  const cwd = '/opt/magi/src/product';
   const text = `${JSON.stringify({ type: 'session_meta', payload: { id, cwd } })}\n${JSON.stringify({ type: 'event_msg', payload: { type: 'item_completed', thread_id: id } })}\n`;
   fs.writeFileSync(file, text);
   return { file, directory, codexHome, cwd, text };
@@ -20,7 +20,7 @@ test('native transcript selection binds exact session and workspace without choo
   const f = fixture(t);
   fs.writeFileSync(path.join(f.directory, 'rollout-newest-unrelated.jsonl'), 'not our session');
   assert.deepEqual(codexSessionTranscript(id, f), { path: f.file, text: f.text });
-  assert.throws(() => codexSessionTranscript(id, { ...f, cwd: 'C:\\src\\other' }), /does not match/);
+  assert.throws(() => codexSessionTranscript(id, { ...f, cwd: '/opt/magi/src/other' }), /does not match/);
 });
 test('native transcript rejects missing, duplicate and malformed captures', t => {
   const f = fixture(t);

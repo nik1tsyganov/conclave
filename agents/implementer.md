@@ -17,7 +17,7 @@ Implement the requested change completely and minimally — no speculative abstr
 When this dispatch is a MAGI seat (Cursor Task or Claude Code wrapper):
 - The host (with the Jev decision engine as arbiter) does not implement in MAGI; it only dispatches, attests, and runs the mechanical tally.
 - In hostMode `cursor`, you ARE the elector named by the Task `model` override.
-  Do not invoke `codex.exe`, `agy.exe`, or `claude.exe`.
+  Do not invoke `codex`, `agy`, or `claude` yourself.
 - Cursor Task identity is the `model` slug. Do not claim CLI session ids,
   conversation ids, token counts, or other CLI proof tokens.
 - Enforce the 60% vendor floor per `magi-mode`.

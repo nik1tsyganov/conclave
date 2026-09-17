@@ -122,37 +122,29 @@ function claudeReads(rows, sessionId, required) {
 }
 
 // The Codex seat proves one whole-file read of an exact literal path, recorded
-// in its native transcript. Windows uses PowerShell; POSIX hosts have no pwsh,
-// so they use cat. Producers (cli-adapters, dispatch-run) emit these strings.
-const POWERSHELL_READ = /^Get-Content -Raw -LiteralPath '((?:[^']|'')+)' -Encoding UTF8$/;
+// in its native transcript, with `cat -- '<path>'`. Producers (cli-adapters,
+// dispatch-run) emit exactly this string.
 const POSIX_READ = /^cat -- '((?:[^']|'\\'')+)'$/;
 
-function codexReadCommand(file, platform = process.platform) {
-  return platform === 'win32'
-    ? `Get-Content -Raw -LiteralPath '${file.replaceAll("'", "''")}' -Encoding UTF8`
-    : `cat -- '${file.replaceAll("'", "'\\''")}'`;
+function codexReadCommand(file) {
+  return `cat -- '${file.replaceAll("'", "'\\''")}'`;
 }
 
 function codexReadTarget(cmd) {
-  const windows = cmd.match(POWERSHELL_READ);
-  if (windows) return { shell: 'powershell', file: windows[1].replaceAll("''", "'") };
   const posix = cmd.match(POSIX_READ);
   if (posix) return { shell: 'cat', file: posix[1].replaceAll("'\\''", "'") };
   return null;
 }
 
-// Both shapes bind the native command to the same literal path; stdout is still
-// compared byte-for-byte against the required file below.
+// The native command binds the same literal path; stdout is still compared
+// byte-for-byte against the required file below. Codex runs the recipe through
+// the login shell: ['/bin/zsh', '-lc', cmd]. Accept that exact wrapper around
+// the exact recipe string, or a bare cat.
 function codexNativeCommandMatches(command, pending) {
   if (!Array.isArray(command) || command.length !== 3) return false;
   const shell = path.basename(command[0]);
-  // Codex on POSIX runs the recipe through the login shell: ['/bin/zsh', '-lc', cmd].
-  // Accept that exact wrapper around the exact recipe string, or a bare cat.
-  if (pending.shell === 'cat') {
-    if (shell === 'cat') return command[1] === '--' && command[2] === pending.file;
-    return /^(?:zsh|bash|sh)$/.test(shell) && /^-l?c$/.test(command[1]) && command[2] === pending.args.cmd;
-  }
-  return /^(?:pwsh|powershell)(?:\.exe)?$/i.test(shell) && command[1] === '-Command' && command[2] === pending.args.cmd;
+  if (shell === 'cat') return command[1] === '--' && command[2] === pending.file;
+  return /^(?:zsh|bash|sh)$/.test(shell) && /^-l?c$/.test(command[1]) && command[2] === pending.args.cmd;
 }
 
 function codexReadCall(item) {

@@ -15,24 +15,7 @@ function existing(file) {
   }
 }
 
-function newestCodexInstall(home = os.homedir()) {
-  const root = path.join(home, 'AppData', 'Local', 'OpenAI', 'Codex', 'bin');
-  let entries;
-  try {
-    entries = fs.readdirSync(root, { withFileTypes: true });
-  } catch {
-    return null;
-  }
-  const candidates = entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => ({ name: entry.name, file: path.join(root, entry.name, 'codex.exe') }))
-    .filter((entry) => existing(entry.file))
-    .sort((a, b) => fs.statSync(b.file).mtimeMs - fs.statSync(a.file).mtimeMs || a.name.localeCompare(b.name));
-  return candidates[0]?.file || null;
-}
-
-// POSIX hosts install the three CLIs into ~/.local/bin; macOS also ships codex
-// inside the ChatGPT desktop app. These come before the Windows .exe defaults.
+// The three CLIs live in ~/.local/bin; macOS also ships codex inside the ChatGPT desktop app.
 function posixCandidates(vendor, home, platform) {
   const name = { openai: 'codex', google: 'agy', anthropic: 'claude' }[vendor];
   const result = [path.join(home, '.local', 'bin', name)];
@@ -60,20 +43,7 @@ function candidates(vendor, options = {}) {
   const configured = config.vendors?.[vendor]?.binary;
   if (configured) return [path.resolve(configured)];
 
-  if (platform !== 'win32') result.push(...posixCandidates(vendor, home, platform));
-
-  if (vendor === 'openai') {
-    result.push(path.join(home, 'AppData', 'Local', 'Microsoft', 'WinGet', 'Links', 'codex.exe'));
-    const discovered = newestCodexInstall(home);
-    if (discovered) result.push(discovered);
-    result.push(path.join(home, 'tools', 'bin', 'codex.exe'));
-  } else if (vendor === 'google') {
-    result.push(path.join(home, 'AppData', 'Local', 'agy', 'bin', 'agy.exe'));
-    result.push(path.join(home, 'tools', 'bin', 'agy.exe'));
-  } else {
-    result.push(path.join(home, '.local', 'bin', 'claude.exe'));
-  }
-
+  result.push(...posixCandidates(vendor, home, platform));
   return [...new Set(result)];
 }
 
@@ -101,6 +71,6 @@ module.exports = {
   VENDORS,
   candidates,
   existing,
-  newestCodexInstall,
+
   resolveVendorBinary,
 };

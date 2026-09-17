@@ -236,7 +236,7 @@ function check() {
     path.join(ROOT, '.cursor/skills/magi/references/run-local-skill-bundle.md'),
     'utf8',
   );
-  for (const s of ['DESIGN', 'BackendEng', 'HANDOFF', 'not implemented', 'Magi#4', 'agy.exe']) {
+  for (const s of ['DESIGN', 'BackendEng', 'HANDOFF', 'not implemented', 'Magi#4', '~/.local/bin/agy']) {
     if (!skillBundleDesign.includes(s)) {
       console.error(`run-local-skill-bundle.md missing required string: ${s}`);
       return 1;

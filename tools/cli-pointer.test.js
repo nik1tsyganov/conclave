@@ -20,11 +20,11 @@ test('inspectBrief', () => {
 
 test('pointerText', () => {
     const text = pointerText({
-        briefPath: 'C:\\path\\to\\brief.md',
+        briefPath: '/path/to/brief.md',
         bytes: 123,
         sha256: 'abc'
     });
-    assert.strictEqual(text, 'Read C:\\path\\to\\brief.md in full. Bytes: 123. SHA-256: abc. Follow it. Repeat its first line verbatim before anything else.\n');
+    assert.strictEqual(text, 'Read /path/to/brief.md in full. Bytes: 123. SHA-256: abc. Follow it. Repeat its first line verbatim before anything else.\n');
 });
 
 test('writePointerFile', () => {

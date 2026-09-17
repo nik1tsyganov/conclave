@@ -43,10 +43,10 @@ test('Google checking launch grants the explicitly bound sibling evidence direct
   const root = temporary(t, 'magi-read-access-');
   const briefPath = path.join(root, 'BRIEF.md'); fs.writeFileSync(briefPath, 'ACK evidence\n');
   const evidence = path.join(root, 'evidence'); fs.mkdirSync(evidence);
-  const launch = buildLaunch({ vendor: 'google', role: 'review', cwd: 'C:\\src\\synthetic-product',
+  const launch = buildLaunch({ vendor: 'google', role: 'review', cwd: '/opt/magi/src/synthetic-product',
     briefPath, seatContractPath: path.join(root, 'SEAT-CONTRACT.md'), skillRoot: path.join(root, 'skills'),
     capturePath: path.join(root, 'capture.txt'), evidenceReadDirs: [evidence],
-    env: { MAGI_AGY_BIN: process.execPath, MAGI_DEV_ROOT: 'C:\\src' }, mustExistBinary: false });
+    env: { MAGI_AGY_BIN: process.execPath, MAGI_DEV_ROOT: '/opt/magi/src' }, mustExistBinary: false });
   assert.ok(granted(launch.args, evidence), 'sealed sibling evidence must be in native add-dir grants');
   assert.ok(launch.args.includes('--sandbox'));
 });
@@ -219,7 +219,7 @@ test('exact same-unit prerequisite output requires completed PASS evidence, not 
 test('reparse ancestors, linked descendants, and hardlink contents fail closed', t => {
   const run = accessFixture(t); inputs(run);
   const target = path.join(run.root, 'outside'); fs.mkdirSync(target);
-  const link = path.join(run.evidence, 'alias'); fs.symlinkSync(target, link, process.platform === 'win32' ? 'junction' : 'dir');
+  const link = path.join(run.evidence, 'alias'); fs.symlinkSync(target, link, 'dir');
   assert.throws(() => validateEvidenceReadDirs({ ...run.dispatches[0], evidenceReadDirs: [link] }, { plan: run.planObject, runDir: run.runDir }), /junction|symlink/);
   assert.throws(() => snapshotEvidenceReads([run.evidence]), /links/);
   fs.unlinkSync(link);
@@ -254,9 +254,9 @@ test('OpenAI evidence grants leave the exact scratch argv and environment unchan
   const output = path.join(runDir, 'out/d1'); fs.mkdirSync(output, { recursive: true });
   const briefPath = path.join(output, 'BRIEF.md'); fs.writeFileSync(briefPath, 'ACK evidence\n');
   const evidence = path.join(root, 'evidence'); fs.mkdirSync(evidence);
-  const opts = { vendor: 'openai', role: 'verify', cwd: 'C:\\src\\synthetic-product', runDir, dispatchId: 'd1', readonlyScratch: true,
+  const opts = { vendor: 'openai', role: 'verify', cwd: '/opt/magi/src/synthetic-product', runDir, dispatchId: 'd1', readonlyScratch: true,
     briefPath, seatContractPath: path.join(output, 'SEAT-CONTRACT.md'), skillRoot: path.join(output, 'skills'), capturePath: path.join(output, 'capture.txt'),
-    env: { MAGI_CODEX_BIN: process.execPath, MAGI_DEV_ROOT: 'C:\\src' }, mustExistBinary: false };
+    env: { MAGI_CODEX_BIN: process.execPath, MAGI_DEV_ROOT: '/opt/magi/src' }, mustExistBinary: false };
   const before = buildLaunch(opts); const after = buildLaunch({ ...opts, evidenceReadDirs: [evidence] });
   assert.deepEqual(after.args, before.args); assert.deepEqual(after.env, before.env);
   assert.deepEqual(after.evidenceReadDirs, [canonicalPlainPath(evidence)]);

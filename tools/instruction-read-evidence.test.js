@@ -38,13 +38,13 @@ function claudeRows(f) {
 }
 function codexRows(f) {
   return [{ type: 'session_meta', payload: { id: SESSION, session_id: SESSION, cwd: f.run.cwd } }, ...f.files.flatMap((file, index) => {
-    const cmd = `Get-Content -Raw -LiteralPath '${file.path.replaceAll("'", "''")}' -Encoding UTF8`;
+    const cmd = codexReadCommand(file.path);
     const args = { cmd, workdir: f.run.cwd, max_output_tokens: 20000 };
     const output = file.text + '\n'; const callId = `read-${index}`;
     return [{ type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: callId,
       input: `const r = await tools.exec_command(${JSON.stringify(args)});\ntext(r.output);` } },
     { type: 'event_msg', payload: { type: 'item_completed', thread_id: SESSION, item: { type: 'CommandExecution', id: `exec-${index}`,
-      command: [path.join(f.run.root, 'pwsh.exe'), '-Command', cmd], cwd: pathToFileURL(f.run.cwd).href,
+      command: ['/bin/zsh', '-lc', cmd], cwd: pathToFileURL(f.run.cwd).href,
       status: 'completed', exit_code: 0, stdout: output, stderr: '', formatted_output: output } } },
     { type: 'response_item', payload: { type: 'custom_tool_call_output', call_id: callId,
       output: [{ type: 'input_text', text: 'Script completed\nOutput:\n' }, { type: 'input_text', text: output }] } }];
@@ -104,13 +104,6 @@ test('trusted required set includes bound brief, contract, both manifests, every
   fs.writeFileSync(manifestFile, JSON.stringify(changed));
   assert.throws(() => collectRequiredInstructionFiles(f.options), /trusted instruction inputs/);
 });
-test('Windows contract path case aliases bind the same required files', { skip: process.platform !== 'win32' }, t => {
-  const f = fixture(t);
-  const text = fs.readFileSync(f.options.seatContractPath, 'utf8');
-  fs.writeFileSync(f.options.seatContractPath, text.replaceAll(f.run.root, f.run.root.toLowerCase()));
-  f.files = collectRequiredInstructionFiles(f.options).files;
-  assert.equal(verify(f, 'anthropic', claudeRows(f)).status, 'PASS');
-});
 test('required pointers must occupy their bound fields, not appear only in unrelated prose', t => {
   const f = fixture(t);
   const text = fs.readFileSync(f.options.seatContractPath, 'utf8');
@@ -166,9 +159,9 @@ for (const [label, mutate] of Object.entries({
   'mismatched delivered call ID': rows => { rows[3].payload.call_id = 'other'; },
   'echo instead of real native read': rows => { rows[2].payload.item.command[2] = 'echo claimed read'; },
   'missing native command record': rows => { rows.splice(2, 1); },
-  'UTF8 flag omitted': rows => { rows[1].payload.input = rows[1].payload.input.replace(' -Encoding UTF8', ''); },
+  'recipe without the -- guard': rows => { rows[1].payload.input = rows[1].payload.input.replace('cat -- ', 'cat '); },
   'arbitrary wrapper evaluation': rows => { rows[1].payload.input += '\ntext("fabricated");'; },
-  'product mutation before required reads': rows => { rows.splice(1, 0, { type: 'event_msg', payload: { type: 'item_completed', thread_id: SESSION, item: { type: 'CommandExecution', command: ['pwsh.exe', '-Command', 'Set-Content product.txt changed'], status: 'completed', exit_code: 0 } } }); },
+  'product mutation before required reads': rows => { rows.splice(1, 0, { type: 'event_msg', payload: { type: 'item_completed', thread_id: SESSION, item: { type: 'CommandExecution', command: ['/bin/zsh', '-lc', 'echo product'], status: 'completed', exit_code: 0 } } }); },
   'native file-change event before required reads': rows => { rows.splice(1, 0, { type: 'event_msg', payload: { type: 'item_completed', item: { type: 'FileChange', changes: [{ path: 'product.txt' }] } } }); },
 })) {
   test(`Codex rejects ${label}`, t => { const f = fixture(t); const rows = codexRows(f); mutate(rows); assert.throws(() => verify(f, 'openai', rows), { code: 'INSTRUCTION_READ_FAIL' }); });
@@ -192,7 +185,7 @@ test('Codex native UserMessage metadata does not count as product work', t => {
 });
 
 function relativeProductRead(f, index = 99) {
-  const cmd = "Get-Content -Raw -LiteralPath 'lib\\d1-sum.js' -Encoding UTF8";
+  const cmd = "cat -- 'lib/d1-sum.js'";
   const args = { cmd, workdir: f.run.cwd, max_output_tokens: 20000 };
   const output = 'function sum(a, b) {\n  return a - b;\n}\n';
   const callId = `product-read-${index}`;
@@ -200,15 +193,14 @@ function relativeProductRead(f, index = 99) {
     { type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: callId,
       input: `const r = await tools.exec_command(${JSON.stringify(args)});\ntext(r.output);` } },
     { type: 'event_msg', payload: { type: 'item_completed', thread_id: SESSION, item: { type: 'CommandExecution', id: `exec-product-${index}`,
-      command: [path.join(f.run.root, 'pwsh.exe'), '-Command', cmd], cwd: pathToFileURL(f.run.cwd).href,
+      command: ['/bin/zsh', '-lc', cmd], cwd: pathToFileURL(f.run.cwd).href,
       status: 'completed', exit_code: 0, stdout: output, stderr: '', formatted_output: output } } },
     { type: 'response_item', payload: { type: 'custom_tool_call_output', call_id: callId,
       output: [{ type: 'input_text', text: 'Script completed\nOutput:\n' }, { type: 'input_text', text: output }] } },
   ];
 }
 
-// POSIX seats have no pwsh; they read with `cat -- '<path>'` and the native
-// command array carries the same exact literal path.
+// Seats read with `cat -- '<path>'`; the native command array carries the same exact literal path.
 function codexPosixRows(f) {
   return [{ type: 'session_meta', payload: { id: SESSION, session_id: SESSION, cwd: f.run.cwd } }, ...f.files.flatMap((file, index) => {
     const cmd = codexReadCommand(file.path, 'darwin');
@@ -224,11 +216,10 @@ function codexPosixRows(f) {
   })];
 }
 
-test('Codex read recipe round-trips both host shapes, including quoted paths', () => {
+test('Codex read recipe round-trips quoted paths', () => {
   const tricky = "/Users/o'brien/src/it's here.md";
-  assert.equal(codexReadCommand(tricky, 'darwin'), "cat -- '/Users/o'\\''brien/src/it'\\''s here.md'");
-  assert.deepEqual(codexReadTarget(codexReadCommand(tricky, 'darwin')), { shell: 'cat', file: tricky });
-  assert.deepEqual(codexReadTarget(codexReadCommand(tricky, 'win32')), { shell: 'powershell', file: tricky });
+  assert.equal(codexReadCommand(tricky), "cat -- '/Users/o'\\''brien/src/it'\\''s here.md'");
+  assert.deepEqual(codexReadTarget(codexReadCommand(tricky)), { shell: 'cat', file: tricky });
   assert.equal(codexReadTarget("cat -- '/a/b.md' && rm -rf /"), null);
 });
 
@@ -318,7 +309,7 @@ test('Google requires matching collector conversation and full transcript digest
 });
 
 for (const [label, extra] of Object.entries({
-  'custom shell': { shell: 'product/pwsh.exe' },
+  'custom shell': { shell: 'product/zsh' },
   'permission override': { sandbox_permissions: 'require_escalated' },
   'login override': { login: false },
   'environment override': { env: { PATH: 'product' } },
@@ -332,7 +323,7 @@ for (const [label, extra] of Object.entries({
     const cmd = rows[2].payload.item.command[2];
     const args = { cmd, workdir: f.run.cwd, max_output_tokens: 10000, ...extra };
     if (extra.shell) {
-      args.shell = path.join(f.run.cwd, 'pwsh.exe');
+      args.shell = path.join(f.run.cwd, 'zsh');
       rows[2].payload.item.command[0] = args.shell;
     }
     rows[1].payload.input = `const r = await tools.exec_command(${JSON.stringify(args)});\ntext(r.output);`;

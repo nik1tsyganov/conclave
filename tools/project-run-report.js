@@ -17,7 +17,7 @@ function createReport({ runDir, outputDir, phase = 'finalize', errorFile, projec
   if (!runDir || !outputDir || !PHASES.includes(phase)) throw new Error('runDir, a new outputDir, and a valid phase are required');
   const protectedRun = canonicalPlainPath(runDir);
   // Native canonicalization is for containment. Evidence paths retain the
-  // producer's realpath spelling (Windows case and 8.3 aliases can differ).
+  // producer's realpath spelling (case aliases can differ).
   const root = fs.realpathSync(runDir);
   const destination = canonicalPlainPath(outputDir);
   if (!fs.statSync(root).isDirectory()) throw new Error('runDir must be an existing attempt/run directory');

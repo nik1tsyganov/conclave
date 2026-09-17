@@ -33,7 +33,7 @@ function legalBrief({ role = 'implement', vendor = 'openai' } = {}) {
     vendor === 'google' ? 'Vendor: agy. casper_via=agy.' : `Vendor: ${vendor}.`,
     vendor === 'anthropic' ? 'R16 auth and headless probe status checked by the arbiter.' : '',
     'Runtime-owned receipt ACK, handoff envelope, telemetry R17, and R18 vendor-native proof.',
-    'SLICES not vendors (R11). not CONCLAVE. No C:\\src\\vault writes (R21).',
+    'SLICES not vendors (R11). not CONCLAVE. No /src/vault writes (R21).',
   ].join('\n');
 }
 
@@ -188,9 +188,7 @@ test('standalone structural checks read adjacent profile and hashed skills', (t)
 
 test('standalone skill pointers use the canonical filesystem spelling', (t) => {
   const fixture = stagedBrief(t);
-  // Windows permits case and 8.3 aliases. Staging records the long, canonical
-  // spelling, which remains authoritative when callers use another alias.
-  const briefPath = process.platform === 'win32' ? fixture.briefPath.toUpperCase() : fixture.briefPath;
+  const briefPath = fixture.briefPath;
   const result = checkBriefFile(briefPath, { requireStructural: true });
   assert.strictEqual(result.ok, true, result.missing.join('; '));
 });

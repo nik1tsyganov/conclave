@@ -35,17 +35,12 @@ function runtimeError(message) {
 // of the filesystem root is therefore platform layout: it is resolved first and
 // the plain-path rule is re-asserted on the realpath (which is also what the
 // callers' containment checks then see). Any deeper link is run-controlled and
-// stays refused, as it does on Windows.
-// This also canonicalizes Windows short-name and case aliases before containment checks.
+// stays refused. The realpath also canonicalizes case aliases before containment checks.
 function canonicalPlainPath(file) {
   if (typeof file !== 'string' || !file.trim()) throw runtimeError('a non-empty filesystem path is required');
   const absolute = path.resolve(file);
   const parsed = path.parse(absolute);
   const segments = absolute.slice(parsed.root.length).split(path.sep).filter(Boolean);
-  if (process.platform === 'win32' && (
-    /^\\\\[?.]\\/.test(absolute) ||
-    segments.some(segment => /[. ]$|[<>:"|?*\x00-\x1f]/.test(segment) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(segment))
-  )) throw runtimeError(`ambiguous or unsafe Windows path: ${absolute}`);
   let current = parsed.root;
   for (let i = 0; i <= segments.length; i += 1) {
     let stat;
@@ -55,7 +50,7 @@ function canonicalPlainPath(file) {
       return path.join(fs.realpathSync.native(path.dirname(current)), path.basename(current), ...segments.slice(i));
     }
     if (stat.isSymbolicLink()) {
-      if (process.platform === 'win32' || i !== 1) throw runtimeError(`symlink or junction forbidden in path: ${current}`);
+      if (i !== 1) throw runtimeError(`symlink forbidden in path: ${current}`);
       return canonicalPlainPath(path.join(fs.realpathSync.native(current), ...segments.slice(i)));
     }
     if (i < segments.length && !stat.isDirectory()) throw runtimeError(`filesystem parent is not a directory: ${current}`);

@@ -32,26 +32,15 @@ function getMagiBusRoot() {
   return DEFAULT_MAGI_BUS_ROOT;
 }
 
-function looksWindowsPath(value) {
-  return typeof value === 'string' && (/^[A-Za-z]:[\\/]/.test(value) || value.startsWith('\\\\'));
-}
-
 function resolveAllowedPath(filePath) {
   if (typeof filePath !== 'string' || filePath.trim() === '') {
     throw new Error('path is required');
   }
-  const trimmed = filePath.trim();
-  if (looksWindowsPath(trimmed)) {
-    return path.win32.resolve(trimmed);
-  }
-  return path.resolve(trimmed);
+  return path.resolve(filePath.trim());
 }
 
 function compareKey(filePath) {
   const resolved = resolveAllowedPath(filePath);
-  if (looksWindowsPath(resolved) || (resolved.includes('\\') && !resolved.startsWith('/'))) {
-    return resolved.replace(/\//g, '\\').toLowerCase();
-  }
   // Both the candidate and the zone roots (repo, os.tmpdir()-based bus root)
   // go through the canonicalizer so a symlinked ancestor compares as itself.
   return canonicalPlainPath(resolved);
@@ -88,7 +77,6 @@ module.exports = {
   HOST_MODES,
   getRepoRoot,
   getMagiBusRoot,
-  looksWindowsPath,
   resolveAllowedPath,
   isUnderRoot,
   assertInJail,

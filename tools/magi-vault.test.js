@@ -41,10 +41,10 @@ test('looksSecret catches key-shaped text and resolveVaultRoot stays explicit', 
 });
 
 test('tmp run dirs never auto-link even when MAGI_VAULT_ROOT is set', () => {
-  assert.equal(shouldLinkVault(path.join(os.tmpdir(), 'magi-run'), { MAGI_VAULT_ROOT: 'C:\\src\\ai-ops-vault' }), false);
-  assert.equal(shouldLinkVault(path.join(path.parse(os.tmpdir()).root, 'magi-runs', 'run-001'), { MAGI_VAULT_ROOT: 'C:\\src\\ai-ops-vault' }), true);
+  assert.equal(shouldLinkVault(path.join(os.tmpdir(), 'magi-run'), { MAGI_VAULT_ROOT: '/Users/test/src/ai-ops-vault' }), false);
+  assert.equal(shouldLinkVault(path.join(path.parse(os.tmpdir()).root, 'magi-runs', 'run-001'), { MAGI_VAULT_ROOT: '/Users/test/src/ai-ops-vault' }), true);
   assert.equal(shouldLinkVault(path.join(path.parse(os.tmpdir()).root, 'magi-runs', 'run-001'), {}), false);
-  assert.equal(shouldLinkVault(path.join(path.parse(os.tmpdir()).root, 'magi-runs', 'run-001'), { MAGI_VAULT_ROOT: 'C:\\src\\ai-ops-vault', MAGI_VAULT_LINK: '0' }), false);
+  assert.equal(shouldLinkVault(path.join(path.parse(os.tmpdir()).root, 'magi-runs', 'run-001'), { MAGI_VAULT_ROOT: '/Users/test/src/ai-ops-vault', MAGI_VAULT_LINK: '0' }), false);
 });
 
 test('link appends unique telemetry and writes analysis that needs attention when empty or hog-fails', t => {

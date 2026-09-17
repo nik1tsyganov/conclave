@@ -140,7 +140,7 @@ Check each real exit code before the next command. A dispatch execution PASS alo
 
 ## Record every stop
 
-Capture command arguments, exit code, stdout, and stderr for each gate in the external `commands/` directory. Prefer UTF-8 logs. The reporter also reads PowerShell's UTF-16LE logs with a byte-order mark. In Windows PowerShell 5.1, use `$LASTEXITCODE` for native commands; `$?` can be false merely because stderr was written.
+Capture command arguments, exit code, stdout, and stderr for each gate in the external `commands/` directory as UTF-8 logs; check `$?` after each command.
 
 After success, export a report to a new external directory:
 

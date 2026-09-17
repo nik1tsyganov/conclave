@@ -15,7 +15,6 @@ function runLaunch(launch, options = {}) {
       cwd: launch.cwd,
       env: launch.env || process.env,
       shell: false,
-      windowsHide: true,
       stdio: launch.stdio || ['pipe', 'pipe', 'pipe'],
     });
     const pid = child.pid;

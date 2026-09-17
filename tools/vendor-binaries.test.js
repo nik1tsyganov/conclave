@@ -1,37 +1,37 @@
 'use strict';
+const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const assert = require('node:assert/strict');
-const { resolveVendorBinary } = require('./vendor-binaries.js');
+const { candidates, resolveVendorBinary } = require('./vendor-binaries.js');
 const { temporary } = require('./test-fixtures.js');
-test('binary precedence is explicit, env, config, discovery, shim, then fail', (t) => {
-  const home = temporary(t); const make = (relative) => { const file = path.join(home, relative); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, 'fixture'); return file; };
-  const shim = make('tools/bin/codex.exe'); const official = make('AppData/Local/Microsoft/WinGet/Links/codex.exe');
-  const configured = make('configured.exe'); const env = make('environment.exe'); const explicit = make('explicit.exe');
-  const options = { home, platform: 'win32', env: { MAGI_CODEX_BIN: env }, config: { vendors: { openai: { binary: configured } } }, binary: explicit };
-  assert.equal(resolveVendorBinary('openai', options), explicit);
-  delete options.binary; assert.equal(resolveVendorBinary('openai', options), env);
-  options.env = {}; assert.equal(resolveVendorBinary('openai', options), configured);
-  delete options.config; assert.equal(resolveVendorBinary('openai', options), official);
-  fs.unlinkSync(official); assert.equal(resolveVendorBinary('openai', options), shim);
-  fs.unlinkSync(shim); assert.throws(() => resolveVendorBinary('openai', options), { code: 'BINARY_MISSING' });
-});
-test('POSIX hosts resolve ~/.local/bin ahead of the Windows .exe defaults', (t) => {
+
+function make(home, relative) { const file = path.join(home, relative); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, ''); return file; }
+
+test('binary precedence is explicit, env, config, then ~/.local/bin', (t) => {
   const home = temporary(t);
-  const make = (relative) => { const file = path.join(home, relative); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, 'fixture'); return file; };
-  const shim = make('tools/bin/codex.exe');
-  for (const [vendor, name] of [['openai', 'codex'], ['google', 'agy'], ['anthropic', 'claude']]) {
-    const local = make(path.join('.local', 'bin', name));
-    assert.equal(resolveVendorBinary(vendor, { home, env: {}, platform: 'darwin' }), local);
-    assert.equal(resolveVendorBinary(vendor, { home, env: {}, platform: 'linux' }), local);
-  }
-  assert.equal(resolveVendorBinary('openai', { home, env: {}, platform: 'win32' }), shim);
+  const local = make(home, '.local/bin/codex');
+  const configured = make(home, 'configured/codex'); const env = make(home, 'environment/codex'); const explicit = make(home, 'explicit/codex');
+  const options = { home, platform: 'darwin', env: { MAGI_CODEX_BIN: env }, config: { vendors: { openai: { binary: configured } } } };
+  assert.equal(resolveVendorBinary('openai', { ...options, binary: explicit }), explicit);
+  assert.equal(resolveVendorBinary('openai', options), env);
+  assert.equal(resolveVendorBinary('openai', { ...options, env: {} }), configured);
+  assert.equal(resolveVendorBinary('openai', { home, platform: 'darwin', env: {}, config: {} }), local);
+  assert.deepEqual(candidates('openai', { home, platform: 'linux', env: {}, config: {} }), [local]);
+  assert.throws(() => resolveVendorBinary('openai', { home: path.join(home, 'empty'), platform: 'linux', env: {}, config: {} }), /No openai CLI binary found/);
 });
-test('a broken higher-priority override never silently falls back', (t) => {
-  const home = temporary(t); const shim = path.join(home, 'tools/bin/agy.exe'); fs.mkdirSync(path.dirname(shim), { recursive: true }); fs.writeFileSync(shim, 'fixture');
-  for (const options of [{ binary: path.join(home, 'absent') }, { env: { MAGI_AGY_BIN: path.join(home, 'absent') } }, { config: { vendors: { google: { binary: path.join(home, 'absent') } } } }]) {
-    assert.throws(() => resolveVendorBinary('google', { home, env: {}, ...options }), { code: 'BINARY_MISSING' });
+
+test('every vendor resolves its own ~/.local/bin name', (t) => {
+  const home = temporary(t);
+  for (const [vendor, name] of [['openai', 'codex'], ['google', 'agy'], ['anthropic', 'claude']]) {
+    const file = make(home, `.local/bin/${name}`);
+    assert.equal(resolveVendorBinary(vendor, { home, platform: 'darwin', env: {}, config: {} }), file);
   }
-  assert.equal(resolveVendorBinary('google', { home, env: {}, binary: shim, configFile: path.join(home, 'absent-config') }), shim);
+  assert.throws(() => candidates('xai', { home }), /unsupported vendor/);
+});
+
+test('a broken higher-priority override never silently falls back', (t) => {
+  const home = temporary(t); make(home, '.local/bin/agy');
+  assert.throws(() => resolveVendorBinary('google', { home, platform: 'darwin', env: { MAGI_AGY_BIN: path.join(home, 'missing', 'agy') }, config: {} }), /Configured google CLI does not exist/);
+  assert.throws(() => resolveVendorBinary('google', { home, platform: 'darwin', env: {}, config: { vendors: { google: { binary: path.join(home, 'missing', 'agy') } } } }), /No google CLI binary found/);
 });

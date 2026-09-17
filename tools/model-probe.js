@@ -41,7 +41,7 @@ async function probe({ vendor, model, effort, evidenceDir, cwd, maxWallMs = 1200
   const nativeLogPath = vendor === 'google' ? path.join(root, 'native-cli.log') : undefined;
   const env = { ...subscriptionEnv(), AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
   if (vendor === 'anthropic') {
-    const auth = JSON.parse(execFileSync(binary, ['auth', 'status'], { env, encoding: 'utf8', windowsHide: true, timeout: 15000 }));
+    const auth = JSON.parse(execFileSync(binary, ['auth', 'status'], { env, encoding: 'utf8', timeout: 15000 }));
     if (auth.loggedIn !== true || auth.authMethod !== 'claude.ai') throw new Error('Claude subscription authentication is not available');
     writeJson(path.join(root, 'auth-status.json'), { loggedIn: true, authMethod: auth.authMethod });
   }

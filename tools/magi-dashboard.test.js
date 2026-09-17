@@ -104,37 +104,6 @@ test('genuine Claude checkpoint remains awaiting attestation with no approval or
   assert.deepEqual(inventory(run.runDir), frozen);
 });
 
-test('Windows producer path spelling resolves to the same plain evidence directory', { skip: process.platform !== 'win32' }, async t => {
-  const previous = { TEMP: process.env.TEMP, TMP: process.env.TMP };
-  const alias = os.tmpdir().toLowerCase();
-  let run;
-  try {
-    process.env.TEMP = alias; process.env.TMP = alias;
-    run = createSealedRun(t);
-  } finally {
-    for (const [name, value] of Object.entries(previous)) {
-      if (value === undefined) delete process.env[name]; else process.env[name] = value;
-    }
-  }
-  const canonicalRun = fs.realpathSync.native(run.runDir);
-  assert.notEqual(run.runDir, canonicalRun, 'The fixture must exercise a real path spelling difference');
-  t.diagnostic(JSON.stringify({ producerRoot: run.runDir, canonicalRoot: canonicalRun }));
-  const native = fakeWithClose();
-  const runLaunch = async launch => {
-    const snapshot = createSnapshot(run.runDir);
-    assert.equal(snapshot.dispatches[0].status, 'RUNNING', snapshot.dispatches[0].issue);
-    assert.ok(snapshot.events.some(event => event.kind === 'launch'));
-    return native.runLaunch(launch);
-  };
-  const result = await require('./dispatch-run.js').runDispatch({ ...run.opts, dispatchId: 'd1' }, { ...native, runLaunch });
-  assert.equal(result.ok, true);
-  const frozen = inventory(run.runDir);
-  const snapshot = createSnapshot(canonicalRun);
-  assert.equal(snapshot.dispatches[0].status, 'PASS', snapshot.dispatches[0].issue);
-  assert.equal(snapshot.dispatches[0].proofId, result.proofId);
-  assert.deepEqual(inventory(run.runDir), frozen);
-});
-
 test('observed handoffs retain launch references and distinguish consumer recovery attempts', t => {
   const run = fixture(t, [{}, { role: 'verify', vendor: 'google' }]);
   const original = run.state(1);
@@ -329,18 +298,18 @@ test('untrusted evidence paths and junction roots cannot read outside the select
   assert.equal(snapshot.dispatches[0].status, 'UNKNOWN');
   assert.equal(snapshot.dispatches[0].issue, 'UNTRUSTED_EVIDENCE_PATH');
   const link = path.join(run.root, 'linked-run');
-  try { fs.symlinkSync(run.runDir, link, process.platform === 'win32' ? 'junction' : 'dir'); }
+  try { fs.symlinkSync(run.runDir, link, 'dir'); }
   catch (error) { if (error.code === 'EPERM') { t.diagnostic('Symlink subcase NOT RUN: OS denies link creation.'); return; } throw error; }
   assert.throws(() => createSnapshot(link), /plain local directory/);
   fs.mkdirSync(path.dirname(state.evidenceDir), { recursive: true });
-  fs.symlinkSync(outside, state.evidenceDir, process.platform === 'win32' ? 'junction' : 'dir');
+  fs.symlinkSync(outside, state.evidenceDir, 'dir');
   write(state.file, state.value);
   assert.equal(createSnapshot(run.runDir).dispatches[0].issue, 'UNTRUSTED_EVIDENCE_PATH');
 });
 
 test('network, device and traversal evidence paths are rejected before filesystem lookup', t => {
   const run = fixture(t); const state = run.state();
-  const paths = ['//server/share/run/out/d1', String.raw`\\server\share\run\out\d1`, String.raw`\\?\C:\run\out\d1`, String.raw`\\.\PIPE\dashboard`, path.join(run.runDir, 'out') + '/../../outside'];
+  const paths = ['//server/share/run/out/d1', '/dev/null/run/out/d1', '../../etc/run/out/d1', 'run/out/d1'];
   const traversalTarget = path.resolve(paths.at(-1));
   const lookups = [];
   const original = fs.lstatSync;

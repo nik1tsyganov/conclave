@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const { TextDecoder } = require('node:util');
 
 // Decode only; hashes continue to cover the original bytes, including any BOM.
-// PowerShell 5.1 Set-Content -Encoding UTF8 writes a leading UTF-8 BOM.
+// Some editors write a leading UTF-8 BOM; it is accepted and still hashed.
 function parseJsonBytes(bytes) {
   let text;
   try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }

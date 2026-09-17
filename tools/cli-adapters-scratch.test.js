@@ -24,7 +24,7 @@ function fixture(t) {
   const opts = { runDir, dispatchId: 'verify-one', cwd, briefPath, seatContractPath, skillRoot,
     capturePath: path.join(evidence, 'capture.txt'), role: 'verify', model: 'gpt-5.6-sol', effort: 'medium',
     readonlyScratch: true, mustExistBinary: false,
-    env: { MAGI_DEV_ROOT: root, MAGI_CODEX_BIN: 'C:\\bin\\codex.exe', temp: 'unsafe', TMP: 'unsafe', NPM_CONFIG_CACHE: 'unsafe' } };
+    env: { MAGI_DEV_ROOT: root, MAGI_CODEX_BIN: '/opt/magi/bin/codex', temp: 'unsafe', TMP: 'unsafe', NPM_CONFIG_CACHE: 'unsafe' } };
   return { root, evidence, opts };
 }
 
@@ -75,7 +75,7 @@ test('scratch refuses junctions in its derived path', t => {
   const f = fixture(t);
   const target = path.join(f.root, 'unrelated');
   fs.mkdirSync(target);
-  fs.symlinkSync(target, path.join(f.evidence, 'scratch'), process.platform === 'win32' ? 'junction' : 'dir');
+  fs.symlinkSync(target, path.join(f.evidence, 'scratch'), 'dir');
   assert.throws(() => openaiLaunch(f.opts), /symlink|junction/);
   assert.deepEqual(fs.readdirSync(target), []);
 });

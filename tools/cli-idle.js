@@ -43,7 +43,6 @@ function decide(sample) {
 function forbiddenKill(cmd) {
     if (typeof cmd !== 'string') return false;
     const lowerCmd = cmd.toLowerCase();
-    if (/\btaskkill\s+\/im\b/.test(lowerCmd)) return true;
     if (/\bkillall\b/.test(lowerCmd)) return true;
     if (/\bpkill\s+[^\d-]/.test(lowerCmd)) return true;
     return false;

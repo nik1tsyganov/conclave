@@ -216,7 +216,7 @@ test('Git config edits, source rules/skills edits and hard-link scope escape all
 test('an evidence junction cannot redirect wrapper writes into product files', async (t) => {
   const run = createSealedRun(t);
   const target = path.join(run.cwd, 'unscoped'); fs.mkdirSync(target);
-  fs.symlinkSync(target, path.join(run.runDir, 'telemetry'), process.platform === 'win32' ? 'junction' : 'dir');
+  fs.symlinkSync(target, path.join(run.runDir, 'telemetry'), 'dir');
   const native = fakeVendor();
   await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1' }, native), /junctions/);
   assert.equal(native.calls(), 0); assert.equal(fs.readdirSync(target).length, 0);
