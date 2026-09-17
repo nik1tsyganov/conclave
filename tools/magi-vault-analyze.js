@@ -45,7 +45,10 @@ function analyzeRows(rows) {
   let missingCapturedBy = 0;
   let proofPresent = 0;
   let tokenPresent = 0;
+  const passed = rows.filter((row) => row.status === 'PASS');
   for (const row of rows) {
+    // Only committed PASS rows carry capture, proof and token fields; FAIL and NOT_RUN rows are honest blanks (R17).
+    if (row.status !== 'PASS') { if (row.role && vendorByRole[row.role] && row.vendor) vendorByRole[row.role][row.vendor] = (vendorByRole[row.role][row.vendor] || 0) + 1; continue; }
     if (row.capturedBy === 'lead') capturedByLead += 1;
     else if (!row.capturedBy) missingCapturedBy += 1;
     if (row.role && vendorByRole[row.role] && row.vendor) {
@@ -58,12 +61,13 @@ function analyzeRows(rows) {
   const findings = [];
   if (!rows.length) findings.push({ id: 'capture:zero-rows', severity: 'attention', detail: 'vault telemetry is empty; later MAGI analysis has nothing to score' });
   if (missingCapturedBy > 0) findings.push({ id: 'capture:missing-capturedBy', severity: 'attention', detail: `${missingCapturedBy} rows missing capturedBy` });
-  if (rows.length && proofPresent / rows.length < 0.5) {
-    findings.push({ id: 'proof:low', severity: 'attention', detail: `proofPresent ${proofPresent}/${rows.length}` });
+  if (passed.length && proofPresent / passed.length < 0.5) {
+    findings.push({ id: 'proof:low', severity: 'attention', detail: `proofPresent ${proofPresent}/${passed.length} PASS rows` });
   }
-  if (rows.length && tokenPresent / rows.length < 0.5) {
-    findings.push({ id: 'tokens:null-rate', severity: 'attention', detail: `token fields present on ${tokenPresent}/${rows.length} rows` });
+  if (passed.length && tokenPresent / passed.length < 0.9) {
+    findings.push({ id: 'tokens:null-rate', severity: 'attention', detail: `token fields present on ${tokenPresent}/${passed.length} PASS rows` });
   }
+  findings.push({ id: 'outcomes', severity: 'ok', detail: `${passed.length} PASS, ${rows.filter((r) => r.status === 'FAIL').length} FAIL, ${rows.filter((r) => r.status === 'NOT_RUN').length} NOT_RUN of ${rows.length} rows` });
   findings.push(...hogFindings(rows));
   const needsAttention = findings.some((item) => item.severity !== 'ok');
   return {

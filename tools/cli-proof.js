@@ -191,10 +191,13 @@ function parseGoogle(captureText, logText, expectedModel) {
     throw proofError(`Google/agy model mismatch: expected ${expectedModel}, observed ${modelObserved}`);
   }
 
+  const googleTokens = Number(envelope.usage?.total_tokens);
   return {
     vendor: 'google',
     conversationId: envelope.conversation_id,
     usage: envelope.usage,
+    // Telemetry accounting (2026-09-16): agy reports usage.total_tokens; earlier rows carried null here.
+    vendorSideTokens: Number.isFinite(googleTokens) && googleTokens >= 0 ? googleTokens : null,
     modelObserved,
     modelRequested: expectedModel || null,
     identityEvidence: 'exact',
