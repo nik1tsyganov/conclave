@@ -4,7 +4,8 @@
   "type": "commonjs",
   "description": "Code-enforced CONCLAVE tri-vendor Cursor and CLI runtime",
   "bin": {
-    "conclave-mcp": "mcp/server.js"
+    "conclave-mcp": "mcp/server.js",
+    "conclave-panel": "tools/conclave-panel.js"
   },
   "scripts": {
     "test": "node --test \"tools/*.test.js\" \"mcp/*.test.js\"",

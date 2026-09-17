@@ -57,7 +57,7 @@ test('an unknown protocol version is answered with one this server speaks', () =
 test('the tool list is every tool, and each one says what it costs', () => {
   const list = last([HELLO, READY, { jsonrpc: '2.0', id: 2, method: 'tools/list' }]);
   const names = list.result.tools.map((tool) => tool.name).sort();
-  assert.deepEqual(names, ['conclave_attest', 'conclave_drive', 'conclave_hosts', 'conclave_run_report', 'conclave_seal', 'conclave_tally', 'conclave_validate_row']);
+  assert.deepEqual(names, ['conclave_attest', 'conclave_drive', 'conclave_hosts', 'conclave_read_reply', 'conclave_run_report', 'conclave_seal', 'conclave_tally', 'conclave_validate_row']);
   const drive = list.result.tools.find((tool) => tool.name === 'conclave_drive');
   assert.match(drive.description, /SPENDS SUBSCRIPTION CAPACITY/);
   for (const tool of list.result.tools) {
@@ -98,10 +98,34 @@ test('a row is checked against the same schema the runtime uses', () => {
 });
 
 test('the tally is the runtime\'s own, not a second copy of the rule', () => {
-  const answer = ask('conclave_tally', { ballots: [] });
-  const body = JSON.parse(answer.result.content[0].text);
-  // An empty panel must not read as a split: below the quorum floor it fails closed.
-  assert.notEqual(body.verdict, 'PASSAGE');
+  const empty = JSON.parse(ask('conclave_tally', { receipts: [] }).result.content[0].text);
+  // An empty panel must not read as a split: below the quorum it is not a panel at all.
+  assert.equal(empty.outcome, 'NOT_PANEL');
+
+  const seat = (slot, vendor, role, position, evidence) => ({
+    slot, vendor, role, position, evidence, status: 'completed',
+    sessionId: `s-${slot}`, tokens: 10, modelObserved: 'm', treeBefore: 'a', treeAfter: 'a',
+  });
+  const receipts = [
+    seat('ponens', 'openai', 'implement', null, null),
+    seat('scrutator', 'anthropic', 'verify', 'APPROVE', 'The six tests in stats_test.py pass, the even case included.'),
+    seat('advocatus', 'google', 'review', 'APPROVE', 'I read the callers in app.py and none passes a tuple.'),
+  ];
+  assert.equal(JSON.parse(ask('conclave_tally', { receipts }).result.content[0].text).outcome, 'PASSAGE');
+  // The gate a host must not be able to talk its way past.
+  const red = JSON.parse(ask('conclave_tally', { receipts, checkPassed: false }).result.content[0].text);
+  assert.equal(red.outcome, 'CHECK_FAILED');
+  assert.equal(red.lands, false);
+});
+
+test('a reply is read for its one position and its last evidence', () => {
+  const body = JSON.parse(ask('conclave_read_reply', {
+    reply: 'EVIDENCE: one sentence naming a check\n\nI read it.\nPOSITION: APPROVE\nEVIDENCE: looks good',
+  }).result.content[0].text);
+  assert.equal(body.position, 'APPROVE');
+  assert.equal(body.evidence, 'looks good');
+  assert.equal(body.judged.independent, false, 'and the host is told the reason is bare');
+  assert.equal(JSON.parse(ask('conclave_read_reply', { reply: 'POSITION: APPROVE\nPOSITION: REJECT' }).result.content[0].text).position, null);
 });
 
 test('a call that would spend capacity is refused unless the caller says so', () => {

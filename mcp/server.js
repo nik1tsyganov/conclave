@@ -34,7 +34,9 @@ const ROOT = path.resolve(__dirname, '..');
 const TOOLS_DIR = path.join(ROOT, 'tools');
 
 const { CLI_HOST_MODES, HOST_MODES, ROLES, VENDORS, validateDispatchRow } = require(path.join(TOOLS_DIR, 'dispatch-schema.js'));
-const { tally, VERDICT } = require(path.join(TOOLS_DIR, 'position-tally.js'));
+// The panel's own rules, not the older elector count in `position-tally.js`: that one answers
+// a different question, about a bench of vendors rather than one unit's three seats.
+const panelRules = require(path.join(TOOLS_DIR, 'panel-rules.js'));
 
 const SERVER_NAME = 'conclave-mcp';
 const SERVER_VERSION = '0.1.0';
@@ -152,20 +154,36 @@ const TOOLS = [
   },
   {
     name: 'conclave_tally',
-    title: 'Count positions into a verdict',
+    title: 'Count a panel into a verdict',
     description:
-      'Counts checker ballots the way the runtime does: two approvals carry a unit, an approval with no evidence of its own does not count as one, ' +
-      'and a panel below the quorum floor fails closed rather than reporting a split. No model is asked what the panel meant. Offline, and spends nothing.',
+      'Counts one unit\'s seats the way the runtime does: two reasoned approvals carry it, an approval with no reason of its own counts as an abstention, ' +
+      'a vote counts only from a seat that proved its vendor session and the model that answered, and a unit whose own check failed does not land whatever the seats voted. ' +
+      'No model is asked what the panel meant. Offline, deterministic, spends nothing. This is what a host with its own interface calls instead of reimplementing the rules.',
     inputSchema: {
       type: 'object',
       properties: {
-        ballots: {
+        receipts: {
           type: 'array',
-          description: 'One entry per checking seat: its elector, its position and its evidence.',
+          description: 'One per seat, the builder included: slot, vendor, role, position, evidence, status, sessionId, tokens, modelObserved, treeBefore, treeAfter.',
           items: { type: 'object' },
         },
+        critical: { type: 'boolean', description: 'Raise the quorum to three, for a security-sensitive unit.' },
+        checkPassed: { type: 'boolean', description: 'Whether the unit\'s own check passed. Omit when it named none.' },
       },
-      required: ['ballots'],
+      required: ['receipts'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'conclave_read_reply',
+    title: 'Read a position and its evidence out of a seat reply',
+    description:
+      'Finds the one POSITION line and the last EVIDENCE line in a checker\'s reply, and says whether that evidence is a reason or bare agreement. ' +
+      'A reply with two position lines, or one that argues against its own vote underneath it, is no vote at all. Offline, and spends nothing.',
+    inputSchema: {
+      type: 'object',
+      properties: { reply: { type: 'string', description: 'The seat\'s reply, as it came back.' } },
+      required: ['reply'],
       additionalProperties: false,
     },
   },
@@ -271,13 +289,27 @@ async function callTool(name, rawArgs) {
     }
 
     case 'conclave_tally': {
-      if (!Array.isArray(args.ballots)) fail('"ballots" must be an array.');
+      if (!Array.isArray(args.receipts)) fail('"receipts" must be an array.');
       try {
-        const result = tally({ ballots: args.ballots });
-        return text(result);
+        return text(panelRules.verdict({
+          receipts: args.receipts,
+          critical: args.critical === true,
+          checkPassed: args.checkPassed === undefined ? null : args.checkPassed,
+        }));
       } catch (error) {
-        return text({ ok: false, reason: error.message, verdicts: VERDICT });
+        return text({ ok: false, reason: error.message });
       }
+    }
+
+    case 'conclave_read_reply': {
+      const reply = requireString(args.reply, 'reply');
+      const evidence = panelRules.evidenceIn(reply);
+      const position = panelRules.positionIn(reply);
+      return text({
+        position,
+        evidence,
+        judged: position === 'APPROVE' ? panelRules.judgeEvidence(evidence) : null,
+      });
     }
 
     case 'conclave_run_report': {
