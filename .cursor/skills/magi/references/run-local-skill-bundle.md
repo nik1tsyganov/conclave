@@ -14,7 +14,7 @@ copy/add-dir-all-vendors helper in this tree now.
 Magi#4 HOLD:
 
 - Claude `--add-dir` stays cwd + briefDir under the pointer zones. Never
-  broaden Claude to `C:\Users`.
+  broaden Claude to the whole home directory.
 - Gemini/`agy` binary stays `agy.exe`. `cli-gemini.js` already passes
-  `--add-dir C:\Users\YESSIR\.claude\skills`. `cli-smoke.js` asserts that
+  `--add-dir $HOME\.claude\skills`. `cli-smoke.js` asserts that
   grant on the google dry-run plan (DevOps/harness must keep it).

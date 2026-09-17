@@ -166,7 +166,7 @@ and STOP. **The command EXITS 0 either way — never trust the exit code.**
 
 Read `gemini-bridge`'s "Headless dispatch — THE recipe" first. On top of it:
 
-- **Every MAGI `agy` dispatch MUST pass `--add-dir C:\Users\YESSIR\.claude\skills`** (and `C:\Users\YESSIR\.claude\docs` if docs are needed). This grant is required for agy to read the MAGI policy skills and any other in-scope files outside the OS temp tree. Close stdin after piping the prompt (`agy` hangs if stdin is left open).
+- **Every MAGI `agy` dispatch MUST pass `--add-dir $HOME\.claude\skills`** (and `$HOME\.claude\docs` if docs are needed). This grant is required for agy to read the MAGI policy skills and any other in-scope files outside the OS temp tree. Close stdin after piping the prompt (`agy` hangs if stdin is left open).
 
 - **A WRITE NEEDS TWO THINGS ON agy 1.1.22, AND OMITTING `--sandbox` IS ONLY THE FIRST.**
   Measured live 2026-08-30, this seat's own lane. Both are mandatory; neither alone writes.
@@ -191,8 +191,8 @@ Read `gemini-bridge`'s "Headless dispatch — THE recipe" first. On top of it:
 - **`--add-dir <target>` grants agy the RECURSIVE READ of the tree it has to change** (measured
   2026-08-15: the grant is recursive, normalises separators, and repeats for several
   directories). **MEASURED 2026-08-30: a write OUTSIDE the OS temp tree SUCCEEDED with the
-  covering grant present** — `--add-dir C:/Users/YESSIR/.claude/docs/rulevec` landed
-  (`workspaceDirs=[C:\Users\YESSIR\.claude\docs\rulevec C:/Users/YESSIR/.claude/docs/rulevec]`
+  covering grant present** — `--add-dir $HOME/.claude/docs/rulevec` landed
+  (`workspaceDirs=[$HOME\.claude\docs\rulevec $HOME/.claude/docs/rulevec]`
   in that run's own log) and the files were written. **STILL UNVERIFIED: whether the grant is
   NECESSARY for that write.** No run has yet attempted a non-temp write WITHOUT the covering
   grant, and in the successful run the process cwd was the target directory as well, so this one
@@ -225,7 +225,7 @@ Read `gemini-bridge`'s "Headless dispatch — THE recipe" first. On top of it:
 - `--output-format json`, env hygiene (`GEMINI_API_KEY` / `GOOGLE_API_KEY` cleared — the
   subscription-only constraint), `AGY_CLI_DISABLE_AUTO_UPDATE=true`, fresh conversation, never
   `--continue`.
-- **Before you dispatch:** read `C:\Users\YESSIR\.claude\docs\capacity-state.json` and do not
+- **Before you dispatch:** read `$HOME\.claude\docs\capacity-state.json` and do not
   run a slug whose bucket is `exhausted` with `resetsAt` not yet passed. Never work around
   exhaustion with an API key or usage credits. **CAPACITY PRE-FLIGHT — a uniform written step,
   not advice (2026-08-30, W4):** before the vendor call, open that file and find the TARGET

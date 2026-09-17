@@ -2,6 +2,8 @@
 name: magi
 description: MAGI in Cursor. Use when the user says magi or /magi. Grok routes Claude+Codex+Gemini. Not CONCLAVE.
 ---
+> **Legacy host mode (2026-09-16):** `/magi` Cursor Task mode predates the macOS runtime. The product is `/magi-cli` (`.cursor/skills/magi-cli`, `commands/magi-cli.md`). Cursor Task electors are not MAGI seats.
+
 
 # MAGI in Cursor
 
@@ -46,19 +48,19 @@ Everything below applies only to an explicitly selected `hostMode: cursor` run. 
 
 Read these files in order:
 
-1. `C:\Users\YESSIR\.claude\skills\engineering-orchestrator\SKILL.md`
-2. `C:\Users\YESSIR\.claude\skills\graph-engineering\SKILL.md`
-3. `C:\Users\YESSIR\.claude\skills\loop-engineering\SKILL.md`
-4. `C:\Users\YESSIR\.claude\skills\harness-engineering\SKILL.md`
-5. `C:\Users\YESSIR\.claude\skills\evaluation-engineering\SKILL.md`
-6. `C:\Users\YESSIR\.claude\skills\context-engineering\SKILL.md`
-7. `C:\Users\YESSIR\.claude\skills\magi-mode\SKILL.md`
-8. `C:\Users\YESSIR\.claude\skills\magi-dispatch\SKILL.md`
-9. `C:\Users\YESSIR\.claude\skills\mix-mode\SKILL.md`
-10. `C:\Users\YESSIR\.claude\skills\dispatch-efficiency\SKILL.md`
-11. `C:\Users\YESSIR\.claude\skills\task-retrospective\SKILL.md`
-12. `C:\Users\YESSIR\.claude\skills\codex-bridge\SKILL.md` when dispatching Codex
-13. `C:\Users\YESSIR\.claude\skills\gemini-bridge\SKILL.md` when dispatching Gemini
+1. `$HOME\.claude\skills\engineering-orchestrator\SKILL.md`
+2. `$HOME\.claude\skills\graph-engineering\SKILL.md`
+3. `$HOME\.claude\skills\loop-engineering\SKILL.md`
+4. `$HOME\.claude\skills\harness-engineering\SKILL.md`
+5. `$HOME\.claude\skills\evaluation-engineering\SKILL.md`
+6. `$HOME\.claude\skills\context-engineering\SKILL.md`
+7. `$HOME\.claude\skills\magi-mode\SKILL.md`
+8. `$HOME\.claude\skills\magi-dispatch\SKILL.md`
+9. `$HOME\.claude\skills\mix-mode\SKILL.md`
+10. `$HOME\.claude\skills\dispatch-efficiency\SKILL.md`
+11. `$HOME\.claude\skills\task-retrospective\SKILL.md`
+12. `$HOME\.claude\skills\codex-bridge\SKILL.md` when dispatching Codex
+13. `$HOME\.claude\skills\gemini-bridge\SKILL.md` when dispatching Gemini
 
 If the native host check trips into `cursor-cli`, stop using this native branch and follow the CLI procedure above. Do not carry the full native skill stack into CLI leaves.
 
@@ -71,7 +73,7 @@ If the native host check trips into `cursor-cli`, stop using this native branch 
   CLI wrapper in this mode.
 - Any implement/review/vote by the arbiter is FAILED activation in native Cursor mode too.
 - Before each Cursor elector Task, and after a Task fails with usage or quota
-  language, run `node C:\src\magi\tools\host-resolver.js`. If it trips, send
+  language, run `node $HOME/src/magi\tools\host-resolver.js`. If it trips, send
   remaining seats through the CLI branch above and validate a complete sealed CLI plan before launch; do not persist a global mode.
 
 ### Native three-vendor implement split
@@ -95,14 +97,14 @@ Project slice lists do NOT assign vendors. Ignore any `implement`/`verify` vendo
 
 Each implementer must paste WRITE AUDIT (`git diff --stat` + `git status --porcelain`).
 
-After implement rows, write `magi-dispatch-log.jsonl` `{vendor, role:"implement"}` (gitignored) and run `node C:\src\magi\tools\activation-check.js <log path>`. Exit 1 = FAILED activation. Do not use `dispatch-log.pass.jsonl` as a live log.
+After implement rows, write `magi-dispatch-log.jsonl` `{vendor, role:"implement"}` (gitignored) and run `node $HOME/src/magi\tools\activation-check.js <log path>`. Exit 1 = FAILED activation. Do not use `dispatch-log.pass.jsonl` as a live log.
 
-Log path: product-repo runs write `C:\src\magi\projects\<slug>\magi-dispatch-log.jsonl`, never a log inside the product repo; MAGI-kit work uses `C:\src\magi\magi-dispatch-log.jsonl`. See `C:\src\magi\projects\README.md`.
+Log path: product-repo runs write `$HOME/src/magi\projects\<slug>\magi-dispatch-log.jsonl`, never a log inside the product repo; MAGI-kit work uses `$HOME/src/magi\magi-dispatch-log.jsonl`. See `$HOME/src/magi\projects\README.md`.
 
 ### Native workflow execution
 
 - Do not run `magi-battery.js` or `mix-run.js` under plain node.
-- Parse check only: `node C:\Users\YESSIR\.claude\workflows\checks\magi-workflow-cli.mjs`
+- Parse check only: `node $HOME\.claude\workflows\checks\magi-workflow-cli.mjs`
 
 ### Native packs (efficiency, not routers)
 
@@ -119,7 +121,7 @@ See `~\.cursor\rules\cursor-packs.mdc`.
 
 ### Native POSITION tally
 
-Tally native panel POSITION with `node C:\src\magi\tools\position-tally.js`. Do not hand-count. Passage is `>=2 APPROVE` among eligible electors; `ABSTAIN` never toward passage; counted eligible ballots below 2 is `NOT_PANEL` (`degraded=true`, `quorumFloor`); else `DEADLOCK`. Gate roles (implementer / reviewer / verifier) are advisory. This native tally procedure does not apply to CLI runs.
+Tally native panel POSITION with `node $HOME/src/magi\tools\position-tally.js`. Do not hand-count. Passage is `>=2 APPROVE` among eligible electors; `ABSTAIN` never toward passage; counted eligible ballots below 2 is `NOT_PANEL` (`degraded=true`, `quorumFloor`); else `DEADLOCK`. Gate roles (implementer / reviewer / verifier) are advisory. This native tally procedure does not apply to CLI runs.
 
 ### Native briefs
 

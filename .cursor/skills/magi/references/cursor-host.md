@@ -24,7 +24,7 @@ directory or the repo — never into the Task `prompt`. The Task `prompt` carrie
 only the pointer sentence built by `tools/task-delivery.js`:
 
 ```bash
-node -e "console.log(require('C:/src/magi/tools/task-delivery.js').buildTaskPrompt(process.argv[1]).prompt)" "<brief path>"
+node -e "console.log(require('$HOME/src/magi/tools/task-delivery.js').buildTaskPrompt(process.argv[1]).prompt)" "<brief path>"
 ```
 
 `buildTaskPrompt` refuses a missing brief file and an empty (0-byte) brief.
@@ -40,13 +40,13 @@ window.
 Before each Cursor Task to an elector slug, run:
 
 ```bash
-node C:\src\magi\tools\host-resolver.js
+node $HOME/src/magi\tools\host-resolver.js
 ```
 
 Run it again when a Task fails with usage or quota language:
 
 ```bash
-node C:\src\magi\tools\host-resolver.js --from cursor --error-text "<exact error>"
+node $HOME/src/magi\tools\host-resolver.js --from cursor --error-text "<exact error>"
 ```
 
 If the resolver
@@ -62,7 +62,7 @@ contested; do not convene a vote-everything panel.
 
 ## Lead-written telemetry
 
-The arbiter writes one JSONL row per dispatched seat. When the project has its own `telemetry` directory, the arbiter passes `--log <project>\telemetry\dispatches.jsonl`; otherwise it uses the tool's default, `C:\src\magi\telemetry\dispatches.jsonl` (the tool does not pick a project path by itself). Each row carries at least:
+The arbiter writes one JSONL row per dispatched seat. When the project has its own `telemetry` directory, the arbiter passes `--log <project>\telemetry\dispatches.jsonl`; otherwise it uses the tool's default, `$HOME/src/magi\telemetry\dispatches.jsonl` (the tool does not pick a project path by itself). Each row carries at least:
 
 ```json
 { "vendor": "anthropic|openai|google", "role": "implement|verify|review", "hostMode": "cursor", "routedBy": "arbiter" }
@@ -71,9 +71,9 @@ The arbiter writes one JSONL row per dispatched seat. When the project has its o
 Write and read rows mechanically, never by hand-editing the log:
 
 ```bash
-node C:\src\magi\tools\telemetry-append.js --row '<json>'
-node C:\src\magi\tools\telemetry-stats.js
-node C:\src\magi\tools\validate-telemetry.js --log <path>
+node $HOME/src/magi\tools\telemetry-append.js --row '<json>'
+node $HOME/src/magi\tools\telemetry-stats.js
+node $HOME/src/magi\tools\validate-telemetry.js --log <path>
 ```
 
 The formal row schema is `telemetry/schema.json`. `validate-telemetry.js` checks that schema. `--adapt` wraps a valid Magi row for unified ingest; it does not invent a join key toward Conclave hook rows. See `telemetry/README.md`.
@@ -81,7 +81,7 @@ The formal row schema is `telemetry/schema.json`. `validate-telemetry.js` checks
 `hostMode` and `routedBy` are required; `telemetry-append.js` rejects a row
 without them. Token fields (`vendorSideTokens`, `totalTokens`) are a positive
 number or `null` — missing telemetry stays absent or `null`, never `0`, and a
-`0` is rejected. The default file is `C:\src\magi\telemetry\dispatches.jsonl`
+`0` is rejected. The default file is `$HOME/src/magi\telemetry\dispatches.jsonl`
 (gitignored; never commit rows); pass `--log <path>` to append to a
 project-local `telemetry/dispatches.jsonl` instead. Only the lead writes
 telemetry; do not let a seat write its own row. No hook captures dispatches in
@@ -93,10 +93,10 @@ same turn as the dispatch.
 After implement dispatches, the lead writes one JSONL row per implement unit `{vendor, role:"implement"}` to `magi-dispatch-log.jsonl` (gitignored; do not commit secrets). Then run the activation check:
 
 ```bash
-node C:\src\magi\tools\activation-check.js <log path>
+node $HOME/src/magi\tools\activation-check.js <log path>
 ```
 
-Log path: product-repo runs write `C:\src\magi\projects\<slug>\magi-dispatch-log.jsonl`, never a log inside the product repo; MAGI-kit work uses `C:\src\magi\magi-dispatch-log.jsonl`. See `C:\src\magi\projects\README.md`.
+Log path: product-repo runs write `$HOME/src/magi\projects\<slug>\magi-dispatch-log.jsonl`, never a log inside the product repo; MAGI-kit work uses `$HOME/src/magi\magi-dispatch-log.jsonl`. See `$HOME/src/magi\projects\README.md`.
 
 `activation-check.js` rejects checked-in fixtures, then calls `hog-check.js` to enforce the 60% vendor floor. Exit 0 = `FLOOR HOLDS`; exit 1 = `FAILED activation`.
 
@@ -105,7 +105,7 @@ Log path: product-repo runs write `C:\src\magi\projects\<slug>\magi-dispatch-log
 After the panel returns POSITION ballots, tally them with the shared passage tool. Do not hand-count. Gate-role reviews (implementer / reviewer / verifier) stay advisory.
 
 ```bash
-node C:\src\magi\tools\position-tally.js --ballots '<json>' --json
+node $HOME/src/magi\tools\position-tally.js --ballots '<json>' --json
 ```
 
 Passage is `>=2 APPROVE` among eligible electors; `ABSTAIN` never toward passage. Counted eligible ballots below 2 is `NOT_PANEL` (`degraded=true`, `reason=quorumFloor`) — fail closed, shared with CONCLAVE. Else `DEADLOCK`. `--author-vendor` recuses the implement author. `--degraded` is the cursor-cli Claude fail path only. Idle Casper is `FAILED activation`, not a duo. See README.md for the CONCLAVE alignment note.
@@ -116,5 +116,5 @@ Cursor Task seats run `check-compiler-errors` and `deslop` when they edited code
 
 ## Agent discovery
 
-- Claude Code reaches the MAGI seats via wrappers already in `C:\Users\YESSIR\.claude\agents\`.
-- Cursor Task uses `implementer`, `reviewer`, and `verifier` from the MAGI plugin `agents/` directory when enabled (copied to `C:\Users\YESSIR\.cursor\plugins\local\magi\agents`). Keep all plugin agents; the CLI wrapper agents still serve other host modes.
+- Claude Code reaches the MAGI seats via wrappers already in `$HOME\.claude\agents\`.
+- Cursor Task uses `implementer`, `reviewer`, and `verifier` from the MAGI plugin `agents/` directory when enabled (copied to `$HOME\.cursor\plugins\local\magi\agents`). Keep all plugin agents; the CLI wrapper agents still serve other host modes.
