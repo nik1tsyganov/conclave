@@ -9,9 +9,12 @@
 // the replies add up to. JSON in on stdin or a file, JSON out on stdout, exit 0 on an answer
 // and 2 on a bad request. No filesystem, no network, no clock.
 //
-//   conclave-panel read   --input reply.txt      # the position and evidence in a reply
-//   conclave-panel judge  --input evidence.txt   # whether a line is a reason or agreement
-//   conclave-panel tally  --input panel.json     # the verdict
+//   conclave-panel block     --input reply.txt   # the units a lead's reply asks for
+//   conclave-panel route     --input plan.json   # who builds each unit and who checks it
+//   conclave-panel readiness --input seats.json  # whether this panel can run here
+//   conclave-panel read      --input reply.txt   # the position and evidence in a reply
+//   conclave-panel judge     --input evidence.txt# whether a line is a reason or agreement
+//   conclave-panel tally     --input panel.json  # the verdict
 //
 // `tally` takes { receipts: [...], critical?: bool, checkPassed?: bool|null }. A receipt is
 // { slot, vendor, role, position, evidence, status, sessionId, tokens, modelObserved,
@@ -19,8 +22,10 @@
 
 const fs = require('node:fs');
 const rules = require('./panel-rules.js');
+const routing = require('./panel-routing.js');
+const blocks = require('./panel-block.js');
 
-const COMMANDS = ['read', 'judge', 'tally'];
+const COMMANDS = ['read', 'judge', 'tally', 'route', 'block', 'readiness'];
 
 function fail(message, code = 2) {
   process.stderr.write(`${message}\n`);
@@ -76,11 +81,38 @@ function main(argv = process.argv.slice(2)) {
     return 0;
   }
 
+  if (command === 'block') {
+    // The reply as it came back from the lead, not JSON: a block is a fence in prose.
+    const units = blocks.units(text);
+    process.stdout.write(`${JSON.stringify({ hasBlock: blocks.hasBlock(text), units, without: blocks.without(text) })}\n`);
+    return 0;
+  }
+
   let request;
   try {
     request = JSON.parse(text);
   } catch (error) {
     fail(`invalid JSON: ${error.message}`);
+  }
+
+  if (command === 'readiness') {
+    process.stdout.write(`${JSON.stringify(routing.readiness(request.seats, request.readyVendors))}\n`);
+    return 0;
+  }
+
+  if (command === 'route') {
+    if (!Array.isArray(request.units)) fail('route needs { "units": [ ... ] }');
+    try {
+      process.stdout.write(`${JSON.stringify(routing.route({
+        units: request.units,
+        seats: request.seats,
+        readyVendors: request.readyVendors,
+        criticalTwoReviews: request.criticalTwoReviews !== false,
+      }))}\n`);
+    } catch (error) {
+      fail(`cannot route these units: ${error.message}`);
+    }
+    return 0;
   }
   if (!request || typeof request !== 'object' || !Array.isArray(request.receipts)) {
     fail('tally needs { "receipts": [ ... ] }');

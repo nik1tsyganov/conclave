@@ -57,7 +57,7 @@ test('an unknown protocol version is answered with one this server speaks', () =
 test('the tool list is every tool, and each one says what it costs', () => {
   const list = last([HELLO, READY, { jsonrpc: '2.0', id: 2, method: 'tools/list' }]);
   const names = list.result.tools.map((tool) => tool.name).sort();
-  assert.deepEqual(names, ['conclave_attest', 'conclave_drive', 'conclave_hosts', 'conclave_read_reply', 'conclave_run_report', 'conclave_seal', 'conclave_tally', 'conclave_validate_row']);
+  assert.deepEqual(names, ['conclave_attest', 'conclave_drive', 'conclave_hosts', 'conclave_read_block', 'conclave_read_reply', 'conclave_route', 'conclave_run_report', 'conclave_seal', 'conclave_tally', 'conclave_validate_row']);
   const drive = list.result.tools.find((tool) => tool.name === 'conclave_drive');
   assert.match(drive.description, /SPENDS SUBSCRIPTION CAPACITY/);
   for (const tool of list.result.tools) {
@@ -126,6 +126,27 @@ test('a reply is read for its one position and its last evidence', () => {
   assert.equal(body.evidence, 'looks good');
   assert.equal(body.judged.independent, false, 'and the host is told the reason is bare');
   assert.equal(JSON.parse(ask('conclave_read_reply', { reply: 'POSITION: APPROVE\nPOSITION: REJECT' }).result.content[0].text).position, null);
+});
+
+test('routing and block reading are served whole, so a host reimplements neither', () => {
+  const routed = JSON.parse(ask('conclave_route', {
+    units: [{ id: 'C1', brief: 'b', class: 'security-sensitive', files: ['a.py'] }],
+    readyVendors: ['openai', 'anthropic', 'google'],
+  }).result.content[0].text);
+  assert.equal(routed.units[0].builder, 'scrutator');
+  assert.equal(routed.units[0].checkers.length, 3, 'a security unit is read a third time');
+  assert.equal(routed.readiness.crossVendor, true);
+
+  const short = JSON.parse(ask('conclave_route', { units: [{ id: 'U1', brief: 'b' }], readyVendors: ['openai'] }).result.content[0].text);
+  assert.equal(short.units.length, 0, 'a panel that cannot run routes nothing');
+  assert.match(short.dropped[0].reason, /all three seats ready/);
+
+  const read = JSON.parse(ask('conclave_read_block', {
+    reply: 'Here.\n\n```conclave\n[{"unit":"U1","brief":"1. Add it."}]\n```',
+  }).result.content[0].text);
+  assert.equal(read.hasBlock, true);
+  assert.equal(read.units[0].id, 'U1');
+  assert.equal(read.without, 'Here.', 'the block leaves the reply');
 });
 
 test('a call that would spend capacity is refused unless the caller says so', () => {

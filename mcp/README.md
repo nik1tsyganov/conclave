@@ -27,6 +27,18 @@ Droppy Code solved the same problem a different way: it makes each seat a chat a
 back as a message when the panel is done. It could, because it owns its own window. A server
 that is called through a pipe cannot, so it hands back a run id instead.
 
+## The rules, for a host with its own interface
+
+Four calls, all pure and all free. A host that draws its own panel needs these and does not
+need the rest: `conclave_read_block` for the units a lead asked for, `conclave_route` for who
+builds each one and who checks it, `conclave_read_reply` for what a seat said, and
+`conclave_tally` for what the replies add up to.
+
+What stays with the host is what only it can do: the window, the chats, the provider sessions,
+the worktree, the patch. What comes here is the judgement, so it exists once rather than once
+per host. `tools/conclave-panel.js` is the same four over stdin and stdout, for a host that
+would rather spawn a process than speak MCP.
+
 ## The tools that cost nothing
 
 `conclave_hosts`, `conclave_validate_row` and `conclave_tally` are pure and offline. The second is how a

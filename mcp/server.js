@@ -37,6 +37,8 @@ const { CLI_HOST_MODES, HOST_MODES, ROLES, VENDORS, validateDispatchRow } = requ
 // The panel's own rules, not the older elector count in `position-tally.js`: that one answers
 // a different question, about a bench of vendors rather than one unit's three seats.
 const panelRules = require(path.join(TOOLS_DIR, 'panel-rules.js'));
+const panelRouting = require(path.join(TOOLS_DIR, 'panel-routing.js'));
+const panelBlock = require(path.join(TOOLS_DIR, 'panel-block.js'));
 
 const SERVER_NAME = 'conclave-mcp';
 const SERVER_VERSION = '0.1.0';
@@ -175,6 +177,38 @@ const TOOLS = [
     },
   },
   {
+    name: 'conclave_route',
+    title: 'Decide who builds each unit and who checks it',
+    description:
+      'Routes a block\'s units across three seats: the class decides which vendor should build, a running count keeps one seat from authoring the whole block, ' +
+      'two units may not claim the same file, and a security-sensitive unit is read a third time by the seat that verified it. ' +
+      'Also says whether the panel can run here at all. Offline, deterministic, spends nothing.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        units: { type: 'array', description: 'The units to route, each with id, brief and optionally files and class.', items: { type: 'object' } },
+        seats: { type: 'array', description: 'The three seats: slot, vendor and name. Omit for the default arrangement.', items: { type: 'object' } },
+        readyVendors: { type: 'array', description: 'The vendors set up on this machine.', items: { type: 'string' } },
+        criticalTwoReviews: { type: 'boolean', description: 'Whether a security unit gets its second review. Default true.' },
+      },
+      required: ['units', 'readyVendors'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'conclave_read_block',
+    title: 'Read the units a lead asked for',
+    description:
+      'Finds the fenced block at the end of a lead\'s reply and reads its units, taking field names loosely so a synonym does not cost a round. ' +
+      'Returns the reply with the block taken out, which is what the reader should see. An empty block asks for nothing and is not the same answer as one that cannot be read. Offline, spends nothing.',
+    inputSchema: {
+      type: 'object',
+      properties: { reply: { type: 'string', description: 'The lead\'s reply, as it came back.' } },
+      required: ['reply'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'conclave_read_reply',
     title: 'Read a position and its evidence out of a seat reply',
     description:
@@ -299,6 +333,26 @@ async function callTool(name, rawArgs) {
       } catch (error) {
         return text({ ok: false, reason: error.message });
       }
+    }
+
+    case 'conclave_route': {
+      if (!Array.isArray(args.units)) fail('"units" must be an array.');
+      if (!Array.isArray(args.readyVendors)) fail('"readyVendors" must be an array.');
+      try {
+        return text(panelRouting.route({
+          units: args.units,
+          seats: args.seats,
+          readyVendors: args.readyVendors,
+          criticalTwoReviews: args.criticalTwoReviews !== false,
+        }));
+      } catch (error) {
+        return text({ ok: false, reason: error.message });
+      }
+    }
+
+    case 'conclave_read_block': {
+      const reply = requireString(args.reply, 'reply');
+      return text({ hasBlock: panelBlock.hasBlock(reply), units: panelBlock.units(reply), without: panelBlock.without(reply) });
     }
 
     case 'conclave_read_reply': {
