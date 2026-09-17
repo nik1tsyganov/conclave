@@ -18,6 +18,8 @@ const CLI_RUNTIME_TOOLS = Object.freeze([
   'instruction-read-evidence.js', 'evidence-read-access.js',
   'magi-vault.js', 'magi-vault-link.js', 'magi-vault-sync.js', 'magi-vault-analyze.js', 'magi-skill-web.js',
   'dispatch-log.pass.jsonl', 'dispatch-log.fail.jsonl',
+  // Added 2026-09-16 (macOS): Jev arbiter, run driver, dashboard, retry, telemetry rows.
+  'jev-client.js', 'jev-arbiter.js', 'jev-check.js', 'jev-plan-classify.js', 'panel-tally-jev.js', 'run-drive.js', 'launch-retry.js', 'ledger-row.js', 'magi-dashboard.js', 'dashboard.html', 'dashboard.css', 'dashboard.js',
 ]);
 
 function runtimeError(message) {

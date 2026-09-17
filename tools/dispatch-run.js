@@ -460,6 +460,9 @@ async function runDispatch(opts, dependencies = {}) {
   if (evidenceReadDirs.length) atomicJson(path.join(evidenceDir, 'evidence-reads-before.json'), evidenceReadsBefore);
   const result = await (dependencies.runLaunch || runLaunch)(launch, { pidFile, stdoutFile: stdoutPath, stderrFile: stderrPath, maxWallMs, signal: dependencies.signal });
   childResult = result;
+  // Child exit record for observers (dashboard) and post-mortems; never proof by itself.
+  atomicJson(path.join(evidenceDir, 'process-result.json'), { ok: result.ok === true, exitCode: result.exitCode ?? null, exitConfirmed: result.exitConfirmed === true, killed: result.killed === true, killReason: result.killReason || null,
+    pid: result.pid ?? null, startedAt: transaction.state.startedAt, completedAt: new Date().toISOString(), ...(result.lifetime && typeof result.lifetime === 'object' ? { lifetime: result.lifetime } : {}) });
   for (const file of [telemetryLog, activationLog, capturePath, path.join(evidenceDir, 'vendor.log'), transaction.file, path.join(runDir, '.magi-sessions'), ...(launch.nativeLogPath ? [launch.nativeLogPath] : [])]) assertPlainPath(file);
   const after = snapshotWorkspace(cwd);
   atomicJson(path.join(evidenceDir, 'workspace-after.json'), after);
@@ -546,6 +549,7 @@ async function runDispatch(opts, dependencies = {}) {
     model: opts.model, modelRequested: opts.model, modelObserved: proof.modelObserved, effort: opts.effort, proofId, vendorSideTokens: proof.vendorSideTokens ?? null,
     authorVendor: opts.authorVendor || null, planId: opts.planId, planHash: opts.planHash, escalation: opts.escalation === true, escalationReason: opts.escalationReason || null,
     transactionPath: transaction.file,
+    startedAt: transaction.state.startedAt, completedAt: now.toISOString(), durationMs: Math.max(0, now.getTime() - Date.parse(transaction.state.startedAt)),
     note: `evidence=${evidenceDir};matrix=v${matrix.schemaVersion};seat-profile=v${seatProfiles.schemaVersion}`,
   }, { requireCursorCli: true, requireArbiter: true, requireDispatchId: true, requireUnitId: true, requireProof: true });
 

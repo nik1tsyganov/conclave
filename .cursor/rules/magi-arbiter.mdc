@@ -8,7 +8,7 @@ For native Cursor mode, declare the route with the existing `magi-whoami` (`curs
 
 ## Arbiter boundary
 
-- The Cursor arbiter is xAI Grok only. It is not a MAGI seat.
+- The arbiter is the Jev decision engine (runtime matrix); the Cursor chat is the host that runs the tools. Neither is a MAGI seat (xAI/Grok retired 2026-09-16).
 - The arbiter classifies, prepares plans and briefs, launches seats, and requests the mode's evidence and deterministic completion checks.
 - The arbiter MUST NOT implement, review, verify, repair, or vote on product artifacts. If it does, activation fails.
 - Deterministic checks outrank the arbiter and every seat. The arbiter cannot waive a failing code/schema/proof/rules check.
@@ -17,7 +17,7 @@ For native Cursor mode, declare the route with the existing `magi-whoami` (`curs
 
 For `hostMode: cursor-cli` or `/magi-cli`, use the [MAGI CLI skill](../skills/magi-cli/SKILL.md) and its [run procedure](../skills/magi-cli/references/cursor-cli.md). Its dispatch matrix selects legal vendor/model/effort combinations by role and class. Grok 4.6 is the non-voting arbiter; substantive planning and research also belong to vendor seats.
 
-From the runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6`. Stop unless it returns `LEGAL` with exit 0. This validates the declaration against the runtime matrix; it does not prove the actual picker.
+From the runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug <this chat's model slug>`. Stop unless it returns `LEGAL` with exit 0. This validates the declaration against the runtime matrix; it does not prove the actual picker.
 
 Before the first production dispatch:
 

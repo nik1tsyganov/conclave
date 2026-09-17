@@ -74,3 +74,31 @@ test('ballots cannot be supplied by the arbiter or inferred from prose', async (
   assert.equal(finalizeRun(run.runDir).approvalStatus, 'FAIL');
   assert.throws(() => tallyUnit(inspectRun(run.runDir), 'u1'), /exactly one POSITION/);
 });
+
+test('finalize writes one completion row per unit and one per run, with tokens, durations, panel and Jev fields', async t => {
+  const { createSealedRun, fakeVendor, completeSyntheticDispatch } = require('./test-fixtures.js');
+  const run = createSealedRun(t, [
+    { unitId: 'u1', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium', role: 'implement', class: 'standard-feature' },
+    { unitId: 'u1', vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', role: 'verify', class: 'standard-feature', authorVendor: 'openai' },
+    { unitId: 'u1', vendor: 'anthropic', model: 'opus', effort: 'high', role: 'review', class: 'review-adversarial', authorVendor: 'openai' },
+  ]);
+  const native = fakeVendor();
+  for (const entry of run.dispatches) await completeSyntheticDispatch({ ...run.opts, dispatchId: entry.dispatchId }, native);
+  fs.writeFileSync(path.join(run.runDir, 'jev-tally-u1.json'), JSON.stringify({ verdict: 'PASSAGE', counts: { APPROVE: 2, REJECT: 0, ABSTAIN: 0 }, jev: { score: 1.9, confidence: 0.8 }, flags: [] }));
+  const result = finalizeRun(run.runDir);
+  assert.equal(result.ok, true);
+  assert.equal(result.unitRows.length, 1);
+  const unit = result.unitRows[0];
+  assert.deepEqual([unit.kind, unit.unitId, unit.approval, unit.authorVendor, unit.dispatches.length], ['unit', 'u1', 'PASS', 'openai', 3]);
+  assert.equal(unit.key, `${result.planHash}:u1`);
+  assert.ok(unit.dispatches.every((d) => d.status === 'PASS' && typeof d.durationMs === 'number'));
+  assert.deepEqual(unit.dispatches.filter((d) => d.role !== 'implement').map((d) => d.position), ['APPROVE', 'APPROVE']);
+  assert.equal(unit.jev.verdict, 'PASSAGE');
+  assert.ok(typeof unit.tokensTotal === 'number' && unit.tokensTotal > 0, 'tokens summed from proof');
+  const runRow = result.runRow;
+  assert.deepEqual([runRow.kind, runRow.key, runRow.dispatches, runRow.pass, runRow.fail, runRow.executionStatus, runRow.approvalStatus], ['run', result.planHash, 3, 3, 0, 'PASS', 'PASS']);
+  assert.ok(typeof runRow.wallMs === 'number');
+  const units = fs.readFileSync(path.join(run.runDir, 'units.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.equal(units[0].key, unit.key);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(run.runDir, 'run-row.json'), 'utf8')).key, runRow.key);
+});

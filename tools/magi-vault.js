@@ -53,6 +53,8 @@ function vaultLayout(root) {
     root,
     home,
     telemetryLog: path.join(home, 'telemetry', 'dispatches.jsonl'),
+    unitsLog: path.join(home, 'telemetry', 'units.jsonl'),
+    runsLog: path.join(home, 'telemetry', 'runs.jsonl'),
     analysisDir: path.join(home, 'analysis'),
     analysisLatestJson: path.join(home, 'analysis', 'latest.json'),
     analysisLatestMd: path.join(home, 'analysis', 'latest.md'),

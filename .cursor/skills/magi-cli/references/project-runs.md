@@ -4,7 +4,7 @@ Use this guide for a small, useful change in an existing project. Keep each atte
 
 ## Start in Cursor
 
-1. Open the intended project. Use Agent mode. Select Grok 4.6 explicitly; disable automatic model selection.
+1. Open the intended project. Use Agent mode. Select the hosting model explicitly; disable automatic model selection.
 2. Reload Cursor after a MAGI runtime update. The host declaration checker does not attest the actual picker model.
 3. Paste the prompt below. Replace the two bracketed fields. If `/magi-cli` is unavailable, attach the installed `commands/magi-cli.md` and this file to the same prompt.
 
@@ -15,7 +15,7 @@ Read and follow the installed MAGI CLI references/project-runs.md handoff.
 Project: [absolute project directory]
 Outcome: [one useful change, with a concrete example of the expected behavior]
 
-Act as the non-voting Grok arbiter. Classify, prepare briefs, seal a complete
+Act as the non-voting host; the Jev decision engine is the arbiter. Classify, prepare briefs, seal a complete
 plan, launch native vendor seats through dispatch-run.js, and collect evidence.
 Leave substantive implementation, diagnosis, repair, verification, and review
 to the assigned native vendor seats. Do not use Cursor Task agents as vendors.
@@ -58,13 +58,13 @@ Do not commit, publish, or merge the product change as part of this trial.
 
 On YESSIR's machine, the installed runtime is:
 
-```powershell
+```bash
 $magiRuntime = Join-Path $env:USERPROFILE '.cursor/plugins/local/magi-cursor-cli'
 $magiRules = Join-Path $env:USERPROFILE '.cursor/magi-rules/v2'
 $env:MAGI_RULES_ROOT = $magiRules
-$env:MAGI_VAULT_ROOT = 'C:\src\ai-ops-vault'
+export MAGI_VAULT_ROOT="$HOME/src/ai-ops-vault"
 Set-Location -LiteralPath $magiRuntime
-node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6
+node tools/magi-whoami.js --mode <cursor-cli|synara|claude-code> --slug <this session's model slug>
 # Synara-hosted arbiter: also LEGAL with --mode synara
 node tools/magi-cli-preflight.js --rules-root $magiRules
 ```
@@ -129,7 +129,7 @@ Claude returns an `AWAITING_ATTESTATION` checkpoint after the native call and de
 
 On a successful attempt, run these tools in order, using the same sealed run directory:
 
-```powershell
+```bash
 node tools/run-finalize.js --run-dir $magiRun
 node tools/magi-vault-analyze.js
 node tools/activation-check.js --run-dir $magiRun
@@ -144,13 +144,13 @@ Capture command arguments, exit code, stdout, and stderr for each gate in the ex
 
 After success, export a report to a new external directory:
 
-```powershell
+```bash
 node tools/project-run-report.js --run-dir $magiRun --project-root $magiProject --output-dir $magiIssueDir --phase finalize
 ```
 
 After failure, include the captured failing command output:
 
-```powershell
+```bash
 node tools/project-run-report.js --run-dir $magiRun --project-root $magiProject --output-dir $magiIssueDir --phase dispatch --error-file $magiFailureLog
 ```
 
@@ -185,7 +185,7 @@ Give the next repair session the report directory and original run directory. Re
 
 ## Synara as the outer harness
 
-When this Grok arbiter is hosted in Synara, use `hostMode: synara` and snapshot `synara_capabilities` with `synara-catalog.js` before sealing. Map MAGI vendor names to Synara providers only for catalog checks (`openai`/`codex`, `anthropic`/`claudeAgent`, `google`/`antigravity`). Launch remains `dispatch-run.js`.
+When the host is Synara, use `hostMode: synara` and snapshot `synara_capabilities` with `synara-catalog.js` before sealing. Map MAGI vendor names to Synara providers only for catalog checks (`openai`/`codex`, `anthropic`/`claudeAgent`, `google`/`antigravity`). Launch remains `dispatch-run.js`.
 
 Use Synara worktrees as an implement `cwd` when the worktree is already inside MAGI allowed roots. Bind that path with `host-helper-worktree.js` before sealing. Use `browser_*` only as a host helper after MAGI implement; stage those files with `host-helper-evidence.js` and list the destination on verify/review `evidenceReadDirs`. Never tally a Synara-thread helper as a MAGI `POSITION`. `synara_wait_for_threads` does not join `dispatch-run` PIDs. Record a `join-manifest.json` with `magi-synara-watch.js --record-join`, then `--wait` on the sealed run directory. The same watch scan reports leftover `RUNNING` children and synara-capture `ask` revert without rewriting receipts.
 

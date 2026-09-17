@@ -27,7 +27,7 @@
         <div class="hero-copy">
           <div class="eyebrow">MULTI-VENDOR · CODE-ENFORCED · FAIL-CLOSED</div>
           <h1 id="hero-title">MAGI<span>MULTI-AGENT GENERAL INTELLIGENCE</span></h1>
-          <p>Three AI vendors build, challenge, plan, research, and verify. A fourth-vendor arbiter routes the work. Sealed plans and native evidence hold the system to its rules.</p>
+          <p>Three AI vendors build, challenge, plan, research, and verify. A typed decision engine, Jev, proposes the route and the verdict; deterministic code gates every proposal. Sealed plans and native evidence hold the system to its rules.</p>
           <div class="actions">
             <a class="btn primary" href="#system">See the system</a>
             <a class="btn" href="https://github.com/nik1tsyganov/magi">Open repository</a>
@@ -35,7 +35,7 @@
         </div>
         <figure class="hero-art">
           <img src="magi-site-hero.jpg" width="1280" height="853" alt="MAGI concept artwork: Melchior, Balthasar, and Casper overlook a shared command room, with the five-stage workflow below." fetchpriority="high" decoding="async">
-          <figcaption><span>Three vendor seats. One non-voting arbiter.</span><a href="magi-site-hero.jpg">Full artwork</a><a href="magi-core.svg">System diagram</a></figcaption>
+          <figcaption><span>Three vendor seats. One decision engine. No arbiter vote.</span><a href="magi-site-hero.jpg">Full artwork</a><a href="magi-core.svg">System diagram</a></figcaption>
         </figure>
       </div>
     </section>
@@ -44,22 +44,22 @@
       <div class="wrap">
         <div class="kicker">The panel <span class="jp" lang="ja" aria-hidden="true">三者合議</span></div>
         <h2 id="system-title">Different vendors.<br>Different failure modes.</h2>
-        <p class="lead">Melchior, Balthasar, and Casper are vendor-separated seats. Grok classifies work, dispatches seats, and collects evidence. It supplies no substantive seat result or vote.</p>
+        <p class="lead">Melchior, Balthasar, and Casper are vendor-separated seats. Jev classifies work and proposes seats and verdicts as probability distributions; the hosting session runs the tools and collects evidence. Neither supplies a seat result or a vote.</p>
         <div class="grid3">
           <article class="card blue">
             <div class="seat-label">MELCHIOR / OPENAI</div>
             <h3>Technical depth.</h3>
-            <p>Implementation, debugging, and adversarial review. The OpenAI ladder runs from Luna through Terra and Sol to Astra. Every Astra route needs a recorded escalation reason.</p>
+            <p>Implementation, verification, and adversarial review on GPT-5.6 Sol. GPT-6 Astra is the escalation tier: every Astra route needs a fresh probe and a recorded escalation reason.</p>
           </article>
           <article class="card amber">
             <div class="seat-label">BALTHASAR / ANTHROPIC</div>
             <h3>Judgment in context.</h3>
-            <p>Review, planning, safety, and long-running agentic implementation. Sonnet, Fable, and Opus are selected by role. Production proof requires native observed model and effort.</p>
+            <p>Long-running agentic implementation on Fable; review, planning, and security judgment on Opus. Production proof requires native observed model and effort, and the host attests each response.</p>
           </article>
           <article class="card green">
             <div class="seat-label">CASPER / GOOGLE</div>
             <h3>A wider field of view.</h3>
-            <p>Context, breadth, and synthesis from a third vendor. agy must prove its exact observed model slug, including the fused effort. A silent substitution fails the dispatch.</p>
+            <p>Implementation and verification on Gemini 3.8 Flash, review and research on Gemini 3.1 Pro. agy must prove its exact observed slug, including the fused effort, and a denied action fails the dispatch.</p>
           </article>
         </div>
       </div>
@@ -69,7 +69,7 @@
       <div class="wrap">
         <div class="kicker">Routing <span class="jp" lang="ja" aria-hidden="true">経路選択</span></div>
         <h2 id="matrix-title">The dispatch matrix<br>is executable policy.</h2>
-        <p class="lead">Grok proposes a route. The validator checks the complete plan: task class, role, vendor, model, effort, scope, author provenance, escalation, and fresh availability evidence.</p>
+        <p class="lead">Jev proposes the class and the route, recorded with the seal. The validator checks the complete plan: task class, role, vendor, model, effort, scope, author provenance, escalation, and fresh availability evidence.</p>
         <p class="scroll-hint" id="matrix-scroll-hint">On narrow screens, scroll the table sideways. Keyboard users can focus it and use the arrow keys.</p>
         <div class="table-scroll" role="region" aria-labelledby="matrix-caption" aria-describedby="matrix-scroll-hint" tabindex="0">
           <table class="matrix">
@@ -77,8 +77,8 @@
             <thead><tr><th scope="col">Task class</th><th scope="col">Primary route</th><th scope="col">Alternates / escalation</th></tr></thead>
             <tbody>
               <tr><th scope="row">Architecture / planning</th><td>Claude Opus · high</td><td>GPT-5.6 Sol · Gemini Pro · Astra escalation</td></tr>
-              <tr><th scope="row">Standard feature</th><td>GPT-5.6 Terra · medium</td><td>Claude Sonnet · Gemini Flash</td></tr>
-              <tr><th scope="row">Bulk / mechanical</th><td>GPT-5.6 Luna · medium</td><td>Gemini Flash · Claude Sonnet</td></tr>
+              <tr><th scope="row">Standard feature</th><td>GPT-5.6 Sol · medium</td><td>Claude Fable · Gemini Flash</td></tr>
+              <tr><th scope="row">Bulk / mechanical</th><td>Gemini Flash · fused-low</td><td>GPT-5.6 Sol · Claude Fable</td></tr>
               <tr><th scope="row">Difficult debugging</th><td>Claude Fable · xhigh</td><td>GPT-5.6 Sol · Gemini Pro · Astra escalation</td></tr>
               <tr><th scope="row">Long-running agentic work</th><td>Claude Fable · xhigh</td><td>Astra escalation · Gemini Flash · GPT-5.6 Sol</td></tr>
               <tr><th scope="row">Long-context analysis / research</th><td>Gemini Pro · fused-high</td><td>Astra escalation · Claude Fable · GPT-5.6 Sol</td></tr>
@@ -98,15 +98,15 @@
         <h2 id="enforcement-title">From a legal route<br>to accountable work.</h2>
         <p class="lead">The runtime seals the whole plan before a production dispatch. Each launch consumes a bound entry. Changed routes, scopes, briefs, or author claims fail validation.</p>
         <figure class="diagram">
-          <img src="architecture.svg" width="1400" height="760" alt="Grok proposes a plan. Dispatch, seat, and rules policy constrain vendor execution. Native proof and telemetry feed the approval tally." loading="lazy" decoding="async">
+          <img src="architecture.svg" width="1400" height="760" alt="Jev proposes a plan. Dispatch, seat, and rules policy constrain vendor execution. Native proof and telemetry feed the approval tally." loading="lazy" decoding="async">
           <figcaption><span>Policy, capabilities, execution, evidence.</span><a href="architecture.svg">Full diagram</a></figcaption>
         </figure>
         <ol class="codeflow" aria-label="MAGI lifecycle">
-          <li class="step"><b><span>01</span> Dispatch</b><p>Seal the complete plan against fresh model/effort probes, concrete scopes, and author provenance.</p></li>
-          <li class="step"><b><span>02</span> Execute</b><p>Leaf seats receive hashed rules and lean skills. Role permissions bound the work; post-run write audits reject out-of-scope changes.</p></li>
+          <li class="step"><b><span>01</span> Dispatch</b><p>Jev classifies each unit; seal the complete plan against that record, fresh model/effort probes, concrete scopes, and author provenance.</p></li>
+          <li class="step"><b><span>02</span> Execute</b><p>Leaf seats read one hashed rules bundle and lean skills. Sub-agents are denied natively; role permissions bound the work; post-run write audits reject out-of-scope changes.</p></li>
           <li class="step"><b><span>03</span> Deliberate</b><p>Foreign reviewers challenge the work. Each captured response carries one APPROVE, ABSTAIN, or REJECT position.</p></li>
           <li class="step"><b><span>04</span> Verify</b><p>Check native identity, usage, acknowledgments, artifact hashes, write audits, and committed outcomes.</p></li>
-          <li class="step"><b><span>05</span> Activate</b><p>Finalize execution and approval separately. Native POSITION tallies decide critical approval after author recusal.</p></li>
+          <li class="step"><b><span>05</span> Activate</b><p>Finalize execution and approval separately. Code counts the native POSITION votes after author recusal; Jev scores each reply for independent evidence. Every run lands as telemetry rows per dispatch, unit, and run.</p></li>
         </ol>
         <p class="boundary-note">Execution PASS alone does not approve work. Ordinary approval requires foreign verification and an approving review. Critical approval needs two eligible APPROVE votes. Approval records a decision; it does not deploy or merge work by itself.</p>
       </div>
@@ -118,7 +118,7 @@
         <h2 id="principles-title">What MAGI refuses to trust.</h2>
         <div class="principles">
           <div class="principle"><div class="num" aria-hidden="true">01</div><div><strong>No self-grading</strong><span>A vendor cannot review or verify the artifact it authored.</span></div></div>
-          <div class="principle"><div class="num" aria-hidden="true">02</div><div><strong>No arbiter seat</strong><span>Grok classifies and dispatches but never supplies the substantive seat result or vote.</span></div></div>
+          <div class="principle"><div class="num" aria-hidden="true">02</div><div><strong>No arbiter seat</strong><span>Jev proposes and the host dispatches; neither supplies the substantive seat result or vote.</span></div></div>
           <div class="principle"><div class="num" aria-hidden="true">03</div><div><strong>No invented identity evidence</strong><span>Codex and Claude must prove native observed model and effort. agy must prove its exact fused slug. Requested settings alone cannot qualify.</span></div></div>
           <div class="principle"><div class="num" aria-hidden="true">04</div><div><strong>No hidden skill sprawl</strong><span>Seats receive hashed, allow-listed skills and rules. Every non-implementation role is read-only. Bridges and orchestration remain arbiter-only.</span></div></div>
           <div class="principle"><div class="num" aria-hidden="true">05</div><div><strong>No fake distribution math</strong><span>The 60% implementation share cap starts at two units. Planning, research, and review do not inflate the implementation count.</span></div></div>

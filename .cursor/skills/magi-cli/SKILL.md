@@ -1,15 +1,15 @@
 ---
 name: magi-cli
-description: Plan-bound MAGI Cursor CLI mode. Grok 4.6 is the non-voting arbiter; OpenAI, Anthropic and Google seats use native CLIs. Not CONCLAVE.
+description: Plan-bound MAGI CLI mode. The Jev decision engine is the arbiter and the hosting session (Cursor, Synara or Claude Code) runs the tools; OpenAI, Anthropic and Google seats use native CLIs. Not CONCLAVE.
 ---
 
 # MAGI Cursor CLI
 
 ## Identity and authority
 
-From the MAGI runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6`. In a Synara-hosted Grok thread, `--mode synara` is also LEGAL. Stop unless the declared route is LEGAL. This declaration check uses the runtime matrix; it does not prove the actual picker or host model. Seats still launch through native vendor CLIs.
+From the MAGI runtime root, run `node tools/magi-whoami.js --mode <cursor-cli|synara|claude-code> --slug <hosting session slug>`. Stop unless the declared route is LEGAL. This declaration check uses the runtime matrix; it does not prove the actual picker or host model. Seats still launch through native vendor CLIs.
 
-Grok 4.6 coordinates the run. It classifies work, writes briefs and complete plans, invokes the deterministic runtime, and requests finalization and tallying. It never performs substantive implementation, repair, planning, research, review, verification, or voting as a seat.
+The host coordinates the run with the Jev decision engine as arbiter: Jev classifies units (`jev-plan-classify.js`) and scores the panel (`panel-tally-jev.js`); the host writes briefs and complete plans, invokes the deterministic runtime (`run-drive.js`), attests Claude output, and requests finalization and tallying. It never performs substantive implementation, repair, planning, research, review, verification, or voting as a seat.
 
 Read `references/cursor-cli.md` for the complete run procedure, `references/dispatch-matrix.json` for route legality, `references/seat-profiles.json` for capabilities, and `references/brief-rules-block.md` for brief instructions.
 
@@ -71,6 +71,6 @@ Google probes and dispatches pin `--log-file` to `native-cli.log` in a unique ev
 
 The runtime commits a transaction only after plan binding, acknowledgment, proof, scope audit, receipts, and idempotent telemetry agree. Failed work remains recorded. Execution PASS is distinct from approval.
 
-Review responses end with exactly one `POSITION: APPROVE`, `POSITION: REJECT`, or `POSITION: ABSTAIN` line. `panel-tally.js` extracts votes from verified native responses. Grok never writes ballots or votes. No model can waive deterministic failure.
+Review responses end with exactly one `POSITION: APPROVE`, `POSITION: REJECT`, or `POSITION: ABSTAIN` line. `panel-tally.js` extracts votes from verified native responses. The host and the Jev engine never write ballots or votes. No model can waive deterministic failure.
 
 `cli-launch.js` and standalone `cli-smoke.js` are transport diagnostics, not production activation paths. Use `npm run check` and the explicit-root `cross-repo-check.js` for offline validation. Native acceptance remains a separate target-machine check.

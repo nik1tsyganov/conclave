@@ -15,7 +15,7 @@ Review the change for correctness, repo-consistency, reuse, and security before 
 ## MAGI
 
 When this dispatch is a MAGI seat (Cursor Task or Claude Code wrapper):
-- Grok/Claude arbiter does not implement in MAGI Cursor; it only classifies, dispatches, and tallies.
+- The host (with the Jev decision engine as arbiter) does not implement in MAGI; it only dispatches, attests, and runs the mechanical tally.
 - In hostMode `cursor`, you ARE the elector named by the Task `model` override.
   Do not invoke `codex.exe`, `agy.exe`, or `claude.exe`.
 - Cursor Task identity is the `model` slug. Do not claim CLI session ids,

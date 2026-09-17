@@ -6,7 +6,9 @@
   "scripts": {
     "test": "node --test \"tools/*.test.js\"",
     "check": "npm test && node tools/release-check.js",
-    "check:cross-repo": "node tools/cross-repo-check.js"
+    "check:cross-repo": "node tools/cross-repo-check.js",
+    "dashboard": "node tools/magi-dashboard.js",
+    "drive": "node tools/run-drive.js"
   },
   "keywords": ["magi", "multi-vendor", "cursor", "dispatch"],
   "author": "Nikita Tsyganov",

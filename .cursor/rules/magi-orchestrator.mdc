@@ -8,7 +8,7 @@ This file applies to MAGI runs. Ignore it in CONCLAVE and unrelated chats.
 
 For `hostMode: cursor-cli` or `/magi-cli`, read the [MAGI CLI skill](../skills/magi-cli/SKILL.md) and its [run procedure](../skills/magi-cli/references/cursor-cli.md). Use its dispatch matrix and seat profiles. Native-mode instructions below do not apply to this branch.
 
-- Grok 4.6 is the non-voting arbiter. It classifies work, prepares complete plans and briefs, launches selected seats, and requests deterministic finalization and tallying. It cannot act as an implementation, repair, planning, research, review, or verification seat.
+- The Jev decision engine is the arbiter (2026-09-16); the hosting chat is non-voting. It prepares complete plans and briefs, runs jev-plan-classify, launches selected seats, and requests deterministic finalization and tallying. It cannot act as an implementation, repair, planning, research, review, or verification seat.
 - Orchestration, routing, bridges, distribution, assessment, and retrospective skills belong to the arbiter. Each leaf receives only its selected vendor card and role/class skills from the staged, hashed skill manifest. Do not load the arbiter's full discipline stack into leaves.
 - Every seat is a leaf. It cannot delegate or edit policy, receipts, evidence, or telemetry. Non-implementation roles remain read-only under their selected native permission profile.
 - Use the external STANDING v2 / R01-R22 pack and the staged skill and rule contracts. Structural checks must verify real files and hashes; skill names in prose do not establish their presence.

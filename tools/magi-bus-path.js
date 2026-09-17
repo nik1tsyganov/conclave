@@ -15,10 +15,10 @@
 const path = require('node:path');
 
 const { canonicalPlainPath } = require('./runtime-paths.js');
-const { MAGI_BUS_ROOT: CLAUDE_BUS_ROOT } = require('./cli-claude.js');
-
-const DEFAULT_MAGI_BUS_ROOT = CLAUDE_BUS_ROOT;
-const HOST_MODES = Object.freeze(['cursor', 'cursor-cli', 'synara']);
+// The legacy launchers (cli-claude.js, cli-gemini.js, cli-launch.js) were removed on
+// 2026-09-16; the bus root default now lives here. MAGI_BUS_ROOT overrides it.
+const DEFAULT_MAGI_BUS_ROOT = path.join(require('node:os').tmpdir(), 'magi-bus');
+const HOST_MODES = Object.freeze(['cursor', 'cursor-cli', 'synara', 'claude-code']);
 
 function getRepoRoot() {
   return path.resolve(__dirname, '..');
@@ -78,7 +78,7 @@ function assertInJail(filePath, label = 'path') {
 
 function assertHostMode(hostMode) {
   if (!HOST_MODES.includes(hostMode)) {
-    throw new Error(`hostMode must be cursor, cursor-cli, or synara, got ${hostMode}`);
+    throw new Error(`hostMode must be cursor, cursor-cli, synara, or claude-code, got ${hostMode}`);
   }
   return hostMode;
 }

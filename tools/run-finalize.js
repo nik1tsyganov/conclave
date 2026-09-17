@@ -19,6 +19,11 @@ const { linkRunToVault } = require('./magi-vault-link.js');
 const SEQUENCE_PROTOCOL = 'magi-unit-sequence-v1';
 
 function readJson(file) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+function compatible(committed, fresh, label) {
+  if (!committed || typeof committed !== 'object' || !fresh || typeof fresh !== 'object') throw new Error(`${label} disagrees with committed evidence`);
+  const differing = Object.keys(committed).filter((key) => JSON.stringify(committed[key]) !== JSON.stringify(fresh[key]));
+  if (differing.length) throw new Error(`${label} disagrees with committed evidence (${differing.join(', ')})`);
+}
 function same(a, b, label) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${label} disagrees with committed evidence`); }
 function validateLogDestinations(run, logs, evidenceDir, protectedPaths = []) {
   const reserved = [evidenceDir, run.planPath, run.sealPath, run.availablePath,
@@ -202,8 +207,16 @@ function verifySavedExecution(run, entry, state, pending, allowReceiptProjection
   proof.instructionReads = { protocol: INSTRUCTION_READ_PROTOCOL, requiredSetSha256: instructionReads.requiredSetSha256, evidenceSha256: instructionReads.evidenceSha256 };
   if (postRun) proof.attestationProtocol = ATTESTATION_PROTOCOL;
   Object.assign(proof, { planId: run.plan.planId, planHash: run.seal.planHash, escalation: entry.escalation === true, escalationReason: entry.escalationReason || null });
-  const proofId = hash(JSON.stringify(proof));
-  same(readJson(artifact('proof.json')), { proofId, class: entry.class, ...proof }, 'native proof');
+  let proofId = hash(JSON.stringify(proof)); // recomputed from live evidence; superseded below by the committed id once the committed fields verify
+  // Forward-compatible: a later runtime may derive MORE proof fields from the same
+  // native evidence (e.g. Google vendorSideTokens, 2026-09-16); every committed field
+  // must still recompute identically, and no committed field may vanish.
+  const committedProof = readJson(artifact('proof.json'));
+  const { proofId: committedProofId, class: _committedClass, ...committedFields } = committedProof;
+  void _committedClass;
+  if (hash(JSON.stringify(committedFields)) !== committedProofId) throw new Error('native proof id does not match its committed fields');
+  compatible(committedProof, { proofId: committedProofId, class: entry.class, ...proof }, 'native proof');
+  proofId = committedProofId;
   for (const [key, value] of Object.entries({ dispatchId: entry.dispatchId, unitId: entry.unitId, role: entry.role, vendor: entry.vendor, class: entry.class, model: entry.model, effort: entry.effort, proofId, modelRequested: entry.model, modelObserved: proof.modelObserved, planId: run.plan.planId, planHash: run.seal.planHash, escalation: entry.escalation === true, escalationReason: entry.escalationReason || null })) {
     if (state.telemetry[key] !== value || state.receipt[key] !== value) throw new Error(`receipt/telemetry ${key} mismatch`);
   }
@@ -374,8 +387,62 @@ function finalizeRun(runDir) {
   for (const log of new Set(run.executions.flatMap(({ state }) => state.logs))) writeRows(log, rows.filter((row) => run.executions.find(({ state }) => state.telemetry === row).state.logs.includes(log)));
   writeRows(path.join(run.root, 'telemetry.jsonl'), terminalRows);
   writeRows(path.join(run.root, 'implementation.jsonl'), rows.filter((row) => row.role === 'implement'));
-  writeJson(path.join(run.root, 'run-summary.json'), result);
-  return result;
+  // Completion telemetry (2026-09-16): one row per unit with the panel and Jev
+  // verdicts, tokens and durations, plus one row per run. Derived from the same
+  // receipts as everything above; idempotent by planHash (+ unitId).
+  const unitRows = buildUnitRows(run, result, rows);
+  const runRow = buildRunRow(run, result, rows, unitRows);
+  writeRows(path.join(run.root, 'units.jsonl'), unitRows);
+  writeJson(path.join(run.root, 'run-row.json'), runRow);
+  writeJson(path.join(run.root, 'run-summary.json'), { ...result, unitRows, runRow });
+  return { ...result, unitRows, runRow };
+}
+
+function sumTokens(rowsOf) {
+  const by = {};
+  for (const row of rowsOf) if (typeof row.vendorSideTokens === 'number') by[row.vendor] = (by[row.vendor] || 0) + row.vendorSideTokens;
+  return { byVendor: by, total: Object.values(by).reduce((a, b) => a + b, 0) };
+}
+function spanMs(states) {
+  const starts = states.map((s) => Date.parse(s.startedAt)).filter(Number.isFinite);
+  const ends = states.map((s) => Date.parse(s.completedAt)).filter(Number.isFinite);
+  return starts.length && ends.length ? Math.max(0, Math.max(...ends) - Math.min(...starts)) : null;
+}
+function readJevTally(run, unitId) {
+  const file = path.join(run.root, `jev-tally-${unitId}.json`);
+  if (!fs.existsSync(file)) return null;
+  try { const t = JSON.parse(fs.readFileSync(file, 'utf8')); return { verdict: t.verdict, counts: t.counts || null, score: t.jev?.score ?? null, confidence: t.jev?.confidence ?? null, flags: t.flags || [], degraded: t.degraded === true }; } catch { return null; }
+}
+function buildUnitRows(run, result, rows) {
+  return result.units.map((unit) => {
+    const entries = run.plan.dispatches.filter((entry) => entry.unitId === unit.unitId);
+    const author = entries.find((entry) => entry.role === 'implement');
+    const executions = run.executions.filter(({ entry }) => entry.unitId === unit.unitId);
+    const dispatches = entries.map((entry) => {
+      const execution = executions.find((ex) => ex.entry.dispatchId === entry.dispatchId);
+      const row = rows.find((r) => r.dispatchId === entry.dispatchId);
+      const outcome = result.outcomes.find((o) => o.dispatchId === entry.dispatchId);
+      return { dispatchId: entry.dispatchId, role: entry.role, vendor: entry.vendor, model: entry.model, modelObserved: row?.modelObserved || null, status: outcome?.status || 'NOT_RUN',
+        tokens: row?.vendorSideTokens ?? null, durationMs: execution ? Math.max(0, Date.parse(execution.state.completedAt) - Date.parse(execution.state.startedAt)) : null,
+        position: execution && ['verify', 'review'].includes(entry.role) ? (() => { try { return nativePosition(execution.response); } catch { return null; } })() : null };
+    });
+    let panel = null;
+    try { const t = tallyUnit(run, unit.unitId); panel = { verdict: t.verdict, passed: t.passed, approve: t.approveCount, reject: t.rejectCount, abstain: t.abstainCount }; } catch (error) { panel = { verdict: 'NOT_PANEL', reason: error.message }; }
+    const tokens = sumTokens(rows.filter((r) => r.unitId === unit.unitId));
+    return { schemaVersion: 1, kind: 'unit', key: `${run.seal.planHash}:${unit.unitId}`, planId: run.plan.planId, planHash: run.seal.planHash, hostMode: run.plan.hostMode, date: result.finalizedAt.slice(0, 10),
+      unitId: unit.unitId, class: author?.class || entries[0]?.class || null, authorVendor: author?.vendor || null, approval: unit.status, reason: unit.reason, panel, jev: readJevTally(run, unit.unitId),
+      dispatches, tokensByVendor: tokens.byVendor, tokensTotal: tokens.total, durationMs: spanMs(executions.map((ex) => ex.state)), finalizedAt: result.finalizedAt };
+  });
+}
+function buildRunRow(run, result, rows, unitRows) {
+  const tokens = sumTokens(rows);
+  const count = (status) => result.outcomes.filter((o) => o.status === status).length;
+  return { schemaVersion: 1, kind: 'run', key: run.seal.planHash, planId: run.plan.planId, planHash: run.seal.planHash, hostMode: run.plan.hostMode, arbiter: run.plan.arbiter || null, date: result.finalizedAt.slice(0, 10),
+    executionStatus: result.executionStatus, approvalStatus: result.approvalStatus, ok: result.ok,
+    dispatches: result.outcomes.length, pass: count('PASS'), fail: count('FAIL'), notRun: count('NOT_RUN'),
+    units: unitRows.map((u) => ({ unitId: u.unitId, approval: u.approval, panel: u.panel?.verdict || null, jev: u.jev?.verdict || null })),
+    tokensByVendor: tokens.byVendor, tokensTotal: tokens.total, wallMs: spanMs(run.executions.map((ex) => ex.state)), jevClassify: run.seal.jevClassify ? { status: run.seal.jevClassify.status, units: Object.fromEntries(Object.entries(run.seal.jevClassify.units || {}).map(([u, r]) => [u, { class: r.jevClass, p: r.p, agrees: r.agrees }])) } : null,
+    sealedAt: run.seal.sealedAt, finalizedAt: result.finalizedAt };
 }
 
 function main(argv = process.argv.slice(2)) {

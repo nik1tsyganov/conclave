@@ -322,7 +322,7 @@ test('documented startup command works without source or home policy in an isola
     for (const name of ['exec', 'execSync', 'execFile', 'execFileSync', 'spawn', 'spawnSync', 'fork']) child[name] = () => { throw new Error('child calls forbidden'); };
   `);
   const before = snapshot(f.installed);
-  const command = 'node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6';
+  const command = 'node tools/magi-whoami.js --mode cursor-cli --slug cursor-grok-4.6-high-fast';
   const result = spawnSync(process.execPath, command.split(' ').slice(1), {
     cwd: f.installed, env: { ...process.env, HOME: home, USERPROFILE: home, NODE_OPTIONS: `--require "${guard.replaceAll('\\', '/')}"` },
     input: '', encoding: 'utf8', timeout: 30000, windowsHide: true, shell: false,

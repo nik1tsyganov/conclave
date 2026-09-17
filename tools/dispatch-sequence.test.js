@@ -239,5 +239,8 @@ test('assessment reads authoritative outcomes without writing projections', asyn
   assert.equal(assessed.ok, true);
   assert.deepEqual(snapshotWorkspace(run.runDir), before);
   const final = finalizeRun(run.runDir);
-  assert.deepEqual({ ...final, finalizedAt: null }, { ...assessed, finalizedAt: null });
+  // finalize adds the completion rows (units, run) on top of the assessment; the assessment itself is unchanged.
+  const { unitRows, runRow, ...finalCore } = final;
+  assert.ok(Array.isArray(unitRows) && runRow && runRow.kind === 'run');
+  assert.deepEqual({ ...finalCore, finalizedAt: null }, { ...assessed, finalizedAt: null });
 });

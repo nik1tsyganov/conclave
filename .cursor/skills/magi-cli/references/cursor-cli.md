@@ -1,214 +1,70 @@
-# Cursor CLI host mode (`cursor-cli`)
+# MAGI CLI run guide (macOS, 2026-09-16)
 
-This run guide is for the Grok arbiter operating the installed MAGI CLI runtime or a source checkout. It covers probes, sealed plans, dispatch, and completion evidence. MAGI is not CONCLAVE.
+This guide is for the hosting session that operates the installed MAGI CLI runtime or a source checkout. The arbiter is the Jev decision engine named by the runtime matrix; the host (a Cursor chat, a Synara thread, or Claude Code) runs the tools, attests Claude output, and holds no vote. Nothing in this guide creates proof: the runtime's receipts do.
 
-Run commands from the runtime root, where `tools/` exists. The source checkout stores policy in `.cursor/skills/magi-cli/references/`; the installed plugin stores it in `skills/magi-cli/references/`. Both layouts carry the same tools and lean `seat-skills/` bundle.
+## Identity
 
-## Establish the local prerequisites
-
-From the runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug grok-4.6`. In a Synara-hosted Grok thread, `--mode synara` is also LEGAL with the same arbiter slug. It compares the declared mode and exact slug with the runtime matrix; it does not prove the actual picker or host model. The command returns `LEGAL` with exit 0, rejects forbidden declarations with exit 1, and rejects missing, duplicate, unknown, or malformed arguments with exit 2. Seats still launch through native `claude.exe` / `codex.exe` / `agy.exe`. Synara is the outer harness; MAGI remains the seat runtime.
-
-Grok 4.6 is the non-voting arbiter. It may classify, compose briefs, seal plans, dispatch, collect evidence, and request deterministic tallies. Substantive implementation, planning, research, verification, review, repair, and votes belong to vendor seats.
-
-Set the external rule-pack path explicitly:
-
-```powershell
-$env:MAGI_RULES_ROOT = Join-Path $env:USERPROFILE '.cursor/magi-rules/v2'
-$env:MAGI_VAULT_ROOT = 'C:\src\ai-ops-vault'
-$env:MAGI_FIELD_LIBRARY_ROOT = 'C:\src\field-library'
-$env:MAGI_VAULT_SKILLS_ROOT = 'C:\src\vault-skills'
-node tools/magi-cli-preflight.js --rules-root $env:MAGI_RULES_ROOT
+```bash
+source ~/.config/magi/env.sh
+node tools/magi-whoami.js --mode <cursor-cli|synara|claude-code> --slug <this session's model slug>
+# examples
+node tools/magi-whoami.js --mode cursor-cli --slug cursor-grok-4.6-high-fast
+node tools/magi-whoami.js --mode claude-code --slug claude-fable-5-1
 ```
 
-The active pack is STANDING v2 with `RULES/INDEX.md`, `VENDOR.md`, and exactly R01–R22. Missing or extra rules fail. Required rule files and each bundled `SKILL.md` must contain non-whitespace text. Preflight also checks the required runtime tool files. Native CLI authentication remains local to the machine. `claude auth status` is the Claude login check; the native model probe also verifies its subscription authentication. Never copy credentials from the kit.
+Stop unless the declaration is LEGAL. It records the host; it is not proof of the picker.
 
-`MAGI_VAULT_ROOT` is the ai-ops-vault checkout. It is MAGI's durable data home: telemetry, lean seat-skill mirrors, inbox skills, analysis, and the skill-web catalog. It is not the live rules pack. `run-finalize.js` links `telemetry.jsonl` into the vault when this env is set and the run directory is not a temp test path. After a MAGI skill edit, run `magi-vault-sync.js --push`. New vault skills land in `projects/magi/seat-skills-inbox/`; `magi-vault-sync.js --pull-inbox` copies them into MAGI `seat-skills/`.
+## Environment
 
-Set `MAGI_FIELD_LIBRARY_ROOT` and `MAGI_VAULT_SKILLS_ROOT` so `magi-vault-sync.js --index` can catalog those sibling repos. Do not merge them into MAGI or the vault. Do not stage the host store, vault-skills methods, or field-library modules onto leaf seats. The map is `skill-sources.json`.
+`~/.config/magi/env.sh` exports `MAGI_RULES_ROOT` (STANDING v2 + R01–R22 pack), `MAGI_VAULT_ROOT` (ai-ops-vault checkout), `MAGI_FIELD_LIBRARY_ROOT`, `MAGI_VAULT_SKILLS_ROOT`, the three vendor binaries, `MAGI_ALLOWED_WORKSPACE_ROOTS`, and `MAGI_CODEX_PROVIDER=openai`. `TYPESAFE_API_KEY` enables Jev. Run `node tools/magi-cli-preflight.js` once per session. Live check before every run: `claude auth status` must report `loggedIn: true` (subscription, never an API key); a claim of reachability without a same-turn live check is NOT RUN.
 
-The example uses YESSIR's installed external pack. On another machine, supply its actual verified v2 pack. For bounded real-project attempts and failure recording, follow [the project handoff](../../magi-cli/references/project-runs.md).
+## Plan
 
-Binary resolution uses explicit overrides, environment overrides, configured/discovered installations, and known shims. Set `MAGI_CODEX_BIN`, `MAGI_CLAUDE_BIN`, or `MAGI_AGY_BIN` when an explicit binary is needed. An invalid explicit path fails. Preflight file checks do not establish authentication or model availability.
+Draft `draft-plan.json`:
 
-## Probe each exact model and effort
-
-The catalog in `dispatch-matrix.json` defines legal combinations. Catalog membership is not a current availability claim. Every intended model/effort pair needs fresh native evidence in the executing environment. Unknown or unproven pairs are unavailable.
-
-For one catalog route:
-
-```powershell
-node tools/model-probe.js --vendor openai --model gpt-5.6-terra --effort medium --evidence-dir C:/src/magi-runs/probes/terra-medium
-node tools/model-availability.js --file C:/src/magi-runs/availability.json --probe C:/src/magi-runs/probes/terra-medium/probe.json
-```
-
-Use a new evidence directory for each probe. Repeat for every pair selected by the plan. Google efforts use the matrix's fused names, such as `fused-high`. Probes invoke native CLIs and use included subscription capacity. Offline contract tests do not perform these calls.
-
-A native probe that starts as one catalog model and answers as another after a vendor fallback (for example Fable `[cyber]` falling back to Opus) is FAIL. Remap to a pair whose probe identity matches, or leave that route unavailable. Do not treat the fallback as the requested model. After a Fable identity conflict, run `node tools/synara-catalog.js --remap-probe <probe.json> --catalog <synara-catalog.json>` and probe the suggested Opus pair; never accept the mismatched identity.
-
-When the arbiter is Synara-hosted, snapshot live `synara_capabilities` before sealing:
-
-```powershell
-node tools/synara-catalog.js --import C:/src/magi-runs/synara-capabilities.json --out C:/src/magi-runs/synara-catalog.json
-```
-
-Pass that file as `--synara-catalog` to `plan-seal.js`. Seal may narrow the static dispatch-matrix to models Synara currently lists. It must not invent routes Synara does not list, and it must not skip MAGI probes or `cli-proof`. Google fused efforts stay MAGI-side; `launch.json` records both `magiEffort` and the Synara option key (`reasoningEffort` vs `effort`).
-
-By default, a probe creates a scratch workspace under its evidence directory. If you supply `--cwd`, it must already exist and must not contain the evidence directory. Keep both paths outside the runtime. An unconfirmed child exit leaves incomplete scope evidence; inspect the recorded PID and stop before another attempt.
-
-Availability imports replay the hashed native capture and log. Use a separate availability output file; it must not replace the probe, capture, or log. The 60-minute freshness checks use the original probe timestamps. Re-importing a probe does not renew them. Missing, changed, expired, or mismatched native evidence fails.
-
-## Prepare the complete plan
-
-Write each brief as a UTF-8 file. Put its unique acknowledgment line first. Include `brief-rules-block.md` and replace every placeholder before hashing. A final response must begin with that bound BRIEF first line. The STANDING fingerprint is a separate pack check.
-
-Do not brief seats to read MAGI CLI runtime, plugin, vendor-bridge, or dispatcher source. Product work stays in the assigned worktree. Asking Anthropic seats to inspect those internals has triggered `reasoning_extraction` refusals.
-
-Write operator JSON files as UTF-8. A leading UTF-8 BOM from PowerShell 5.1 is accepted; plan hashes still cover the original bytes. UTF-16 and malformed UTF-8 are rejected. Supply each CLI option once; repeated selectors are errors.
-
-Calculate the final brief hash with:
-
-```powershell
-(Get-FileHash -Algorithm SHA256 -LiteralPath C:/src/magi-runs/briefs/implement.md).Hash.ToLowerInvariant()
-```
-
-The plan contains these fields:
-
-| Field | Contract |
+| Field | Value |
 |---|---|
-| `planId` | Unique safe identifier for the whole run. |
-| `hostMode` | `cursor-cli` for plain Cursor Agent, or `synara` when this Grok arbiter is Synara-hosted. |
-| `arbiter` | `{"vendor":"xai","model":"grok-4.6","effort":"high"}`; the matrix also accepts xhigh. |
-| `magiConvened` | True when a MAGI panel is convened; required for critical classes. |
-| `dispatches` | All intended implementation, review, verification, planning, and research entries. |
+| `planId` | unique per run |
+| `hostMode` | `cursor-cli`, `synara`, or `claude-code` |
+| `arbiter` | `{"vendor":"jev","model":"jev-latest","host":"<session slug>"}` |
+| `dispatches[]` | `dispatchId`, `unitId`, `class`, `role`, `vendor`, `model`, `effort`, `cwd` (unit worktree), `brief`, `briefSha256`, `writeScope` (implement) or `authorVendor` + `evidenceReadDirs` (verify/review); Astra rows add `escalation: true` and `escalationReason` |
 
-Each dispatch binds `dispatchId`, `unitId`, `class`, `role`, `vendor`, `model`, `effort`, absolute `cwd`, absolute `brief`, `briefSha256`, and `writeScope`. Use unique dispatch IDs. Use real absolute worktree paths.
+Briefs are files; the first line is the seat's acknowledgment. Include the brief rules block (`brief-rules-block.md`) and run `node tools/cli-brief-rules-check.js --brief <file> --role <role> --vendor <vendor>`.
 
-An implementation `writeScope` contains concrete relative paths with forward slashes. It cannot contain wildcards, traversal, or `.git`. Non-implementation roles use `writeScope: []`. Their briefs state their read scope.
+## Probe, classify, seal
 
-Review and verify entries require `authorVendor`. It must match the unit's implementation provenance and differ from the reviewing vendor. They use the same unit and product worktree. Ordinary implementation approval needs foreign verification and review, with every review returning native APPROVE. A critical `requiresPanel` class also requires `magiConvened: true` and two distinct foreign review/verify vendors for that unit and worktree.
-
-Astra routes require `escalation: true` and a substantive `escalationReason` with at least 16 characters and three distinct words. Carry any escalation authorization in the complete plan. A stronger model does not grant broader permissions.
-
-Implementation distribution counts implementation units only. A convened run uses `min(3, implementation unit count)` distinct implementation vendors. The 60% cap starts at two implementation units. Review-only, plan, and research runs do not invent implementation rows.
-
-## Seal and dispatch
-
-Validate and copy the complete draft plan into a new run directory:
-
-```powershell
-node tools/plan-seal.js --plan C:/src/magi-runs/draft-plan.json --run-dir C:/src/magi-runs/run-001 --availability C:/src/magi-runs/availability.json
-# synara hostMode also requires --synara-catalog <normalized catalog.json>
-# optional: --skill-source-root <dir> binds skill bytes into seal schemaVersion 2
+```bash
+node tools/model-probe.js --vendor <openai|anthropic|google> --model <model> --effort <effort> --evidence-dir <probes/name>
+node tools/model-availability.js --file <availability.json> --probe <probes/name/probe.json>
+node tools/jev-plan-classify.js --plan draft-plan.json --out jev-classify.json --provenance jev-decisions.jsonl
+node tools/plan-seal.js --plan draft-plan.json --run-dir <run> --availability <availability.json> --skill-source-root <seat-skills> --jev-classification jev-classify.json
 ```
 
-The seal binds plan bytes, brief hashes, matrix snapshots, seat profiles, and skill-source hashes. New work requires schemaVersion 2. OpenAI checking roles use scoped readonly scratch under `run/out/<dispatchId>/scratch`. Keep the run directory outside product worktrees and the runtime. Known destination collisions fail before copying plan files. Changes require a new complete plan validation and a new run directory. A `vendorOverride` in `graph.json`, a SLICES vendor column, or an ad-hoc route flag grants no authority.
+Probes expire 60 minutes after they complete. The seal refuses a plan whose class is not Jev's choice and sits below the flag gate unless `--class-override <reason>` records the owner's decision; `--no-jev <reason>` records an explicit opt-out.
 
-Launch a selected sealed entry:
+## Dispatch
 
-```powershell
-node tools/dispatch-run.js --plan C:/src/magi-runs/run-001/dispatch-plan.json --run-dir C:/src/magi-runs/run-001 --dispatch-id implement-1 --rules-root $env:MAGI_RULES_ROOT
+```bash
+node tools/run-drive.js --run-dir <run> --phase implement
+node tools/run-drive.js --run-dir <run> --attest <id[,id]>        # after reading each pending response.txt
+node tools/run-drive.js --run-dir <run> --phase evidence --tests tests.json
+node tools/run-drive.js --run-dir <run> --phase verify            # then --attest for Claude seats
+node tools/run-drive.js --run-dir <run> --phase review            # then --attest for Claude seats
+node tools/run-drive.js --run-dir <run> --phase finalize
 ```
 
-Repeat for the remaining dispatch IDs after their real dependencies complete. Route fields come from the sealed entry. Changed class, author, role, model, effort, scope, or brief fails before execution. A duplicate logical dispatch cannot append a second successful telemetry row. Preserve failed evidence; a corrected attempt needs a newly authorized plan/run.
+`tests.json` maps `unitId` to `{ "command": "..." }` run in the unit's worktree; the output and diff land in every `evidenceReadDirs` of that unit, which is what Claude and Gemini checking seats read instead of running commands. Single dispatches remain available through `node tools/dispatch-run.js --plan <run>/dispatch-plan.json --run-dir <run> --dispatch-id <id> --availability <availability.json> --rules-root "$MAGI_RULES_ROOT"`.
 
-Local input errors rejected before transaction reservation leave that dispatch unstarted. Correct the reported input and check the run state. An existing RUNNING or terminal FAIL transaction must not be reset. Every planned check remains required; agreeing checks from one vendor count as only one panel vote, and conflicting positions block approval.
+A failed dispatch id is terminal and needs a new id in a new sealed run, except a classified launch failure (safeguard refusal at launch, network reconnect loop, missing auth, spawn error), which the runtime marks RETRYABLE for two more attempts under the same id.
 
-### Claude: inspect, then attest the returned capture
+## Finalize and observe
 
-The initial Claude launch uses the command above without `--on-topic` or `--capture-sha256`. After the child and deterministic checks finish, the command returns exit zero with this checkpoint shape:
+`--phase finalize` runs `run-finalize.js` (receipts → telemetry rows per dispatch, unit and run, linked into the vault), `activation-check.js` (execution and approval), `panel-tally.js` and `panel-tally-jev.js` per unit. `node tools/project-run-report.js --run-dir <run> --output-dir <new dir> --phase activation` exports a report. `node tools/magi-dashboard.js --run-dir <run>` serves a read-only local dashboard. `node tools/ledger-row.js --run-dir <run> --task "<label>"` renders the engineering-ledger row.
 
-```json
-{"ok":false,"status":"AWAITING_ATTESTATION","planId":"...","planHash":"...","dispatchId":"...","capturePath":"...","responsePath":"...","captureSha256":"..."}
-```
+## Known host hazards
 
-This is an expected inspection checkpoint. It is not execution PASS, approval, or a failed vendor call. Pending work cannot unlock verification, review, finalization, or activation. Read both returned files and judge whether the response addresses the bound brief. Topicality inspection does not replace the independent verification or review seats.
+agy headless soft-denies any permission it cannot prompt for (the proof gate names the denied tool); Codex Terra truncated long read sequences and is retired; Opus refuses prescriptive system prompts (the adapter wording is fixed). Details: the run record under `~/.claude/docs/machine-context/reports/`.
 
-The generated seat contract gives absolute paths to the staged rules and role skills. Seats must read those required files before task work. Relative rule links resolve beside the staged brief, not the product working directory. A seat that reports required files missing or unread must stop and report the blocker; it cannot waive those instructions. Before accepting a product seat, inspect its report and available native read evidence for that failure. A topical response or valid receipt alone does not prove instruction compliance.
+## Reference strings the checks expect
 
-Only after that inspection, run the same dispatch command with the returned capture hash:
-
-```powershell
-node tools/dispatch-run.js --plan C:/src/magi-runs/run-001/dispatch-plan.json --run-dir C:/src/magi-runs/run-001 --dispatch-id implement-1 --rules-root $env:MAGI_RULES_ROOT --on-topic --capture-sha256 <returned-sha256>
-```
-
-This completes the saved transaction without launching another child. It revalidates the capture, protected inputs, scope, workspace, and prerequisite evidence. A mismatched hash or changed evidence cannot qualify. Never supply topicality flags on a first launch: the response does not yet exist to inspect.
-
-Repeating the initial command while pending only returns its checkpoint. If the response is off-topic or uncertain, stop and report the pending state; do not attest it. An actual terminal FAIL remains failed and cannot be repaired by these flags. OpenAI and Google keep their one-step completion. Successful receipt replay remains idempotent.
-
-Launches read the sealed availability snapshot. An optional `--availability` argument must be a byte-identical copy. Refreshing expired probes requires a new complete plan and seal.
-
-The runtime derives capabilities from `seat-profiles.json`. It stages the vendor card (`seat-openai`, `seat-anthropic`, or `seat-google`), role skills, and domain class extras only. Long-run classes add no host loop or harness copies. The bundled lean source is the default. Full home orchestration and bridge skills are not seat capabilities.
-
-Every generated `SEAT-CONTRACT.md` points to the actual `skills/skills-manifest.json`. Rules are copied beside the bound brief with `rules-manifest.json`. `cli-brief-rules-check.js` verifies the generated profile, permissions, pointers, files, and hashes. Skill names in prose cannot establish file existence.
-
-Seats are leaf workers. They must not delegate, change routes, or edit evidence, receipts, or telemetry. Every non-implementation role is read-only. OpenAI uses read-only mode; Google uses sandbox mode. `casper_via=agy` is the Google transport, with the exact staged skill root passed through `--add-dir`. No Gemini PAYG fallback is permitted.
-
-Claude non-implementation seats use the schema 5 `read-only-tools` profile. The runtime supplies `--safe-mode --permission-mode dontAsk --tools Read,Glob,Grep --allowedTools Read,Glob,Grep`. These seats inspect authorized files and existing test evidence; they cannot execute shell commands. Provide test reports as explicit inputs. Claude plan mode requires a separate approval turn and cannot reliably finish unattended leaf verification.
-
-Claude implementation uses `--safe-mode --permission-mode bypassPermissions` with its declared scope and post-run audit. Native safe mode disables global customization and hooks while preserving subscription authentication and role permissions. Do not use `--bare`; it disables OAuth. Safe mode is not vendor-home isolation.
-
-Production Claude dispatches request a native `--json-schema` envelope. Put the complete final report in the schema's `response` string, exposed by the CLI as terminal `structured_output.response`. The runtime uses that string unchanged and checks its exact bound-BRIEF first line. It does not strip a prefix, generate an acknowledgment, or fall back to the text `result` field. Missing or malformed structured output fails. Native success, session, model, effort, usage, and scope checks still apply. Standalone `model-probe.js` keeps its challenge-response format; other vendor output formats are unchanged.
-
-Google probes and dispatches supply `--log-file <evidence-dir>/native-cli.log`. Each call has a unique evidence directory. Default second-resolution home-log names can collide during parallel calls, so proof collection uses the pinned native file when building `vendor.log`.
-
-## Read the committed evidence
-
-`cli-proof.js` requires native evidence, separate from requested identity:
-
-| Vendor | Required evidence |
-|---|---|
-| OpenAI | Session ID, token count, sandbox, observed model, and observed effort. |
-| Google/agy | Successful envelope, conversation ID, usage, response, and matching per-conversation native model slug. Effort is fused into that slug. |
-| Anthropic | Successful structured native result, session, numeric usage, canonical observed model, and session-bound native observed effort. |
-
-An unknown, missing, or conflicting observation fails. Requested-only Claude identity cannot qualify a production dispatch. A catalog alias such as `opus` is compared with its canonical observed identity.
-
-The per-dispatch evidence includes `launch.json`, `plan-binding.json`, the copied brief, `seat-profile.json`, `SEAT-CONTRACT.md`, both manifests, `capture.txt`, `vendor.log`, `proof.json`, `scope-audit.json`, `receipt-ack.json`, and `handoff-envelope.json`. The committed transaction binds these artifacts and their hashes to the plan entry, requested/observed identity, changed-file evidence, and idempotent telemetry.
-
-A scope audit rejects product writes outside the declared scope. It does not sandbox vendor home directories or provide universal hostile-process isolation. Local native configuration remains a host responsibility.
-
-## Finalize execution and approval
-
-After the planned dependencies and checks complete:
-
-```powershell
-node tools/run-finalize.js --run-dir C:/src/magi-runs/run-001
-node tools/magi-vault-analyze.js
-node tools/magi-vault-sync.js --status
-node tools/magi-vault-sync.js --index
-node tools/panel-tally.js --run-dir C:/src/magi-runs/run-001 --unit-id api-1
-```
-
-Execution PASS and approval are separate results. A successful implementation alone is insufficient for approval. Ordinary approval requires foreign verification and review, with every review returning native APPROVE. For critical units, the finalizer requires at least two eligible native APPROVE positions after author recusal.
-
-Review responses contain exactly one final `POSITION: APPROVE`, `POSITION: REJECT`, or `POSITION: ABSTAIN` line. `panel-tally.js` reads these votes from verified captured responses and uses the existing position-tally arithmetic. Handwritten ballots and a model's own tally cannot activate work. Grok never votes.
-
-`cli-launch.js` is an internal/legacy transport helper. Standalone `cli-smoke.js` builds offline pointer-delivery plans from staged inputs; its `activationEligible` result is false. Neither is a production activation path.
-
-## Synara host helpers (not seats)
-
-Synara worktrees, `browser_*`, wait, interrupt, and diagnose are harness helpers. They are not MAGI seats.
-
-- Point an implement `cwd` at a Synara worktree that already sits under `MAGI_DEV_ROOT` or `MAGI_ALLOWED_WORKSPACE_ROOTS`. Confirm it with `node tools/host-helper-worktree.js --cwd <worktree> --out <binding.json>`. Launch remains `dispatch-run.js`.
-- After a MAGI implement, run host `browser_*` checks and stage the files with `node tools/host-helper-evidence.js --run-dir <sealed-run> --label <id> --from <evidence-dir>`. Put that destination on verify/review `evidenceReadDirs`. Those directories are extra reads, never a MAGI `POSITION`.
-- `synara_wait_for_threads` joins Synara threads only. It does not join `dispatch-run` child PIDs. For parallel MAGI seats, launch each `dispatch-run.js` yourself, then record and wait:
-
-```powershell
-node tools/magi-synara-watch.js --record-join --run-dir C:/src/magi-runs/run-001 --dispatch-id implement-1 --dispatch-id verify-1
-node tools/magi-synara-watch.js --wait --run-dir C:/src/magi-runs/run-001 --dispatch-id implement-1 --dispatch-id verify-1
-```
-
-That writes `join-manifest.json` and joins MAGI transactions only. The periodic `magi-synara-watch.js --run-roots` scan also reads those manifests for leftover `RUNNING` children and synara-capture `ask` revert. The watchdog notifies; it never rewrites a receipt to PASS.
-- Do not create Casper, Balthasar, or Melchior as Synara threads. Do not substitute Cursor Task elector slugs for seats.
-
-## Offline checks
-
-From the MAGI source checkout:
-
-```powershell
-npm test
-node tools/release-check.js
-node tools/cross-repo-check.js --kit-root C:/src/magi-kit --vault-root $env:MAGI_RULES_ROOT
-```
-
-Cross-repository checks compare complete base/role/class/forbidden skill contracts, the bundled skill bytes, STANDING v2, the exact indexed R01–R22 inventory, and the leaf brief template. Run them against the intended local checkouts. Their success does not prove native authentication, model access, permission support, or complete tri-vendor operation.
+Runtime policy lives in `dispatch-matrix.json` and `seat-profiles.json`; each seat reads `SEAT-CONTRACT.md`, `skills-manifest.json` and `rules-manifest.json`, whose staged `RULES/INDEX.md` and rule bodies are bundled into one read. Proof is verified by `cli-proof.js`; briefs are checked by `cli-brief-rules-check.js`; Google seats run `casper_via=agy`. Synara-hosted runs use `hostMode: synara` with a `--synara-catalog` at seal time and a `join-manifest` recorded by the host; Cursor-hosted runs use `hostMode: cursor-cli`.
