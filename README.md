@@ -1,8 +1,6 @@
 # CONCLAVE
 
-[![CONCLAVE concept artwork: Ponens, Scrutator, and Advocatus coordinate work from a shared command room.](site/conclave-readme-hero.jpg)](site/conclave-readme-hero.jpg)
-
-CONCLAVE runs OpenAI, Anthropic, and Google engineering seats through a sealed, checked dispatch plan. The arbiter is the Jev decision engine (TypeSafe System One): it proposes the task class, the seats, whether to convene, and the panel tally as probability distributions, and deterministic code gates every proposal. The hosting session (Claude Code, a Cursor chat, or Synara) runs the tools and holds no vote.
+CONCLAVE runs OpenAI, Anthropic, and Google engineering seats through a sealed, checked dispatch plan. The arbiter is the Jev decision engine (TypeSafe System One): it proposes the task class, the seats, whether to convene, and the panel tally as probability distributions, and deterministic code gates every proposal. The hosting session runs the tools and holds no vote: a Claude Code session, a Cursor chat, Synara, or an app with its own interface such as Droppy Code.
 
 > The model proposes. Deterministic policy decides what is legal.
 
