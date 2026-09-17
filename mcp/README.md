@@ -27,6 +27,21 @@ Droppy Code solved the same problem a different way: it makes each seat a chat a
 back as a message when the panel is done. It could, because it owns its own window. A server
 that is called through a pipe cannot, so it hands back a run id instead.
 
+## No vendor login, for the half that matters
+
+Nothing in the rules half calls a vendor. `conclave_route` and `conclave_tally` take JSON,
+apply a rule and answer; there is no model behind them, no credential read and no file
+written. A host that wants only those runs the server with `--rules-only`, which serves those
+six and refuses the rest by name as well as hiding them.
+
+That is the point of the split. Droppy Code already holds the user's logins for Codex, Claude
+and Antigravity and launches those CLIs itself; the rules service has no business with either,
+and a tool that could start a nine-seat run is surface a panel host never asked for.
+
+The other four do drive runs, and those spawn vendor CLIs on the machine they run on, with
+whatever logins that machine has. They are for a host that wants CONCLAVE to run the seats
+rather than run them itself.
+
 ## The rules, for a host with its own interface
 
 Four calls, all pure and all free. A host that draws its own panel needs these and does not

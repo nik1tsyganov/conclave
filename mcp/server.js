@@ -50,6 +50,21 @@ const SUPPORTED_PROTOCOLS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-
 const DRIVE_TIMEOUT_MS = 45 * 60 * 1000;
 const MAX_TEXT = 200000;
 
+/// The tools that decide nothing about vendors: they take JSON, apply a rule and answer. No
+/// vendor is called, no credential is read, nothing is spawned, nothing is written.
+const RULES_ONLY = Object.freeze([
+  'conclave_hosts', 'conclave_validate_row', 'conclave_tally',
+  'conclave_route', 'conclave_read_block', 'conclave_read_reply',
+]);
+
+/// `--rules-only` serves those and nothing else.
+///
+/// A host that draws its own panel — Droppy Code is the first — runs the vendor sessions
+/// itself with the user's own logins, and wants the judgement and nothing more. Giving it a
+/// tool that could start a nine-seat run is surface it never asked for, and a tool list is
+/// something an agent reads and tries.
+const rulesOnly = process.argv.includes('--rules-only');
+
 let initialized = false;
 
 function warn(message) {
@@ -294,6 +309,10 @@ const TOOLS = [
 
 async function callTool(name, rawArgs) {
   const args = rawArgs && typeof rawArgs === 'object' && !Array.isArray(rawArgs) ? rawArgs : {};
+  // Hidden from the list is not the same as refused when asked for by name.
+  if (rulesOnly && !RULES_ONLY.includes(name)) {
+    fail(`${name} is not served in rules-only mode. This server was started with --rules-only, which serves the panel's rules and nothing that runs a vendor.`, -32601);
+  }
   switch (name) {
     case 'conclave_hosts':
       return text({
@@ -431,8 +450,12 @@ async function handleRequest(message) {
         protocolVersion: negotiateProtocol(params && params.protocolVersion),
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, title: 'CONCLAVE tri-vendor review panel', version: SERVER_VERSION },
-        instructions:
-          'Runs a tri-vendor review panel: one seat builds, two others check it in sessions of their own, and the votes are counted in code. ' +
+        instructions: rulesOnly
+          ? 'The rules of a tri-vendor review panel, for a host that runs the seats itself. ' +
+            'Ask what a lead\'s block contains, who should build each unit and who should check it, what one seat\'s reply says, and what the replies add up to. ' +
+            'Nothing here calls a vendor, reads a credential or writes a file: the answers are a function of the question. ' +
+            'A vote counts only from a seat that proved its vendor session, its tokens and the model that answered, and a unit whose own check failed does not land whatever the seats voted.'
+          : 'Runs a tri-vendor review panel: one seat builds, two others check it in sessions of their own, and the votes are counted in code. ' +
           'Convening is not one call. Seal a plan, drive one phase at a time, attest what a seat said when it asks, then read the report. ' +
           'A vote counts only from a seat that proved its vendor session, its tokens and the model that answered. ' +
           'conclave_drive spends subscription capacity and refuses to run without "spend": true.',
@@ -444,7 +467,7 @@ async function handleRequest(message) {
       return;
 
     case 'tools/list':
-      sendResult(id, { tools: TOOLS });
+      sendResult(id, { tools: TOOLS.filter((tool) => !rulesOnly || RULES_ONLY.includes(tool.name)) });
       return;
 
     case 'tools/call': {

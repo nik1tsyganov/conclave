@@ -160,6 +160,31 @@ test('a call that would spend capacity is refused unless the caller says so', ()
   assert.match(wrongDir.error.message, /runDir is not a directory/);
 });
 
+test('rules-only serves the judgement and nothing that runs a vendor', () => {
+  const talkTo = (messages) => {
+    const input = messages.map((m) => JSON.stringify(m)).join('\n') + '\n';
+    const result = require('node:child_process').spawnSync(process.execPath, [SERVER, '--rules-only'], { input, encoding: 'utf8', timeout: 60000 });
+    const answers = result.stdout.trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    return answers[answers.length - 1];
+  };
+  const list = talkTo([HELLO, READY, { jsonrpc: '2.0', id: 2, method: 'tools/list' }]);
+  const names = list.result.tools.map((t) => t.name);
+  assert.equal(names.length, 6);
+  for (const name of ['conclave_drive', 'conclave_seal', 'conclave_attest', 'conclave_run_report']) {
+    assert.ok(!names.includes(name), `${name} is not offered`);
+  }
+  for (const name of ['conclave_tally', 'conclave_route', 'conclave_read_block', 'conclave_read_reply']) {
+    assert.ok(names.includes(name), `${name} is`);
+  }
+  // Hidden from the list is not the same as refused when asked for by name.
+  const sneaky = talkTo([HELLO, READY, call('conclave_drive', { runDir: '/tmp', phase: 'implement', spend: true })]);
+  assert.equal(sneaky.error.code, -32601);
+  assert.match(sneaky.error.message, /rules-only/);
+  // And the rules still answer.
+  const routed = talkTo([HELLO, READY, call('conclave_route', { units: [{ id: 'U1', brief: 'b' }], readyVendors: ['openai', 'anthropic', 'google'] })]);
+  assert.equal(JSON.parse(routed.result.content[0].text).units.length, 1);
+});
+
 test('bad input is answered, never crashed on', () => {
   assert.equal(ask('conclave_nonsense', {}).error.code, -32601);
 
