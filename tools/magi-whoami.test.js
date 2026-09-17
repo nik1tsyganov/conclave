@@ -14,7 +14,7 @@ function invoke(argv) {
 test('every CLI host mode is legal with any host slug, and names the runtime arbiter engine', () => {
   const { arbiterVendor, arbiterModel } = loadMatrix().principles;
   assert.equal(arbiterVendor, 'jev');
-  assert.deepEqual(HOST_MODES, ['cursor-cli', 'synara', 'claude-code']);
+  assert.deepEqual(HOST_MODES, ['cursor-cli', 'synara', 'claude-code', 'droppy']);
   for (const mode of HOST_MODES) for (const slug of ['claude-fable-5-1', 'cursor-grok-4.6-high-fast', 'gpt-5.6-sol']) {
     for (const args of [['--mode', mode, '--slug', slug], ['--slug', slug, '--mode', mode]]) {
       const result = invoke(args);

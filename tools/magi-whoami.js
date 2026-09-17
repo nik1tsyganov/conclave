@@ -4,7 +4,7 @@
 // Declares which session hosts a MAGI run. Since 2026-09-16 the arbiter is the
 // Jev decision engine named by the runtime matrix; the host session runs the
 // tools and holds no vote, so any host slug is legal in a CLI host mode.
-const HOST_MODES = ['cursor-cli', 'synara', 'claude-code'];
+const HOST_MODES = ['cursor-cli', 'synara', 'claude-code', 'droppy'];
 
 function main(argv = process.argv.slice(2), io = process) {
   try {

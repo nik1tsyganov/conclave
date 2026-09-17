@@ -7,7 +7,7 @@ description: Plan-bound MAGI CLI mode. The Jev decision engine is the arbiter an
 
 ## Identity and authority
 
-From the MAGI runtime root, run `node tools/magi-whoami.js --mode <cursor-cli|synara|claude-code> --slug <hosting session slug>`. Stop unless the declared route is LEGAL. This declaration check uses the runtime matrix; it does not prove the actual picker or host model. Seats still launch through native vendor CLIs.
+From the MAGI runtime root, run `node tools/magi-whoami.js --mode <cursor-cli|synara|claude-code|droppy> --slug <hosting session slug>`. Stop unless the declared route is LEGAL. This declaration check uses the runtime matrix; it does not prove the actual picker or host model. Seats still launch through native vendor CLIs.
 
 The host coordinates the run with the Jev decision engine as arbiter: Jev classifies units (`jev-plan-classify.js`) and scores the panel (`panel-tally-jev.js`); the host writes briefs and complete plans, invokes the deterministic runtime (`run-drive.js`), attests Claude output, and requests finalization and tallying. It never performs substantive implementation, repair, planning, research, review, verification, or voting as a seat.
 
