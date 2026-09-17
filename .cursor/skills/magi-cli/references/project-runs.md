@@ -79,7 +79,7 @@ Set `MAGI_FIELD_LIBRARY_ROOT` and `MAGI_VAULT_SKILLS_ROOT` and run `magi-vault-s
 
 Read the co-located [CLI command reference](cursor-cli.md), [dispatch matrix](dispatch-matrix.json), [seat profiles](seat-profiles.json), and [brief template](brief-rules-block.md). The command reference governs exact CLI arguments and plan fields. This handoff adds the trial boundary and failure-recording process.
 
-Read `C:/Users/YESSIR/.claude/docs/capacity-state.json` before probes. An exhausted bucket stays blocked until fresh evidence clears it. Do not infer capacity from an old successful call. Do not use API keys, paid credits, or overage. The recorded Opus block also affects any standing Fable-to-Opus fallback. Authentication success alone does not prove included headroom.
+Read the host's capacity record, `~/.claude/docs/capacity-state.json` on this Mac, before probes. An exhausted bucket stays blocked until fresh evidence clears it. Do not infer capacity from an old successful call. Do not use API keys, paid credits, or overage. The recorded Opus block also affects any standing Fable-to-Opus fallback. Authentication success alone does not prove included headroom.
 
 Suggested external layout:
 
