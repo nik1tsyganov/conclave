@@ -473,9 +473,17 @@ async function handleRequest(message) {
       sendResult(id, {
         protocolVersion: negotiateProtocol(params && params.protocolVersion),
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: SERVER_NAME, title: 'CONCLAVE tri-vendor review panel', version: SERVER_VERSION },
+        // Attribution travels with the running server, not only with the source: a host
+        // reads this on connect, and AGPL section 13 is about running, not shipping.
+        serverInfo: {
+          name: SERVER_NAME,
+          title: 'CONCLAVE tri-vendor review panel',
+          version: SERVER_VERSION,
+          websiteUrl: 'https://github.com/nik1tsyganov/conclave',
+        },
         instructions: rulesOnly
-          ? 'The rules of a tri-vendor review panel, for a host that runs the seats itself. ' +
+          ? 'CONCLAVE by Nikita Tsyganov (AGPL-3.0-only). '
+            + 'The rules of a tri-vendor review panel, for a host that runs the seats itself. ' +
             'Ask what a lead\'s block contains, who should build each unit and who should check it, what one seat\'s reply says, and what the replies add up to. ' +
             'Nothing here calls a vendor, reads a credential or writes a file: the answers are a function of the question. ' +
             'A vote counts only from a seat that proved its vendor session, its tokens and the model that answered, and a unit whose own check failed does not land whatever the seats voted.'
