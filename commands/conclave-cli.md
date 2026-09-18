@@ -27,6 +27,14 @@ Unknown or unproven model/effort pairs are unavailable. Availability replays has
 
 The plan binds `planId`, `hostMode: cursor-cli` (or `synara` when Synara hosts this arbiter), the arbiter `{vendor: "jev", model: "jev-latest", host: <session slug>}`, and every dispatch entry. Each entry includes `dispatchId`, `unitId`, `class`, `role`, `vendor`, `model`, `effort`, absolute `cwd` and `brief`, `briefSha256`, and relative `writeScope`. Verify/review entries may list absolute `evidenceReadDirs` for non-voting host-helper files.
 
+An implement entry may also carry `check: {command}` — the unit's own proof, run by the driver
+in the builder's worktree after the implement phase, with its output and the diff written into
+every `evidenceReadDirs` of that unit. Sealing refuses a named check whose checking seats have
+nowhere to read the result, and names the directory to add. This is how a sandboxed seat
+answers without running anything: agy soft-denies a permission it cannot prompt for and
+answers SUCCESS having done nothing, so a checker that has to run the check fails for missing
+proof rather than for the reason.
+
 Non-implementation roles use an empty write scope and remain read-only. Review/verify entries require a different, correct `authorVendor`. Astra requires `escalation: true` and a substantive reason with at least 16 characters and three distinct words.
 
 Claude non-implementation roles use the schema 5 `read-only-tools` profile: `--safe-mode --permission-mode dontAsk --tools Read,Glob,Grep --allowedTools Read,Glob,Grep`. They can inspect files and existing test evidence, but cannot execute shell commands. Supply the needed evidence in the brief. Plan mode requires a separate approval turn and is not the unattended verification path.

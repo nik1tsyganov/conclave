@@ -2,6 +2,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const { drivePhase, attest, captureEvidence } = require('./run-drive.js');
@@ -48,4 +49,42 @@ test('evidence phase writes test output and diff into every evidenceReadDir of t
   assert.deepEqual(result.results[0].dirs, [evidence]);
   assert.match(fs.readFileSync(path.join(evidence, 'test-output.txt'), 'utf8'), /hello-from-test[\s\S]*exit=0/);
   assert.ok(fs.existsSync(path.join(evidence, 'diff.txt')));
+});
+
+// A unit that names its own check has it run host-side and handed to its checking seats.
+// Before this the binding was the plan author's to remember, and forgetting it was invisible
+// until a sandboxed seat tried to run the check itself and was soft-denied (2026-09-18).
+test('sealing refuses a named check whose checkers have nowhere to read the result', (t) => {
+  assert.throws(
+    () => createSealedRun(t, [
+      { unitId: 'u1', role: 'implement', check: { command: 'echo hi' } },
+      { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'fable', effort: 'medium', authorVendor: 'openai' },
+    ]),
+    /names a check and .* has nowhere to read its result.*evidenceReadDirs/s,
+  );
+});
+
+test('a named check is captured after implement, into the directory its checkers read', async (t) => {
+  const run = createSealedRun(t, [
+    { unitId: 'u1', role: 'implement', check: { command: 'echo the-check-ran' } },
+    { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'fable', effort: 'medium', authorVendor: 'openai', evidenceForUnit: true },
+  ]);
+  const evidence = JSON.parse(fs.readFileSync(run.opts.plan, 'utf8')).dispatches.find((e) => e.role === 'verify').evidenceReadDirs[0];
+  const native = fakeVendor();
+  const driven = await drivePhase({ runDir: run.runDir, rulesRoot: run.opts.rulesRoot, skillSourceRoot: run.opts.skillSourceRoot, dependencies: native, phase: 'implement' });
+  assert.equal(driven.results[0].status, 'PASS');
+  assert.ok(driven.evidence && driven.evidence.length === 1, 'the check was captured without anyone asking');
+  const output = fs.readFileSync(path.join(evidence, 'test-output.txt'), 'utf8');
+  assert.match(output, /the-check-ran/);
+  assert.match(output, /exit=0/);
+  assert.ok(fs.existsSync(path.join(evidence, 'diff.txt')), 'the diff is captured beside it');
+});
+
+test('a plan that names no check captures nothing', async (t) => {
+  const run = createSealedRun(t, [
+    { unitId: 'u1', role: 'implement' },
+    { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'fable', effort: 'medium', authorVendor: 'openai' },
+  ]);
+  const driven = await drivePhase({ runDir: run.runDir, rulesRoot: run.opts.rulesRoot, skillSourceRoot: run.opts.skillSourceRoot, dependencies: fakeVendor(), phase: 'implement' });
+  assert.equal(driven.evidence, undefined);
 });

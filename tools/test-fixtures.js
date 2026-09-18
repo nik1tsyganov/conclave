@@ -80,7 +80,17 @@ function createSealedRun(t, entries = [{}], options = {}) {
   const dispatches = entries.map((entry, index) => {
     const role = entry.role || 'implement';
     const brief = briefFixture(path.join(root, 'briefs', String(index)), role);
-    return { class: 'standard-feature', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium', role, dispatchId: `d${index + 1}`, unitId: `u${index + 1}`, cwd, brief, briefSha256: hashFile(brief), writeScope: role === 'implement' ? ['result.txt'] : [], ...entry };
+    const bound = { class: 'standard-feature', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium', role, dispatchId: `d${index + 1}`, unitId: `u${index + 1}`, cwd, brief, briefSha256: hashFile(brief), writeScope: role === 'implement' ? ['result.txt'] : [], ...entry };
+    // `evidenceForUnit: true` asks for the one directory evidence-read-access allows a
+    // checking seat: beside the run, named for the unit. A test cannot write that path itself
+    // because the run root is made in here.
+    if (bound.evidenceForUnit) {
+      delete bound.evidenceForUnit;
+      const dir = path.join(root, 'evidence', bound.unitId);
+      fs.mkdirSync(dir, { recursive: true });
+      bound.evidenceReadDirs = [dir];
+    }
+    return bound;
   });
   const planObject = { planId: 'fixture-run', hostMode: 'cursor-cli', arbiter: { vendor: 'jev', model: 'jev-latest', host: 'fixture-host' }, ...options, dispatches };
   const planSource = path.join(root, 'source-plan.json'); writeJson(planSource, planObject);

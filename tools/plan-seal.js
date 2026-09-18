@@ -63,6 +63,31 @@ function matrixForPlan(plan, catalog, base = loadMatrix()) {
   return narrowMatrix(base, catalog).matrix;
 }
 
+/// A unit that names a check must hand the result to its checking seats.
+///
+/// This refuses rather than repairs. The sealed plan is a byte copy of the authored one so
+/// its hash means something, and a sealer that edited the plan would be signing something
+/// nobody wrote. Refusing also puts the directory in front of the author, who is the one who
+/// knows whether a seat should read the run's own evidence or somewhere else.
+///
+/// Without it, the omission is invisible until launch: a sandboxed seat tries to run the
+/// check itself, agy soft-denies a permission it cannot prompt for and answers SUCCESS having
+/// done nothing, and the seat is failed for missing proof rather than for the reason.
+function requireUnitCheckEvidence(plan, runDir) {
+  const checked = new Set(plan.dispatches.filter((entry) => entry.check && entry.check.command).map((entry) => entry.unitId));
+  if (!checked.size) return;
+  const suggested = (unitId) => path.join(path.dirname(path.resolve(runDir)), 'evidence', unitId);
+  for (const entry of plan.dispatches) {
+    if (!['verify', 'review'].includes(entry.role) || !checked.has(entry.unitId)) continue;
+    if (Array.isArray(entry.evidenceReadDirs) && entry.evidenceReadDirs.length) continue;
+    throw new Error(
+      `unit ${entry.unitId} names a check and ${entry.dispatchId} has nowhere to read its result: `
+      + `add "evidenceReadDirs": ["${suggested(entry.unitId)}"] to that entry. `
+      + 'The driver writes the check output and the diff there after the implement phase.',
+    );
+  }
+}
+
 function sealPlan({ plan, runDir, availability, synaraCatalog, skillSourceRoot, noJev, classOverride, jevClassification }) {
   if (!plan || !runDir) throw new Error('--plan and --run-dir are required');
   const available = loadAvailability(availability);
@@ -84,6 +109,8 @@ function sealPlan({ plan, runDir, availability, synaraCatalog, skillSourceRoot, 
   const sealPath = path.join(root, 'plan-seal.json');
   const availablePath = path.join(root, 'availability.json');
   if (fs.existsSync(sealPath)) throw new Error('run directory already has a sealed plan; use a new run directory');
+  // A unit that names a check must say where its checkers read the result.
+  requireUnitCheckEvidence(validated.plan, root);
   for (const entry of validated.plan.dispatches) {
     if (!entry.brief || hashFile(entry.brief) !== entry.briefSha256) throw new Error(`brief file/hash mismatch: ${entry.dispatchId}`);
     const cwd = canonicalPlainPath(entry.cwd);
@@ -156,4 +183,4 @@ function main(argv = process.argv.slice(2)) {
   } catch (error) { process.stderr.write(`PLAN_SEAL_FAIL: ${error.message}\n`); return 1; }
 }
 if (require.main === module) process.exitCode = main();
-module.exports = { main, readSealedRun, sealPlan };
+module.exports = { main, readSealedRun, requireUnitCheckEvidence, sealPlan };

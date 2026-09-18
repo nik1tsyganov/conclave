@@ -42,7 +42,19 @@ async function drivePhase({ runDir, phase, rulesRoot, availability, skillSourceR
       return { dispatchId: entry.dispatchId, status: result.status, responsePath: result.responsePath, captureSha256: result.captureSha256 };
     } catch (error) { return { dispatchId: entry.dispatchId, status: 'FAIL', code: error.code, error: error.message }; }
   }));
-  return { phase, results, pending: results.filter(r => r.status === AWAITING_ATTESTATION).map(r => r.dispatchId) };
+  // A unit that named a check has it run here, host-side, and written into the evidence
+  // directory its checking seats are bound to. Doing it after implement and before anyone
+  // drives verify is what makes a checking seat able to answer without running anything
+  // itself — which is the one thing a sandboxed seat cannot do.
+  const captured = phase === 'implement' && results.some(r => r.status === 'PASS')
+    ? captureEvidence({ runDir }).results
+    : [];
+  return {
+    phase,
+    results,
+    ...(captured.length ? { evidence: captured } : {}),
+    pending: results.filter(r => r.status === AWAITING_ATTESTATION).map(r => r.dispatchId),
+  };
 }
 
 async function attest({ runDir, dispatchIds, rulesRoot, availability, skillSourceRoot, dependencies = {} }) {
@@ -60,9 +72,22 @@ async function attest({ runDir, dispatchIds, rulesRoot, availability, skillSourc
   return { results };
 }
 
+/// The checks a sealed plan names for itself, in the shape captureEvidence takes. A plan that
+/// names none returns nothing, and the driver captures nothing: this is a plan saying what
+/// proves its unit, not the driver inventing a command to run in someone's worktree.
+function plannedChecks(plan) {
+  const spec = {};
+  for (const entry of plan.dispatches) {
+    if (!entry.check || !entry.check.command || spec[entry.unitId]) continue;
+    spec[entry.unitId] = { command: entry.check.command, ...(entry.check.cwd ? { cwd: entry.check.cwd } : {}) };
+  }
+  return spec;
+}
+
 function captureEvidence({ runDir, tests }) {
   const run = readSealedRun(runDir);
-  const spec = JSON.parse(fs.readFileSync(tests, 'utf8'));
+  const spec = tests ? JSON.parse(fs.readFileSync(tests, 'utf8')) : plannedChecks(run.plan);
+  if (!Object.keys(spec).length) return { results: [] };
   const out = [];
   for (const [unitId, test] of Object.entries(spec)) {
     const implement = run.plan.dispatches.find(e => e.unitId === unitId && e.role === 'implement');
@@ -108,7 +133,7 @@ async function main(argv = process.argv.slice(2)) {
     const rulesRoot = opts.rulesRoot || process.env.CONCLAVE_RULES_ROOT;
     let result;
     if (opts.attest) result = await attest({ runDir: opts.runDir, dispatchIds: opts.attest.split(','), rulesRoot, availability: opts.availability, skillSourceRoot: opts.skillSourceRoot });
-    else if (opts.phase === 'evidence') { if (!opts.tests) throw new Error('--tests <json> is required for the evidence phase'); result = captureEvidence({ runDir: opts.runDir, tests: opts.tests }); }
+    else if (opts.phase === 'evidence') result = captureEvidence({ runDir: opts.runDir, tests: opts.tests });
     else if (opts.phase === 'finalize') result = finalize({ runDir: opts.runDir });
     else if (PHASES.includes(opts.phase)) result = await drivePhase({ runDir: opts.runDir, phase: opts.phase, rulesRoot, availability: opts.availability, skillSourceRoot: opts.skillSourceRoot });
     else throw new Error(`unknown phase: ${opts.phase}`);
