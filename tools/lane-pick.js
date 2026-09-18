@@ -30,13 +30,20 @@ function lanesFor(matrix, classId, role) {
 }
 
 /// True when this exact vendor/model/effort has a passing entry in the availability record.
+///
+/// model-availability writes `{schemaVersion, vendors:{<vendor>:{models:{<model>:{efforts:
+/// {<effort>: {available}}}}}}}`. A flat array is also accepted so a caller can pass probe
+/// records straight through in a test.
 function isAvailable(available, lane) {
-  const rows = Array.isArray(available) ? available : (available?.models || available?.entries || []);
-  return rows.some((row) => row
-    && row.vendor === lane.vendor
-    && (row.model === lane.model || row.requestedModel === lane.model)
-    && (row.effort === undefined || row.effort === lane.effort)
-    && (row.status === undefined || row.status === 'PASS'));
+  if (Array.isArray(available)) {
+    return available.some((row) => row
+      && row.vendor === lane.vendor
+      && (row.model === lane.model || row.requestedModel === lane.model)
+      && (row.effort === undefined || row.effort === lane.effort)
+      && (row.status === undefined || row.status === 'PASS'));
+  }
+  const entry = available?.vendors?.[lane.vendor]?.models?.[lane.model]?.efforts?.[lane.effort];
+  return entry?.available === true;
 }
 
 /// The first lane that can run, skipping vendors the caller has already seated.
