@@ -6,6 +6,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const path = require('node:path');
 const routing = require('./panel-routing.js');
 
 const ALL = ['openai', 'anthropic', 'google'];
@@ -141,14 +142,81 @@ test('a block of three spreads across the seats in every arrangement', () => {
   }
 });
 
-test('a class nobody recognises is ordinary feature work', () => {
+test('a class is read however it is spelled, and naming nothing is ordinary work', () => {
   assert.equal(routing.classNamed('security-sensitive'), 'security-sensitive');
   assert.equal(routing.classNamed('Security Sensitive'), 'security-sensitive', 'however it is spelled');
   assert.equal(routing.classNamed('bulk_mechanical'), 'bulk-mechanical');
-  assert.equal(routing.classNamed('something new'), 'standard-feature');
+  // Naming NOTHING cannot escalate anything, so it is the class that asks least.
   assert.equal(routing.classNamed(undefined), 'standard-feature');
-  assert.equal(routing.isCritical('security-sensitive'), true);
-  assert.equal(routing.isCritical('standard-feature'), false);
+  assert.equal(routing.classNamed(null), 'standard-feature');
+  assert.equal(routing.classNamed('   '), 'standard-feature');
+});
+
+// Before 2026-09-18 a misspelt class became standard-feature in silence, so a unit the lead
+// called security-sensitive was checked twice instead of three times with nothing to say so.
+test('a class this panel does not have is refused, never downgraded', () => {
+  for (const wrong of ['securty-sensitive', 'security-sensitve', 'made-up-nonsense', 'SECURITY!!']) {
+    assert.throws(() => routing.classNamed(wrong), RangeError, `${wrong} must refuse`);
+  }
+  assert.throws(() => routing.classNamed(7), TypeError, 'a non-string class is an error, not a default');
+  for (const unroutable of routing.UNROUTABLE_CLASSES) {
+    assert.throws(() => routing.classNamed(unroutable), /no implement or verify lane/,
+      `${unroutable}: a matrix class this panel cannot seat refuses with its own reason`);
+  }
+});
+
+test('route drops a unit whose class it cannot seat, rather than routing it as something easier', () => {
+  const out = routing.route({
+    units: [unit('GOOD', { class: 'security-sensitive', files: ['a.js'] }),
+            unit('TYPO', { class: 'securty-sensitive', files: ['b.js'] })],
+    readyVendors: ALL,
+  });
+  assert.deepEqual(out.units.map((u) => u.id), ['GOOD'], 'the sound unit still goes out');
+  assert.equal(out.units[0].checkers.length, 3, 'and a security unit still gets its second review');
+  assert.equal(out.dropped.length, 1);
+  assert.equal(out.dropped[0].unitId, 'TYPO');
+  assert.match(out.dropped[0].reason, /unknown task class/, 'and the lead hears exactly why');
+});
+
+// classNamed and isCritical disagreed about 'security_sensitive': one normalised it, the other
+// compared the raw string. isCritical now reads through classNamed, so they cannot part again.
+test('classNamed and isCritical agree about every input, legal or not', () => {
+  const spellings = [
+    ...routing.CLASSES,
+    ...routing.CLASSES.map((c) => c.replace(/-/g, '_')),
+    ...routing.CLASSES.map((c) => c.toUpperCase()),
+    ...routing.CLASSES.map((c) => c.replace(/-/g, ' ')),
+    undefined, null, '',
+  ];
+  for (const raw of spellings) {
+    const named = routing.classNamed(raw);
+    assert.equal(routing.isCritical(raw), named === 'security-sensitive',
+      `${JSON.stringify(raw)}: isCritical must answer for the class classNamed resolved`);
+  }
+  for (const wrong of ['securty-sensitive', 'made-up-nonsense']) {
+    assert.throws(() => routing.isCritical(wrong), RangeError,
+      `${wrong}: isCritical refuses what classNamed refuses`);
+  }
+});
+
+// The matrix is the source; this module copies it because it ships in conclave-mcp and the
+// matrix does not. That copy is only safe if a divergence fails here.
+test('the routable and unroutable classes together are exactly the matrix classes', () => {
+  const matrix = require(path.join(__dirname, '..', '.cursor', 'skills', 'conclave-cli', 'references', 'dispatch-matrix.json'));
+  const inMatrix = Object.keys(matrix.classes).sort();
+  const known = [...routing.CLASSES, ...routing.UNROUTABLE_CLASSES].sort();
+  assert.deepEqual(known, inMatrix,
+    'a class added to the dispatch matrix must be added here too, as routable or as unroutable');
+  assert.equal(new Set(known).size, known.length, 'and named once');
+  for (const id of routing.CLASSES) {
+    const lanes = [...(matrix.classes[id].implement || []), ...(matrix.classes[id].verify || [])];
+    assert.ok(lanes.length > 0, `${id} is routable here, so the matrix must give it a lane`);
+    assert.ok(routing.BUILDER_PREFERENCE[id], `${id} is routable here, so it needs a builder preference`);
+  }
+  for (const id of routing.UNROUTABLE_CLASSES) {
+    const lanes = [...(matrix.classes[id].implement || []), ...(matrix.classes[id].verify || [])];
+    assert.equal(lanes.length, 0, `${id} is refused here, so the matrix must give it no lane`);
+  }
 });
 
 test('a seat the caller left out is filled in rather than refused', () => {

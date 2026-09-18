@@ -13,7 +13,23 @@
 
 const SLOTS = Object.freeze(['ponens', 'scrutator', 'advocatus']);
 const SEAT_VENDORS = Object.freeze(['openai', 'anthropic', 'google']);
-const CLASSES = Object.freeze(['standard-feature', 'bulk-mechanical', 'debug-mystery', 'security-sensitive', 'test-verification']);
+/// The classes this panel can route: every dispatch-matrix class that declares an implement
+/// or verify lane. Kept by hand and not derived, because `tools/panel-routing.js` ships in the
+/// `conclave-mcp` package and `dispatch-matrix.json` does not — a require would break the
+/// published module at import. `panel-routing.test.js` asserts these two lists against the
+/// matrix instead, so a class added there and forgotten here fails the suite rather than being
+/// silently downgraded.
+const CLASSES = Object.freeze([
+  'standard-feature', 'bulk-mechanical', 'debug-mystery', 'security-sensitive',
+  'test-verification', 'agentic-long-run', 'extreme-end-to-end',
+]);
+
+/// Matrix classes with no implement or verify lane. They are legal to name in a plan and this
+/// panel cannot seat them, so naming one is refused with its own reason rather than quietly
+/// becoming ordinary feature work.
+const UNROUTABLE_CLASSES = Object.freeze([
+  'architecture-planning', 'long-context-analysis', 'review-adversarial', 'research-synthesis',
+]);
 
 /// Units one block may ask for. Past this the lead hears which ones did not go out.
 const MAX_UNITS = 8;
@@ -30,6 +46,8 @@ const BUILDER_PREFERENCE = Object.freeze({
   'debug-mystery': ['anthropic', 'openai', 'google'],
   'security-sensitive': ['anthropic', 'openai', 'google'],
   'test-verification': ['openai', 'anthropic', 'google'],
+  'agentic-long-run': ['anthropic', 'openai', 'google'],
+  'extreme-end-to-end': ['openai', 'anthropic', 'google'],
 });
 
 const CHECKER_PREFERENCE = Object.freeze({
@@ -37,17 +55,35 @@ const CHECKER_PREFERENCE = Object.freeze({
   default: ['openai', 'anthropic', 'google'],
 });
 
-/// Security work is the one class where a single review is not enough to let a change land.
-function isCritical(unitClass) {
-  return unitClass === 'security-sensitive';
+/// A class named in a block, however the lead spelled it.
+///
+/// Naming NOTHING and naming something WRONG are different facts and answered differently. A
+/// unit that names no class is ordinary feature work, which asks least of the panel and cannot
+/// escalate anything. A unit that names a class this panel does not have is refused: before
+/// 2026-09-18 `securty-sensitive` became `standard-feature` in silence, and a security unit
+/// then landed on two approvals instead of three with nothing in the run to say so.
+function classNamed(raw) {
+  if (raw === undefined || raw === null) return 'standard-feature';
+  if (typeof raw !== 'string') {
+    throw new TypeError(`a unit's class must be a string or absent, got ${typeof raw}`);
+  }
+  const trimmed = raw.trim();
+  if (trimmed === '') return 'standard-feature';
+  const key = trimmed.toLowerCase().replace(/[\s_]+/g, '-');
+  if (CLASSES.includes(key)) return key;
+  if (UNROUTABLE_CLASSES.includes(key)) {
+    throw new RangeError(`${key} is a matrix class with no implement or verify lane, so this panel cannot seat it. Routable classes: ${CLASSES.join(', ')}`);
+  }
+  throw new RangeError(`unknown task class ${JSON.stringify(raw)}. Routable classes: ${CLASSES.join(', ')}`);
 }
 
-/// A class named in a block, however the lead spelled it. Anything unrecognised is ordinary
-/// feature work, which is the class that asks least of the panel.
-function classNamed(raw) {
-  if (typeof raw !== 'string') return 'standard-feature';
-  const key = raw.trim().toLowerCase().replace(/[\s_]+/g, '-');
-  return CLASSES.includes(key) ? key : 'standard-feature';
+/// Security work is the one class where a single review is not enough to let a change land.
+///
+/// Normalises through classNamed rather than comparing the raw string, so the two can never
+/// disagree about one input. They did: classNamed('security_sensitive') answered
+/// 'security-sensitive' while isCritical on the same string answered false.
+function isCritical(unitClass) {
+  return classNamed(unitClass) === 'security-sensitive';
 }
 
 /// The three seats in panel order, with any the caller left out filled in.
@@ -158,7 +194,15 @@ function route({ units, seats, readyVendors, criticalTwoReviews = true } = {}) {
     }
     for (const file of files) claimed.set(normalizedPath(file), unit.id);
 
-    const unitClass = classNamed(unit.class);
+    // A class this panel cannot seat drops the unit and says why. Routing it as something
+    // easier is the failure this refuses.
+    let unitClass;
+    try {
+      unitClass = classNamed(unit.class);
+    } catch (err) {
+      dropped.push({ unitId: unit.id, reason: err.message });
+      continue;
+    }
     const builder = pick(panel, BUILDER_PREFERENCE[unitClass], builderLoad);
     builderLoad[builder] = (builderLoad[builder] || 0) + 1;
     const rest = panel.filter((seat) => seat.slot !== builder);
@@ -187,6 +231,7 @@ function route({ units, seats, readyVendors, criticalTwoReviews = true } = {}) {
 
 module.exports = {
   BUILDER_PREFERENCE, CHECKER_PREFERENCE, CLASSES, MAX_UNITS, SEAT_VENDORS, SLOTS,
+  UNROUTABLE_CLASSES,
   VENDORS_FOR_FULL_INDEPENDENCE,
   classNamed, isCritical, normalizedPath, ordered, readiness, route,
 };
