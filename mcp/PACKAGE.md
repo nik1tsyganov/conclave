@@ -69,3 +69,6 @@ CONCLAVE by Nikita Tsyganov. Copyright (c) 2026 Nikita Tsyganov.
 GNU Affero General Public License v3.0 only, with additional terms under section 7. See
 `LICENSE` and `ADDITIONAL-TERMS.md`. Running a modified version over a network obliges you to
 offer its source to those who use it.
+
+This package ships as its source: plain JavaScript, unminified, no build step and no
+dependencies. What you install is what runs.
