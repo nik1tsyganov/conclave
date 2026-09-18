@@ -12,6 +12,7 @@ suite, a note about what it does differently.
 | Directory | Host | What is here |
 |---|---|---|
 | `droppy/` | Droppy Code's "Three Brains" | The conformance suite for a host that runs its own seats and asks this runtime only for the rules |
+| `vscode/` | VS Code | An extension that supplies the MCP server definition, and nothing else |
 
 The policy note for each host stays with the runtime policy, under
 `.cursor/skills/conclave-cli/references/`, because that is what `conclave-whoami`

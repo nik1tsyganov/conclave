@@ -1,0 +1,33 @@
+{
+  "name": "conclave",
+  "displayName": "CONCLAVE",
+  "description": "A tri-vendor review panel: one seat builds, two check it, and the votes are counted in code.",
+  "version": "0.1.0",
+  "publisher": "nik1tsyganov",
+  "license": "AGPL-3.0-only",
+  "repository": { "type": "git", "url": "https://github.com/nik1tsyganov/conclave.git", "directory": "hosts/vscode" },
+  "engines": { "vscode": "^1.101.0" },
+  "categories": ["AI", "Chat"],
+  "main": "./extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "mcpServerDefinitionProviders": [
+      { "id": "conclave.servers", "label": "CONCLAVE" }
+    ],
+    "configuration": {
+      "title": "CONCLAVE",
+      "properties": {
+        "conclave.serverPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to `mcp/server.js` in a CONCLAVE checkout. Empty uses a checkout in this workspace if there is one, and the published `conclave-mcp` package otherwise. A path that is set and not there is an error, never a fall back to a different server."
+        },
+        "conclave.rulesOnly": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Serve only the six tools that answer from JSON — read a block, route it, read a reply, count a panel — and refuse the four that drive a run. For an editor that reads verdicts rather than convening panels."
+        }
+      }
+    }
+  }
+}

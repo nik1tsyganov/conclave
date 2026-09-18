@@ -117,13 +117,14 @@ Sibling repositories, indexed rather than merged: [ai-ops-vault](https://github.
 
 ## Hosts
 
-The hosting session runs the tools and holds no vote, so any host is legal. Four exist:
+The hosting session runs the tools and holds no vote, so any host is legal. Five exist:
 
 | Host | What it is | Arbiter |
 |---|---|---|
 | `cursor-cli` | A Cursor chat driving the CLI runtime | Jev |
 | `synara` | Synara driving the same runtime | Jev |
 | `claude-code` | A Claude Code session driving it | none required |
+| `vscode` | A VS Code chat driving it over MCP | none required |
 | `droppy` | Droppy Code's "Three Brains", a native macOS app keeping its own seats | none; counted in code |
 
 `droppy` is the first host that is not a terminal session, and the first that keeps its own
@@ -140,7 +141,11 @@ node mcp/server.js
 ```
 
 A stdio MCP server, so any host that speaks MCP can convene a panel without a plugin written
-for it: VS Code, Cursor, Zed, Claude Desktop, the JetBrains IDEs. Convening is not one call,
+for it: VS Code, Cursor, Zed, Claude Desktop, the JetBrains IDEs. Registered and answering on
+this machine in Claude Code, Cursor and VS Code 1.138, which reports `Discovered 10 tools`.
+[hosts/vscode/](hosts/vscode/) is an extension that supplies the server definition so nobody
+holds a path; it contributes no tool of its own, so a change here reaches the editor with
+nothing rebuilt there. Convening is not one call,
 because a panel outlives any tool call: seal, drive a phase, attest, read the report. See
 [mcp/README.md](mcp/README.md).
 

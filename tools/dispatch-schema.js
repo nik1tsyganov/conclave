@@ -4,11 +4,13 @@
 const VENDORS = Object.freeze(['anthropic', 'openai', 'google']);
 const ROLES = Object.freeze(['implement', 'verify', 'review', 'plan', 'research']);
 // Every host that may write a row. `cursor` is the legacy Cursor Task mode.
-const HOST_MODES = Object.freeze(['cursor', 'cursor-cli', 'synara', 'claude-code', 'droppy']);
+const HOST_MODES = Object.freeze(['cursor', 'cursor-cli', 'synara', 'claude-code', 'vscode', 'droppy']);
 // Hosts whose seats are native vendor CLIs, which is what proof of invocation rests on: a
 // session id and a token count come from the vendor's own process. Droppy Code is a GUI, but
-// its seats are the same vendor CLIs run the same way, so its rows carry the same proof.
-const CLI_HOST_MODES = Object.freeze(['cursor-cli', 'synara', 'claude-code', 'droppy']);
+// its seats are the same vendor CLIs run the same way, so its rows carry the same proof, and
+// so does an editor driving the MCP server: what kind of thing started a seat is not what the
+// proof rests on (`vscode`, added 2026-09-18, measured against VS Code 1.138).
+const CLI_HOST_MODES = Object.freeze(['cursor-cli', 'synara', 'claude-code', 'vscode', 'droppy']);
 
 function isCliHostMode(hostMode) {
   return CLI_HOST_MODES.includes(hostMode);
