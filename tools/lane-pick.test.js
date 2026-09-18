@@ -53,3 +53,40 @@ test('an unroutable class refuses rather than guessing', () => {
   assert.throws(() => lanesFor(matrix, 'research-synthesis', 'implement'), /has no implement lane/);
   assert.throws(() => lanesFor(matrix, 'made-up-nonsense', 'implement'), /unknown class/);
 });
+
+// No seat is tied to a vendor. Owner requirement 2026-09-18: any vendor, model and effort may
+// hold any seat, decided by lane priority and availability rather than by position.
+const { seatPanel } = require('./lane-pick.js');
+const everything = (classId) => ['implement', 'verify', 'review']
+  .flatMap((role) => (matrix.classes[classId][role] || [])
+    .map((l) => ({ vendor: l.vendor, model: l.model, effort: l.effort, status: 'PASS' })));
+
+test('a seated panel puts three different vendors in three seats', () => {
+  for (const classId of Object.keys(matrix.classes).filter((c) => matrix.classes[c].implement)) {
+    const seated = seatPanel(classId, everything(classId));
+    assert.equal(seated.ok, true, `${classId}: ${seated.reason || ''}`);
+    const vendors = ['implement', 'verify', 'review'].map((r) => seated.seats[r].vendor);
+    assert.equal(new Set(vendors).size, 3, `${classId} seated ${vendors} - the builder is recused, so a checker on its vendor cannot vote`);
+  }
+});
+
+test('any vendor can be pinned to any seat, and the rest re-seat around it', () => {
+  const classId = 'standard-feature';
+  const lanes = everything(classId);
+  for (const role of ['implement', 'verify', 'review']) {
+    for (const vendor of ['openai', 'anthropic', 'google']) {
+      const seated = seatPanel(classId, lanes, { prefer: { [role]: vendor } });
+      assert.equal(seated.ok, true, `${vendor} pinned to ${role}: ${seated.reason || ''}`);
+      assert.equal(seated.seats[role].vendor, vendor, 'the pin is honoured');
+      const vendors = ['implement', 'verify', 'review'].map((r) => seated.seats[r].vendor);
+      assert.equal(new Set(vendors).size, 3, 'and the others move out of its way');
+    }
+  }
+});
+
+test('one usable vendor refuses, and names every rung it tried', () => {
+  const onlyOne = everything('bulk-mechanical').filter((l) => l.vendor === 'openai');
+  const seated = seatPanel('bulk-mechanical', onlyOne);
+  assert.equal(seated.ok, false);
+  assert.match(seated.reason, /vendor already seated|no passing probe/);
+});

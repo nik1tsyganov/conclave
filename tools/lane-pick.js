@@ -61,7 +61,52 @@ function pickLane(classId, role, available, { excludeVendors = [], matrix = load
   };
 }
 
-module.exports = { lanesFor, isAvailable, pickLane };
+/// Seat a whole panel for a class: who builds, who verifies, who reviews.
+///
+/// No slot is tied to a vendor. Any vendor, model and effort the class's lanes allow may hold
+/// any seat; the order they come out in is decided by lane priority and by what has a passing
+/// probe, never by position. Independence is the only structural constraint: the builder is
+/// recused from the count, so the two checking seats must sit on two vendors, neither of them
+/// the builder's - a panel that cannot reach two approving vendors cannot pass, and refusing
+/// here costs nothing where discovering it after three live dispatches costs three.
+///
+/// `prefer` lets a caller pin any seat (`{ implement: 'google' }`) and the rest seats around it.
+function seatPanel(classId, available, { prefer = {}, matrix = loadMatrix() } = {}) {
+  const seats = {};
+  const taken = [];
+  // Pinned seats are placed first, so pinning a vendor re-seats the others around it rather
+  // than colliding with whoever the free pass happened to take.
+  const roles = ['implement', 'verify', 'review'];
+  const order = [...roles.filter((r) => prefer[r]), ...roles.filter((r) => !prefer[r])];
+  for (const role of order) {
+    // Every seat excludes every vendor already seated, the builder included. The builder is
+    // recused from the count, so a checking seat on its vendor would be an elector that cannot
+    // vote; and two checking seats on one vendor are one elector casting both votes. All three
+    // distinct is the only arrangement that can reach two approving vendors.
+    const exclude = [...taken];
+    const wanted = prefer[role];
+    const picked = pickLane(classId, role, available, { excludeVendors: exclude, matrix });
+    let lane = picked.ok ? picked.lane : null;
+    if (wanted) {
+      const pinned = lanesFor(matrix, classId, role)
+        .find((l) => l.vendor === wanted && !exclude.includes(l.vendor) && isAvailable(available, l));
+      if (!pinned) {
+        return { ok: false, reason: `${role} was pinned to ${wanted}, which has no available lane for ${classId}${exclude.includes(wanted) ? ' and is already seated' : ''}` };
+      }
+      lane = pinned;
+    }
+    if (!lane) return { ok: false, reason: picked.reason, seats };
+    seats[role] = lane;
+    taken.push(lane.vendor);
+  }
+  const checkingVendors = new Set([seats.verify.vendor, seats.review.vendor]);
+  if (checkingVendors.size < 2) {
+    return { ok: false, reason: `both checking seats landed on ${[...checkingVendors][0]}, so one elector would cast both votes`, seats };
+  }
+  return { ok: true, seats, vendors: taken };
+}
+
+module.exports = { lanesFor, isAvailable, pickLane, seatPanel };
 
 if (require.main === module) {
   const argv = process.argv.slice(2);
