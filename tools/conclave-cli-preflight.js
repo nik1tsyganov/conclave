@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { TextDecoder } = require('node:util');
 const { resolveVendorBinary } = require('./vendor-binaries.js');
-const { FINGERPRINT_V2, listRuleFiles } = require('./cli-rules-stage.js');
+const { DEFAULT_RULES_ROOT, FINGERPRINT_V2, listRuleFiles } = require('./cli-rules-stage.js');
 const { FORBIDDEN_ARBITER_SKILLS, regularFiles } = require('./cli-skill-stage.js');
 const { CLI_RUNTIME_TOOLS, canonicalPlainPath, resolveRulesRoot, resolveRuntimePaths } = require('./runtime-paths.js');
 const { resolveVaultRoot } = require('./conclave-vault.js');
@@ -90,11 +90,12 @@ function check(options = {}) {
 
   let rulesRoot;
   record('rules:root', () => {
-    rulesRoot = canonicalPlainPath(resolveRulesRoot({ rulesRoot: options.rulesRoot, env: options.env }));
+    // The same resolution staging uses, so preflight cannot pass a pack a run would not stage.
+    rulesRoot = canonicalPlainPath(resolveRulesRoot({ rulesRoot: options.rulesRoot, env: options.env, defaultRulesRoot: DEFAULT_RULES_ROOT }));
     const files = regularFiles(rulesRoot);
     for (const relative of ['STANDING.md', 'VENDOR.md', 'RULES/INDEX.md']) {
       const file = path.join(rulesRoot, ...relative.split('/'));
-      if (!files.includes(file)) throw new Error(`external rules pack missing ${relative}; set CONCLAVE_RULES_ROOT or pass rulesRoot`);
+      if (!files.includes(file)) throw new Error(`rules pack missing ${relative} at ${rulesRoot}; unset CONCLAVE_RULES_ROOT to use the shipped pack, or point it at a complete one`);
       if (!fs.readFileSync(file, 'utf8').trim()) throw new Error(`required rule content is empty: ${relative}`);
     }
     return { value: rulesRoot };
