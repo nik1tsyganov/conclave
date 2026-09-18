@@ -13,7 +13,8 @@
     "check:cross-repo": "node tools/cross-repo-check.js",
     "dashboard": "node tools/conclave-dashboard.js",
     "drive": "node tools/run-drive.js",
-    "package": "node tools/npm-package.js --out dist/conclave-mcp"
+    "package": "node tools/npm-package.js --out dist/conclave-mcp",
+    "publish:mcp": "npm run package && npm publish ./dist/conclave-mcp --access public"
   },
   "keywords": [
     "conclave",

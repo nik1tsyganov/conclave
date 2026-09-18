@@ -57,7 +57,9 @@ function build(outDir) {
     engines: { node: '>=20' },
     author: repo.author,
     license: repo.license,
-    repository: repo.repository,
+    // The shape npm wants, so publishing corrects nothing and warns about nothing.
+    repository: { type: 'git', url: 'git+https://github.com/nik1tsyganov/conclave.git' },
+    homepage: 'https://github.com/nik1tsyganov/conclave',
   };
   fs.writeFileSync(path.join(outDir, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
   return { outDir, manifest, files: [...FILES, 'README.md', 'package.json'].sort() };
