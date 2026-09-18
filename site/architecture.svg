@@ -1,19 +1,102 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 760" role="img" aria-labelledby="t d">
-<title id="t">CONCLAVE enforcement architecture</title><desc id="d">Flow from arbiter classification through deterministic policy, seat execution, proof and tally.</desc>
-<defs><style>.b{fill:#0c111c;stroke:#34435e;stroke-width:2}.t{font:700 22px system-ui,sans-serif;fill:#f6f8fc}.s{font:500 15px system-ui,sans-serif;fill:#aab6c9}.a{stroke:#ff476d;stroke-width:4;fill:none;marker-end:url(#m)}.g{fill:#10283c;stroke:#2f9cff;stroke-width:2}.o{fill:#2e2511;stroke:#f5b93d;stroke-width:2}.gr{fill:#10291d;stroke:#36d88f;stroke-width:2}.x{fill:#29121b;stroke:#ff476d;stroke-width:2}.mono{font:600 14px ui-monospace,monospace;fill:#d7deea}</style><marker id="m" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#ff476d"/></marker></defs>
-<rect width="1400" height="760" fill="#05070b"/>
-<text x="70" y="62" class="t" font-size="34">CONCLAVE / code-enforced dispatch</text><text x="70" y="92" class="s">The model proposes. Deterministic policy decides what is legal.</text>
-<g transform="translate(70 145)"><rect width="210" height="105" rx="16" class="x"/><text x="105" y="42" text-anchor="middle" class="t">Jev engine</text><text x="105" y="69" text-anchor="middle" class="s">classifies + proposes plan</text><text x="105" y="90" text-anchor="middle" class="s">never implements or votes</text></g>
-<path class="a" d="M280 198h100"/>
-<g transform="translate(380 130)"><rect width="280" height="135" rx="16" class="b"/><text x="140" y="38" text-anchor="middle" class="t">Dispatch policy</text><text x="140" y="66" text-anchor="middle" class="mono">dispatch-matrix.json</text><text x="140" y="91" text-anchor="middle" class="s">class · vendor · model · effort</text><text x="140" y="115" text-anchor="middle" class="s">distribution · probes · cross-review</text></g>
-<path class="a" d="M660 198h90"/>
-<g transform="translate(750 130)"><rect width="270" height="135" rx="16" class="b"/><text x="135" y="38" text-anchor="middle" class="t">Seat policy</text><text x="135" y="66" text-anchor="middle" class="mono">seat-profiles.json</text><text x="135" y="91" text-anchor="middle" class="s">role · permissions · skills</text><text x="135" y="115" text-anchor="middle" class="s">leaf-only · required proof</text></g>
-<path class="a" d="M1020 198h90"/>
-<g transform="translate(1110 130)"><rect width="220" height="135" rx="16" class="b"/><text x="110" y="38" text-anchor="middle" class="t">Rules gate</text><text x="110" y="66" text-anchor="middle" class="mono">R01–R22</text><text x="110" y="91" text-anchor="middle" class="s">hashed + staged</text><text x="110" y="115" text-anchor="middle" class="s">fail closed</text></g>
-<path class="a" d="M1220 265v75H700"/>
-<g transform="translate(180 365)"><rect width="290" height="150" rx="18" class="g"/><text x="145" y="40" text-anchor="middle" class="t">Melchior / OpenAI</text><text x="145" y="70" text-anchor="middle" class="s">Luna → Terra → Sol → Astra</text><text x="145" y="100" text-anchor="middle" class="s">workspace-write or read-only</text><text x="145" y="126" text-anchor="middle" class="s">session + tokens + model proof</text></g>
-<g transform="translate(555 365)"><rect width="290" height="150" rx="18" class="o"/><text x="145" y="40" text-anchor="middle" class="t">Balthasar / Anthropic</text><text x="145" y="70" text-anchor="middle" class="s">Sonnet · Fable · Opus by role</text><text x="145" y="100" text-anchor="middle" class="s">implementation vs judgment</text><text x="145" y="126" text-anchor="middle" class="s">native model + effort + usage</text></g>
-<g transform="translate(930 365)"><rect width="290" height="150" rx="18" class="gr"/><text x="145" y="40" text-anchor="middle" class="t">Casper / Google</text><text x="145" y="70" text-anchor="middle" class="s">Flash → Pro</text><text x="145" y="100" text-anchor="middle" class="s">exact observed slug required</text><text x="145" y="126" text-anchor="middle" class="s">conversation + usage + model proof</text></g>
-<path class="a" d="M325 515v85h375"/><path class="a" d="M700 515v85"/><path class="a" d="M1075 515v85H700"/>
-<g transform="translate(495 600)"><rect width="410" height="105" rx="16" class="x"/><text x="205" y="37" text-anchor="middle" class="t">Proof → telemetry → tally → approval</text><text x="205" y="67" text-anchor="middle" class="s">receipts are structured evidence, not claims</text><text x="205" y="89" text-anchor="middle" class="s">deterministic failure cannot be waived</text></g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" width="1000" height="640" role="img" aria-labelledby="ttl dsc">
+<title id="ttl">CONCLAVE enforcement architecture</title>
+<desc id="dsc">The arbiter proposes. Deterministic policy constrains every proposal. Three seats execute under that policy, each a leaf. Evidence, not assertion, decides the outcome, and the unit's own check gates the landing without joining the count.</desc>
+<!-- Named by ROLE and by RULE, never by vendor or model. The previous version of this diagram
+     named four models that were retired within the month; the catalog lives in
+     .cursor/skills/conclave-cli/references/dispatch-matrix.json and nowhere else. -->
+<defs>
+  <style>
+    :root { --bg:#f5f0e8; --ink:#3a332c; --muted:#7a7066; --rub:#8f3d24; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#16120e; --ink:#ebe5dc; --muted:#9d938a; --rub:#c2664a; }
+    }
+    svg   { color: var(--ink); }
+    .bg   { fill: var(--bg); }
+    .box  { fill:none; stroke:var(--ink); stroke-width:1.6; }
+    .rub  { stroke:var(--rub); }
+    .fill { fill:var(--ink); }
+    .wire { fill:none; stroke:var(--ink); stroke-width:1.6; }
+    .head { font:400 22px Cinzel,Georgia,serif; fill:var(--ink); letter-spacing:.06em; }
+    .band { font:400 11px ui-monospace,SFMono-Regular,Menlo,monospace; fill:var(--rub); letter-spacing:.18em; }
+    .t    { font:400 13px ui-monospace,SFMono-Regular,Menlo,monospace; fill:var(--ink); }
+    .ts   { font:400 11px ui-monospace,SFMono-Regular,Menlo,monospace; fill:var(--ink); opacity:.82; }
+    .tm   { font:400 10px ui-monospace,SFMono-Regular,Menlo,monospace; fill:var(--muted); }
+  </style>
+  <pattern id="h" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+    <line x1="0" y1="0" x2="0" y2="4" stroke="currentColor" stroke-width=".7" opacity=".32"/>
+  </pattern>
+  <pattern id="hx" width="7" height="7" patternUnits="userSpaceOnUse">
+    <path d="M0 0h7M0 0v7" stroke="currentColor" stroke-width=".6" opacity=".28"/>
+  </pattern>
+</defs>
+
+<rect class="bg" x="0" y="0" width="1000" height="640"/>
+<text class="head" x="8" y="32">Enforcement architecture</text>
+<text class="tm"   x="8" y="52">The model proposes. Deterministic policy decides what is legal. Evidence, not assertion, decides the outcome.</text>
+
+<text class="band" x="8" y="96">ARBITER</text>
+<rect class="box" x="8" y="108" width="420" height="62" rx="2" stroke-dasharray="5 4"/>
+<text class="t"  x="26" y="132">Proposes, and is counted in nothing</text>
+<text class="ts" x="26" y="152">task class &#183; which seats &#183; the tally distributions</text>
+<text class="tm" x="444" y="134">Never implements, verifies, reviews or votes.</text>
+<text class="tm" x="444" y="152">Never holds a seat. Reads no files, dispatches nothing.</text>
+<path class="wire" d="M218 170v26"/><path class="fill" d="M212 190l6 8 6-8"/>
+
+<text class="band" x="8" y="222">POLICY &#183; EVERY PROPOSAL PASSES THROUGH IT</text>
+<g>
+  <rect class="box" x="8" y="234" width="312" height="78" rx="2"/>
+  <text class="t"  x="26" y="258">Dispatch matrix</text>
+  <text class="ts" x="26" y="278">the legal lane per task class and role</text>
+  <text class="tm" x="26" y="298">refuses a route it does not allow</text>
+
+  <rect class="box" x="336" y="234" width="312" height="78" rx="2"/>
+  <text class="t"  x="354" y="258">Seat profiles</text>
+  <text class="ts" x="354" y="278">role &#183; permissions &#183; readable skills</text>
+  <text class="tm" x="354" y="298">generated into a contract the seat reads</text>
+
+  <rect class="box" x="664" y="234" width="328" height="78" rx="2" fill="url(#h)"/>
+  <text class="t"  x="682" y="258">Rules pack</text>
+  <text class="ts" x="682" y="278">STANDING + R01&#8211;R22, hashed and staged</text>
+  <text class="tm" x="682" y="298">a named root that cannot be read stops the run</text>
+</g>
+<path class="wire" d="M218 312v26"/><path class="fill" d="M212 332l6 8 6-8"/>
+
+<text class="band" x="8" y="364">SEATS &#183; EACH ONE A LEAF</text>
+<g>
+  <rect class="box rub" x="8" y="376" width="312" height="72" rx="2" fill="url(#h)"/>
+  <text class="t"  x="26" y="400" fill="currentColor">Ponens builds</text>
+  <text class="ts" x="26" y="420">its own worktree &#183; declared paths only</text>
+  <text class="tm" x="26" y="438">its tree moved: never a counted vote</text>
+
+  <rect class="box" x="336" y="376" width="312" height="72" rx="2"/>
+  <text class="t"  x="354" y="400">Scrutator verifies</text>
+  <text class="ts" x="354" y="420">read-only &#183; a session of its own</text>
+  <text class="tm" x="354" y="438">never the vendor that built the unit</text>
+
+  <rect class="box" x="664" y="376" width="328" height="72" rx="2"/>
+  <text class="t"  x="682" y="400">Advocatus reviews</text>
+  <text class="ts" x="682" y="420">read-only &#183; a session of its own</text>
+  <text class="tm" x="682" y="438">a third vendor wherever the class allows one</text>
+</g>
+<text class="tm" x="8" y="466">No seat may open a seat: sub-agent tools are disallowed at launch, and a seat that used one fails proof.</text>
+<path class="wire" d="M218 474v26"/><path class="fill" d="M212 494l6 8 6-8"/>
+
+<text class="band" x="8" y="526">EVIDENCE &#183; WHAT MAKES A VOTE A VOTE</text>
+<g>
+  <rect class="box" x="8" y="538" width="312" height="72" rx="2"/>
+  <text class="t"  x="26" y="562">Proof of the seat</text>
+  <text class="ts" x="26" y="582">session &#183; tokens &#183; the model that answered</text>
+  <text class="tm" x="26" y="600">missing one, the vote does not count</text>
+
+  <rect class="box" x="336" y="538" width="312" height="72" rx="2"/>
+  <text class="t"  x="354" y="562">Write audit</text>
+  <text class="ts" x="354" y="582">both trees, or neither</text>
+  <text class="tm" x="354" y="600">a missing audit allows nothing</text>
+
+  <rect class="box" x="664" y="538" width="328" height="72" rx="2" fill="url(#hx)"/>
+  <text class="t"  x="682" y="562">Counted in code</text>
+  <text class="ts" x="682" y="582">receipts bound into one transaction</text>
+  <text class="tm" x="682" y="600">no model is asked what the panel decided</text>
+</g>
+<text class="tm" x="8" y="628">The unit&#8217;s own check gates the landing and never joins the count. An outcome word this build cannot read is a split, never a passage.</text>
 </svg>

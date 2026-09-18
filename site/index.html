@@ -1,181 +1,1379 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="CONCLAVE coordinates AI engineering across three vendors through sealed plans, native evidence, and independent review. Runs on macOS, from a terminal session, a native app or any MCP host.">
-  <title>CONCLAVE — a sealed panel for AI engineering</title>
-  <link rel="stylesheet" href="styles.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CONCLAVE — extra omnes</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<script>document.documentElement.classList.add('js')</script>
+<style>
+/* design · reading-mode: Flow (Impact opening) · composition: Stack over Canvas
+ * vector: single-gesture/medium/warm/tactile-decorated
+ * palette: unchanged from the previous build at the owner's instruction (parchment · ink · rubric)
+ * illustration: original engraved line-work — armillary, geometric field, chapel flue, route plate.
+ *   Hatching is an SVG <pattern>, as the old plates used. No third-party scans: public-domain
+ *   artwork is still someone's file, someone's host and someone's terms.
+ * ship-check: Intent ok · Hierarchy ok · Craft ok · Restraint ok · Distinctness ok
+ */
+:root {
+  --background: oklch(0.962 0.014 84);
+  --foreground: oklch(0.225 0.018 56);
+  --muted: oklch(0.475 0.020 56);
+  --border: oklch(0.868 0.016 78);
+  --card: oklch(0.985 0.008 84);
+  --primary: oklch(0.468 0.160 32);
+  --primary-foreground: oklch(0.985 0.008 84);
+  --ring: oklch(0.468 0.160 32);
+  --ok: oklch(0.430 0.086 148);
+  --smoke-black: oklch(0.165 0.012 52);
+  --smoke-white: oklch(0.975 0.006 84);
+  --sky: oklch(0.585 0.022 240);
+  --field: oklch(0.225 0.018 56 / 0.075);   /* the diagram behind everything */
+  --field-rubric: oklch(0.468 0.160 32 / 0.10);
+
+  --font-inscription: "Cinzel", "Trajan Pro", Georgia, serif;
+  --font-text: "EB Garamond", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  --type-label: 0.6875rem; --type-small: 0.875rem; --type-body: 1.1875rem;
+  --type-lead: 1.375rem;
+  --type-section: clamp(1.75rem, 4vw, 2.5rem);
+  --type-display: clamp(3rem, 11vw, 7rem);
+
+  --space-xs: 0.5rem;  --space-sm: 1rem;   --space-md: 1.75rem;
+  --space-lg: 3rem;    --space-xl: 5rem;   --space-2xl: 8rem;
+  --radius-sm: 2px;
+  --rule: 1px solid var(--border);
+  --rule-heavy: 2px solid var(--foreground);
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --dur: 220ms;
+  --scroll: 0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: oklch(0.158 0.014 52);
+    --foreground: oklch(0.912 0.016 80);
+    --muted: oklch(0.645 0.018 72);
+    --border: oklch(0.292 0.016 56);
+    --card: oklch(0.195 0.014 52);
+    --primary: oklch(0.672 0.145 38);
+    --primary-foreground: oklch(0.158 0.014 52);
+    --ring: oklch(0.672 0.145 38);
+    --ok: oklch(0.680 0.090 150);
+    --smoke-black: oklch(0.105 0.008 52);
+    --smoke-white: oklch(0.955 0.010 80);
+    --sky: oklch(0.415 0.026 245);
+    --field: oklch(0.912 0.016 80 / 0.085);
+    --field-rubric: oklch(0.672 0.145 38 / 0.13);
+  }
+}
+* { box-sizing: border-box; }
+html, body { overflow-x: clip; }
+body {
+  margin: 0; background: var(--background); color: var(--foreground);
+  font-family: var(--font-text); font-size: var(--type-body); line-height: 1.58;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+.wrap { max-width: 68rem; margin: 0 auto; padding: 0 var(--space-sm); position: relative; }
+.measure { max-width: 34rem; }
+a { color: inherit; text-underline-offset: 0.2em; }
+:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; border-radius: var(--radius-sm); }
+.skip { position: absolute; left: -9999px; }
+.skip:focus { left: var(--space-sm); top: var(--space-sm); background: var(--card); padding: var(--space-xs) var(--space-sm); z-index: 9; }
+.plate { display: block; width: 100%; height: auto; color: var(--foreground); }
+
+/* ——— the field: a geometric plate behind the whole page ——— */
+#field { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+#field svg { position: absolute; left: 50%; top: 50%; width: min(190vmax, 2200px); height: min(190vmax, 2200px);
+  transform: translate(-50%, calc(-50% + var(--scroll) * -70px)); will-change: transform; }
+.orbit { transform-origin: 600px 600px; animation: turn linear infinite; }
+.orbit--i   { animation-duration: 360s; }
+.orbit--ii  { animation-duration: 520s; animation-direction: reverse; }
+.orbit--iii { animation-duration: 240s; }
+@keyframes turn { to { transform: rotate(360deg); } }
+
+/* ——— reveal, staggered ——— */
+/* Only a page that is running the script may hide anything: without it there is nothing to
+   put the content back. Found by a Gemini review seat, 2026-09-18. */
+.ready .rise { opacity: 0; transform: translateY(16px); transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out); }
+.rise.seen { opacity: 1; transform: none; }
+/* Without the script the panel cannot compute, so it must not look as though it did:
+   the controls are disabled and the shown verdict is labelled an example. Found by a Codex
+   review seat, 2026-09-18. */
+/* The controls carry `disabled` in the markup and the script removes it once it has wired
+   them up, so a keyboard can never reach a control that answers nothing. This only dims
+   what is already dead. `.ready` is set at the END of setup: a throw anywhere before that
+   leaves the page in its no-script state, which is complete, rather than blank. */
+html:not(.ready) .ballots input, html:not(.ready) #check, html:not(.ready) #reset { opacity: 0.45; }
+html:not(.ready) .choice { cursor: default; }
+html:not(.ready) #announce::before { content: "An example. Turn scripting on to set the seats yourself."; display: block;
+  font-family: var(--font-mono); font-size: var(--type-label); letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--primary); margin-bottom: var(--space-sm); }
+.ready .stagger > * { opacity: 0; transform: translateY(12px); transition: opacity 560ms var(--ease-out), transform 560ms var(--ease-out); }
+.stagger.seen > * { opacity: 1; transform: none; }
+.stagger.seen > *:nth-child(1) { transition-delay: 0ms; }
+.stagger.seen > *:nth-child(2) { transition-delay: 70ms; }
+.stagger.seen > *:nth-child(3) { transition-delay: 140ms; }
+.stagger.seen > *:nth-child(4) { transition-delay: 210ms; }
+.stagger.seen > *:nth-child(5) { transition-delay: 280ms; }
+
+/* ——— masthead ——— */
+.mast { border-bottom: var(--rule-heavy); position: sticky; top: 0; z-index: 5;
+  background: color-mix(in oklch, var(--background) 88%, transparent); backdrop-filter: blur(7px); }
+.mast .wrap { display: flex; align-items: center; gap: var(--space-md); padding-block: var(--space-sm); flex-wrap: wrap; }
+.wordmark { display: flex; align-items: center; gap: 0.7rem; text-decoration: none; }
+.wordmark svg { width: 22px; height: 22px; flex: none; }
+.wordmark svg path { stroke-dasharray: 14; stroke-dashoffset: 14; animation: draw 900ms var(--ease-out) forwards; }
+.wordmark svg path:nth-child(1) { animation-delay: 60ms; }
+.wordmark svg path:nth-child(2) { animation-delay: 200ms; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.wordmark b { font-family: var(--font-inscription); font-weight: 600; font-size: 1.0625rem; letter-spacing: 0.22em; text-transform: uppercase; }
+.mast nav { margin-left: auto; display: flex; gap: var(--space-md); font-size: var(--type-small); }
+.mast nav a { color: var(--muted); text-decoration: none; letter-spacing: 0.04em; position: relative; }
+.mast nav a::after { content: ""; position: absolute; left: 0; right: 0; bottom: -3px; height: 1px; background: var(--primary); transform: scaleX(0); transform-origin: left; transition: transform var(--dur) var(--ease-out); }
+.mast nav a:hover { color: var(--primary); }
+.mast nav a:hover::after { transform: scaleX(1); }
+
+/* ——— the gate ——— */
+.gate { padding-block: var(--space-2xl) var(--space-xl); border-bottom: var(--rule); position: relative; }
+.gate .wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); align-items: center; }
+.epigraph {
+  font-family: var(--font-inscription); font-weight: 400; font-size: var(--type-display);
+  line-height: 0.94; letter-spacing: -0.012em; margin: 0; text-transform: uppercase;
+  overflow-wrap: anywhere; min-width: 0;
+}
+.epigraph span { display: block; opacity: 0; transform: translateY(0.22em); animation: settle 1100ms var(--ease-out) forwards; }
+.epigraph .rubric { color: var(--primary); animation-delay: 190ms; }
+@keyframes settle { to { opacity: 1; transform: none; } }
+.gloss { font-family: var(--font-mono); font-size: var(--type-label); letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin: var(--space-md) 0 0; opacity: 0; animation: settle 900ms var(--ease-out) 520ms forwards; }
+/* the product, stated before the ceremony, because a sceptic leaves in four seconds */
+.plainly { font-family: var(--font-mono); font-size: var(--type-body); letter-spacing: 0.02em;
+  margin: var(--space-sm) 0 0; color: var(--foreground); }
+.thesis { font-size: var(--type-lead); margin: 0; }
+.thesis em { font-style: italic; color: var(--primary); }
+.acts { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-md); }
+.btn {
+  font-family: var(--font-mono); font-size: var(--type-small); letter-spacing: 0.08em;
+  text-transform: uppercase; text-decoration: none; cursor: pointer;
+  padding: 0.6rem 1.1rem; border: 1px solid var(--foreground); color: var(--foreground);
+  background: transparent; border-radius: var(--radius-sm); position: relative; overflow: hidden; isolation: isolate;
+  transition: color var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out), transform var(--dur) var(--ease-out);
+}
+.btn::before { content: ""; position: absolute; inset: 0; background: var(--foreground); transform: scaleY(0); transform-origin: bottom; transition: transform var(--dur) var(--ease-out); z-index: -1; }
+.btn:hover::before { transform: scaleY(1); }
+.btn:hover { color: var(--background); border-color: var(--foreground); }
+.btn--rubric { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+@media (min-width: 62rem) { .gate .wrap { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: var(--space-xl); } }
+
+/* the armillary: three rings, one for each seat, turning at their own rates */
+.armillary { max-width: 26rem; margin-inline: auto; }
+.armillary .ring { transform-origin: 160px 160px; animation: turn linear infinite; }
+.armillary .ring--i   { animation-duration: 46s; }
+.armillary .ring--ii  { animation-duration: 68s; animation-direction: reverse; }
+.armillary .ring--iii { animation-duration: 92s; }
+.armillary .bead { animation: pulse 3.4s var(--ease-out) infinite; }
+.armillary .bead--ii { animation-delay: 1.1s; }
+.armillary .bead--iii { animation-delay: 2.2s; }
+@keyframes pulse { 0%, 100% { opacity: 0.35; r: 5; } 50% { opacity: 1; r: 7; } }
+
+/* ——— the watch: a scroll-driven eye between the opener and the first band ——— */
+/* At rest the eye is SHUT and completely drawn; the scroll opens it. Without JavaScript
+   --p stays 1, so the plate renders open and the motto reads. */
+.watch { position: relative; height: 150vh; border-bottom: var(--rule); --p: 1; }
+.ready .watch { --p: 0; }
+/* the masthead is sticky too, so centre inside what is actually visible under it */
+.watch-stick { position: sticky; top: 0; min-height: 100vh; display: grid; place-items: center;
+  padding-block: 4.5rem var(--space-lg); }
+/* A phone on its side is shorter than the art: let the section scroll rather than clip it. */
+@media (max-height: 34rem) { .watch { height: auto; } .watch-stick { position: static; min-height: 0; } }
+.watch-inner { display: grid; place-items: center; gap: var(--space-lg); padding: var(--space-sm); text-align: center; }
+/* --open must live where the clipPath's ellipse can inherit it: the <defs> child inherits
+   from the <svg>, not from the <g> that uses the clip. */
+.eye { width: min(54vmin, 26rem); height: auto; color: var(--foreground);
+  --lid: min(1, max(0, var(--p) - 0.06) * 2.2);
+  /* Effective openness, blink included. Every lid-dependent state reads THIS, so a blink
+     cannot leave a shut eye wearing open signals. */
+  --eff: calc(var(--lid) * var(--blink, 1));
+  --open: calc(var(--eff) * 88px); --eye-x: 0; --eye-y: 0; }
+/* the eye follows the pointer, and the lid answers a blink as well as the scroll */
+.eye .look { transform: translate(calc(var(--eye-x) * 1px), calc(var(--eye-y) * 1px)); transition: transform 260ms cubic-bezier(0.2,0,0,1); }
+.eye .lid-clip ellipse { transition: none; }
+.eye .iris-turn { transform-origin: 200px 150px; animation: turn 54s linear infinite; }
+.eye .glint { animation: pulse 4.6s var(--ease-out) infinite; }
+/* the lid opens with the scroll, inside the almond the page already drew */
+.eye .lash { opacity: calc((var(--eff) - 0.45) * 2.4); }
+/* The triad joins the three marks as they light. 826 is this path's MEASURED length:
+   a dasharray shorter than the path leaves a permanent gap, which is what broke it before. */
+/* The thread leaves seat I as it lights and reaches each later mark exactly as that mark
+   lights. Legs measured with getTotalLength(): 257 + 312 + 257 = 826, so the mark thresholds
+   below are 0.34 + fraction * 0.34, not round numbers. */
+.eye .triad { stroke-dasharray: 826; stroke-dashoffset: calc((1 - min(1, max(0, var(--p) - 0.34) * 2.94)) * 826); }
+/* The shut lid clears before the slit is wide enough to read an iris through: it is gone
+   by p=0.071, when the lid has parted 2px of 88. The almond itself never animates — a
+   reader landing mid-section must meet a drawn eye, not a fragment of one. */
+.eye .shut { opacity: calc(1 - var(--eff) * 14); }
+.eye .ray { opacity: calc((var(--p) - 0.5) * 2.6); transform-origin: 200px 150px; transform: scale(calc(0.72 + var(--p) * 0.34)); }
+.eye .seat { opacity: 0; }
+.eye .seat--i   { opacity: calc((var(--p) - 0.300) * 25); }
+.eye .seat--ii  { opacity: calc((var(--p) - 0.406) * 25); }
+.eye .seat--iii { opacity: calc((var(--p) - 0.534) * 25); }
+.watch-line { margin: 0; opacity: calc((var(--p) - 0.68) * 4); transform: translateY(calc((1 - var(--p)) * 14px)); }
+.watch-line .latin { display: block; font-family: var(--font-inscription); font-size: clamp(1.25rem, 3.4vw, 2rem); letter-spacing: 0.06em; }
+.watch-line .gloss2 { display: block; font-family: var(--font-mono); font-size: var(--type-label); letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-top: var(--space-sm); }
+@media (prefers-reduced-motion: reduce) {
+  .watch { height: auto; }
+  .watch-stick { position: static; height: auto; padding-block: var(--space-xl); }
+  .watch { --p: 1 !important; }
+}
+
+/* ——— the figure plates: engraved people, one scale per section ——— */
+/* Original line-work, like the rest of the page: the robed figure is one <g> in <defs>,
+   placed with <use>. Nothing here is traced from a scan. */
+.figs .fig { opacity: 0; transform: translateY(16px); }
+.ready .figs.seen .fig { animation: figrise 780ms var(--ease-out) forwards; animation-delay: calc(var(--n, 0) * 170ms); }
+html:not(.ready) .figs .fig { opacity: 1; transform: none; }
+@keyframes figrise { to { opacity: 1; transform: none; } }
+/* Every .ink path carries pathLength="1", so the dash numbers below are unitless and a
+   wrong guess at a path's real length is not a mistake this code can make. */
+.figs .ink { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.ready .figs.seen .ink { animation: draw 1500ms var(--ease-out) forwards; }
+html:not(.ready) .figs .ink { stroke-dashoffset: 0; }
+.figs .ink--b { animation-delay: 380ms; }
+.figs .held { opacity: 0; transform: translateY(10px); }
+.ready .figs.seen .held { animation: figrise 700ms var(--ease-out) forwards 780ms; }
+html:not(.ready) .figs .held { opacity: 1; transform: none; }
+.figs .spark { fill: var(--primary); }
+.ready .figs.seen .spark { animation: pulse 3.8s var(--ease-out) infinite 1400ms; }
+.figs .puff { opacity: 0; transform-box: fill-box; transform-origin: center; }
+.ready .figs.seen .puff { animation: puff 5.2s var(--ease-out) infinite; animation-delay: calc(1200ms + var(--n, 0) * 620ms); }
+/* Smoke dissipates before it reaches the top of the plate. Without the 66% stop it was still
+   ~19% opaque when the viewBox clipped it, which reads as an invisible ceiling, not as smoke. */
+@keyframes puff {
+  0%   { opacity: 0;    transform: translateY(0) scale(0.5); }
+  22%  { opacity: 0.42; }
+  66%  { opacity: 0;    transform: translateY(-56px) scale(1.7); }
+  100% { opacity: 0;    transform: translateY(-86px) scale(2.3); }
+}
+.figs figcaption, .plate-cap {
+  margin: var(--space-sm) 0 0; font-family: var(--font-mono); font-size: var(--type-label);
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); text-align: center;
+}
+figure.figs { margin: var(--space-xl) 0 0; }
+@media (prefers-reduced-motion: reduce) {
+  .figs .fig, .figs .held, .figs .puff { opacity: 1 !important; transform: none !important; animation: none !important; }
+  .figs .ink { stroke-dashoffset: 0 !important; animation: none !important; }
+}
+
+/* ——— bands and ornament ——— */
+.band { padding-block: var(--space-xl); border-bottom: var(--rule); position: relative; }
+.mark { font-family: var(--font-mono); font-size: var(--type-label); letter-spacing: 0.2em; text-transform: uppercase; color: var(--primary); margin: 0 0 var(--space-md); }
+h2 { font-family: var(--font-inscription); font-weight: 400; font-size: var(--type-section); letter-spacing: 0.01em; line-height: 1.16; margin: 0 0 var(--space-md); max-width: 24ch; overflow-wrap: anywhere; min-width: 0; }
+.band > .wrap > p { margin: 0 0 var(--space-md); }
+.corr-note { margin: var(--space-lg) 0 0; font-size: var(--type-small); color: var(--muted); border-left: 2px solid var(--primary); padding-left: var(--space-md); }
+.fleuron { display: block; margin: var(--space-lg) auto 0; width: 7rem; color: var(--primary); opacity: 0.8; }
+
+/* an illuminated initial, boxed and hatched as in a printed book */
+.illum { display: grid; grid-template-columns: 4.6rem minmax(0, 1fr); gap: var(--space-md); align-items: start; }
+.illum .cap { width: 4.6rem; height: 4.6rem; flex: none; color: var(--primary); }
+.illum p { margin: 0; }
+
+/* ——— the correspondence ——— */
+.corr { list-style: none; margin: var(--space-lg) 0 0; padding: 0; border-top: var(--rule); }
+.corr li { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); padding-block: var(--space-md); border-bottom: var(--rule); transition: background var(--dur) var(--ease-out); }
+.corr li:hover { background: color-mix(in oklch, var(--card) 70%, transparent); }
+.corr .rite { font-style: italic; }
+.corr .rite b { font-style: normal; font-family: var(--font-inscription); letter-spacing: 0.06em; font-weight: 400; }
+.corr .runtime { font-family: var(--font-mono); font-size: var(--type-small); color: var(--muted); line-height: 1.65; }
+@media (min-width: 46rem) { .corr li { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: var(--space-lg); align-items: baseline; } }
+
+/* the thread draws, the ballots drop onto it in order, the seal presses */
+.sigillum .thread { stroke-dasharray: 980; stroke-dashoffset: 980; }
+.sigillum.seen .thread { animation: draw 1700ms var(--ease-out) forwards; }
+.sigillum .ballot-card { opacity: 0; transform: translateY(-14px) rotate(-2deg); transform-origin: center; }
+.sigillum.seen .ballot-card { animation: drop 620ms var(--ease-out) forwards; animation-delay: calc(560ms + var(--n) * 170ms); }
+@keyframes drop { to { opacity: 1; transform: none; } }
+.sigillum .seal { opacity: 0; transform-origin: 742px 108px; transform: scale(2.1) rotate(-14deg); }
+.sigillum.seen .seal { animation: press 520ms cubic-bezier(0.34, 1.3, 0.64, 1) forwards 1420ms; }
+@keyframes press { 60% { opacity: 1; transform: scale(0.94) rotate(1deg); } 100% { opacity: 1; transform: none; } }
+
+/* ——— the scrutiny ——— */
+.scrutiny { display: grid; gap: var(--space-lg); margin-top: var(--space-lg); }
+@media (min-width: 64rem) { .scrutiny { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--space-xl); align-items: start; } }
+.ballots { display: grid; gap: var(--space-md); }
+.ballot { border: var(--rule); border-left: 3px solid var(--border); padding: var(--space-md); background: color-mix(in oklch, var(--card) 88%, transparent); border-radius: var(--radius-sm); transition: border-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out); }
+.ballot[data-counts="yes"] { border-left-color: var(--ok); }
+.ballot[data-counts="no"] { border-left-color: var(--muted); }
+.ballot[data-counts="reject"] { border-left-color: var(--primary); }
+.ballot header { display: flex; align-items: baseline; gap: var(--space-sm); flex-wrap: wrap; margin-bottom: var(--space-sm); }
+.ballot .latin { font-family: var(--font-inscription); letter-spacing: 0.12em; text-transform: uppercase; font-size: 1.0625rem; }
+.ballot .office { font-style: italic; color: var(--muted); font-size: var(--type-small); }
+.ballot .verdictline { margin-left: auto; font-family: var(--font-mono); font-size: var(--type-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); transition: color var(--dur) var(--ease-out); }
+.choices { display: grid; gap: var(--space-xs); }
+.choice { display: flex; gap: var(--space-xs); align-items: flex-start; font-size: var(--type-small); cursor: pointer; padding: 0.3rem 0.4rem; margin-inline: -0.4rem; border-radius: var(--radius-sm); transition: background var(--dur) var(--ease-out); }
+.choice:hover { background: var(--background); }
+.choice input { margin: 0.32rem 0 0; accent-color: var(--primary); flex: none; }
+.choice span { color: var(--muted); transition: color var(--dur) var(--ease-out); }
+.choice input:checked + span { color: var(--foreground); }
+.builder { border: var(--rule); border-style: dashed; padding: var(--space-md); border-radius: var(--radius-sm); }
+.builder p { margin: 0; font-size: var(--type-small); color: var(--muted); }
+.gatecheck { display: flex; gap: var(--space-sm); align-items: center; margin-top: var(--space-md); font-size: var(--type-small); flex-wrap: wrap; }
+
+/* ——— the flue and its smoke ——— */
+.chimney { position: relative; border: var(--rule); border-radius: var(--radius-sm) var(--radius-sm) 0 0; overflow: hidden; background: var(--sky); }
+.chimney .sky { display: block; width: 100%; height: auto; }
+.puffs { position: absolute; inset: 0; pointer-events: none; }
+.puffs i {
+  position: absolute; left: 50%; bottom: 30%; width: var(--w, 3rem); height: var(--w, 3rem);
+  border-radius: 50%; background: radial-gradient(closest-side, var(--tone) 0%, transparent 70%);
+  opacity: 0; transform: translate(-50%, 0) scale(0.35);
+  animation: plume var(--life, 6s) var(--ease-out) infinite;
+  animation-delay: var(--in, 0s);
+}
+@keyframes plume {
+  0%   { opacity: 0;    transform: translate(-50%, 0) scale(0.3) rotate(0deg); }
+  10%  { opacity: 0.95; }
+  45%  { transform: translate(calc(-50% + var(--drift, 1rem) * 0.4), -4.5rem) scale(1.5) rotate(40deg); }
+  100% { opacity: 0;    transform: translate(calc(-50% + var(--drift, 1rem)), -12rem) scale(3) rotate(90deg); }
+}
+.chimney[data-smoke="black"] { --tone: var(--smoke-black); }
+.chimney[data-smoke="white"] { --tone: var(--smoke-white); }
+.chimney[data-smoke="none"] .puffs { display: none; }
+
+.announce { border: var(--rule); border-top: 0; border-radius: 0 0 var(--radius-sm) var(--radius-sm); padding: var(--space-md); background: var(--card); }
+.announce .word { font-family: var(--font-inscription); font-size: 1.6rem; letter-spacing: 0.1em; text-transform: uppercase; margin: 0 0 var(--space-xs); transition: color var(--dur) var(--ease-out); }
+.announce[data-lands="true"] .word { color: var(--ok); }
+.announce[data-lands="false"] .word { color: var(--primary); }
+.announce .latin { font-style: italic; color: var(--muted); margin: 0 0 var(--space-sm); }
+.announce .why { margin: 0; font-size: var(--type-small); color: var(--muted); }
+.tallyline { display: flex; gap: var(--space-md); flex-wrap: wrap; font-family: var(--font-mono); font-size: var(--type-small); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: var(--space-sm) 0 0; padding-top: var(--space-sm); border-top: var(--rule); }
+.tallyline b { color: var(--foreground); font-weight: 400; }
+.noscript { font-size: var(--type-small); color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* ——— the route, with current running through it ——— */
+/* 900 units squeezed into 343 makes 10-unit labels about 4px high. A phone gets the route
+   as rows instead, with the same content. Found by both review seats, 2026-09-18. */
+.route-rows { display: none; list-style: none; margin: var(--space-lg) 0 0; padding: 0; counter-reset: step; }
+.route-rows li { display: grid; grid-template-columns: 2.4rem minmax(0, 1fr); gap: var(--space-sm);
+  padding-block: var(--space-sm); border-top: var(--rule); align-items: start; }
+.route-rows li > * { grid-column: 2; min-width: 0; }
+.route-rows li::before { counter-increment: step; content: counter(step); font-family: var(--font-mono);
+  font-size: var(--type-small); color: var(--primary); }
+.route-rows b { display: block; font-family: var(--font-inscription); letter-spacing: 0.08em;
+  text-transform: uppercase; font-size: var(--type-small); font-weight: 400; }
+.route-rows span { font-size: var(--type-small); color: var(--muted); }
+@media (max-width: 46rem) { .route-plate { display: none; } .route-rows { display: block; } .hint, .routecard { display: none !important; } }
+.route-rows .proves { display: block; margin-top: var(--space-xs); color: var(--foreground); opacity: 0.86; }
+.route-rows .srcchip { margin-top: var(--space-sm); justify-self: start; }
+.srcchip code { white-space: nowrap; }
+
+/* ——— the route, made clickable ——— */
+/* The seven rows below the plate are the one source of truth: the card reads its text out of
+   the matching <li>, so there is no second copy of these sentences to drift. Without the
+   script the rows simply stay visible and the whole section reads as prose. */
+.hint { display: none; }
+.ready .hint { display: block; margin: var(--space-md) 0 0; font-family: var(--font-mono);
+  font-size: var(--type-label); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.ready .hint::before { content: "\2192\00a0\00a0"; color: var(--primary); }
+html:not(.ready) .route-rows { display: block; }
+
+.route-plate .hit { fill: transparent; stroke: none; }
+.ready .route-plate .hit { cursor: pointer; }
+.route-plate .node { transition: opacity var(--dur) var(--ease-out); }
+.route-plate .ring { transition: stroke-width var(--dur) var(--ease-out); }
+.ready .route-plate .hit:hover ~ *, .ready .route-plate .node:hover .ring { stroke-width: 2.6; }
+.route-plate .hit:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+/* one stage chosen: it thickens, the rest step back, and nothing moves position */
+.route-plate[data-picked] .node { opacity: 0.38; }
+.route-plate[data-picked] .node[data-open] { opacity: 1; }
+.route-plate .node[data-open] .ring { stroke: var(--primary); stroke-width: 3; }
+.route-plate .advice { transition: opacity var(--dur) var(--ease-out); }
+.route-plate[data-picked] .advice { opacity: 0.22; }
+.route-plate[data-picked="arbiter"] .advice { opacity: 1; stroke: var(--primary); }
+
+.tally-line { margin: var(--space-md) 0 0; max-width: 62ch; font-size: var(--type-small); color: var(--muted); }
+.tally-line b { color: var(--foreground); font-weight: 500; }
+.route-plate .pip { transition: opacity var(--dur) var(--ease-out); }
+.routecard { margin-top: var(--space-lg); border: var(--rule); border-top: 2px solid var(--primary);
+  border-radius: var(--radius-sm); padding: var(--space-md) var(--space-md) var(--space-sm);
+  background: color-mix(in oklch, var(--card) 90%, transparent); max-width: 62ch;
+  animation: cardin 320ms var(--ease-out); }
+@keyframes cardin { from { opacity: 0; transform: translateY(8px); } }
+.routecard[hidden] { display: none; }
+.rc-kicker { margin: 0; font-family: var(--font-mono); font-size: var(--type-label);
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--primary); display: flex; gap: var(--space-sm); }
+.rc-of { color: var(--muted); }
+.rc-title { font-family: var(--font-inscription); font-weight: 400; font-size: 1.5rem;
+  letter-spacing: 0.02em; margin: var(--space-xs) 0 var(--space-sm); }
+.rc-body { margin: 0 0 var(--space-sm); }
+.rc-proves { margin: 0 0 var(--space-md); padding-left: var(--space-md);
+  border-left: 2px solid var(--primary); color: var(--foreground); opacity: 0.86; font-size: var(--type-small); }
+.rc-src { margin: 0 0 var(--space-md); }
+.srcchip { display: inline-flex; align-items: center; gap: var(--space-xs); text-decoration: none;
+  border: var(--rule); border-radius: var(--radius-pill); padding: 0.25rem 0.7rem;
+  font-size: var(--type-label); color: var(--muted);
+  transition: border-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out); }
+.srcchip::before { content: "\2197"; color: var(--primary); }
+.srcchip:hover { border-color: var(--primary); color: var(--foreground); }
+.rc-nav { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
+.chip { font-family: var(--font-mono); font-size: var(--type-label); letter-spacing: 0.08em;
+  border: var(--rule); border-radius: var(--radius-pill); background: transparent; color: var(--foreground);
+  padding: 0.3rem 0.8rem; cursor: pointer;
+  transition: border-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out); }
+.chip:hover { border-color: var(--primary); }
+.chip--quiet { color: var(--muted); margin-left: auto; }
+@media (prefers-reduced-motion: reduce) { .routecard { animation: none; } }
+
+.route-plate .draw { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.route-plate.seen .draw { animation: draw 1500ms var(--ease-out) forwards; }
+.route-plate.seen .draw--b { animation-delay: 240ms; }
+.route-plate.seen .draw--c { animation-delay: 480ms; }
+.flow { stroke-dasharray: 10 620; stroke-dashoffset: 0; animation: flow 5.5s linear infinite; }
+.flow--b { animation-delay: 1.3s; } .flow--c { animation-delay: 2.6s; }
+@keyframes flow { to { stroke-dashoffset: -630; } }
+
+/* ——— the canon ——— */
+.canon { list-style: none; margin: var(--space-lg) 0 0; padding: 0; counter-reset: canon; }
+.canon li { padding-block: var(--space-md); border-top: var(--rule); display: grid; gap: var(--space-xs); grid-template-columns: minmax(0, 1fr); }
+.canon li::before { counter-increment: canon; content: counter(canon, upper-roman) "."; font-family: var(--font-inscription); color: var(--primary); letter-spacing: 0.08em; }
+.canon b { font-weight: 500; }
+.canon span { color: var(--muted); font-size: var(--type-small); line-height: 1.62; }
+@media (min-width: 46rem) { .canon li { grid-template-columns: 3.5rem minmax(0, 16rem) minmax(0, 1fr); gap: var(--space-md); align-items: baseline; } }
+
+.colophon { display: grid; gap: var(--space-md); margin-top: var(--space-lg); grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr)); }
+.colophon div { border-top: var(--rule-heavy); padding-top: var(--space-sm); }
+.colophon dt { font-family: var(--font-mono); font-size: var(--type-label); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.colophon dd { margin: var(--space-xs) 0 0; font-family: var(--font-inscription); font-size: 1.75rem; letter-spacing: 0.02em; }
+.colophon dd a { color: inherit; text-decoration-color: var(--primary); text-decoration-thickness: 1px; }
+.colophon dd a:hover { color: var(--primary); }
+.colophon .gloss3 { margin: var(--space-xs) 0 0; font-family: var(--font-text); font-size: var(--type-small); letter-spacing: 0; color: var(--muted); }
+
+footer { padding-block: var(--space-xl); font-size: var(--type-small); color: var(--muted); }
+footer p { margin: 0 0 var(--space-xs); max-width: 62rem; }
+footer .sign { font-family: var(--font-inscription); letter-spacing: 0.14em; text-transform: uppercase; color: var(--foreground); font-size: var(--type-small); }
+footer a { color: var(--primary); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition-duration: 1ms !important; }
+  .rise, .stagger > *, .epigraph span, .gloss { opacity: 1 !important; transform: none !important; }
+  .wordmark svg path { stroke-dashoffset: 0; }
+  .route-plate .draw { stroke-dashoffset: 0; }
+  .puffs i { opacity: 0.8; transform: translate(-50%, -3.5rem) scale(1.7); }
+  #field svg { transform: translate(-50%, -50%); }
+}
+</style>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to content</a>
-  <header class="nav">
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ——— the field: concentric orbits, degree ticks and construction lines, behind everything ——— -->
+<div id="field" aria-hidden="true">
+  <svg viewBox="0 0 1200 1200" fill="none">
+    <g stroke="var(--field)" stroke-width="1">
+      <g class="orbit orbit--i">
+        <circle cx="600" cy="600" r="540"/><circle cx="600" cy="600" r="524"/>
+        <g stroke-width="1.4">
+          <path d="M600 60v22M600 1118v22M60 600h22M1118 600h22"/>
+          <path d="M218 218l16 16M982 982l-16-16M982 218l-16 16M218 982l16-16"/>
+        </g>
+        <circle cx="600" cy="60" r="5" fill="var(--field-rubric)" stroke="none"/>
+      </g>
+      <g class="orbit orbit--ii">
+        <circle cx="600" cy="600" r="420"/>
+        <path d="M600 180v840M180 600h840"/>
+        <path d="M303 303l594 594M897 303L303 897"/>
+        <circle cx="1020" cy="600" r="6" fill="var(--field-rubric)" stroke="none"/>
+      </g>
+      <g class="orbit orbit--iii">
+        <circle cx="600" cy="600" r="290"/><circle cx="600" cy="600" r="176"/>
+        <path d="M600 310l164 290-164 290-164-290Z"/>
+        <circle cx="600" cy="310" r="5" fill="var(--field-rubric)" stroke="none"/>
+      </g>
+      <circle cx="600" cy="600" r="64"/>
+      <path d="M0 600h1200M600 0v1200" opacity="0.5"/>
+    </g>
+  </svg>
+</div>
+
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+  <defs>
+    <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="6" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+    </pattern>
+    <pattern id="hatch-fine" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+      <line x1="0" y1="0" x2="0" y2="4" stroke="currentColor" stroke-width="0.7" opacity="0.32"/>
+    </pattern>
+    <pattern id="hatch-cross" width="7" height="7" patternUnits="userSpaceOnUse">
+      <path d="M0 0h7M0 0v7" stroke="currentColor" stroke-width="0.6" opacity="0.28"/>
+    </pattern>
+    <g id="robed" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+      <path d="M-44 0c0-30 8-52 20-64h48c12 12 20 34 20 64Z" fill="url(#hatch-fine)"/>
+      <path d="M-24 -64c0-26 10-44 24-44s24 18 24 44"/>
+      <ellipse cx="0" cy="-84" rx="14.5" ry="18" stroke-width="1.3"/>
+      <path d="M-24 -64c8 6 16 9 24 9s16-3 24-9" stroke-width="1.2"/>
+      <path d="M0 -55v50" stroke-width="1"/>
+      <path d="M-17 -44l-7 40M17 -44l7 40" stroke-width="1" opacity="0.66"/>
+    </g>
+    <g id="robed-back" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+      <path d="M-44 0c0-30 8-52 20-64h48c12 12 20 34 20 64Z" fill="url(#hatch-fine)"/>
+      <path d="M-24 -64c0-26 10-44 24-44s24 18 24 44Z" fill="url(#hatch-fine)"/>
+      <path d="M0 -58v52" stroke-width="1" opacity="0.55"/>
+      <path d="M-17 -44l-7 40M17 -44l7 40" stroke-width="1" opacity="0.55"/>
+    </g>
+    <g id="soul" fill="none" stroke="currentColor" stroke-linejoin="round">
+      <path d="M-11 0c0-8 1.6-14 5-17h12c3.4 3 5 9 5 17Z"/>
+      <path d="M-6 -17c0-7 2.6-11 6-11s6 4 6 11"/>
+    </g>
+  </defs>
+</svg>
+
+<header class="mast">
+  <div class="wrap">
+    <a class="wordmark" href="#main">
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6">
+        <path d="M5 3v11M12 3v11M19 3v11"/><path d="M3.5 20h17" stroke="var(--primary)"/>
+      </svg>
+      <b>Conclave</b>
+    </a>
+    <nav>
+      <a href="#rite">The rite</a>
+      <a href="#scrutiny">The scrutiny</a>
+      <a href="#route">The route</a>
+      <a href="https://github.com/nik1tsyganov/conclave">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="gate">
     <div class="wrap">
-      <div class="brand">CONCLAVE</div>
-      <nav class="navlinks" aria-label="Main navigation">
-        <a href="#system">System</a>
-        <a href="#matrix">Matrix</a>
-        <a href="#enforcement">Enforcement</a>
-        <a href="#hosts">Hosts</a>
-        <a href="#principles">Principles</a>
-        <a href="https://github.com/nik1tsyganov/conclave">GitHub</a>
-      </nav>
-    </div>
-  </header>
-  <main id="main" tabindex="-1">
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="wrap">
-        <div class="hero-copy">
-          <div class="eyebrow">MULTI-VENDOR · CODE-ENFORCED · FAIL-CLOSED</div>
-          <h1 id="hero-title">CONCLAVE<span>THREE VENDORS. ONE COUNT. NOTHING TAKEN ON TRUST.</span></h1>
-          <p>Three AI vendors build, challenge, plan, research, and verify. A typed decision engine, Jev, proposes the route and the verdict; deterministic code gates every proposal. Sealed plans and native evidence hold the system to its rules.</p>
-          <div class="actions">
-            <a class="btn primary" href="#system">See the system</a>
-            <a class="btn" href="https://github.com/nik1tsyganov/conclave">Open repository</a>
+      <div>
+        <h1 class="epigraph" lang="la"><span>Extra</span><span class="rubric">omnes.</span></h1>
+        <p class="gloss" lang="en">“Everyone out” · said before the doors are locked</p>
+        <p class="plainly">A tri-vendor code review panel for AI coding agents.</p>
+        <div class="measure" style="margin-top:var(--space-lg)">
+          <p class="thesis">A conclave is not a meeting. It is a room that stays shut until the
+            count is done, and a rule that <em>nobody's word is taken for the count</em>.</p>
+          <div class="acts">
+            <a class="btn btn--rubric" href="#scrutiny">Sit the panel</a>
+            <a class="btn" href="https://www.npmjs.com/package/conclave-mcp">npx conclave-mcp</a>
           </div>
         </div>
-        <figure class="hero-art">
-          <a class="diagram-link" href="conclave-core.svg"><img src="conclave-core.svg" width="1200" height="800" alt="The CONCLAVE system: three vendor seats, the dispatch matrix, and the evidence that feeds the count." fetchpriority="high" decoding="async"></a>
-          <figcaption><span>Three vendor seats. One count. No arbiter vote.</span><a href="conclave-core.svg">System diagram</a></figcaption>
-        </figure>
       </div>
-    </section>
 
-    <section id="system" aria-labelledby="system-title">
-      <div class="wrap">
-        <div class="kicker">The panel</div>
-        <h2 id="system-title">Different vendors.<br>Different failure modes.</h2>
-        <p class="lead">Ponens, Scrutator, and Advocatus are vendor-separated seats. Jev classifies work and proposes seats and verdicts as probability distributions; the hosting session runs the tools and collects evidence. Neither supplies a seat result or a vote.</p>
-        <div class="grid3">
-          <article class="card blue">
-            <div class="seat-label">PONENS / OPENAI</div>
-            <h3>Technical depth.</h3>
-            <p>Implementation, verification, and adversarial review on GPT-5.6 Sol. GPT-6 Astra is the escalation tier: every Astra route needs a fresh probe and a recorded escalation reason.</p>
-          </article>
-          <article class="card amber">
-            <div class="seat-label">SCRUTATOR / ANTHROPIC</div>
-            <h3>Judgment in context.</h3>
-            <p>Long-running agentic implementation on Fable; review, planning, and security judgment on Opus. Production proof requires native observed model and effort, and the host attests each response.</p>
-          </article>
-          <article class="card green">
-            <div class="seat-label">ADVOCATUS / GOOGLE</div>
-            <h3>A wider field of view.</h3>
-            <p>Implementation and verification on Gemini 3.8 Flash, review and research on Gemini 3.1 Pro. agy must prove its exact observed slug, including the fused effort, and a denied action fails the dispatch.</p>
-          </article>
-        </div>
-      </div>
-    </section>
+      <!-- an armillary: three rings, one per seat, each turning at its own rate -->
+      <svg class="plate armillary" viewBox="0 0 320 320" role="img"
+           aria-label="An armillary sphere of three rings, one for each seat, turning about a common centre">
+        <g fill="none" stroke="currentColor">
+          <circle cx="160" cy="160" r="146" stroke-width="1" opacity="0.28"/>
+          <circle cx="160" cy="160" r="128" stroke-width="2.2"/>
+          <path d="M160 32v256M32 160h256" stroke-width="0.8" opacity="0.3"/>
 
-    <section id="matrix" aria-labelledby="matrix-title">
-      <div class="wrap">
-        <div class="kicker">Routing</div>
-        <h2 id="matrix-title">The dispatch matrix<br>is executable policy.</h2>
-        <p class="lead">Jev proposes the class and the route, recorded with the seal. The validator checks the complete plan: task class, role, vendor, model, effort, scope, author provenance, escalation, and fresh availability evidence.</p>
-        <p class="scroll-hint" id="matrix-scroll-hint">On narrow screens, scroll the table sideways. Keyboard users can focus it and use the arrow keys.</p>
-        <div class="table-scroll" role="region" aria-labelledby="matrix-caption" aria-describedby="matrix-scroll-hint" tabindex="0">
-          <table class="matrix">
-            <caption id="matrix-caption">Selected catalog routes · availability must be proved locally</caption>
-            <thead><tr><th scope="col">Task class</th><th scope="col">Primary route</th><th scope="col">Alternates / escalation</th></tr></thead>
-            <tbody>
-              <tr><th scope="row">Architecture / planning</th><td>Claude Opus · high</td><td>GPT-5.6 Sol · Gemini Pro · Astra escalation</td></tr>
-              <tr><th scope="row">Standard feature</th><td>GPT-5.6 Sol · medium</td><td>Claude Fable · Gemini Flash</td></tr>
-              <tr><th scope="row">Bulk / mechanical</th><td>Gemini Flash · fused-low</td><td>GPT-5.6 Sol · Claude Fable</td></tr>
-              <tr><th scope="row">Difficult debugging</th><td>Claude Fable · xhigh</td><td>GPT-5.6 Sol · Gemini Pro · Astra escalation</td></tr>
-              <tr><th scope="row">Long-running agentic work</th><td>Claude Fable · xhigh</td><td>Astra escalation · Gemini Flash · GPT-5.6 Sol</td></tr>
-              <tr><th scope="row">Long-context analysis / research</th><td>Gemini Pro · fused-high</td><td>Astra escalation · Claude Fable · GPT-5.6 Sol</td></tr>
-              <tr><th scope="row">Security-sensitive implementation</th><td>Claude Opus · xhigh</td><td>GPT-5.6 Sol · Gemini Pro · Astra escalation</td></tr>
-              <tr><th scope="row">Adversarial review</th><td>GPT-5.6 Sol · high</td><td>Claude Opus · Gemini Pro · Astra escalation</td></tr>
-              <tr><th scope="row">Extreme end-to-end implementation</th><td>GPT-6 Astra · high · escalation</td><td>Claude Fable · Gemini Pro</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="matrix-note">Every exact model/effort pair needs native probe evidence. It expires 60 minutes after the original probe completes; re-importing it does not renew it. Unproven pairs remain unavailable. Astra always requires an escalation flag and a recorded reason.</p>
-      </div>
-    </section>
+          <g class="ring ring--i" opacity="0.95">
+            <ellipse cx="160" cy="160" rx="128" ry="44" stroke-width="1.8"/>
+            <circle class="bead" cx="288" cy="160" r="5.5" fill="var(--primary)" stroke="none"/>
+          </g>
+          <g class="ring ring--ii" opacity="0.95">
+            <ellipse cx="160" cy="160" rx="44" ry="128" stroke-width="1.8"/>
+            <circle class="bead bead--ii" cx="160" cy="32" r="5.5" fill="var(--primary)" stroke="none"/>
+          </g>
+          <g class="ring ring--iii" opacity="0.95">
+            <ellipse cx="160" cy="160" rx="112" ry="112" stroke-width="1.2" stroke-dasharray="3 7"/>
+            <circle class="bead bead--iii" cx="272" cy="160" r="5.5" fill="var(--primary)" stroke="none"/>
+          </g>
 
-    <section id="enforcement" aria-labelledby="enforcement-title">
-      <div class="wrap">
-        <div class="kicker">Control plane</div>
-        <h2 id="enforcement-title">From a legal route<br>to accountable work.</h2>
-        <p class="lead">The runtime seals the whole plan before a production dispatch. Each launch consumes a bound entry. Changed routes, scopes, briefs, or author claims fail validation.</p>
-        <figure class="diagram">
-          <img src="architecture.svg" width="1400" height="760" alt="Jev proposes a plan. Dispatch, seat, and rules policy constrain vendor execution. Native proof and telemetry feed the approval tally." loading="lazy" decoding="async">
-          <figcaption><span>Policy, capabilities, execution, evidence.</span><a href="architecture.svg">Full diagram</a></figcaption>
-        </figure>
-        <ol class="codeflow" aria-label="CONCLAVE lifecycle">
-          <li class="step"><b><span>01</span> Dispatch</b><p>Jev classifies each unit; seal the complete plan against that record, fresh model/effort probes, concrete scopes, and author provenance.</p></li>
-          <li class="step"><b><span>02</span> Execute</b><p>Leaf seats read one hashed rules bundle and lean skills. Sub-agents are denied natively; role permissions bound the work; post-run write audits reject out-of-scope changes.</p></li>
-          <li class="step"><b><span>03</span> Deliberate</b><p>Foreign reviewers challenge the work. Each captured response carries one APPROVE, ABSTAIN, or REJECT position.</p></li>
-          <li class="step"><b><span>04</span> Verify</b><p>Check native identity, usage, acknowledgments, artifact hashes, write audits, and committed outcomes.</p></li>
-          <li class="step"><b><span>05</span> Activate</b><p>Finalize execution and approval separately. Code counts the native POSITION votes after author recusal; Jev scores each reply for independent evidence. Every run lands as telemetry rows per dispatch, unit, and run.</p></li>
-        </ol>
-        <p class="boundary-note">Execution PASS alone does not approve work. Ordinary approval requires foreign verification and an approving review. Critical approval needs two eligible APPROVE votes. Approval records a decision; it does not deploy or merge work by itself.</p>
-      </div>
-    </section>
-
-    <section id="hosts" aria-labelledby="hosts-title">
-      <div class="wrap">
-        <div class="kicker">Hosts</div>
-        <h2 id="hosts-title">The host runs the tools.<br>It holds no vote.</h2>
-        <p class="lead">A panel is three vendor seats and a count. Whatever convenes it is a host, and a host is not a seat: it dispatches, it captures, it attests what it read, and it never supplies a position. That is why more than one kind of host can exist at all.</p>
-        <div class="table-scroll">
-          <table class="matrix">
-            <caption>Host modes · every seat is a native vendor CLI</caption>
-            <thead>
-              <tr><th scope="col">Host</th><th scope="col">What it is</th><th scope="col">Arbiter</th></tr>
-            </thead>
-            <tbody>
-              <tr><th scope="row">cursor-cli</th><td>A Cursor chat driving the CLI runtime</td><td>Jev</td></tr>
-              <tr><th scope="row">synara</th><td>Synara driving the same runtime</td><td>Jev</td></tr>
-              <tr><th scope="row">claude-code</th><td>A Claude Code session driving it</td><td>none required</td></tr>
-              <tr><th scope="row">droppy</th><td>Droppy Code, a native macOS app, as its Three Brains panel</td><td>none; counted in code</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="matrix-note">Droppy Code is the first host that is not a terminal session. It reimplements the protocol in Swift against its own provider sessions, so each seat is a chat a person can watch work. It shares no code with this runtime and does not need to: it writes the same telemetry rows, which is what makes one set of tools read runs from either.</p>
-        <div class="grid3">
-          <article class="card blue">
-            <div class="seat-label">MCP</div>
-            <h3>One plug, not one plugin per editor.</h3>
-            <p>A stdio MCP server exposes the panel to any host that speaks the protocol: VS Code, Cursor, Zed, Claude Desktop, the JetBrains IDEs. No extension has to be written for each one.</p>
-          </article>
-          <article class="card amber">
-            <div class="seat-label">Not one call</div>
-            <h3>A panel outlives a tool call.</h3>
-            <p>Minutes to tens of minutes, against a host that times out in seconds. So the run directory persists between calls: seal a plan, drive one phase, attest what a seat said, read the report.</p>
-          </article>
-          <article class="card green">
-            <div class="seat-label">Native</div>
-            <h3>Where the panel needs a window.</h3>
-            <p>MCP cannot draw a seat you watch, a verdict card or a seat arrangement. A host that wants those implements the protocol itself, the way Droppy Code did. The row format is what keeps them one system.</p>
-          </article>
-        </div>
-        <p class="boundary-note">One call spends subscription capacity, and it refuses to run unless the caller confirms it. Reading a tool list should not be able to start a nine-seat run.</p>
-      </div>
-    </section>
-
-    <section id="principles" aria-labelledby="principles-title">
-      <div class="wrap">
-        <div class="kicker">Standing design</div>
-        <h2 id="principles-title">What CONCLAVE refuses to trust.</h2>
-        <div class="principles">
-          <div class="principle"><div class="num" aria-hidden="true">01</div><div><strong>No self-grading</strong><span>A vendor cannot review or verify the artifact it authored.</span></div></div>
-          <div class="principle"><div class="num" aria-hidden="true">02</div><div><strong>No arbiter seat</strong><span>Jev proposes and the host dispatches; neither supplies the substantive seat result or vote.</span></div></div>
-          <div class="principle"><div class="num" aria-hidden="true">03</div><div><strong>No invented identity evidence</strong><span>Codex and Claude must prove native observed model and effort. agy must prove its exact fused slug. Requested settings alone cannot qualify.</span></div></div>
-          <div class="principle"><div class="num" aria-hidden="true">04</div><div><strong>No hidden skill sprawl</strong><span>Seats receive hashed, allow-listed skills and rules. Every non-implementation role is read-only. Bridges and orchestration remain arbiter-only.</span></div></div>
-          <div class="principle"><div class="num" aria-hidden="true">05</div><div><strong>No fake distribution math</strong><span>The 60% implementation share cap starts at two units. Planning, research, and review do not inflate the implementation count.</span></div></div>
-          <div class="principle"><div class="num" aria-hidden="true">06</div><div><strong>No prose-only compliance</strong><span>Real files, manifest hashes, native proof, receipts, and idempotent telemetry must agree with the sealed plan.</span></div></div>
-        </div>
-        <p class="boundary-note">Project writes are audited after execution. These checks do not isolate vendor home directories or control arbitrary shell calls.</p>
-      </div>
-    </section>
-  </main>
-  <footer class="footer">
-    <div class="wrap">
-      <div><strong>CONCLAVE</strong><br>A sealed panel for AI engineering<br>Copyright &copy; 2026 Nikita Tsyganov</div>
-      <div>Free software under the <a href="https://github.com/nik1tsyganov/conclave/blob/main/LICENSE">GNU Affero General Public License v3</a>, with <a href="https://github.com/nik1tsyganov/conclave/blob/main/ADDITIONAL-TERMS.md">additional terms</a> for attribution, origin and marks. Anyone running a modified CONCLAVE as a network service must offer that modified source to its users.</div>
-      <div>Project artwork and system diagrams are the project's own.</div>
+          <circle cx="160" cy="160" r="30" fill="url(#hatch-cross)" stroke-width="1.6"/>
+          <circle cx="160" cy="160" r="8" fill="currentColor" stroke="none"/>
+          <g stroke-width="1.2" opacity="0.55">
+            <path d="M160 288v24M148 312h24"/>
+            <path d="M136 296h48" stroke-width="2"/>
+          </g>
+        </g>
+      </svg>
     </div>
-  </footer>
+  </section>
+
+  <!-- the watch: the scrutineer's eye, opened by the reader's own scrolling -->
+  <section class="watch" id="watch" aria-label="The scrutineer's eye">
+    <div class="watch-stick">
+      <div class="watch-inner">
+        <svg class="eye" viewBox="0 0 400 300" role="img"
+             aria-label="An engraved eye opening, with three marks circling it, one for each seat">
+          <defs>
+            <clipPath id="lid"><ellipse cx="200" cy="150" rx="150" ry="0" style="ry: var(--open, 0)"/></clipPath>
+            <!-- the lid ellipse is wider than the drawn almond near its corners; nesting the
+                 two clips intersects them, so nothing ever shows outside the line. -->
+            <clipPath id="almond"><path d="M50 150c40-58 100-88 150-88s110 30 150 88c-40 58-100 88-150 88s-110-30-150-88Z"/></clipPath>
+          </defs>
+          <g fill="none" stroke="currentColor" stroke-width="1.6">
+            <!-- rays: the signal, thrown outward as the eye opens -->
+            <g class="ray" stroke-width="1.2" opacity="0">
+              <path d="M200 26V6M200 274v20M44 150H20M380 150h-24"/>
+              <path d="M92 62L78 48M308 238l14 14M308 62l14-14M92 238l-14 14"/>
+              <path d="M146 40l-8-19M254 40l8-19M146 260l-8 19M254 260l8 19" opacity="0.6"/>
+            </g>
+
+            <!-- the eye itself, revealed through the opening lid -->
+            <g clip-path="url(#almond)"><g class="lid-clip" clip-path="url(#lid)">
+              <circle cx="200" cy="150" r="96" fill="url(#hatch-fine)" stroke="none"/>
+              <g class="look"><g class="iris-turn">
+                <circle cx="200" cy="150" r="62" stroke-width="1.8"/>
+                <circle cx="200" cy="150" r="46" stroke-width="0.8" opacity="0.6"/>
+                <g stroke-width="0.9" opacity="0.62">
+                  <path d="M200 88v-0M200 88l0 24M200 212v-24M138 150h24M262 150h-24"/>
+                  <path d="M156 106l17 17M244 194l-17-17M244 106l-17 17M156 194l17-17"/>
+                  <path d="M178 92l8 22M222 208l-8-22M222 92l-8 22M178 208l8-22"/>
+                  <path d="M142 128l22 8M258 172l-22-8M258 128l-22 8M142 172l22-8"/>
+                </g>
+              </g>
+              <circle cx="200" cy="150" r="19" fill="currentColor" stroke="none"/>
+              <circle class="glint" cx="188" cy="140" r="4.5" fill="var(--background)" stroke="none" opacity="0.75"/>
+              </g>
+            </g></g>
+
+            <!-- the almond, drawn as the reader scrolls -->
+            <path class="almond" d="M50 150c40-58 100-88 150-88s110 30 150 88" stroke-width="2.4"/>
+            <path class="almond" d="M50 150c40 58 100 88 150 88s110-30 150-88" stroke-width="2.4"/>
+
+            <g class="shut" stroke-width="2.4">
+              <path d="M56 150h288"/>
+              <g stroke-width="1.4" opacity="0.7">
+                <path d="M96 150l-12 14M152 150l-7 17M200 150v18M248 150l7 17M304 150l12 14"/>
+              </g>
+            </g>
+
+            <g class="lash" stroke-width="1.4" opacity="0">
+              <path d="M200 62V42M140 74l-8-18M260 74l8-18M92 104l-16-12M308 104l16-12"/>
+              <path d="M200 238v20M140 226l-8 18M260 226l8 18M92 196l-16 12M308 196l16 12" opacity="0.55"/>
+            </g>
+
+            <!-- three marks circling, one per seat, appearing in turn -->
+            <g stroke="none" fill="var(--primary)">
+              <circle class="seat seat--i"   cx="200" cy="18"  r="6"/>
+              <circle class="seat seat--ii"  cx="356" cy="222" r="6"/>
+              <circle class="seat seat--iii" cx="44"  cy="222" r="6"/>
+            </g>
+            <path class="triad" d="M200 18 356 222 44 222Z" stroke-width="0.8" opacity="0.28"/>
+          </g>
+        </svg>
+
+        <p class="watch-line">
+          <span class="latin" lang="la">Nihil creditur. Omnia probantur.</span>
+          <span class="gloss2">Nothing is believed · everything is proven</span>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="rite">
+    <div class="wrap">
+      <p class="mark">I · The correspondence</p>
+      <h2>The rite already describes the machine</h2>
+      <div class="illum measure">
+        <svg class="cap" viewBox="0 0 64 64" role="img" aria-label="Illuminated initial E">
+          <rect x="1" y="1" width="62" height="62" fill="url(#hatch-fine)" stroke="currentColor" stroke-width="1.4"/>
+          <rect x="6" y="6" width="52" height="52" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.5"/>
+          <text x="32" y="47" text-anchor="middle" font-family="Cinzel, Georgia, serif" font-size="42" fill="currentColor">E</text>
+        </svg>
+        <p>very part of this runtime has a name older than software, because the problem is
+          older than software: how a body of people reaches a decision that nobody present can
+          quietly fix.</p>
+      </div>
+      <figure class="figs rise">
+        <svg class="plate" viewBox="0 0 900 300" role="img"
+             aria-label="Three robed scrutineers behind a long table, an urn between them, one holding a ballot up to be read aloud">
+          <g fill="none" stroke="currentColor" stroke-width="1.6">
+            <g opacity="0.45" stroke-width="1.2">
+              <path class="ink" pathLength="1" d="M168 236V150a62 62 0 0 1 124 0v86"/>
+              <path class="ink" pathLength="1" d="M388 236V150a62 62 0 0 1 124 0v86"/>
+              <path class="ink" pathLength="1" d="M608 236V150a62 62 0 0 1 124 0v86"/>
+            </g>
+            <g class="fig" style="--n:0"><use href="#robed" x="230" y="236"/></g>
+            <g class="fig" style="--n:2"><use href="#robed" x="450" y="236"/></g>
+            <g class="fig" style="--n:1"><use href="#robed" x="670" y="236"/></g>
+            <g class="held">
+              <path d="M700 196c8-6 18-8 26-6" stroke-width="1.4"/>
+              <rect x="700" y="150" width="58" height="42" rx="2" fill="var(--background)"/>
+              <rect x="700" y="150" width="58" height="42" rx="2"/>
+              <path d="M710 166h38M710 178h24" stroke-width="1" opacity="0.5"/>
+              <circle class="spark" cx="748" cy="160" r="4.5" stroke="none"/>
+            </g>
+            <g class="held">
+              <path d="M426 198h48l-6 22h-36Z" fill="url(#hatch)"/>
+              <path d="M450 220v10M434 236h32M426 198h48"/>
+            </g>
+            <rect x="40" y="236" width="820" height="42" fill="var(--background)"/>
+            <path d="M40 236h820M40 278h820M40 236v42M860 236v42"/>
+            <path d="M40 250h820" stroke-width="1" opacity="0.5"/>
+            <g class="held" opacity="0.8">
+              <rect x="112" y="214" width="56" height="22" rx="2" fill="var(--background)"/>
+              <rect x="112" y="214" width="56" height="22" rx="2" stroke-width="1.2"/>
+              <rect x="736" y="216" width="56" height="20" rx="2" fill="var(--background)"/>
+              <rect x="736" y="216" width="56" height="20" rx="2" stroke-width="1.2"/>
+            </g>
+          </g>
+        </svg>
+        <figcaption>Three seats · one urn · read aloud</figcaption>
+      </figure>
+
+      <ul class="corr stagger">
+        <li><span class="rite"><b>Scrutatores</b> — three, chosen by lot, who open the ballots and read them aloud.</span><span class="runtime">Three seats, each a separate vendor session. A seat that cannot show its session, its tokens and the model that answered does not count.</span></li>
+        <li><span class="rite"><b>The third scrutineer recounts</b> what the first two have already counted.</span><span class="runtime">A checking seat never runs on the builder’s vendor, and a third vendor takes the review wherever the class allows one. One vendor’s blind spot cannot pass unseen.</span></li>
+        <li><span class="rite"><b>Revisores</b> — three more, who review the scrutineers' own count before it is announced.</span><span class="runtime">The count is re-derived from the receipts rather than read back from what the seats said about it.</span></li>
+        <li><span class="rite"><b>Advocatus diaboli</b> — appointed to argue against, so assent is not mistaken for agreement. <em>Borrowed, not a conclave office:</em> the devil's advocate belongs to canonisation proceedings.</span><span class="runtime">An approval carrying no reason of its own counts as an abstention.</span></li>
+        <li><span class="rite"><b>The Master of Ceremonies</b> calls <i lang="la">extra omnes</i>, orders the room cleared, and walks out with everyone else. He runs the procedure and holds no vote.</span><span class="runtime">The host session drives the run and calls the tools. It is not a seat. <code>HOST_MODES</code> lists the places it may run from, never a list of voters.</span></li>
+        <li><span class="rite"><b>Chosen by lot</b> — the scrutineers are drawn, not appointed, so nobody can arrange who does the counting.</span><span class="runtime">The arbiter proposes the seats from the routing matrix under a margin rule, and is barred from sitting one. Not randomness: a choice that has to show its numbers, which deterministic code can then overrule.</span></li>
+        <li><span class="rite"><b>Cum clave</b> — with a key. Nothing enters and nothing leaves until it is settled.</span><span class="runtime">The plan is sealed and hashed before the first process starts. A route the matrix does not allow is refused before a vendor is called.</span></li>
+        <li><span class="rite"><b>Each ballot is pierced through the word <i>Eligo</i></b> with a needle and thread, and the thread is tied, so none can be added or taken away afterwards.</span><span class="runtime">Receipts are bound into one committed transaction with the plan entry, the plan hash and the artifact hashes. A duplicate logical dispatch cannot create a second successful row.</span></li>
+        <li><span class="rite"><b>The ballots are burned.</b> For centuries the smoke was the only announcement — until 2005, when bells were added, because the smoke could not reliably be read.</span><span class="runtime">The same failure, answered the same way. Two outcomes are written as themselves, and an outcome word this build cannot read is a split, never a passage. Nothing is inferred from the colour of anything.</span></li>
+      </ul>
+      <p class="corr-note measure">Where it does not hold, it is said here. The historical three
+        scrutineers all counted; this runtime has two voting checkers, a builder that never votes,
+        and code that does the counting. The rite is the older answer to the same problem, not a
+        blueprint this was built from.</p>
+      <svg class="plate sigillum rise" viewBox="0 0 900 220" role="img" style="margin-top:var(--space-xl)"
+           aria-label="Three receipts, one per seat, pierced on one thread, and a wax seal pressed over the knot">
+        <g fill="none" stroke="currentColor" stroke-width="1.5">
+          <path class="thread" d="M40 118C140 84 230 150 320 116S500 84 590 120s140 6 200-24"/>
+          <g class="ballots">
+            <g class="ballot-card" style="--n:0"><rect x="96" y="66" width="86" height="60" rx="2" fill="url(#hatch-fine)"/><rect x="96" y="66" width="86" height="60" rx="2"/><path d="M110 92h58M110 104h40" stroke-width="1" opacity="0.5"/><circle cx="139" cy="100" r="4.5" fill="var(--primary)" stroke="none"/></g>
+            <g class="ballot-card" style="--n:1"><rect x="288" y="84" width="86" height="60" rx="2" fill="url(#hatch-fine)"/><rect x="288" y="84" width="86" height="60" rx="2"/><path d="M302 110h58M302 122h40" stroke-width="1" opacity="0.5"/><circle cx="331" cy="118" r="4.5" fill="var(--primary)" stroke="none"/></g>
+            <g class="ballot-card" style="--n:2"><rect x="480" y="62" width="86" height="60" rx="2" fill="url(#hatch-fine)"/><rect x="480" y="62" width="86" height="60" rx="2"/><path d="M494 88h58M494 100h40" stroke-width="1" opacity="0.5"/><circle cx="523" cy="96" r="4.5" fill="var(--primary)" stroke="none"/></g>
+          </g>
+          <g class="seal">
+            <circle cx="742" cy="108" r="46" fill="url(#hatch)" stroke="var(--primary)" stroke-width="2.6"/>
+            <circle cx="742" cy="108" r="34" stroke="var(--primary)" stroke-width="1"/>
+            <g stroke="var(--primary)" stroke-width="3.4" stroke-linecap="square">
+              <path d="M730 92v32M742 92v32M754 92v32"/>
+            </g>
+            <path d="M718 132h48" stroke="var(--primary)" stroke-width="2.4"/>
+          </g>
+          <text x="40" y="186" font-family="ui-monospace, monospace" font-size="11" letter-spacing="2.4"
+                stroke="none" fill="currentColor" opacity="0.6">ONE THREAD &#183; ONE KNOT &#183; NOTHING ADDED AFTERWARDS</text>
+        </g>
+      </svg>
+
+      <svg class="fleuron" viewBox="0 0 120 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2">
+        <path d="M2 10h34M84 10h34"/>
+        <path d="M60 3c-7 0-11 3-11 7s4 7 11 7 11-3 11-7-4-7-11-7Z"/>
+        <path d="M49 10c-4-4-9-4-13 0 4 4 9 4 13 0ZM71 10c4-4 9-4 13 0-4 4-9 4-13 0Z"/>
+        <circle cx="60" cy="10" r="2.2" fill="currentColor"/>
+      </svg>
+    </div>
+  </section>
+
+  <section class="band" id="scrutiny">
+    <div class="wrap">
+      <p class="mark">II · The scrutiny</p>
+      <h2>Sit the panel yourself</h2>
+      <p class="measure">Choose what each checker did. The count below is this project's own rule,
+        transcribed branch for branch from <code>tools/panel-rules.js</code>. It is a copy, not the
+        running function: if the two ever disagree, the file is right and this page is wrong.
+        There are three seats. Ponens built the unit, so its tree moved and the write audit
+        disqualifies its receipt — the two checkers below are the whole vote. This is the
+        ordinary case, so it cannot reach the quorum of three a critical unit needs, and the
+        arbiter that proposes the seats never appears in a tally at all.</p>
+
+      <figure class="figs rise">
+        <svg class="plate" viewBox="0 0 900 300" role="img"
+             aria-label="Two robed figures with their backs to us, standing before a locked double door under a stone arch">
+          <g fill="none" stroke="currentColor" stroke-width="1.6">
+            <path class="ink" pathLength="1" d="M310 262V120a140 70 0 0 1 280 0v142" stroke-width="1.8"/>
+            <path class="ink" pathLength="1" d="M296 262V116a154 78 0 0 1 308 0v146" stroke-width="1.1" opacity="0.5"/>
+            <path d="M450 58v204" stroke-width="1.3"/>
+            <g stroke-width="1.1" opacity="0.62">
+              <rect x="330" y="140" width="100" height="44" rx="2"/><rect x="330" y="196" width="100" height="44" rx="2"/>
+              <rect x="470" y="140" width="100" height="44" rx="2"/><rect x="470" y="196" width="100" height="44" rx="2"/>
+            </g>
+            <g stroke="var(--primary)" stroke-width="1.8">
+              <circle cx="450" cy="126" r="13" fill="var(--background)"/>
+              <path d="M450 122v10M446 140h8" stroke-width="2.2"/>
+              <path d="M450 126h-34M412 122a4 4 0 1 0 0 8 4 4 0 1 0 0-8M420 130v6M428 130v5" class="held"/>
+            </g>
+            <g class="fig" style="--n:0"><use href="#robed-back" x="384" y="262"/></g>
+            <g class="fig" style="--n:1"><use href="#robed-back" x="524" y="262"/></g>
+            <path class="ink" pathLength="1" d="M90 262h720" stroke-width="1.2" opacity="0.45"/>
+          </g>
+        </svg>
+        <figcaption lang="la">Cum clave &#183; <span lang="en">nothing enters, nothing leaves</span></figcaption>
+      </figure>
+
+      <div class="scrutiny">
+        <div class="ballots">
+          <div class="builder">
+            <p><b style="font-family:var(--font-inscription);letter-spacing:.1em;text-transform:uppercase;color:var(--foreground)">Ponens</b> —
+              the one who presents. Builds the change in a copy of the project. Its tree moved,
+              so its receipt is never a counted vote. It does not appear below.</p>
+          </div>
+
+          <fieldset class="ballot" data-seat="scrutator" data-counts="yes">
+            <legend class="sr-only">Scrutator — what the verifying seat did</legend>
+            <header>
+              <span class="latin" lang="la">Scrutator</span><span class="office">examines</span>
+              <span class="verdictline" data-line>counted · approve</span>
+            </header>
+            <div class="choices">
+              <label class="choice"><input disabled type="radio" name="scrutator" value="reasoned" checked><span>Approved, and said why: “Ran the suite from a clean checkout; every check passed, none skipped.”</span></label>
+              <label class="choice"><input disabled type="radio" name="scrutator" value="bare"><span>Approved with nothing of its own: “Looks good to me.”</span></label>
+              <label class="choice"><input disabled type="radio" name="scrutator" value="reject"><span>Rejected.</span></label>
+              <label class="choice"><input disabled type="radio" name="scrutator" value="unproven"><span>Answered, but could not show the model that replied.</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="ballot" data-seat="advocatus" data-counts="yes">
+            <legend class="sr-only">Advocatus — what the reviewing seat did</legend>
+            <header>
+              <span class="latin" lang="la">Advocatus</span><span class="office">argues against</span>
+              <span class="verdictline" data-line>counted · approve</span>
+            </header>
+            <div class="choices">
+              <label class="choice"><input disabled type="radio" name="advocatus" value="reasoned" checked><span>Approved, and said why: “The unknown-word branch reads as a split, so an older build cannot land it.”</span></label>
+              <label class="choice"><input disabled type="radio" name="advocatus" value="bare"><span>Approved with nothing of its own: “Agreed.”</span></label>
+              <label class="choice"><input disabled type="radio" name="advocatus" value="reject"><span>Rejected.</span></label>
+              <label class="choice"><input disabled type="radio" name="advocatus" value="unproven"><span>Left its tree changed, so the write audit fails.</span></label>
+            </div>
+          </fieldset>
+
+          <div class="gatecheck">
+            <label class="choice" style="margin:0"><input disabled type="checkbox" id="check" checked><span>The unit's own check passed</span></label>
+            <button class="btn" type="button" id="reset" disabled>Reset</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="chimney" data-smoke="white" id="chimney">
+            <svg class="sky" viewBox="0 0 320 240" role="img" aria-label="A chimney on a tiled roof, smoke rising into a dusk sky">
+              <rect width="320" height="240" fill="var(--sky)"/>
+              <g color="var(--smoke-black)" opacity="0.9">
+                <circle cx="266" cy="52" r="20" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/>
+                <circle cx="266" cy="52" r="30" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0.25"/>
+              </g>
+              <g color="var(--smoke-black)">
+                <path d="M0 240V186l160-54 160 54v54Z" fill="url(#hatch)" stroke="currentColor" stroke-width="2"/>
+                <path d="M0 240V186l160-54 160 54v54Z" fill="none" stroke="currentColor" stroke-width="2.4"/>
+                <path d="M148 134V86h30v48" fill="url(#hatch-fine)" stroke="currentColor" stroke-width="2.4"/>
+                <path d="M141 86h44" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/>
+                <path d="M55 166h210M38 186h244M24 206h272" stroke="currentColor" stroke-width="0.9" opacity="0.4"/>
+                <path d="M160 132v108M100 149v91M220 149v91" stroke="currentColor" stroke-width="0.7" opacity="0.28"/>
+              </g>
+            </svg>
+            <div class="puffs" aria-hidden="true">
+              <i style="--in:0s;   --life:6.0s; --w:2.6rem; --drift:1.7rem; left:50%"></i>
+              <i style="--in:0.7s; --life:6.6s; --w:3.2rem; --drift:-1.2rem; left:47%"></i>
+              <i style="--in:1.5s; --life:5.6s; --w:2.2rem; --drift:2.4rem; left:53%"></i>
+              <i style="--in:2.2s; --life:7.0s; --w:3.6rem; --drift:0.6rem; left:49%"></i>
+              <i style="--in:3.0s; --life:6.2s; --w:2.4rem; --drift:-2.0rem; left:52%"></i>
+              <i style="--in:3.8s; --life:6.8s; --w:3.0rem; --drift:1.2rem; left:50%"></i>
+              <i style="--in:4.6s; --life:5.8s; --w:2.0rem; --drift:-0.8rem; left:48%"></i>
+              <i style="--in:5.3s; --life:7.2s; --w:3.4rem; --drift:2.0rem; left:51%"></i>
+            </div>
+          </div>
+
+          <div class="announce" data-lands="true" id="announce" role="status" aria-live="polite" aria-atomic="true">
+            <p class="word" id="word">Passage</p>
+            <p class="latin"><span id="latin-it" lang="it">Fumata bianca</span><span id="latin-en"> — the work may land.</span></p>
+            <p class="why" id="why">Two counted approvals, each resting on its own reason, no rejection, and the unit's own check green.</p>
+            <p class="tallyline" id="tally"></p>
+          </div>
+          <noscript><p class="noscript">This panel is interactive with scripting on. The rules it
+            runs are written out in full under “The canon” below.</p></noscript>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="route">
+    <div class="wrap">
+      <p class="mark">III &#183; The route</p>
+      <h2>One unit, from block to smoke</h2>
+      <p class="measure">A lead writes a fenced block. Everything after that is decided by the
+        matrix and counted in code. The current runs left to right; nothing flows back.</p>
+      <p class="hint">Choose a stage to see what it decides and what it has to prove.</p>
+      <svg class="plate route-plate rise" viewBox="0 0 920 430" style="margin-top:var(--space-lg)"
+           aria-label="A unit travels from the lead's block, through routing, to one building seat and two checking seats, whose receipts are counted into a verdict and then a gate">
+        <g fill="none" stroke="currentColor" stroke-width="1.6" font-family="ui-monospace, monospace">
+          <g class="node" data-node="block">
+            <rect x="8" y="130" width="128" height="76" rx="2" fill="url(#hatch-fine)"/>
+            <rect class="ring" x="8" y="130" width="128" height="76" rx="2"/>
+            <text x="72" y="162" text-anchor="middle" font-size="13" stroke="none" fill="currentColor">the lead's</text>
+            <text x="72" y="182" text-anchor="middle" font-size="13" stroke="none" fill="currentColor">block</text>
+            <text x="8" y="226" font-size="10" stroke="none" fill="currentColor" opacity="0.7">host &#183; drives, never votes</text>
+            <rect class="hit" data-node="block" x="8" y="130" width="128" height="76" rx="2" role="button" tabindex="0" aria-label="The lead's block"/>
+          </g>
+
+          <path class="draw" pathLength="1" d="M136 168h58"/>
+          <path class="flow" d="M136 168h58" stroke="var(--primary)" stroke-width="2.6" stroke-linecap="round"/>
+          <path d="M188 162l8 6-8 6" fill="currentColor" stroke="none"/>
+
+          <g class="node" data-node="route">
+            <rect class="ring" x="196" y="144" width="98" height="48" rx="2"/>
+            <text x="245" y="173" text-anchor="middle" font-size="12" stroke="none" fill="currentColor">route</text>
+            <rect class="hit" data-node="route" x="196" y="144" width="98" height="48" rx="2" role="button" tabindex="0" aria-label="Route"/>
+          </g>
+          <text x="160" y="248" font-size="11" stroke="none" fill="currentColor" opacity="0.75">class &#183; files &#183; vendors ready</text>
+
+          <path class="draw draw--b" pathLength="1" d="M294 168h40M334 168V66h52M334 168h52M334 168v102h52"/>
+          <path class="flow flow--b" d="M294 168h40M334 168V66h52" stroke="var(--primary)" stroke-width="2.4" stroke-linecap="round"/>
+          <path class="flow flow--c" d="M294 168h40M334 168v102h52" stroke="var(--primary)" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M380 60l8 6-8 6M380 162l8 6-8 6M380 264l8 6-8 6" fill="currentColor" stroke="none"/>
+
+          <g class="node node--build" data-node="ponens">
+            <rect x="388" y="40" width="172" height="54" rx="2" stroke="var(--primary)" fill="url(#hatch-fine)"/>
+            <rect class="ring" x="388" y="40" width="172" height="54" rx="2" stroke="var(--primary)"/>
+            <text x="404" y="64" font-size="12" stroke="none" fill="var(--primary)">PONENS</text>
+            <text x="404" y="82" font-size="11" stroke="none" fill="currentColor" opacity="0.82">builds &#183; tree changes</text>
+            <rect class="hit" data-node="ponens" x="388" y="40" width="172" height="54" rx="2" role="button" tabindex="0" aria-label="Ponens presents"/>
+          </g>
+
+          <g class="node" data-node="scrutator">
+            <rect class="ring" x="388" y="142" width="172" height="54" rx="2"/>
+            <text x="404" y="166" font-size="12" stroke="none" fill="currentColor">SCRUTATOR</text>
+            <text x="404" y="184" font-size="11" stroke="none" fill="currentColor" opacity="0.82">verifies &#183; read-only</text>
+            <rect class="hit" data-node="scrutator" x="388" y="142" width="172" height="54" rx="2" role="button" tabindex="0" aria-label="Scrutator examines"/>
+          </g>
+
+          <g class="node" data-node="advocatus">
+            <rect class="ring" x="388" y="244" width="172" height="54" rx="2"/>
+            <text x="404" y="268" font-size="12" stroke="none" fill="currentColor">ADVOCATUS</text>
+            <text x="404" y="286" font-size="11" stroke="none" fill="currentColor" opacity="0.82">reviews &#183; read-only</text>
+            <rect class="hit" data-node="advocatus" x="388" y="244" width="172" height="54" rx="2" role="button" tabindex="0" aria-label="Advocatus argues against"/>
+          </g>
+
+          <g class="pip" stroke-width="1.4">
+            <circle cx="540" cy="54" r="5" fill="currentColor"/>
+            <path d="M540 148a6 6 0 0 0 0 12Z" fill="currentColor" stroke="none"/><circle cx="540" cy="154" r="6"/>
+            <circle cx="540" cy="256" r="6"/>
+          </g>
+          <text x="388" y="324" font-size="10" stroke="none" fill="currentColor" opacity="0.7">one vendor each &#183; never the builder&#8217;s</text>
+
+          <path class="draw draw--c" pathLength="1" d="M560 67h48v101M560 169h48M560 271h48V170"/>
+          <path class="flow flow--b" d="M560 169h48M608 169h38" stroke="var(--primary)" stroke-width="2.4" stroke-linecap="round"/>
+          <text x="570" y="54" font-size="11" stroke="none" fill="currentColor" opacity="0.75">receipts</text>
+          <path d="M640 163l8 6-8 6" fill="currentColor" stroke="none"/>
+          <path class="draw draw--c" pathLength="1" d="M608 169h40"/>
+
+          <g class="node" data-node="counted">
+            <rect x="650" y="136" width="114" height="66" rx="2" fill="url(#hatch-cross)"/>
+            <rect class="ring" x="650" y="136" width="114" height="66" rx="2"/>
+            <text x="707" y="164" text-anchor="middle" font-size="12" stroke="none" fill="currentColor">counted</text>
+            <text x="707" y="182" text-anchor="middle" font-size="12" stroke="none" fill="currentColor">in code</text>
+            <rect class="hit" data-node="counted" x="650" y="136" width="114" height="66" rx="2" role="button" tabindex="0" aria-label="Counted in code"/>
+          </g>
+
+          <path class="draw draw--c" pathLength="1" d="M764 169h38"/>
+          <path d="M796 163l8 6-8 6" fill="currentColor" stroke="none"/>
+
+          <g class="node" data-node="check">
+            <rect class="ring" x="804" y="136" width="90" height="66" rx="2" stroke="var(--primary)"/>
+            <text x="849" y="174" text-anchor="middle" font-size="12" stroke="none" fill="var(--primary)">the check</text>
+            <rect class="hit" data-node="check" x="804" y="136" width="90" height="66" rx="2" role="button" tabindex="0" aria-label="The unit's own check"/>
+          </g>
+          <text x="849" y="222" text-anchor="middle" font-size="11" stroke="none" fill="currentColor" opacity="0.75">gates, never votes</text>
+          <g stroke="none" fill="currentColor">
+            <circle cx="849" cy="104" r="5" opacity="0.5"/><circle cx="840" cy="82" r="7" opacity="0.32"/>
+            <circle cx="856" cy="56" r="9.5" opacity="0.18"/><circle cx="843" cy="30" r="12" opacity="0.09"/>
+          </g>
+          <path d="M849 136V112" stroke-width="1.2" opacity="0.5"/>
+
+          <!-- The arbiter sits off the current on purpose: dashed, because it advises and is
+               never counted. It enters twice — at the fan-out and at the tally. -->
+          <g class="advice" stroke-dasharray="4 5" stroke-width="1.3" opacity="0.6">
+            <path d="M388 380H334V272"/>
+            <path d="M560 380h147V206"/>
+          </g>
+          <g class="node node--arb" data-node="arbiter">
+            <rect class="ring" x="388" y="356" width="172" height="48" rx="2" stroke-dasharray="5 4"/>
+            <text x="404" y="378" font-size="12" stroke="none" fill="currentColor" opacity="0.75">ARBITER</text>
+            <text x="404" y="395" font-size="11" stroke="none" fill="currentColor" opacity="0.6">proposes &#183; never votes</text>
+            <rect class="hit" data-node="arbiter" x="388" y="356" width="172" height="48" rx="2" role="button" tabindex="0" aria-label="The arbiter"/>
+          </g>
+          <text x="572" y="420" font-size="10" stroke="none" fill="currentColor" opacity="0.55">reads no files &#183; dispatches nothing</text>
+        </g>
+      </svg>
+
+      <p class="tally-line">Five parties in the room. <b>Two counted votes.</b> The host drives and
+        does not vote; the builder&#8217;s tree moved, so its receipt cannot count; the arbiter proposes
+        and is barred from sitting a seat at all.</p>
+
+      <div class="routecard" id="routecard" hidden>
+        <p class="rc-kicker"><span class="rc-step"></span><span class="rc-of"></span></p>
+        <h3 class="rc-title"></h3>
+        <p class="rc-body"></p>
+        <p class="rc-proves"></p>
+        <p class="rc-src"></p>
+        <div class="rc-nav">
+          <button class="chip" type="button" data-step="-1">&#8592; Previous</button>
+          <button class="chip" type="button" data-step="1">Next &#8594;</button>
+          <button class="chip chip--quiet" type="button" data-close>Close</button>
+        </div>
+      </div>
+
+      <ol class="route-rows">
+        <li data-node="block"><b>The host and its block</b><span>The host session — Claude Code, Cursor, VS Code, Droppy or a bare CLI — drives the run and writes a fenced block naming the units, their class and their files.</span><span class="proves">Drives everything and decides nothing. It runs the tools, holds no seat and casts no vote, and the matrix may refuse the block it wrote.</span><a class="srcchip" href="https://github.com/nik1tsyganov/conclave/blob/main/commands/conclave-cli.md"><code>commands/conclave-cli.md</code></a></li>
+        <li data-node="arbiter"><b>The arbiter</b><span>Jev classifies the unit, proposes which seats to convene and which vendors take them, and at the end proposes whether each reply carried independent evidence of its own.</span><span class="proves">Proposes only, and is drawn off the current for that reason. It never holds a seat, never implements, verifies or reviews, and never votes. Deterministic rules outrank it at every gate.</span><a class="srcchip" href="https://github.com/nik1tsyganov/conclave/blob/main/tools/jev-arbiter.js"><code>tools/jev-arbiter.js</code></a></li>
+        <li data-node="route"><b>Route</b><span>The class, the files and which vendors are ready decide who builds and who checks.</span><span class="proves">Refuses a route the matrix does not allow, before any vendor is called.</span><a class="srcchip" href="https://github.com/nik1tsyganov/conclave/blob/main/tools/dispatch-matrix.js"><code>tools/dispatch-matrix.js</code></a></li>
+        <li data-node="ponens"><b>Ponens presents</b><span>Builds the unit in a copy of the project, with a tree it is allowed to change.</span><span class="proves">Never counts. Its tree moved, so its receipt cannot be a vote.</span><a class="srcchip" href="https://github.com/nik1tsyganov/conclave/blob/main/tools/panel-rules.js"><code>tools/panel-rules.js</code></a></li>
+        <li data-node="scrutator"><b>Scrutator examines</b><span>Verifies the change against the evidence, read-only, in a session of its own. The three vendors are anthropic, openai and google — Claude, Codex and Antigravity — and which one takes this seat is decided per unit by the matrix.</span><span class="proves">Must show its vendor session, its token count, the model that answered, and an unchanged tree.</span><a class="srcchip" href="https://github.com/nik1tsyganov/conclave/blob/main/tools/panel-rules.js"><code>tools/panel-rules.js</code></a></li>
+        <li data-node="advocatus"><b>Advocatus argues against</b><span>Reviews for what the other two missed. A third vendor wherever the class allows one.</span><span class="proves">Counts only with a reason of its own. An approval carrying none is an abstention.</span><a class="srcchip" href="https://github.com/nik1tsyganov/conclave/blob/main/tools/panel-rules.js"><code>tools/panel-rules.js</code></a></li>
+        <li data-node="counted"><b>Counted in code</b><span>Receipts are bound into one transaction with the plan entry, the plan hash and the artifact hashes.</span><span class="proves">No model is asked what the panel decided. Two reasoned approvals and no rejection, or nothing lands.</span><a class="srcchip" href="https://github.com/nik1tsyganov/conclave/blob/main/tools/panel-rules.js"><code>tools/panel-rules.js</code></a></li>
+        <li data-node="check"><b>The unit's own check</b><span>Runs after the seats and answers yes or no on its own terms.</span><span class="proves">Gates the landing and never joins the count. A failed check refuses, whatever the seats said.</span><a class="srcchip" href="https://github.com/nik1tsyganov/conclave/blob/main/tools/panel-rules.js"><code>tools/panel-rules.js</code></a></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <p class="mark">IV · The canon</p>
+      <h2>What makes a vote a vote</h2>
+      <figure class="figs rise">
+        <svg class="plate" viewBox="0 0 900 260" role="img"
+             aria-label="One robed figure places a ballot into an urn while a second stands by as witness">
+          <g fill="none" stroke="currentColor" stroke-width="1.6">
+            <g class="fig" style="--n:0"><use href="#robed" x="320" y="240"/></g>
+            <g class="fig" style="--n:1" opacity="0.62"><use href="#robed" x="650" y="240"/></g>
+            <g class="held">
+              <path d="M356 172c16-14 36-19 52-14l-5 18c-12-3-26 1-38 9Z" fill="var(--background)"/>
+              <path d="M356 172c16-14 36-19 52-14l-5 18c-12-3-26 1-38 9" stroke-width="1.3"/>
+              <rect x="404" y="140" width="44" height="32" rx="2" fill="var(--background)"/>
+              <rect x="404" y="140" width="44" height="32" rx="2" stroke-width="1.3"/>
+              <circle class="spark" cx="440" cy="148" r="4" stroke="none"/>
+            </g>
+            <g class="held">
+              <path d="M466 196h84l-12 44h-60Z" fill="url(#hatch)"/>
+              <path d="M466 196h84l-12 44h-60ZM458 196h100" stroke-width="1.6"/>
+              <path d="M478 240v10M538 240v10M470 250h76" stroke-width="1.2"/>
+            </g>
+            <path class="ink" pathLength="1" d="M60 240h780" stroke-width="1.2" opacity="0.5"/>
+          </g>
+        </svg>
+        <figcaption>Cast in the open · counted in code</figcaption>
+      </figure>
+
+      <ol class="canon stagger">
+        <li><b>Evidence, not assent</b><span>An approval carrying no reason of its own counts as an abstention. Agreement is not evidence.</span></li>
+        <li><b>Proof of the seat</b><span>The vendor session, the token count, and the model that actually answered. Missing any of the three, the vote does not count.</span></li>
+        <li><b>An unchanged tree</b><span>Both trees or neither. A missing write audit is a check that did not run, and a check that did not run allows nothing.</span></li>
+        <li><b>The gate, never a vote</b><span>A unit whose own check failed does not land, whatever the seats said. The check gates the act; it never joins the count.</span></li>
+        <li><b>Silence is refusal</b><span>An outcome this build cannot read is a split. A newer runtime can never land work in an older one that cannot tell what it meant.</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <p class="mark">V · The colophon</p>
+      <p class="measure">Each of these links to the thing that produces it. A page that asks you to
+        take its own numbers on faith has not earned the motto at the top of it.</p>
+      <dl class="colophon stagger">
+        <div><dt>Vendors</dt><dd><a href="https://github.com/nik1tsyganov/conclave/blob/main/.cursor/skills/conclave-cli/references/dispatch-matrix.json">Three</a></dd><dd class="gloss3">openai · anthropic · google, in the dispatch matrix</dd></div>
+        <div><dt>Quorum</dt><dd><a href="https://github.com/nik1tsyganov/conclave/blob/main/tools/panel-rules.js">Two</a></dd><dd class="gloss3"><code>ORDINARY_QUORUM</code>, three when critical</dd></div>
+        <div><dt>Checks</dt><dd><a href="https://github.com/nik1tsyganov/conclave/actions/workflows/verify.yml">Green</a></dd><dd class="gloss3">the whole suite, on Linux and macOS, every push — the link is the live answer</dd></div>
+        <div><dt>Hosts</dt><dd><a href="https://github.com/nik1tsyganov/conclave/blob/main/tools/dispatch-schema.js">Five</a></dd><dd class="gloss3"><code>CLI_HOST_MODES</code> in the schema</dd></div>
+        <div><dt>Licence</dt><dd><a href="https://github.com/nik1tsyganov/conclave/blob/main/ADDITIONAL-TERMS.md">AGPL-3.0</a></dd><dd class="gloss3">with section 7 terms for attribution, origin and marks</dd></div>
+      </dl>
+
+      <figure class="figs rise">
+        <!-- The window opens 70 above the origin so the smoke has somewhere to go. With the old
+             0 0 900 300 it was still 23% opaque when the viewBox cut it, which read as a ceiling. -->
+        <svg class="plate" viewBox="0 -70 900 370" role="img"
+             aria-label="A crowd of small robed figures, backs to us, watching smoke rise from a distant chimney">
+          <g fill="none" stroke="currentColor" stroke-width="1.6">
+            <g stroke-width="1.3" opacity="0.55">
+              <path class="ink" pathLength="1" d="M300 186V126l150-52 150 52v60"/>
+              <path class="ink ink--b" pathLength="1" d="M478 92v-30h30v41"/>
+              <path d="M300 186h300" stroke-width="1.1"/>
+              <g stroke-width="1" opacity="0.7">
+                <rect x="352" y="140" width="34" height="46" rx="17"/>
+                <rect x="433" y="140" width="34" height="46" rx="17"/>
+                <rect x="514" y="140" width="34" height="46" rx="17"/>
+              </g>
+            </g>
+            <g stroke="none">
+              <circle class="puff" style="--n:0" cx="493" cy="56" r="6" fill="currentColor"/>
+              <circle class="puff" style="--n:1" cx="487" cy="58" r="8" fill="currentColor"/>
+              <circle class="puff" style="--n:2" cx="499" cy="54" r="5" fill="currentColor"/>
+              <circle class="puff" style="--n:3" cx="490" cy="58" r="9.5" fill="currentColor"/>
+            </g>
+            <path class="ink" pathLength="1" d="M40 186h860" stroke-width="1.1" opacity="0.3"/>
+            <g stroke-width="1.5">
+              <g transform="translate(101 210) scale(0.856)"><g class="fig" style="--n:0"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(199 204) scale(0.89)"><g class="fig" style="--n:1"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(272 206) scale(0.957)"><g class="fig" style="--n:2"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(373 206) scale(0.946)"><g class="fig" style="--n:3"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(442 207) scale(0.943)"><g class="fig" style="--n:4"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(539 204) scale(0.959)"><g class="fig" style="--n:5"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(612 206) scale(0.933)"><g class="fig" style="--n:0"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(700 206) scale(0.849)"><g class="fig" style="--n:1"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(779 209) scale(0.869)"><g class="fig" style="--n:2"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(116 236) scale(1.068)"><g class="fig" style="--n:1"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(172 234) scale(1.132)"><g class="fig" style="--n:2"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(243 241) scale(1.086)"><g class="fig" style="--n:3"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(327 241) scale(1.04)"><g class="fig" style="--n:4"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(374 242) scale(1.096)"><g class="fig" style="--n:5"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(463 237) scale(1.049)"><g class="fig" style="--n:0"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(522 241) scale(1.072)"><g class="fig" style="--n:1"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(574 236) scale(1.156)"><g class="fig" style="--n:2"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(661 234) scale(1.07)"><g class="fig" style="--n:3"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(711 234) scale(1.136)"><g class="fig" style="--n:4"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(781 239) scale(1.094)"><g class="fig" style="--n:5"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(109 269) scale(1.351)"><g class="fig" style="--n:0"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(166 268) scale(1.31)"><g class="fig" style="--n:1"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(215 268) scale(1.316)"><g class="fig" style="--n:2"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(288 264) scale(1.276)"><g class="fig" style="--n:3"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(325 271) scale(1.323)"><g class="fig" style="--n:4"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(381 273) scale(1.356)"><g class="fig" style="--n:5"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(454 269) scale(1.259)"><g class="fig" style="--n:0"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(493 268) scale(1.247)"><g class="fig" style="--n:1"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(555 265) scale(1.244)"><g class="fig" style="--n:2"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(619 267) scale(1.341)"><g class="fig" style="--n:3"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(677 269) scale(1.3)"><g class="fig" style="--n:4"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(738 268) scale(1.273)"><g class="fig" style="--n:5"><use href="#soul" x="0" y="0"/></g></g>
+              <g transform="translate(804 273) scale(1.341)"><g class="fig" style="--n:0"><use href="#soul" x="0" y="0"/></g></g>
+            </g>
+          </g>
+        </svg>
+        <figcaption>The smoke is the announcement &#183; nothing else is</figcaption>
+      </figure>
+
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p class="sign">Conclave · by Nikita Tsyganov</p>
+    <p>Copyright © 2026 Nikita Tsyganov. Free software under the GNU Affero General Public
+      License v3, with additional terms for attribution, origin and marks. Anyone running a
+      modified CONCLAVE as a network service must offer that modified source to its users.</p>
+    <p>Every illustration on this page is drawn here in SVG. Nothing is traced from, or loaded
+      from, anyone else's file. <a href="https://github.com/nik1tsyganov/conclave">github.com/nik1tsyganov/conclave</a></p>
+  </div>
+</footer>
+
+<script>
+(() => {
+  'use strict';
+  const QUORUM = 2;
+  const SEATS = ['scrutator', 'advocatus'];
+  const RECEIPT = {
+    reasoned: { position: 'APPROVE', independent: true,  counts: true,  note: 'counted · approve' },
+    bare:     { position: 'APPROVE', independent: false, counts: true,  note: 'counted · abstain' },
+    reject:   { position: 'REJECT',  independent: true,  counts: true,  note: 'counted · reject' },
+    unproven: { position: 'APPROVE', independent: true,  counts: false, note: 'not counted' },
+  };
+
+  // Ported from tools/panel-rules.js: the builder never votes; a receipt counts only with
+  // proof and an unchanged tree; an approval with no reason of its own becomes an abstention;
+  // the unit's own check gates the landing and never joins the count.
+  function verdict(picks, checkPassed) {
+    let approve = 0, reject = 0, abstain = 0, counted = 0, adjusted = 0, uncounted = 0;
+    for (const seat of SEATS) {
+      const r = RECEIPT[picks[seat]];
+      if (!r.counts) { uncounted += 1; continue; }
+      counted += 1;
+      if (r.position === 'APPROVE' && !r.independent) { abstain += 1; adjusted += 1; continue; }
+      if (r.position === 'APPROVE') approve += 1; else reject += 1;
+    }
+    let outcome;
+    if (counted < QUORUM) outcome = 'NOT_PANEL';
+    else if (reject >= 2) outcome = 'REJECT';
+    else if (approve >= 2 && reject === 0) outcome = 'PASSAGE';
+    else outcome = 'DEADLOCK';
+    if (checkPassed === false && outcome === 'PASSAGE') outcome = 'CHECK_FAILED';
+    return { outcome, lands: outcome === 'PASSAGE', approve, reject, abstain, counted, uncounted, adjusted };
+  }
+
+  const SAYS = {
+    PASSAGE:      ['Passage',      'Fumata bianca', ' — the work may land.',           'white'],
+    DEADLOCK:     ['Deadlock',     'Fumata nera',   ' — the room stays shut.',           'black'],
+    REJECT:       ['Rejected',     'Fumata nera',   ' — the room stays shut.',           'black'],
+    NOT_PANEL:    ['Not a panel',  '',              'No smoke — there was never a vote to burn.', 'none'],
+    CHECK_FAILED: ['Check failed', 'Fumata nera',   ' — the seats agreed and the code did not.', 'black'],
+  };
+
+  function because(v) {
+    if (v.outcome === 'NOT_PANEL') return `Only ${v.counted} of ${SEATS.length} checkers could be counted, and a panel needs ${QUORUM}. A seat that cannot prove itself, or whose tree moved, is not a vote.`;
+    if (v.outcome === 'CHECK_FAILED') return 'Two approvals and no rejection — and the unit’s own check did not pass. The check gates the landing; it never joins the count.';
+    if (v.outcome === 'REJECT') return 'Both checkers refused. Nothing lands.';
+    if (v.outcome === 'DEADLOCK') {
+      if (v.adjusted) return `${v.adjusted === 1 ? 'One approval' : 'Two approvals'} carried no reason of its own, so it counted as an abstention. Agreement is not evidence, and ${v.approve} counted approval${v.approve === 1 ? '' : 's'} is short of ${QUORUM}.`;
+      return `A rejection stands. ${v.approve} approval${v.approve === 1 ? '' : 's'} against ${v.reject}, and nothing lands while one checker objects.`;
+    }
+    return 'Two counted approvals, each resting on its own reason, no rejection, and the unit’s own check green.';
+  }
+
+  const el = (id) => document.getElementById(id);
+  const chimney = el('chimney'), announce = el('announce'), check = el('check');
+
+  function paint() {
+    const picks = {};
+    for (const seat of SEATS) {
+      const hit = document.querySelector(`input[name="${seat}"]:checked`);
+      picks[seat] = hit ? hit.value : 'reasoned';
+    }
+    const v = verdict(picks, check.checked);
+    const [heading, foreign, english, smoke] = SAYS[v.outcome];
+    el('word').textContent = heading;
+    el('latin-it').textContent = foreign;
+    el('latin-en').textContent = english;
+    el('why').textContent = because(v);
+    chimney.dataset.smoke = smoke;
+    announce.dataset.lands = String(v.lands);
+    el('tally').innerHTML =
+      `<span>approve <b>${v.approve}</b></span><span>reject <b>${v.reject}</b></span>` +
+      `<span>abstain <b>${v.abstain}</b></span><span>counted <b>${v.counted}</b> of ${QUORUM}</span>` +
+      `<span>outcome <b>${v.outcome}</b></span>`;
+    for (const seat of SEATS) {
+      const box = document.querySelector(`[data-seat="${seat}"]`);
+      const r = RECEIPT[picks[seat]];
+      box.querySelector('[data-line]').textContent = r.note;
+      box.dataset.counts = !r.counts ? 'no' : r.position === 'REJECT' ? 'reject' : r.independent ? 'yes' : 'no';
+    }
+  }
+
+  document.addEventListener('change', (e) => {
+    if (e.target.matches('input[name="scrutator"], input[name="advocatus"], #check')) paint();
+  });
+  el('reset').addEventListener('click', () => {
+    for (const seat of SEATS) document.querySelector(`input[name="${seat}"][value="reasoned"]`).checked = true;
+    check.checked = true;
+    paint();
+  });
+  paint();
+
+  const still = matchMedia('(prefers-reduced-motion: reduce)');
+  if (!still.matches) {
+    // the field drifts against the scroll, one write per frame and nothing read in the handler
+    let ticking = false;
+    // the eye opens on the reader's own scrolling: one progress value, everything derived
+    const watch = document.getElementById('watch');
+    const drive = () => {
+      const r = watch.getBoundingClientRect();
+      const travel = r.height - innerHeight;
+      // No travel means the section cannot drive anything (the short-height media query, a
+      // phone on its side). Show the finished plate, as no-JS and reduced-motion do.
+      const p = travel > 0 ? Math.min(1, Math.max(0, -r.top / travel)) : 1;
+      watch.style.setProperty('--p', p.toFixed(4));
+    };
+    addEventListener('scroll', () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        document.documentElement.style.setProperty('--scroll', (scrollY / innerHeight).toFixed(3));
+        drive();
+        ticking = false;
+      });
+    }, { passive: true });
+    addEventListener('resize', drive, { passive: true });
+    drive();
+
+    // The eye follows the pointer. It is the scrutineer's, and it should feel like one.
+    const eye = document.querySelector('.eye');
+    let pending = false, px = 0, py = 0;
+    addEventListener('pointermove', (e) => {
+      px = e.clientX; py = e.clientY;
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(() => {
+        const b = eye.getBoundingClientRect();
+        if (b.width) {
+          const dx = px - (b.left + b.width / 2);
+          const dy = py - (b.top + b.height / 2);
+          const far = Math.hypot(dx, dy) || 1;
+          const reach = Math.min(1, far / (b.width * 0.75)) * 26;   // never past the iris
+          eye.style.setProperty('--eye-x', ((dx / far) * reach).toFixed(2));
+          eye.style.setProperty('--eye-y', ((dy / far) * reach).toFixed(2));
+        }
+        pending = false;
+      });
+    }, { passive: true });
+
+    // and it blinks, at intervals nobody can predict
+    const blink = () => {
+      eye.style.setProperty('--blink', '0.04');
+      setTimeout(() => eye.style.setProperty('--blink', '1'), 95);
+      setTimeout(blink, 4200 + Math.random() * 7000);
+    };
+    setTimeout(blink, 3500 + Math.random() * 3000);
+
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver((rows) => {
+        for (const row of rows) if (row.isIntersecting) { row.target.classList.add('seen'); io.unobserve(row.target); }
+      }, { rootMargin: '0px 0px -10% 0px' });
+      document.querySelectorAll('.rise, .stagger').forEach((n) => io.observe(n));
+    } else {
+      document.querySelectorAll('.rise, .stagger').forEach((n) => n.classList.add('seen'));
+    }
+  } else {
+    document.querySelectorAll('.rise, .stagger').forEach((n) => n.classList.add('seen'));
+  }
+
+
+  // ——— the route plate, made clickable ———
+  // Every sentence the card shows is read out of the matching <li>, which is the visible
+  // fallback when this never runs. One source, two presentations.
+  const plate = document.querySelector('.route-plate');
+  const card = document.getElementById('routecard');
+  if (plate && card) {
+    const order = [...document.querySelectorAll('.route-rows li')].map((li) => li.dataset.node);
+    const rowFor = (id) => document.querySelector(`.route-rows li[data-node="${id}"]`);
+    const pick = (id, focus) => {
+      const row = rowFor(id);
+      if (!row) return;
+      const i = order.indexOf(id);
+      plate.dataset.picked = id;
+      plate.querySelectorAll('.node').forEach((n) => n.toggleAttribute('data-open', n.dataset.node === id));
+      card.querySelector('.rc-step').textContent = String(i + 1).padStart(2, '0');
+      card.querySelector('.rc-of').textContent = `of ${order.length}`;
+      card.querySelector('.rc-title').textContent = row.querySelector('b').textContent;
+      card.querySelector('.rc-body').textContent = row.querySelector('span:not(.proves)').textContent;
+      card.querySelector('.rc-proves').textContent = row.querySelector('.proves').textContent;
+      const src = row.querySelector('.srcchip');
+      card.querySelector('.rc-src').innerHTML = '';
+      card.querySelector('.rc-src').append(src.cloneNode(true));
+      card.hidden = false;
+      if (focus) card.querySelector('.rc-title').scrollIntoView({ block: 'nearest', behavior: still.matches ? 'auto' : 'smooth' });
+    };
+    const shut = () => {
+      delete plate.dataset.picked;
+      plate.querySelectorAll('.node').forEach((n) => n.removeAttribute('data-open'));
+      card.hidden = true;
+    };
+    plate.querySelectorAll('.hit').forEach((h) => {
+      h.addEventListener('click', () => pick(h.dataset.node, true));
+      h.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(h.dataset.node, true); }
+      });
+    });
+    card.addEventListener('click', (e) => {
+      const step = e.target.closest('[data-step]');
+      if (step) {
+        const at = order.indexOf(plate.dataset.picked);
+        const next = (at + Number(step.dataset.step) + order.length) % order.length;
+        pick(order[next], false);
+        plate.querySelector(`.hit[data-node="${order[next]}"]`).focus();
+        return;
+      }
+      if (e.target.closest('[data-close]')) {
+        const back = plate.querySelector(`.hit[data-node="${plate.dataset.picked}"]`);
+        shut();
+        if (back) back.focus();
+      }
+    });
+    addEventListener('keydown', (e) => { if (e.key === 'Escape' && !card.hidden) shut(); });
+  }
+
+  // Last, and only if everything above survived: hand the controls to the reader and let the
+  // reveal styles apply. A throw before this leaves the complete no-script page instead of a
+  // blank one, which is the failure mode `.js` had.
+  document.querySelectorAll('.ballots input, #check, #reset').forEach((n) => { n.disabled = false; });
+  document.documentElement.classList.add('ready');
+})();
+</script>
 </body>
 </html>

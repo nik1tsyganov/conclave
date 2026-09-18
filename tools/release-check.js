@@ -54,7 +54,6 @@ const REQUIRED = [
   'tools/seat-policy.js',
   'tools/vendor-binaries.js',
   'site/index.html',
-  'site/styles.css',
   'site/conclave-core.svg',
   'site/architecture.svg',
 ];

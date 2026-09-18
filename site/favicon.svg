@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+  <title>CONCLAVE</title>
+  <style>
+    .seat{fill:#252b27}.count{fill:#903e28}
+    @media(prefers-color-scheme:dark){.seat{fill:#efeee6}.count{fill:#efa48c}}
+  </style>
+  <path class="seat" d="M2 2h2v8H2zm5 0h2v8H7zm5 0h2v8h-2z"/>
+  <path class="count" d="M2 12h12v2H2z"/>
+</svg>

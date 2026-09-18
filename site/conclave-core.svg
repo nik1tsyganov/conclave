@@ -1,66 +1,90 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
-  <title id="title">CONCLAVE tri-seat command system</title>
-  <desc id="desc">Original retro-futurist illustration of the Jev arbiter above three interconnected vendor cores.</desc>
-  <defs>
-    <radialGradient id="bg" cx="50%" cy="45%" r="70%"><stop offset="0" stop-color="#17223a"/><stop offset=".55" stop-color="#070a12"/><stop offset="1" stop-color="#020305"/></radialGradient>
-    <radialGradient id="blue"><stop offset="0" stop-color="#9fd5ff"/><stop offset=".25" stop-color="#3197ff"/><stop offset="1" stop-color="#0a1a49"/></radialGradient>
-    <radialGradient id="amber"><stop offset="0" stop-color="#fff1af"/><stop offset=".25" stop-color="#ffbd3d"/><stop offset="1" stop-color="#4c2300"/></radialGradient>
-    <radialGradient id="green"><stop offset="0" stop-color="#aaffd0"/><stop offset=".25" stop-color="#31d98a"/><stop offset="1" stop-color="#063724"/></radialGradient>
-    <linearGradient id="horizon" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#ff315f" stop-opacity=".65"/><stop offset="1" stop-color="#331124" stop-opacity="0"/></linearGradient>
-    <filter id="glow"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <style>
-      .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.08em}.label{font:700 26px system-ui,sans-serif;fill:#fff}.small{font:600 15px system-ui,sans-serif;fill:#d8deea;letter-spacing:.08em}.wire{fill:none;stroke:#ff315f;stroke-width:4;opacity:.78}.grid{stroke:#15223d;stroke-width:1}.core{stroke:#fff;stroke-opacity:.25;stroke-width:2}.hud{fill:none;stroke:#ff315f;stroke-width:3}.ghost{fill:#9cb1d0;opacity:.055}
-    </style>
-  </defs>
-  <rect width="1600" height="900" fill="url(#bg)"/>
-  <g opacity=".55">
-    <path class="grid" d="M0 120h1600M0 240h1600M0 360h1600M0 480h1600M0 600h1600M0 720h1600"/>
-    <path class="grid" d="M200 0v900M400 0v900M600 0v900M800 0v900M1000 0v900M1200 0v900M1400 0v900"/>
-  </g>
-  <path d="M0 680 Q800 570 1600 680 L1600 900H0Z" fill="url(#horizon)" opacity=".42"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 500" width="920" height="500" role="img" aria-labelledby="ttl dsc">
+<title id="ttl">CONCLAVE: one unit, from block to smoke</title>
+<desc id="dsc">A unit travels from the host's block, through routing, to one building seat and two checking seats. Their receipts are counted in code, and the unit's own check gates the landing. An arbiter proposes off to one side and is counted in nothing.</desc>
+<!-- Named by ROLE, never by vendor or model: the catalog turns over and a diagram cannot chase it.
+     Which vendor takes which seat is in .cursor/skills/conclave-cli/references/dispatch-matrix.json. -->
+<defs>
+  <style>
+    :root { --bg:#f5f0e8; --ink:#3a332c; --muted:#7a7066; --rub:#8f3d24; }
+    svg { color: var(--ink); }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#16120e; --ink:#ebe5dc; --muted:#9d938a; --rub:#c2664a; }
+    }
+    .bg   { fill: var(--bg); }
+    .wire { fill:none; stroke:var(--ink); stroke-width:1.6; }
+    .box  { fill:none; stroke:var(--ink); stroke-width:1.6; }
+    .rub  { stroke:var(--rub); }
+    .fill { fill:var(--ink); }
+    .rubf { fill:var(--rub); }
+    .t    { font:400 13px ui-monospace,SFMono-Regular,Menlo,monospace; fill:var(--ink); }
+    .ts   { font:400 11px ui-monospace,SFMono-Regular,Menlo,monospace; fill:var(--ink); opacity:.82; }
+    .tm   { font:400 10px ui-monospace,SFMono-Regular,Menlo,monospace; fill:var(--muted); }
+    .tr   { font:400 12px ui-monospace,SFMono-Regular,Menlo,monospace; fill:var(--rub); }
+    .head { font:400 20px Cinzel,Georgia,serif; fill:var(--ink); letter-spacing:.06em; }
+  </style>
+  <pattern id="h" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+    <line x1="0" y1="0" x2="0" y2="4" stroke="currentColor" stroke-width=".7" opacity=".32"/>
+  </pattern>
+  <pattern id="hx" width="7" height="7" patternUnits="userSpaceOnUse">
+    <path d="M0 0h7M0 0v7" stroke="currentColor" stroke-width=".6" opacity=".28"/>
+  </pattern>
+</defs>
 
-  <g class="ghost">
-    <path d="M800 80c-128 0-216 92-216 214 0 80 28 146 76 198l-74 218h428l-74-218c48-52 76-118 76-198 0-122-88-214-216-214z"/>
-    <path d="M664 220l136 162 136-162-34 252H698z"/>
-  </g>
+<rect class="bg" x="0" y="0" width="920" height="500"/>
+<text class="head" x="8" y="30">One unit, from block to smoke</text>
+<text class="tm"  x="8" y="50">The current runs left to right. Nothing flows back. Five parties, two counted votes.</text>
 
-  <g class="hud" opacity=".8"><path d="M70 70h270l40 40h110M1530 70h-270l-40 40h-110M70 830h310l40-40h100M1530 830h-310l-40-40h-100"/></g>
+<g transform="translate(0,64)">
+  <rect class="box" x="8" y="130" width="128" height="76" rx="2" fill="url(#h)"/>
+  <text class="t" x="72" y="162" text-anchor="middle">the host's</text>
+  <text class="t" x="72" y="182" text-anchor="middle">block</text>
+  <text class="tm" x="8" y="226">host &#183; drives, never votes</text>
 
-  <g transform="translate(800 150)">
-    <polygon points="0,-68 86,-18 86,82 0,132 -86,82 -86,-18" fill="#10151f" stroke="#ff315f" stroke-width="4" filter="url(#glow)"/>
-    <text x="0" y="12" text-anchor="middle" class="label" font-size="24">GROK 4.6</text>
-    <text x="0" y="43" text-anchor="middle" class="small">ARBITER</text>
-    <text x="0" y="68" text-anchor="middle" class="small" fill="#ff7792">NON-VOTING</text>
-  </g>
+  <path class="wire" d="M136 168h58"/><path class="fill" d="M188 162l8 6-8 6"/>
+  <rect class="box" x="196" y="144" width="98" height="48" rx="2"/>
+  <text class="t" x="245" y="173" text-anchor="middle">route</text>
+  <text class="tm" x="138" y="248">class &#183; files &#183; vendors ready</text>
 
-  <path class="wire" d="M800 280L430 420M800 280L800 420M800 280l370 140"/>
-  <path class="wire" d="M430 420Q800 690 1170 420M430 420Q800 190 1170 420" stroke-dasharray="12 10" opacity=".38"/>
+  <path class="wire" d="M294 168h40M334 168V66h52M334 168h52M334 168v102h52"/>
+  <path class="fill" d="M380 60l8 6-8 6M380 162l8 6-8 6M380 264l8 6-8 6"/>
 
-  <g transform="translate(430 500)">
-    <circle r="150" fill="url(#blue)" class="core" filter="url(#glow)"/>
-    <circle r="118" fill="none" stroke="#8ecbff" stroke-width="2" stroke-dasharray="8 12"/>
-    <text y="-18" text-anchor="middle" class="label">MELCHIOR</text>
-    <text y="18" text-anchor="middle" class="small">OPENAI</text>
-    <text y="56" text-anchor="middle" class="small">REASON · IMPLEMENT</text>
-  </g>
-  <g transform="translate(800 500)">
-    <circle r="150" fill="url(#amber)" class="core" filter="url(#glow)"/>
-    <circle r="118" fill="none" stroke="#ffe39a" stroke-width="2" stroke-dasharray="8 12"/>
-    <text y="-18" text-anchor="middle" class="label">BALTHASAR</text>
-    <text y="18" text-anchor="middle" class="small">ANTHROPIC</text>
-    <text y="56" text-anchor="middle" class="small">JUDGMENT · AGENTIC</text>
-  </g>
-  <g transform="translate(1170 500)">
-    <circle r="150" fill="url(#green)" class="core" filter="url(#glow)"/>
-    <circle r="118" fill="none" stroke="#a6ffd0" stroke-width="2" stroke-dasharray="8 12"/>
-    <text y="-18" text-anchor="middle" class="label">CASPER</text>
-    <text y="18" text-anchor="middle" class="small">GOOGLE</text>
-    <text y="56" text-anchor="middle" class="small">CONTEXT · BREADTH</text>
-  </g>
+  <rect class="box rub" x="388" y="40" width="172" height="54" rx="2" fill="url(#h)"/>
+  <text class="tr" x="404" y="64">PONENS</text><text class="ts" x="404" y="82">builds &#183; tree changes</text>
+  <circle class="fill" cx="540" cy="54" r="5"/>
 
-  <g transform="translate(800 770)">
-    <path d="M-270 0h540" stroke="#ff315f" stroke-width="2"/>
-    <text y="-30" text-anchor="middle" class="mono" fill="#fff" font-size="20">CLASSIFY → DISPATCH → EXECUTE → CROSS-CHECK → PROVE → TALLY</text>
-    <text y="28" text-anchor="middle" class="mono" fill="#93a1b8" font-size="14">CODE DEFINES WHAT IS LEGAL. THE ARBITER CHOOSES ONLY AMONG LEGAL ROUTES.</text>
+  <rect class="box" x="388" y="142" width="172" height="54" rx="2"/>
+  <text class="t" x="404" y="166">SCRUTATOR</text><text class="ts" x="404" y="184">verifies &#183; read-only</text>
+  <path class="fill" d="M540 148a6 6 0 0 0 0 12Z"/><circle class="box" cx="540" cy="154" r="6"/>
+
+  <rect class="box" x="388" y="244" width="172" height="54" rx="2"/>
+  <text class="t" x="404" y="268">ADVOCATUS</text><text class="ts" x="404" y="286">reviews &#183; read-only</text>
+  <circle class="box" cx="540" cy="256" r="6"/>
+  <text class="tm" x="388" y="324">one vendor each &#183; never the builder&#8217;s</text>
+
+  <path class="wire" d="M560 67h48v101M560 169h48M560 271h48V170M608 169h40"/>
+  <text class="tm" x="570" y="54">receipts</text>
+  <path class="fill" d="M640 163l8 6-8 6"/>
+
+  <rect class="box" x="650" y="136" width="114" height="66" rx="2" fill="url(#hx)"/>
+  <text class="t" x="707" y="164" text-anchor="middle">counted</text>
+  <text class="t" x="707" y="182" text-anchor="middle">in code</text>
+
+  <path class="wire" d="M764 169h38"/><path class="fill" d="M796 163l8 6-8 6"/>
+  <rect class="box rub" x="804" y="136" width="90" height="66" rx="2"/>
+  <text class="tr" x="849" y="174" text-anchor="middle">the check</text>
+  <text class="tm" x="849" y="222" text-anchor="middle">gates, never votes</text>
+  <g class="fill">
+    <circle cx="849" cy="104" r="5" opacity=".5"/><circle cx="840" cy="82" r="7" opacity=".32"/>
+    <circle cx="856" cy="56" r="9.5" opacity=".18"/><circle cx="843" cy="30" r="12" opacity=".09"/>
   </g>
+  <path class="wire" d="M849 136V112" stroke-width="1.2" opacity=".5"/>
+
+  <g class="wire" stroke-dasharray="4 5" stroke-width="1.3" opacity=".6">
+    <path d="M388 380H334V272"/><path d="M560 380h147V206"/>
+  </g>
+  <rect class="box" x="388" y="356" width="172" height="48" rx="2" stroke-dasharray="5 4"/>
+  <text class="ts" x="404" y="378">ARBITER</text>
+  <text class="tm" x="404" y="395">proposes &#183; never votes</text>
+  <text class="tm" x="572" y="420">reads no files &#183; dispatches nothing</text>
+</g>
 </svg>

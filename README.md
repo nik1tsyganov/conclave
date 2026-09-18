@@ -9,7 +9,7 @@
 
 [![npm](https://img.shields.io/npm/v/conclave-mcp?style=flat-square&label=conclave-mcp&labelColor=252b27&color=903e28)](https://www.npmjs.com/package/conclave-mcp)
 [![licence](https://img.shields.io/badge/licence-AGPL--3.0-903e28?style=flat-square&labelColor=252b27)](LICENSE)
-[![verification](https://img.shields.io/github/actions/workflow/status/nik1tsyganov/conclave/verify.yml?branch=main&style=flat-square&label=883%20checks&labelColor=252b27&color=3c6b4f)](../../actions/workflows/verify.yml)
+[![verification](https://img.shields.io/github/actions/workflow/status/nik1tsyganov/conclave/verify.yml?branch=main&style=flat-square&label=checks&labelColor=252b27&color=3c6b4f)](../../actions/workflows/verify.yml)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-252b27?style=flat-square&labelColor=252b27&color=5b5750)](package.json)
 
 </div>
@@ -20,6 +20,14 @@ A tri-vendor review panel. One seat builds a unit of work; two others check it i
 their own, on different vendors; the votes are counted in deterministic code rather than by
 asking a model what the panel decided.
 
+> [!NOTE]
+> **Status — working, and young.** The suite is green on Linux and macOS from a clean
+> checkout; the badge above is the live count. Driven end to end on all three vendors with
+> vendor-native proof of invocation (first full day: 2026-09-16, 11 sealed runs and 7 Jev
+> tallies). Every run so far has been on this repository or on fixtures — **no external
+> project has been built through it yet**, and the seat table is still a proposal. Read the
+> version number literally.
+
 > [!IMPORTANT]
 > An approval carrying no reason of its own counts as an **abstention**. A vote counts only
 > from a seat that proved its vendor session, its token count and the model that actually
@@ -29,28 +37,44 @@ asking a model what the panel decided.
 npx conclave-mcp        # the rules, over MCP, for a host that runs its own seats
 ```
 
-The arbiter is the Jev decision engine (TypeSafe System One): it proposes the task class, the
-seats, whether to convene, and the panel tally as probability distributions, and deterministic
-code gates every proposal. The hosting session runs the tools and holds no vote — a Claude Code
+## What it gives you
+
+- **A vote you can audit.** Every counted approval carries a vendor session id, a token count and the model that actually answered. Missing any of the three, it does not count.
+- **Agreement is not evidence.** An approval with no reason of its own is recorded as an abstention, by rule, in code.
+- **The checker is never the builder.** A checking seat runs in its own session on a different vendor, read-only, with a write audit on its tree before and after.
+- **The test gates; it never votes.** A unit whose own check failed does not land, whatever the seats said.
+- **The plan is sealed first.** Hashed with the matrix and the profiles it was checked against, before the first process starts. Each launch consumes one sealed entry.
+- **Nothing is inferred from silence.** An outcome word a build cannot read is a split, never a passage.
+- **Any MCP host can convene one.** A stdio server, so VS Code, Cursor, Zed, Claude Desktop and the JetBrains IDEs need no plugin written for them.
+- **Subscription capacity only.** No API-key billing path is configured or suggested; an exhausted bucket pauses the run rather than buying more.
+
+## Requirements
+
+| | |
+|---|---|
+| Node | ≥ 20 |
+| Vendors | Any two of `codex`, `claude`, `agy` on `PATH` for a panel; all three for full independence |
+| Auth | Each vendor signed in on its own subscription. No API key is read or accepted. |
+| Arbiter | `TYPESAFE_API_KEY` for Jev. Without it the seal refuses unless an opt-out reason is recorded. |
+| Platform | Linux and macOS are checked in CI. Windows is unverified. |
+
+Only `conclave-mcp` needs none of this: it answers from JSON, calls no model and reads no credential.
+
+The arbiter proposes the task class, the seats, whether to convene, and the panel tally as
+probability distributions; deterministic code gates every proposal. **Any vendor and any model
+may arbitrate.** The Jev decision engine (TypeSafe System One) is the recommended default, not a
+requirement. One arrangement is refused — the arbiter's own vendor *and* model also holding a
+seat, because a model cannot score the independence of its own reply. An arbiter that merely
+shares a vendor with a seat is legal, marked `seated`, and its bias is measured rather than
+assumed. Prefer an arbiter from a vendor that holds no seat. The hosting session runs the tools and holds no vote — a Claude Code
 session, a Cursor chat, VS Code, Synara, or an app with its own interface such as Droppy Code.
 
 > The model proposes. Deterministic policy decides what is legal.
 
 ## One unit, from block to smoke
 
-```mermaid
-flowchart LR
-  B["the lead's block"] --> R{route}
-  R -->|builds| P["PONENS<br/><small>tree changes</small>"]
-  R -->|verifies| S["SCRUTATOR<br/><small>read-only</small>"]
-  R -->|reviews| A["ADVOCATUS<br/><small>read-only</small>"]
-  P -- receipt --> C["counted in code"]
-  S -- receipt --> C
-  A -- receipt --> C
-  C --> G{"the unit's own check"}
-  G -->|passes| W["PASSAGE<br/>fumata bianca"]
-  G -->|fails| N["CHECK_FAILED<br/>fumata nera"]
-```
+<img src="site/conclave-core.svg" alt="A unit travels from the host's block, through routing, to one building seat and two checking seats. Their receipts are counted in code, and the unit's own check gates the landing. An arbiter proposes off to one side and is counted in nothing." width="920">
+
 
 The builder's receipt reaches the count and is never a vote: its tree moved, and a changed tree
 is what the write audit is looking for.
@@ -68,11 +92,11 @@ $ node tools/conclave-cli-preflight.js
 
 $ node tools/run-drive.js --run-dir <run> --phase implement
   { "phase": "implement",
-    "results": [ { "dispatchId": "d1", "status": "PASS", "modelObserved": "gpt-5.6-sol" } ] }
+    "results": [ { "dispatchId": "d1", "status": "PASS", "modelObserved": "<the model that answered>" } ] }
 
 $ node tools/run-drive.js --run-dir <run> --phase verify
   { "phase": "verify",
-    "results": [ { "dispatchId": "v2", "status": "PASS", "modelObserved": "gemini-3.8-flash-medium" } ] }
+    "results": [ { "dispatchId": "v2", "status": "PASS", "modelObserved": "<the model that answered>" } ] }
 ```
 
 A seat that cannot show its session, its tokens and the model that answered is failed for
@@ -82,14 +106,19 @@ missing proof, not counted as an abstention.
 
 ## System
 
-| Seat | Vendor | Models (owner catalog, 2026-09-16) |
+| Seat | What it does | Counted? |
 |---|---|---|
-| Ponens | OpenAI | `gpt-5.6-sol` standing; `gpt-6-astra` escalation-only, probe-required |
-| Scrutator | Anthropic | `fable` implement; `opus` verify, review, plan |
-| Advocatus | Google (agy) | `gemini-3.8-flash-*` implement and verify; `gemini-3.1-pro-high` review and research |
-| Arbiter | Jev | `jev-latest` decision engine; never a seat, never a vote |
+| Ponens | Builds the unit, in a copy of the project | No — its tree moved, so its receipt cannot be a vote |
+| Scrutator | Verifies the change against the evidence, read-only | Yes, with proof and a reason of its own |
+| Advocatus | Reviews for what the other two missed | Yes, with proof and a reason of its own |
+| Arbiter | Proposes the class, the seats and the tally distributions. Any vendor; `jev`/`jev-latest` recommended | Never, and it never holds a seat either |
 
-The [dispatch matrix](.cursor/skills/conclave-cli/references/dispatch-matrix.json) defines the legal lanes per task class and role. Every model/effort pair needs a fresh native probe (60-minute expiry) before a plan that names it can seal. Terra, Luna and Sonnet were retired from every lane on 2026-09-16.
+Which vendor and which model takes which seat is decided per unit, and that catalog turns over
+faster than a document tracking it can stay right: the [dispatch matrix](.cursor/skills/conclave-cli/references/dispatch-matrix.json)
+is the one place it is written down, with the legal lanes per task class and role. Every
+model/effort pair needs a fresh native probe (60-minute expiry) before a plan naming it can seal.
+
+<img src="site/architecture.svg" alt="The arbiter proposes. Dispatch matrix, seat profiles and the rules pack constrain every proposal. Three seats execute, each a leaf. Proof of the seat, the write audit and the code tally decide the outcome." width="1000">
 
 ## Install
 
@@ -97,18 +126,13 @@ The [dispatch matrix](.cursor/skills/conclave-cli/references/dispatch-matrix.jso
 node tools/install-plugin.js
 ```
 
-The installer creates the CONCLAVE Cursor CLI plugin (tools, policy, templates, the lean `seat-skills/` source, and the run dashboard) under `~/.cursor/plugins/local`. Put the runtime environment in one file and source it before any tool:
+The installer creates the CONCLAVE Cursor CLI plugin (tools, policy, templates, the lean `seat-skills/` source, and the run dashboard) under `~/.cursor/plugins/local`.
+
+Put the runtime environment in one file and source it before any tool. **[`.env.example`](.env.example) is the annotated list** — which variables are required, which are optional, and what refuses without each:
 
 ```bash
-# ~/.config/conclave/env.sh
-# The STANDING v2 + R01-R22 pack ships at <checkout>/standing-rules. Set CONCLAVE_RULES_ROOT only
-# to replace it; a root that is named and unreadable stops the run rather than falling back.
-export CONCLAVE_VAULT_ROOT="$HOME/src/ai-ops-vault"             # telemetry, analysis, seat-skill sync
-export CONCLAVE_FIELD_LIBRARY_ROOT="$HOME/src/field-library"
-export CONCLAVE_VAULT_SKILLS_ROOT="$HOME/src/vault-skills"
-export CONCLAVE_CODEX_BIN="$HOME/.local/bin/codex"; export CONCLAVE_AGY_BIN="$HOME/.local/bin/agy"; export CONCLAVE_CLAUDE_BIN="$HOME/.local/bin/claude"
-export CONCLAVE_ALLOWED_WORKSPACE_ROOTS="$HOME/.local/scratch/conclave:/private/tmp/conclave"
-export CONCLAVE_CODEX_PROVIDER="openai"                          # headless codex otherwise routes through a local proxy
+cp .env.example ~/.config/conclave/env.sh   # then edit it, then:
+source ~/.config/conclave/env.sh
 ```
 
 Live check before every run: `claude auth status` must report `loggedIn: true` (claude.ai subscription, never an API key), and each intended model/effort pair needs a fresh native probe; a claim of reachability without a same-turn live check is NOT RUN.
@@ -119,21 +143,26 @@ Live check before every run: `claude auth status` must report `loggedIn: true` (
 
 ```bash
 source ~/.config/conclave/env.sh
-node tools/conclave-whoami.js --mode claude-code --slug claude-fable-5-1          # declare the host; the arbiter comes from the matrix
-node tools/conclave-cli-preflight.js
-node tools/model-probe.js --vendor openai --model gpt-5.6-sol --effort medium --evidence-dir $RUN/probes/sol-medium
-node tools/model-availability.js --file $RUN/availability.json --probe $RUN/probes/sol-medium/probe.json
-node tools/jev-plan-classify.js --plan $RUN/draft-plan.json --out $RUN/jev-classify.json --provenance $RUN/jev-decisions.jsonl
-node tools/plan-seal.js --plan $RUN/draft-plan.json --run-dir $RUN/run --availability $RUN/availability.json --skill-source-root ./seat-skills --jev-classification $RUN/jev-classify.json
-node tools/run-drive.js --run-dir $RUN/run --phase implement        # then --attest <id> for each Claude checkpoint after reading its response.txt
-node tools/run-drive.js --run-dir $RUN/run --phase evidence --tests $RUN/tests.json
-node tools/run-drive.js --run-dir $RUN/run --phase verify
-node tools/run-drive.js --run-dir $RUN/run --phase review
-node tools/run-drive.js --run-dir $RUN/run --phase finalize          # run-finalize, activation-check, panel-tally, panel-tally-jev
-node tools/conclave-dashboard.js --run-dir $RUN/run                    # optional local observer at 127.0.0.1
+
+node tools/conclave-whoami.js          # declare the host that is driving
+node tools/conclave-cli-preflight.js   # binaries, rules pack, live auth
+node tools/model-probe.js              # one fresh probe per model/effort pair
+node tools/jev-plan-classify.js        # the arbiter proposes a class
+node tools/plan-seal.js                # hashed with the matrix and profiles it was checked against
+
+node tools/run-drive.js --run-dir <run> --phase implement   # then --attest <id> per checkpoint
+node tools/run-drive.js --run-dir <run> --phase evidence
+node tools/run-drive.js --run-dir <run> --phase verify
+node tools/run-drive.js --run-dir <run> --phase review
+node tools/run-drive.js --run-dir <run> --phase finalize
+
+node tools/conclave-dashboard.js --run-dir <run>            # optional read-only observer
 ```
 
-The complete command reference and plan fields are in [commands/conclave-cli.md](commands/conclave-cli.md). A plan binds `planId`, `hostMode` (`cursor-cli`, `synara`, or `claude-code`), the arbiter `{"vendor":"jev","model":"jev-latest","host":"<session slug>"}`, and every dispatch entry: `dispatchId`, `unitId`, `class`, `role`, `vendor`, `model`, `effort`, `cwd`, `brief`, `briefSha256`, `writeScope`, and for checking roles `authorVendor` and `evidenceReadDirs`. Astra entries carry `escalation: true` and a reason.
+The flags each step takes are in [commands/conclave-cli.md](commands/conclave-cli.md). That is
+the command reference; this is the shape of a run, not a second copy of it.
+
+A plan binds its id, its host mode, the arbiter, and one entry per dispatch naming the unit, class, role, vendor, model, effort, working directory, brief and write scope. Every field is listed in [commands/conclave-cli.md](commands/conclave-cli.md).
 
 Each launch consumes one sealed entry. A changed class, author, role, model, effort, scope, or brief fails validation; a corrected route needs a new plan and run. A dispatch id that failed is terminal, except a classified launch failure (safeguard refusal at launch, network reconnect loop, missing auth, spawn error) which may retry twice under the same id with its evidence kept.
 
@@ -158,10 +187,43 @@ Completion is decided from committed receipts: `activation-check` replays every 
 
 Telemetry is derived from those receipts, never the other way round: one row per dispatch (model observed, proof id, tokens, duration), one row per unit (approval, panel and Jev verdicts, tokens, duration), and one row per run, all appended idempotently to `$CONCLAVE_VAULT_ROOT/projects/conclave/telemetry/`. `tools/ledger-row.js` renders a run into an engineering-ledger row.
 
+## Statistics
+
+Two questions this project has to answer about itself with numbers rather than belief, both read
+from committed tally receipts and never from a model:
+
+```bash
+node tools/panel-stats.js --runs <dir-of-runs>        # both reports
+node tools/panel-stats.js --runs <dir> --json         # the same, machine-readable
+```
+
+**Panel benefit** — would one seat have decided the same? A unit that did not land although a
+seat approved it is a unit a single model would have waved through. **Arbiter bias** — does the
+arbiter score its own vendor's seats differently? Computable only when the arbiter shares a
+vendor with a seat, which is why choosing a seat vendor as arbiter is discouraged rather than
+forbidden: the cost is measurable, so it is measured.
+
+Both reports print raw counts always, and refuse to call any proportion a rate below a declared
+floor of 20 units. What the recorded runs give today:
+
+```
+PANEL BENEFIT  — would one seat have decided the same?
+  units with a reported seat        4
+  seats disagreed                   1  (25%)
+  exactly one seat rejected         1  <- would have landed on the other seat alone
+  approvals downgraded by the rule  1  <- carried no reason of their own
+  stopped although a seat approved  2  (50%)  <- the panel's whole claim
+  UNMEASURED as a rate: 4 of 20 units needed. The counts above are real; the percentages are anecdote.
+```
+
+Four units is an anecdote and the tool says so. Both arbiters on record (`jev`, `xai`) held no
+seat, so **there is no measured baseline for a seated arbiter at all** — which is the reason the
+bias report exists before anyone picks one.
+
 ## Verification
 
 ```bash
-npm test                      # 833 tests
+npm test                      # the whole suite
 node tools/release-check.js
 node tools/cross-repo-check.js --kit-root ~/src/conclave-kit --vault-root $CONCLAVE_RULES_ROOT
 ```
@@ -187,7 +249,7 @@ The dependency-free explainer is in [site/](site/); open `site/index.html`. `too
 | `projects/` | Product-run notes; not product source |
 | `site/` | Visual explainer |
 
-Sibling repositories, indexed rather than merged: [ai-ops-vault](https://github.com/nik1tsyganov/ai-ops-vault) `projects/conclave/` (telemetry, analysis, rules-pack copy), [field-library](https://github.com/nik1tsyganov/field-library), [vault-skills](https://github.com/nik1tsyganov/vault-skills). Run `node tools/conclave-vault-sync.js --index` after setting the three roots.
+**Sibling repositories are private.** `ai-ops-vault` (`projects/conclave/` — telemetry, analysis, a rules-pack copy), `field-library` and `vault-skills` are indexed by the three `*_ROOT` variables below and are not published; the links are omitted because they would 404. A public clone does not need them to seal or drive a run — the standing-rules pack ships in `standing-rules/` — but `conclave-cli-preflight`, `conclave-skill-web`, `conclave-vault`, `plugin-check` and `run-finalize` read `CONCLAVE_VAULT_ROOT`, so telemetry, skill-sync and the vault index are owner-local until those are opened or replaced. `node tools/conclave-vault-sync.js --index` needs all three roots set.
 
 ## Hosts
 
@@ -227,6 +289,12 @@ holds a path; it contributes no tool of its own, so a change here reaches the ed
 nothing rebuilt there. Convening is not one call,
 because a panel outlives any tool call: seal, drive a phase, attest, read the report. See
 [mcp/README.md](mcp/README.md).
+
+## Contributing, security and support
+
+- **Contributing** — [CONTRIBUTING.md](.github/CONTRIBUTING.md). The short version: the panel reviews changes to itself, so a pull request is expected to say what it proves, not only what it does.
+- **Security** — [SECURITY.md](.github/SECURITY.md). Report privately; do not open a public issue for a vulnerability.
+- **A refused gate** — if the runtime refused something you believe it should have allowed, open a [gate-refused issue](.github/ISSUE_TEMPLATE/gate-refused.md) with the run directory's `plan-seal.json` and the refusal text. A wrong refusal is a bug here; a wrong passage is a worse one.
 
 ## Licence
 
