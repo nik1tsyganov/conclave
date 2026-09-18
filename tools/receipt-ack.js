@@ -15,11 +15,11 @@
  * briefSha256 is UTF-8 SHA-256 (tools/utf8-hash.js), not the raw-buffer
  * hash cli-pointer.js prints on the pointer line.
  *
- * Works for hostMode cursor, cursor-cli, and synara. Does not replace Task/CLI
- * pointer delivery (cli-pointer.js / task-delivery.js).
+ * Works for any hostMode in tools/dispatch-schema.js, which is the only list of them.
+ * Does not replace Task/CLI pointer delivery (cli-pointer.js / task-delivery.js).
  *
  *   node tools/receipt-ack.js --dispatch-id ID --seat SEAT --brief PATH \
- *     [--echo LINE] [--out PATH] [--host-mode cursor|cursor-cli|synara]
+ *     [--echo LINE] [--out PATH] [--host-mode MODE]
  *   node tools/receipt-ack.js --validate --file receipt.json
  */
 

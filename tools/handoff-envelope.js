@@ -23,6 +23,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { inspectBrief } = require('./cli-pointer.js');
 const { assertHostMode, assertInJail } = require('./conclave-bus-path.js');
+const { isCliHostMode } = require('./dispatch-schema.js');
 const { firstLineUtf8File, sha256Utf8File } = require('./utf8-hash.js');
 
 const SCHEMA_ID = 'handoff-envelope.v1';
@@ -121,10 +122,13 @@ function rejectJoinKeys(row) {
 
 function systemFromHostMode(hostMode) {
   assertHostMode(hostMode);
+  // `cursor` is the legacy Cursor Task mode and the only host that is not a native vendor
+  // CLI, so dispatch-schema answers for all the rest. This named the CLI hosts one by one
+  // until 2026-09-18, which is why vscode and droppy fell through to the throw below. The
+  // throw stays for a future non-CLI host: that is a decision to make, not a name to add.
   if (hostMode === 'cursor') return 'conclave';
-  if (hostMode === 'cursor-cli' || hostMode === 'synara' || hostMode === 'claude-code') return 'conclave-cli';
-  const _exhaustive = hostMode;
-  throw new HandoffError(`unhandled hostMode: ${_exhaustive}`);
+  if (isCliHostMode(hostMode)) return 'conclave-cli';
+  throw new HandoffError(`unhandled hostMode: ${hostMode}`);
 }
 
 function inspectJailedBrief(briefPath) {

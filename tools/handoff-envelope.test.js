@@ -27,6 +27,7 @@ const {
 } = require('./handoff-envelope.js');
 const { firstLineUtf8File, sha256Utf8File } = require('./utf8-hash.js');
 const { inspectBrief } = require('./cli-pointer.js');
+const { HOST_MODES, isCliHostMode } = require('./dispatch-schema.js');
 
 const node = process.execPath;
 const helper = path.join(__dirname, 'handoff-envelope.js');
@@ -68,9 +69,15 @@ function seedBrief(dir, name = 'brief.md', body = 'HANDOFF-FIRST\nbody\n') {
 
 describe('handoff-envelope', () => {
   it('maps hostMode to conclave / conclave-cli and keeps dispatch schema untouched', () => {
+    // Every host, read from the one list. This named three hosts until 2026-09-18 and so
+    // never noticed that vscode and droppy reached the unhandled-hostMode throw instead.
+    for (const mode of HOST_MODES) {
+      assert.strictEqual(systemFromHostMode(mode), isCliHostMode(mode) ? 'conclave-cli' : 'conclave');
+    }
     assert.strictEqual(systemFromHostMode('cursor'), 'conclave');
-    assert.strictEqual(systemFromHostMode('cursor-cli'), 'conclave-cli');
-    assert.strictEqual(systemFromHostMode('synara'), 'conclave-cli');
+    for (const mode of ['vscode', 'droppy']) {
+      assert.strictEqual(systemFromHostMode(mode), 'conclave-cli');
+    }
     assert.deepStrictEqual(SYSTEMS, ['conclave', 'conclave-cli']);
     assert.deepStrictEqual(STATUSES, ['accepted', 'blocked', 'done', 'failed']);
     assert.ok(DEFAULT_LOG.endsWith(path.join('telemetry', 'handoffs.jsonl')));

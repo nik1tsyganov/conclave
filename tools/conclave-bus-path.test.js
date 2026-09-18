@@ -4,7 +4,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
-const { mkdtempSync, rmSync } = require('node:fs');
+const { mkdtempSync, readFileSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const {
   DEFAULT_CONCLAVE_BUS_ROOT,
@@ -15,6 +15,7 @@ const {
   assertInJail,
   assertHostMode,
 } = require('./conclave-bus-path.js');
+const { HOST_MODES: SCHEMA_HOST_MODES } = require('./dispatch-schema.js');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -33,7 +34,19 @@ describe('conclave-bus-path', () => {
   it('default CONCLAVE_BUS_ROOT matches cli-claude.js', () => {
     assert.strictEqual(DEFAULT_CONCLAVE_BUS_ROOT, path.join(tmpdir(), 'conclave-bus'));
     assert.strictEqual(getRepoRoot(), ROOT);
-    assert.deepStrictEqual(HOST_MODES, ['cursor', 'cursor-cli', 'synara', 'claude-code']);
+  });
+
+  // Until 2026-09-18 this module froze its own four-name copy of the host modes, so
+  // assertHostMode threw for vscode and droppy while dispatch-schema accepted both. Identity,
+  // not equality: a copy that happens to match today is the thing that drifted last time.
+  it('shares one host-mode list with the dispatch schema', () => {
+    assert.strictEqual(HOST_MODES, SCHEMA_HOST_MODES, 'HOST_MODES must be dispatch-schema.js\'s own array, not a copy');
+    for (const mode of ['vscode', 'droppy']) {
+      assert.ok(HOST_MODES.includes(mode), `${mode} is a host in dispatch-schema.js, so it is a host here`);
+    }
+    const src = readFileSync(path.join(__dirname, 'conclave-bus-path.js'), 'utf8');
+    assert.doesNotMatch(src, /const HOST_MODES = Object\.freeze/, 'redeclaring HOST_MODES here is how the two lists drifted apart');
+    assert.match(src, /require\('\.\/dispatch-schema\.js'\)/);
   });
 
   it('allows repo paths and CONCLAVE_BUS_ROOT, refuses prefix traps and outsiders', () => {
@@ -56,12 +69,13 @@ describe('conclave-bus-path', () => {
     }
   });
 
-  it('accepts both hostMode values and rejects others', () => {
-    assert.strictEqual(assertHostMode('cursor'), 'cursor');
-    assert.strictEqual(assertHostMode('cursor-cli'), 'cursor-cli');
-    assert.strictEqual(assertHostMode('synara'), 'synara');
-    assert.strictEqual(assertHostMode('claude-code'), 'claude-code');
+  // Walks the list rather than quoting it, so adding a host cannot make this fail for
+  // saying the right thing -- the same fix commit afc28d0 made to the dispatch-matrix test.
+  it('accepts every host mode the dispatch schema defines and rejects others', () => {
+    for (const mode of HOST_MODES) assert.strictEqual(assertHostMode(mode), mode);
     assert.throws(() => assertHostMode('banana'), /hostMode must be/);
     assert.throws(() => assertHostMode(undefined), /hostMode must be/);
+    // The message names the legal hosts by reading the list, never in frozen prose.
+    assert.throws(() => assertHostMode('banana'), new RegExp(HOST_MODES.join(', ')));
   });
 });

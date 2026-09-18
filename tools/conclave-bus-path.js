@@ -16,10 +16,13 @@
 const path = require('node:path');
 
 const { canonicalPlainPath } = require('./runtime-paths.js');
+// One host-mode list, and it is dispatch-schema.js's. This module kept a second copy until
+// 2026-09-18; that copy stopped at claude-code, so assertHostMode rejected vscode and droppy
+// for as long as both had been hosts. A second list is not a feature.
+const { HOST_MODES } = require('./dispatch-schema.js');
 // The legacy launchers (cli-claude.js, cli-gemini.js, cli-launch.js) were removed on
 // 2026-09-16; the bus root default now lives here. CONCLAVE_BUS_ROOT overrides it.
 const DEFAULT_CONCLAVE_BUS_ROOT = path.join(require('node:os').tmpdir(), 'conclave-bus');
-const HOST_MODES = Object.freeze(['cursor', 'cursor-cli', 'synara', 'claude-code']);
 
 function getRepoRoot() {
   return path.resolve(__dirname, '..');
@@ -68,7 +71,7 @@ function assertInJail(filePath, label = 'path') {
 
 function assertHostMode(hostMode) {
   if (!HOST_MODES.includes(hostMode)) {
-    throw new Error(`hostMode must be cursor, cursor-cli, synara, or claude-code, got ${hostMode}`);
+    throw new Error(`hostMode must be one of ${HOST_MODES.join(', ')}, got ${hostMode}`);
   }
   return hostMode;
 }
