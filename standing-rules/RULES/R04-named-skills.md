@@ -8,4 +8,4 @@ The runtime derives a vendor leaf profile, role skills and class supplements fro
 
 ## Runtime source
 
-The matching MAGI release owns the implementation and regression tests. Do not waive a failed check with a prose assertion.
+The matching CONCLAVE release owns the implementation and regression tests. Do not waive a failed check with a prose assertion.

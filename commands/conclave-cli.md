@@ -15,7 +15,7 @@ The Jev decision engine (TypeSafe System One) is the arbiter: it proposes classi
 
 ## Prepare
 
-1. Set `CONCLAVE_RULES_ROOT` to the external STANDING v2 / R01–R22 pack. Set `CONCLAVE_VAULT_ROOT` to the ai-ops-vault checkout for telemetry, lean skill sync, and analysis.
+1. The STANDING v2 / R01–R22 pack ships at `<checkout>/standing-rules`; set `CONCLAVE_RULES_ROOT` only to replace it with an external one. Set `CONCLAVE_VAULT_ROOT` to the ai-ops-vault checkout for telemetry, lean skill sync, and analysis.
 2. Run installed `tools/conclave-cli-preflight.js`.
 3. Check Claude with `claude auth status`. Probe every intended exact model/effort using `model-probe.js --vendor --model --effort --evidence-dir`.
 4. Import each native `probe.json` with `model-availability.js --file <availability.json> --probe <probe.json>`.
@@ -64,7 +64,7 @@ node tools/run-drive.js --run-dir <run-dir> --phase finalize         # run-final
 Launch each selected entry with:
 
 ```text
-node tools/dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-dir> --dispatch-id <id> --availability <availability.json> --rules-root <external-v2-pack>
+node tools/dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-dir> --dispatch-id <id> --availability <availability.json> [--rules-root <pack>]
 ```
 
 Route fields come from the sealed entry. Any changed route, author, scope, or brief requires a new complete plan validation and seal. Graph overrides and naked route flags grant no authority.

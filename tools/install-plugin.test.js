@@ -91,7 +91,7 @@ function sourceFixture(t) {
   const installed = path.join(root, 'installed');
   const repo = path.resolve(__dirname, '..');
   const entries = ['.cursor/skills/conclave-cli', '.cursor/rules', 'commands/conclave-cli.md', 'seat-skills',
-    'skill-sources.json', 'tools/templates', 'tools/install-plugin.js', ...CLI_RUNTIME_TOOLS.map(name => `tools/${name}`)];
+    'standing-rules', 'skill-sources.json', 'tools/templates', 'tools/install-plugin.js', ...CLI_RUNTIME_TOOLS.map(name => `tools/${name}`)];
   for (const relative of entries) {
     const from = path.join(repo, relative);
     const to = path.join(source, relative);
@@ -306,4 +306,23 @@ test('documented startup command works without source or home policy in an isola
   assert.deepStrictEqual(snapshot(home), []);
   assert.strictEqual(fs.existsSync(f.source), false);
   t.diagnostic(JSON.stringify({ command, exitCode: result.status, stdout: result.stdout.trim(), sourceAvailable: false, homeFiles: 0 }));
+});
+
+// The installed layout flattens `.cursor/rules` to `rules/`, which is the Cursor .mdc set
+// and not the standing-rules pack. The pack travels under its own name so the runtime's
+// default root resolves to a pack rather than to four .mdc files (2026-09-18).
+test('an installed runtime carries its own standing-rules pack, distinct from the Cursor rules', t => {
+  const f = sourceFixture(t);
+  fs.mkdirSync(f.installed);
+  install(f);
+  const pack = path.join(f.installed, 'standing-rules');
+  assert.ok(fs.existsSync(path.join(pack, 'STANDING.md')), 'installed pack has STANDING.md');
+  assert.ok(fs.existsSync(path.join(pack, 'RULES', 'INDEX.md')), 'installed pack has RULES/INDEX.md');
+  assert.ok(fs.existsSync(path.join(f.installed, 'rules', 'conclave-arbiter.mdc')), 'installed Cursor rules are still rules/');
+  assert.strictEqual(fs.existsSync(path.join(f.installed, 'rules', 'STANDING.md')), false, 'the two never share a directory');
+
+  const brief = path.join(f.root, 'brief', 'BRIEF.md');
+  put(brief, 'brief\n');
+  const staged = require('./cli-rules-stage.js').stageRules({ briefPath: brief, rulesRoot: pack });
+  assert.strictEqual(staged.rulesRoot, fs.realpathSync(pack));
 });

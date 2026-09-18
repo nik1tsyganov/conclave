@@ -6,7 +6,7 @@
 | applies_to | all |
 | role | lead |
 | tag | VERIFIED |
-| sources | magi-activation.mdc; magi-mode; mix-mode projectSlicePolicy |
+| sources | conclave-activation.mdc; conclave-mode; mix-mode projectSlicePolicy |
 
 ## MUST
 

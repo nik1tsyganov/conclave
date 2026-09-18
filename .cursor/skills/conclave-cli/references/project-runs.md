@@ -59,19 +59,20 @@ Do not commit, publish, or merge the product change as part of this trial.
 On YESSIR's machine, the installed runtime is:
 
 ```bash
-$conclaveRuntime = Join-Path $env:USERPROFILE '.cursor/plugins/local/conclave-cursor-cli'
-$conclaveRules = Join-Path $env:USERPROFILE '.cursor/conclave-rules/v2'
-$env:CONCLAVE_RULES_ROOT = $conclaveRules
-export CONCLAVE_VAULT_ROOT="$HOME/src/ai-ops-vault"
-Set-Location -LiteralPath $conclaveRuntime
+conclaveRuntime="$HOME/.cursor/plugins/local/conclave-cursor-cli"
+. ~/.config/conclave/env.sh
+cd "$conclaveRuntime"
 node tools/conclave-whoami.js --mode <cursor-cli|synara|claude-code> --slug <this session's model slug>
 # Synara-hosted arbiter: also LEGAL with --mode synara
-node tools/conclave-cli-preflight.js --rules-root $conclaveRules
+node tools/conclave-cli-preflight.js
 ```
 
 The startup command checks the declared route against the installed matrix. It does not prove the actual Cursor picker.
 
-Use the installed runtime for project work. Set `CONCLAVE_RULES_ROOT` to the installed v2 pack (`~\.cursor\conclave-rules\v2` on this machine). The git-tracked copy lives in `ai-ops-vault/projects/conclave-cli-rules` and must stay aligned with that pack. Preflight must prove the STANDING v2 fingerprint and exactly R01–R22.
+Use the installed runtime for project work. It carries its own standing-rules pack at
+`standing-rules/`, so nothing needs to be named; `CONCLAVE_RULES_ROOT` replaces it with an
+external pack and a root that is named and unreadable stops the run. Preflight must prove the
+STANDING v2 fingerprint and exactly R01–R22.
 
 Set `CONCLAVE_VAULT_ROOT` to the ai-ops-vault checkout. Finalize links durable telemetry there and writes `projects/conclave/analysis/latest.md`. That analysis is required later; do not leave CONCLAVE rows only in a disposable run directory. Lean seat skills sync with `projects/conclave/seat-skills/` (`conclave-vault-sync.js --push` after a CONCLAVE skill edit; `--pull-inbox` for new vault skills).
 

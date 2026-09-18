@@ -113,10 +113,17 @@ function resolveRuntimePaths(options = {}) {
   };
 }
 
-// Standing rules are never bundled; CONCLAVE_RULES_ROOT (or an explicit rulesRoot)
-// must point at an external pack. This never falls back to a different source.
+// Resolution order: an explicit rulesRoot, then CONCLAVE_RULES_ROOT, then the
+// caller's default. This primitive still refuses to guess: with none of the three
+// it throws. A caller that ships a pack passes it as defaultRulesRoot.
+// A CONCLAVE_RULES_ROOT that is present but empty is an operator who meant to name
+// a pack, so it is an error rather than a silent fall-through to the default.
 function resolveRulesRoot(options = {}) {
-  const rulesRoot = options.rulesRoot || (options.env || process.env).CONCLAVE_RULES_ROOT || options.defaultRulesRoot;
+  const env = options.env || process.env;
+  if (!options.rulesRoot && 'CONCLAVE_RULES_ROOT' in env && !String(env.CONCLAVE_RULES_ROOT).trim()) {
+    throw runtimeError('CONCLAVE_RULES_ROOT is set but empty: name a rules pack or unset it');
+  }
+  const rulesRoot = options.rulesRoot || env.CONCLAVE_RULES_ROOT || options.defaultRulesRoot;
   if (!rulesRoot) {
     throw runtimeError('no rules root supplied: set CONCLAVE_RULES_ROOT or pass an explicit rulesRoot/defaultRulesRoot');
   }

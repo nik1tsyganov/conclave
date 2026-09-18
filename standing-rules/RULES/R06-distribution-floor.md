@@ -8,4 +8,4 @@ For two or more independent implementation units, no vendor receives more than 6
 
 ## Runtime source
 
-The matching MAGI release owns the implementation and regression tests. Do not waive a failed check with a prose assertion.
+The matching CONCLAVE release owns the implementation and regression tests. Do not waive a failed check with a prose assertion.

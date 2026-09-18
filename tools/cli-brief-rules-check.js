@@ -29,7 +29,7 @@ const STRICT_MARKERS = Object.freeze([
   { id: 'telemetry', anyOf: ['telemetry', 'R17'] },
   { id: 'vendor proof', anyOf: ['vendor-native proof', 'cli-proof', 'R18'] },
   { id: 'SLICES not vendors', anyOf: ['SLICES≠vendors', 'SLICES are not vendor', 'SLICES not vendor', 'R11'] },
-  { id: 'not CONCLAVE', anyOf: ['not CONCLAVE', 'NOT CONCLAVE', 'R20'] },
+  { id: 'R20 not the legacy scaffold', anyOf: ['R20', 'not the legacy conclave scaffold', 'not CONCLAVE', 'NOT CONCLAVE'] },
   // The rule id or a vault path.
   { id: 'no vault writes', anyOf: ['R21', '/src/vault', 'Second-Brain'] },
 ]);

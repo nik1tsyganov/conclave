@@ -1,33 +1,33 @@
 ---
-description: MAGI Cursor arbiter rules. Always on in every Cursor workspace; ignore in CONCLAVE chats.
+description: CONCLAVE Cursor arbiter rules. Always on in every Cursor workspace.
 alwaysApply: true
 ---
-This file applies to MAGI runs. Ignore it in CONCLAVE (`/conclave`, `camerlengo-8`) and unrelated chats.
+This file applies to CONCLAVE runs. `camerlengo-8` and `session-whoami` belong to the abandoned scaffold archived as `conclave-legacy` and are not this runtime (R20).
 
-For native Cursor mode, declare the route with the existing `magi-whoami` (`cursor`) check. For `cursor-cli`, use the runtime-local command below. These checks declare the route, not the actual host model. For operational status, use a current check as described in [live-check.mdc](live-check.mdc).
+For native Cursor mode, declare the route with the existing `conclave-whoami` (`cursor`) check. For `cursor-cli`, use the runtime-local command below. These checks declare the route, not the actual host model. For operational status, use a current check as described in [live-check.mdc](live-check.mdc).
 
 ## Arbiter boundary
 
-- The arbiter is the Jev decision engine (runtime matrix); the Cursor chat is the host that runs the tools. Neither is a MAGI seat (xAI/Grok retired 2026-09-16).
+- The arbiter is the Jev decision engine (runtime matrix); the Cursor chat is the host that runs the tools. Neither is a CONCLAVE seat (xAI/Grok retired 2026-09-16).
 - The arbiter classifies, prepares plans and briefs, launches seats, and requests the mode's evidence and deterministic completion checks.
 - The arbiter MUST NOT implement, review, verify, repair, or vote on product artifacts. If it does, activation fails.
 - Deterministic checks outrank the arbiter and every seat. The arbiter cannot waive a failing code/schema/proof/rules check.
 
 ## Cursor CLI only
 
-For `hostMode: cursor-cli` or `/magi-cli`, use the [MAGI CLI skill](../skills/magi-cli/SKILL.md) and its [run procedure](../skills/magi-cli/references/cursor-cli.md). Its dispatch matrix selects legal vendor/model/effort combinations by role and class. Grok 4.6 is the non-voting arbiter; substantive planning and research also belong to vendor seats.
+For `hostMode: cursor-cli` or `/conclave-cli`, use the [CONCLAVE CLI skill](../skills/conclave-cli/SKILL.md) and its [run procedure](../skills/conclave-cli/references/cursor-cli.md). Its dispatch matrix selects legal vendor/model/effort combinations by role and class. The Jev decision engine is the non-voting arbiter; substantive planning and research also belong to vendor seats.
 
-From the runtime root, run `node tools/magi-whoami.js --mode cursor-cli --slug <this chat's model slug>`. Stop unless it returns `LEGAL` with exit 0. This validates the declaration against the runtime matrix; it does not prove the actual picker.
+From the runtime root, run `node tools/conclave-whoami.js --mode cursor-cli --slug <this chat's model slug>`. Stop unless it returns `LEGAL` with exit 0. This validates the declaration against the runtime matrix; it does not prove the actual picker.
 
 Before the first production dispatch:
 
-1. Classify every unit. Set `MAGI_RULES_ROOT` to the external STANDING v2 / R01-R22 pack and run the CLI preflight.
+1. Classify every unit, then run the CLI preflight. The runtime ships its STANDING v2 / R01-R22 pack; set `CONCLAVE_RULES_ROOT` only to replace it with an external one.
 2. Probe every selected exact vendor/model/effort pair with `model-probe.js --vendor <vendor> --model <model> --effort <effort> --evidence-dir <new-probe-dir>`. Import each captured `probe.json` with `model-availability.js --file <availability.json> --probe <probe.json>`.
 3. Require actual native observed identity and hashed evidence for every route. Unknown, mismatched, or unproven pairs are unavailable. Evidence expires 60 minutes after its original completion; importing it again does not renew it.
-4. Finalize the briefs and their SHA256 hashes. Prepare the whole plan with `planId`, `hostMode: "cursor-cli"`, `arbiter: {vendor: "xai", model: "grok-4.6", effort: "high"}`, `magiConvened`, and all `dispatches`. The matrix also permits arbiter effort `xhigh`.
+4. Finalize the briefs and their SHA256 hashes. Prepare the whole plan with `planId`, `hostMode: "cursor-cli"`, `arbiter: {vendor: "jev", model: "jev-latest", host: <session slug>}`, `conclaveConvened`, and all `dispatches`. A Jev matrix rejects `arbiter.effort`; the host session goes in `arbiter.host`.
 5. Each dispatch binds `dispatchId`, `unitId`, `class`, `role`, `vendor`, `model`, `effort`, absolute `cwd`, absolute `brief`, `briefSha256`, and relative `writeScope`. Review/verify entries require correct foreign `authorVendor`. Read-only roles have `writeScope: []`. Carry escalation authorization in the plan; Astra always requires `escalation: true` and a reason of at least 16 characters and three distinct words.
 6. Seal the complete plan with `node <runtime-root>/tools/plan-seal.js --plan <draft.json> --run-dir <new-run-dir> --availability <availability.json>`. A policy failure stops the launch.
-7. Launch each entry through `node <runtime-root>/tools/dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-dir> --dispatch-id <id> --rules-root <external-v2-pack>`. The runtime binds the selected entry, staged skill/rule hashes, native proof, scope audit, receipts, and idempotent telemetry.
+7. Launch each entry through `node <runtime-root>/tools/dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-dir> --dispatch-id <id> [--rules-root <pack>]`. The runtime binds the selected entry, staged skill/rule hashes, native proof, scope audit, receipts, and idempotent telemetry.
 
 Launch uses the availability evidence pinned by the seal. Omit `--availability` on `dispatch-run`; that optional argument accepts only a byte-identical copy for relocation. A refreshed availability snapshot requires a new complete plan and seal.
 
@@ -39,10 +39,10 @@ Project slices and graphs define units, dependencies, and write scope. A SLICES 
 
 Finalize with `run-finalize.js --run-dir <run-dir>` and activate with `activation-check.js --run-dir <run-dir>`. Use `panel-tally.js --run-dir <run-dir> --unit-id <unit>` for verified native POSITION votes and author recusal. Execution and approval are separate results. The arbiter cannot fabricate votes or telemetry, hand-count passage, or waive failure.
 
-Resolve `<runtime-root>` from the MAGI source checkout or installed runtime directory. Standalone smoke and transport diagnostics cannot activate production work.
+Resolve `<runtime-root>` from the CONCLAVE source checkout or installed runtime directory. Standalone smoke and transport diagnostics cannot activate production work.
 
 ## Native Cursor only
 
-For an explicitly selected `hostMode: cursor` run, follow the [native MAGI skill](../skills/magi/SKILL.md) and [native Task model table](../skills/magi/references/cursor-host.md). Their native routing, distribution, and tally policy is scoped to that mode and cannot override the CLI branch above.
+For an explicitly selected `hostMode: cursor` run, follow the [native Cursor Task skill](../skills/conclave/SKILL.md) and [native Task model table](../skills/conclave/references/cursor-host.md). Their native routing, distribution, and tally policy is scoped to that mode and cannot override the CLI branch above.
 
 If a native host check switches a dispatch to `cursor-cli`, use the CLI skill and validate a complete sealed CLI plan before launch.

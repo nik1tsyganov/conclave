@@ -1,25 +1,25 @@
 ---
-description: MAGI orchestrator rules
+description: CONCLAVE orchestrator rules
 alwaysApply: true
 ---
-This file applies to MAGI runs. Ignore it in CONCLAVE and unrelated chats.
+This file applies to CONCLAVE runs. Ignore it in unrelated chats.
 
 ## Cursor CLI orchestration
 
-For `hostMode: cursor-cli` or `/magi-cli`, read the [MAGI CLI skill](../skills/magi-cli/SKILL.md) and its [run procedure](../skills/magi-cli/references/cursor-cli.md). Use its dispatch matrix and seat profiles. Native-mode instructions below do not apply to this branch.
+For `hostMode: cursor-cli` or `/conclave-cli`, read the [CONCLAVE CLI skill](../skills/conclave-cli/SKILL.md) and its [run procedure](../skills/conclave-cli/references/cursor-cli.md). Use its dispatch matrix and seat profiles. Native-mode instructions below do not apply to this branch.
 
 - The Jev decision engine is the arbiter (2026-09-16); the hosting chat is non-voting. It prepares complete plans and briefs, runs jev-plan-classify, launches selected seats, and requests deterministic finalization and tallying. It cannot act as an implementation, repair, planning, research, review, or verification seat.
 - Orchestration, routing, bridges, distribution, assessment, and retrospective skills belong to the arbiter. Each leaf receives only its selected vendor card and role/class skills from the staged, hashed skill manifest. Do not load the arbiter's full discipline stack into leaves.
 - Every seat is a leaf. It cannot delegate or edit policy, receipts, evidence, or telemetry. Non-implementation roles remain read-only under their selected native permission profile.
-- Use the external STANDING v2 / R01-R22 pack and the staged skill and rule contracts. Structural checks must verify real files and hashes; skill names in prose do not establish their presence.
+- Use the STANDING v2 / R01-R22 pack the runtime ships, or an external one named by `CONCLAVE_RULES_ROOT`, and the staged skill and rule contracts. Structural checks must verify real files and hashes; skill names in prose do not establish their presence.
 - Capture and import fresh native probe evidence for every exact model/effort pair. Unknown or unproven routes are unavailable. Probe evidence expires after 60 minutes from its original completion time.
 - Before launch, seal the whole plan with `plan-seal.js --plan <draft.json> --run-dir <new-run-dir> --availability <availability.json>`. The plan binds each route, class, role, worktree, brief hash, write scope, author provenance, and escalation decision.
-- Launch only through `dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-dir> --dispatch-id <id> --availability <availability.json> --rules-root <external-v2-pack>`. Resolve tools from the MAGI source checkout or installed runtime directory.
+- Launch only through `dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-dir> --dispatch-id <id> --availability <availability.json> [--rules-root <pack>]`. Resolve tools from the CONCLAVE source checkout or installed runtime directory.
 - Project slices and graphs define units, dependencies, and write scope. They do not assign routing authority. A `vendorOverride` in `graph.json` cannot alter a sealed CLI route. A requested route change needs a revised complete plan, all matrix/availability/independence/distribution/escalation checks, and a new seal.
-- Apply the unit-scaled distribution and approval rules in [magi-activation.mdc](magi-activation.mdc). Use `run-finalize.js --run-dir <run-dir>` and `activation-check.js --run-dir <run-dir>` for completion. Use `panel-tally.js --run-dir <run-dir> --unit-id <unit>` for deterministic native POSITION tallying. The arbiter never fabricates votes or telemetry.
+- Apply the unit-scaled distribution and approval rules in [conclave-activation.mdc](conclave-activation.mdc). Use `run-finalize.js --run-dir <run-dir>` and `activation-check.js --run-dir <run-dir>` for completion. Use `panel-tally.js --run-dir <run-dir> --unit-id <unit>` for deterministic native POSITION tallying. The arbiter never fabricates votes or telemetry.
 
-## Native MAGI only
+## Native Cursor Task mode only
 
-For an explicitly selected non-CLI MAGI mode, delegate orchestration to its existing [native MAGI skill](../skills/magi/SKILL.md) and the native host's `engineering-orchestrator`, `magi-mode`, `magi-dispatch`, and `mix-mode` skills. Their discipline-loading and native workflow rules apply only to that mode.
+For an explicitly selected non-CLI Cursor Task mode, delegate orchestration to its existing [native Cursor Task skill](../skills/conclave/SKILL.md) and the native host's `engineering-orchestrator`, `conclave-mode`, and `mix-mode` skills. Their discipline-loading and native workflow rules apply only to that mode.
 
 Do not use this delegation to override the CLI branch or to load native orchestration skills into CLI leaves. If a native workflow switches to `cursor-cli`, start with the CLI skill and validate a complete CLI plan before launch.

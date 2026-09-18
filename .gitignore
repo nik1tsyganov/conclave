@@ -3,4 +3,4 @@ telemetry/_tmp-*.json
 telemetry/dispatches.jsonl
 telemetry/handoffs.jsonl
 tools/dispatch-log.jsonl
-magi-dispatch-log.jsonl
+conclave-dispatch-log.jsonl

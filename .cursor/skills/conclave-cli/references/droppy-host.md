@@ -55,7 +55,7 @@ on what kind of thing started it.
 
 ## The suite
 
-`hosts/droppy/tests/` holds the conformance suite: five suites, 705 checks, compiled against a
+`hosts/droppy/tests/` holds the conformance suite: five suites, 708 checks, compiled against a
 Droppy checkout. Two of them drive the MCP path end to end, and print `NOT RUN` rather than
 passing when the service cannot be reached.
 

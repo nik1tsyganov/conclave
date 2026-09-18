@@ -12,7 +12,11 @@ const FINGERPRINT = 'CONCLAVE-CLI-STANDING v1 — Read this file in full; repeat
 // here as the standing-rules pack revs; never widen this to a pattern/regex.
 const FINGERPRINT_V2 = 'CONCLAVE-CLI-STANDING v2 — Read this file and RULES/INDEX.md in full before task work.';
 const TRUSTED_FINGERPRINTS = Object.freeze([FINGERPRINT, FINGERPRINT_V2]);
-const DEFAULT_RULES_ROOT = null;
+// The pack ships with the runtime that enforces it, so a clone can start a run.
+// CONCLAVE_RULES_ROOT replaces it wholesale; a root that is set and unreadable
+// stops the run rather than falling back here, and the manifest records which
+// root was staged either way.
+const DEFAULT_RULES_ROOT = path.join(__dirname, '..', 'standing-rules');
 
 function sha256(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');

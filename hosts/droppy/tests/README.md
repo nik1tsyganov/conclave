@@ -7,12 +7,12 @@ own sources and asserts their behaviour, against the worktree at
 
     ./run-all.sh
 
-Five suites, 705 checks as of 2026-09-18, all passing. The live tier below is
+Five suites, 708 checks as of 2026-09-18, all passing. The live tier below is
 separate and is not counted here.
 
 | Suite | Checks | What it compiles | What it is for |
 |---|---|---|---|
-| `core` | 537 | Core models | Blocks, effort, skills, verdict lines, the prompts |
+| `core` | 540 | Core models | Blocks, effort, skills, verdict lines, the prompts |
 | `decode` | 54 | Core plus the real `ChatThread` | What a stored thread does across builds |
 | `diffshape` | 7 | nothing; it runs git | The shape of the command that captures a change |
 | `telemetry` | 60 | Core and Services | The two record files a panel writes |
@@ -74,7 +74,8 @@ The other sets the checkout and asserts routing comes back: the client really
 spawned `mcp/server.js`, shook hands and got its units back routed. That second
 one prints `NOT RUN` rather than passing when the server cannot be reached, so a
 moved checkout is visible instead of silent. It reads `CONCLAVE_CHECKOUT`, and
-defaults to `~/src/conclave`.
+defaults to `~/src/conclave`. `core/` reads the same variable for the three checks it
+puts through `conclave-panel.js`, and says at the end how many went through.
 
 Nothing in `run-all.sh` spends a vendor turn: the project folder is deliberately
 not a git repository, so no copy can be made and the run stops at the last point

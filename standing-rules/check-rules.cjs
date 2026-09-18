@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const root = __dirname;
-const fingerprint = 'MAGI-CLI-STANDING v2 — Read this file and RULES/INDEX.md in full before task work.';
+const fingerprint = 'CONCLAVE-CLI-STANDING v2 — Read this file and RULES/INDEX.md in full before task work.';
 assert.equal(fs.readFileSync(path.join(root, 'STANDING.md'), 'utf8').split(/\r?\n/)[0], fingerprint);
 for (const name of ['VENDOR.md','RULES/INDEX.md','BRIEF-RULES-BLOCK.md']) assert.ok(fs.statSync(path.join(root,name)).isFile(), name);
 const files = fs.readdirSync(path.join(root, 'RULES')).filter(f => /^R\d{2}-.*\.md$/.test(f));

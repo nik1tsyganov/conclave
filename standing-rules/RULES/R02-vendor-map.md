@@ -10,7 +10,7 @@
 
 ## MUST
 
-MUST treat Magi CLI vendors as openai→`codex`, anthropic→`claude`, google→`agy` (`casper_via=agy`). MUST NOT require or install a `gemini` CLI for Casper. Tag `gemini_skipped_subscription` only as spend/auth constraint, never as missing Magi vendor.
+MUST treat CONCLAVE CLI vendors as openai→`codex`, anthropic→`claude`, google→`agy` (`casper_via=agy`). MUST NOT require or install a `gemini` CLI for Casper. Tag `gemini_skipped_subscription` only as spend/auth constraint, never as missing CONCLAVE vendor.
 
 ## Brief / pack hook
 

@@ -172,7 +172,10 @@ func receipt(_ slot: Brain.Slot, _ role: BrainsRole, _ position: BrainsPosition?
 /// Returns nil when the service is not on this machine, so the suite degrades to skipping
 /// these rather than failing for the wrong reason.
 func serviceReads(_ reply: String) -> (position: String?, evidence: String?)? {
-    let server = URL(fileURLWithPath: NSString(string: "~/src/magi/tools/conclave-panel.js").expandingTildeInPath)
+    // The checkout this machine keeps CONCLAVE in. Override with CONCLAVE_CHECKOUT so a
+    // moved or renamed checkout turns into a setting, not a silently skipped check.
+    let checkout = ProcessInfo.processInfo.environment["CONCLAVE_CHECKOUT"] ?? "~/src/conclave"
+    let server = URL(fileURLWithPath: NSString(string: "\(checkout)/tools/conclave-panel.js").expandingTildeInPath)
     guard FileManager.default.fileExists(atPath: server.path),
           let node = ["/opt/homebrew/bin/node", "/usr/local/bin/node", "\(NSHomeDirectory())/.local/bin/node"]
               .first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else { return nil }
@@ -847,6 +850,12 @@ for phase in BrainsPhase.allCases where phase.isFinished {
 
 // MARK: - Result
 
+// A skipped service check reads as a pass unless the skip is said out loud.
+if serviceChecks == 0 {
+    print("   NOT RUN: the rules service was not reached, so nothing here was read by it")
+} else {
+    print("   \(serviceChecks) of these were read by the rules service")
+}
 print("\(checks - failures)/\(checks) checks passed")
 if failures > 0 {
     FileHandle.standardError.write(Data("\(failures) FAILURES\n".utf8))

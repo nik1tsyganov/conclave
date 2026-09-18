@@ -1,15 +1,15 @@
 ---
-description: MAGI activation rules
+description: CONCLAVE activation rules
 alwaysApply: true
 ---
-This file applies to MAGI runs. Ignore it in CONCLAVE and unrelated chats.
+This file applies to CONCLAVE runs. Ignore it in unrelated chats.
 
 ## Cursor CLI activation
 
-For `hostMode: cursor-cli` or `/magi-cli`, use this branch and the [MAGI CLI skill](../skills/magi-cli/SKILL.md). Native-mode instructions below do not apply to this branch.
+For `hostMode: cursor-cli` or `/conclave-cli`, use this branch and the [CONCLAVE CLI skill](../skills/conclave-cli/SKILL.md). Native-mode instructions below do not apply to this branch.
 
-- Validate and seal the complete plan before the first vendor process. Launch only its selected entries through `dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-dir> --dispatch-id <id> --availability <availability.json> --rules-root <external-v2-pack>`.
-- For `magiConvened: true` with implementation units, require at least `min(3, implementation unit count)` distinct implementation vendors.
+- Validate and seal the complete plan before the first vendor process. Launch only its selected entries through `dispatch-run.js --plan <run-dir/dispatch-plan.json> --run-dir <run-dir> --dispatch-id <id> --availability <availability.json> [--rules-root <pack>]`. The runtime ships its own standing-rules pack; `--rules-root` or `CONCLAVE_RULES_ROOT` replaces it, and a root that is named and unreadable stops the launch.
+- For `conclaveConvened: true` with implementation units, require at least `min(3, implementation unit count)` distinct implementation vendors.
 - For every plan with at least two implementation units, no vendor may hold more than 60% of those units. The matrix's `distributionFloor` and `distributionFloorMinimumImplementUnits` define this share cap and threshold. The cap does not apply to one implementation unit.
 - Planning, research, and review-only plans must not manufacture implementation rows. Only planned roles and the applicable approval rules determine completion.
 - Preserve author independence and all class requirements. A critical `requiresPanel` implementation needs a convened plan and two distinct foreign review/verify vendors on the same unit and worktree.
@@ -18,10 +18,10 @@ For `hostMode: cursor-cli` or `/magi-cli`, use this branch and the [MAGI CLI ski
 - For a unit's panel decision, use `node <runtime-root>/tools/panel-tally.js --run-dir <run-dir> --unit-id <unit>`. It reads verified native responses containing exactly one `POSITION: APPROVE`, `POSITION: REJECT`, or `POSITION: ABSTAIN` line and applies author recusal. Do not write ballots or count votes by hand.
 - Follow the finalizer's result. It reports execution and approval separately; execution PASS alone does not establish approval. No arbiter or seat can waive a deterministic failure.
 
-`<runtime-root>` means the resolved MAGI source checkout or installed runtime directory. Completion uses that sealed run's committed evidence and runtime projections, not manually assembled implementation logs. Standalone smoke and transport diagnostics cannot activate a production run.
+`<runtime-root>` means the resolved CONCLAVE source checkout or installed runtime directory. Completion uses that sealed run's committed evidence and runtime projections, not manually assembled implementation logs. Standalone smoke and transport diagnostics cannot activate a production run.
 
-## Native MAGI only
+## Native Cursor Task mode only
 
-For an explicitly selected non-CLI MAGI mode, delegate activation policy to its existing [native MAGI skill](../skills/magi/SKILL.md) and the native host's `magi-mode` skill. Read only their guidance for that native mode. This delegation does not import their CLI examples, distribution rules, or graph overrides into `cursor-cli`.
+For an explicitly selected non-CLI Cursor Task mode, delegate activation policy to its existing [native Cursor Task skill](../skills/conclave/SKILL.md) and the native host's `conclave-mode` skill. Read only their guidance for that native mode. This delegation does not import their CLI examples, distribution rules, or graph overrides into `cursor-cli`.
 
 If a native workflow switches to `cursor-cli`, apply the CLI branch above and validate a complete CLI plan before launch.

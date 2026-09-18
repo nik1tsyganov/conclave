@@ -8,4 +8,4 @@ Use hostMode `cursor-cli`, `synara` or `claude-code` (the session that runs the 
 
 ## Runtime source
 
-The matching MAGI release owns the implementation and regression tests. Do not waive a failed check with a prose assertion.
+The matching CONCLAVE release owns the implementation and regression tests. Do not waive a failed check with a prose assertion.

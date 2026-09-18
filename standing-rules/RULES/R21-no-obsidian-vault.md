@@ -10,7 +10,7 @@
 
 ## MUST
 
-MUST NOT write into the owner's Obsidian second brain at `~/Documents/Second-Brain` (aliases `~/src/vault`, `~/src/Second-Brain`; reference only; rewritten for macOS 2026-09-16). MAGI work writes only to the assigned product worktree (implement seats, inside writeScope), the sealed run directory (runtime), or the separate `~/src/ai-ops-vault` telemetry tree (run-finalize) — never the second brain.
+MUST NOT write into the owner's Obsidian second brain at `~/Documents/Second-Brain` (aliases `~/src/vault`, `~/src/Second-Brain`; reference only; rewritten for macOS 2026-09-16). CONCLAVE work writes only to the assigned product worktree (implement seats, inside writeScope), the sealed run directory (runtime), or the separate `~/src/ai-ops-vault` telemetry tree (run-finalize) — never the second brain.
 
 ## Brief / pack hook
 

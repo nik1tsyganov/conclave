@@ -101,7 +101,7 @@ function conclaveCursorManifest() {
 function conclaveCliManifest() {
   return applySurfaceFields({
     name: 'conclave-cursor-cli', displayName: 'CONCLAVE Cursor CLI',
-    description: 'Grok arbiter + vendor CLIs with fail-closed matrix/seat/rules/proof/telemetry enforcement. Not CONCLAVE.',
+    description: 'Jev arbiter + vendor CLIs with fail-closed matrix/seat/rules/proof/telemetry enforcement.',
     version: '0.1.0', author: { name: 'Nikita Tsyganov' }, repository: 'https://github.com/nik1tsyganov/conclave.git',
     license: 'MIT', keywords: ['conclave', 'conclave-cli', 'multi-vendor', 'cursor', 'cli'],
   }, INSTALLED_CONCLAVE_CLI_SURFACE);
@@ -117,7 +117,7 @@ function readInstalledManifest(dest) {
 function installConclaveCursor() {
   return writeInstall(prepareInstall(ROOT, CONCLAVE_DEST, conclaveCursorManifest(), [
     ['.cursor/skills', 'skills'], ['.cursor/rules', 'rules'], ['agents', 'agents'],
-    ['tools', 'tools'], ['seat-skills', 'seat-skills'],
+    ['tools', 'tools'], ['seat-skills', 'seat-skills'], ['standing-rules', 'standing-rules'],
     ['commands/conclave.md', 'commands/conclave.md'], ['commands/conclave-cli.md', 'commands/conclave-cli.md'],
   ]));
 }
@@ -141,7 +141,7 @@ function installConclaveCursorCli({ destination = CONCLAVE_CLI_DEST, sourceRoot 
   const prepared = prepareInstall(sourceRoot, destination, conclaveCliManifest(), [
     ['.cursor/skills/conclave-cli', 'skills/conclave-cli'], ['.cursor/rules', 'rules'],
     ['commands/conclave-cli.md', 'commands/conclave-cli.md'], ['tools/templates', 'tools/templates'],
-    ['seat-skills', 'seat-skills'], ['skill-sources.json', 'skill-sources.json'],
+    ['seat-skills', 'seat-skills'], ['standing-rules', 'standing-rules'], ['skill-sources.json', 'skill-sources.json'],
     ...CLI_RUNTIME_TOOLS.map(tool => [`tools/${tool}`, `tools/${tool}`]),
   ], validateCliFiles);
   return writeInstall(prepared);

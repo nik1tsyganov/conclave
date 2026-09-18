@@ -4,7 +4,7 @@ Status: executable contract target; native runtime behavior still requires targe
 
 ## MUST
 
-dispatch-matrix.json defines legal routing, not an optimality claim. Every production seat is bound to a validated complete plan, immutable brief hash, semantic role, explicit scope and unique dispatch ID. Reviews and verification require matching author provenance and another vendor. Critical requiresPanel classes require magiConvened:true and two distinct foreign review/verify vendors on the same unit and worktree. Astra requires escalation:true and a reason with at least 16 characters and three distinct words, bound through launch receipts. Every model/effort combination needs fresh, replayable native probe evidence; imports preserve the original 60-minute expiry.
+dispatch-matrix.json defines legal routing, not an optimality claim. Every production seat is bound to a validated complete plan, immutable brief hash, semantic role, explicit scope and unique dispatch ID. Reviews and verification require matching author provenance and another vendor. Critical requiresPanel classes require conclaveConvened:true and two distinct foreign review/verify vendors on the same unit and worktree. Astra requires escalation:true and a reason with at least 16 characters and three distinct words, bound through launch receipts. Every model/effort combination needs fresh, replayable native probe evidence; imports preserve the original 60-minute expiry.
 
 run-finalize distinguishes execution completion from approval. Ordinary implementation approval requires foreign verification and review, with every review returning native APPROVE. Critical approval requires at least two eligible native APPROVE votes after author recusal. panel-tally extracts exactly one canonical POSITION line from each eligible verified response; handwritten ballots cannot establish approval.
 
@@ -12,4 +12,4 @@ Launch-failure retry (added 2026-09-16, adopted from Droppy Code Hydra): a dispa
 
 ## Runtime source
 
-The matching MAGI release owns the implementation and regression tests. Do not waive a failed check with a prose assertion.
+The matching CONCLAVE release owns the implementation and regression tests. Do not waive a failed check with a prose assertion.

@@ -17,7 +17,7 @@ still streaming, so the first unit starts while the lead is still writing the
 second; a question per token does not belong on a pipe. And readiness — which
 vendors are set up on this machine — is drawn synchronously in Settings.
 
-- `tests/` — the conformance suite. Five suites, 705 checks, run against a Droppy
+- `tests/` — the conformance suite. Five suites, 708 checks, run against a Droppy
   checkout. Two of them assert the MCP path end to end and print `NOT RUN` rather
   than passing when the service cannot be reached.
 - [droppy-host.md](../../.cursor/skills/conclave-cli/references/droppy-host.md) —

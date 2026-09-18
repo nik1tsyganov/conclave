@@ -1,4 +1,4 @@
-# R15 — No Gemini PAYG / no gemini CLI for Magi
+# R15 — No Gemini PAYG / no gemini CLI for CONCLAVE
 
 | Field | Value |
 |---|---|
@@ -10,7 +10,7 @@
 
 ## MUST
 
-MUST NOT install or use `@google/gemini-cli` / Gemini API pay-as-you-go for Magi Casper. Magi google path strips GEMINI_API_KEY and launches agy. Standing: no extra paid tokens outside existing subscriptions.
+MUST NOT install or use `@google/gemini-cli` / Gemini API pay-as-you-go for CONCLAVE Casper. The CONCLAVE google path strips GEMINI_API_KEY and launches agy. Standing: no extra paid tokens outside existing subscriptions.
 
 ## Brief / pack hook
 

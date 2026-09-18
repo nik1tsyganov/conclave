@@ -27,7 +27,8 @@ The installer creates the CONCLAVE Cursor CLI plugin (tools, policy, templates, 
 
 ```bash
 # ~/.config/conclave/env.sh
-export CONCLAVE_RULES_ROOT="$HOME/.cursor/conclave-rules/v2"        # STANDING v2 + R01–R22 pack
+# The STANDING v2 + R01-R22 pack ships at <checkout>/standing-rules. Set CONCLAVE_RULES_ROOT only
+# to replace it; a root that is named and unreadable stops the run rather than falling back.
 export CONCLAVE_VAULT_ROOT="$HOME/src/ai-ops-vault"             # telemetry, analysis, seat-skill sync
 export CONCLAVE_FIELD_LIBRARY_ROOT="$HOME/src/field-library"
 export CONCLAVE_VAULT_SKILLS_ROOT="$HOME/src/vault-skills"

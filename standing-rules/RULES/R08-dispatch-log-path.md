@@ -8,4 +8,4 @@ Each run has a distinct evidence directory outside every product worktree. Each 
 
 ## Runtime source
 
-The matching MAGI release owns the implementation and regression tests. Do not waive a failed check with a prose assertion.
+The matching CONCLAVE release owns the implementation and regression tests. Do not waive a failed check with a prose assertion.
