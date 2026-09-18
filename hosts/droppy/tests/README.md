@@ -2,12 +2,13 @@
 
 The Droppy Code repository has no test target and the build is its check
 (`DroppyCode/AGENTS.md`). This harness stands in for one: it compiles Droppy's
-own sources and asserts their behaviour, against the worktree at
-`~/.droppy-code/worktrees/agent-brains-verify`. Set `W` to point it elsewhere.
+own sources and asserts their behaviour, against a Droppy checkout. Set `W` to the
+`DroppyCode` directory inside it; it defaults to
+`~/.droppy-code/worktrees/agent-brains-verify/DroppyCode`.
 
     ./run-all.sh
 
-Five suites, 708 checks as of 2026-09-18, all passing. The live tier below is
+Five suites, 708 checks as of 2026-09-18, all passing against Droppy Code 1.6.0. The live tier below is
 separate and is not counted here.
 
 | Suite | Checks | What it compiles | What it is for |
@@ -96,7 +97,7 @@ once. Without them it exits 3 and says so, which `run-all.sh` treats as "cannot
 run here" rather than as a failure.
 
     B=~/.local/scratch/droppy-brains-build
-    W=~/.droppy-code/worktrees/agent-brains-verify
+    W=<your Droppy checkout>        # e.g. ~/.droppy-code/worktrees/agent-brains-mcp
 
     # 1. Any xcodebuild run produces the SwiftTerm module. See XCODE.md for the
     #    three gates this hits on a machine that is not the maintainer's.
