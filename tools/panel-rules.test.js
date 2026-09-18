@@ -193,3 +193,32 @@ test('two approvals resting on one sentence are flagged as one argument', () => 
   assert.ok(v.flags.includes('both-checkers-gave-the-same-reason'));
   assert.equal(v.outcome, 'PASSAGE', 'flagged, not refused');
 });
+
+// The arbiter gates, or it votes, never both. Considered and rejected 2026-09-18 after the
+// first live run returned a Jev verdict that contradicted its own score inside one output.
+// This is a prohibition, so it is a test and not a comment: a later change that quietly hands
+// the arbiter a ballot fails here.
+test('the arbiter cannot cast a vote, on any unit, critical or not', () => {
+  const seat = (slot, role, vendor, sid) => ({
+    role, slot, vendor, position: 'APPROVE', status: 'completed',
+    evidence: 'Ran the suite from a clean checkout; every check passed and the diff touches only the two files the brief named.',
+    sessionId: sid, tokens: 1000, modelObserved: `${vendor}-model`, treeBefore: 'a', treeAfter: 'a',
+  });
+  const checkers = [seat('scrutator', 'verify', 'openai', 's1'), seat('advocatus', 'review', 'google', 's2')];
+
+  // verdict takes no arbiter parameter; anything passed under that name must be ignored.
+  const withBallot = rules.verdict({
+    receipts: checkers, critical: true, checkPassed: true,
+    arbiter: { vendor: 'jev', position: 'APPROVE', evidence: 'The replies establish the artifact meets its brief.', seated: false },
+  });
+  const without = rules.verdict({ receipts: checkers, critical: true, checkPassed: true });
+  assert.deepEqual(withBallot, without, 'an arbiter ballot changes nothing about the count');
+  assert.equal(withBallot.approve, 2, 'only the two seats voted');
+
+  // and an arbiter-shaped receipt in the receipts array is not a counted seat either
+  const smuggled = rules.verdict({
+    receipts: [...checkers, { ...seat('arbiter', 'arbiter', 'jev', 's3'), role: 'arbiter' }],
+    critical: true, checkPassed: true,
+  });
+  assert.equal(smuggled.approve, 2, 'an arbiter role does not become a third approval');
+});

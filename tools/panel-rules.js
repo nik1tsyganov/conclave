@@ -20,6 +20,8 @@
 
 const POSITIONS = Object.freeze(['APPROVE', 'REJECT', 'ABSTAIN']);
 const ROLES = Object.freeze(['implement', 'verify', 'review']);
+/// The only roles that produce a counted vote. The builder's tree moved; nothing else is a seat.
+const COUNTING_ROLES = Object.freeze(['verify', 'review']);
 
 /// Two counted checks carry an ordinary unit. A critical one needs its verifier and both of
 /// its reviews, which is what the extra seat is for.
@@ -186,6 +188,16 @@ function sameReason(receipts) {
 /// a brief contradicted the repository's test, both checkers read the failure, decided the
 /// test was wrong, approved with reasons, and the work landed red. The votes were defensible.
 /// The landing was not.
+/// The arbiter is NOT a parameter here, and that is deliberate.
+///
+/// Considered and rejected 2026-09-18: letting the arbiter cast a critical unit's third vote.
+/// It grades a panel it composed - it proposes the class, the seats and whether to convene -
+/// which is the same conflict as a builder voting on its own work, one step removed. It also
+/// never reads the artifact; it judges replies, so its ballot would claim a third look that
+/// nobody took. Measured the same day: on the first live run Jev returned verdict DEADLOCK
+/// with APPROVE 0 / ABSTAIN 2 while its own score said APPROVE at confidence 1, and flagged
+/// the disagreement itself. A judge that contradicts itself inside one output does not get a
+/// ballot. It gates, or it votes, never both.
 function verdict({ receipts, critical = false, checkPassed = null } = {}) {
   if (!Array.isArray(receipts)) throw new TypeError('receipts must be an array');
   const uncounted = [];
@@ -196,7 +208,10 @@ function verdict({ receipts, critical = false, checkPassed = null } = {}) {
   const seenSessions = new Set();
 
   for (const receipt of receipts) {
-    if (receipt.role === 'implement') continue;
+    // An allowlist, not a denylist. Skipping only 'implement' meant any other role - an
+    // arbiter ballot, a 'plan' or 'research' entry - became a counted approval simply by not
+    // being the builder. Only the two checking roles produce a vote.
+    if (!COUNTING_ROLES.includes(receipt.role)) continue;
     // One seat in one role is one vote, and one vendor session is one vote. The same reading
     // recorded twice would let a single opinion carry a unit on its own.
     const seat = `${receipt.role}:${receipt.slot}`;
@@ -230,9 +245,9 @@ function verdict({ receipts, critical = false, checkPassed = null } = {}) {
     counted.push({ receipt, position: receipt.position });
   }
 
-  const approve = counted.filter((c) => c.position === 'APPROVE').length;
-  const reject = counted.filter((c) => c.position === 'REJECT').length;
-  const abstain = counted.filter((c) => c.position === 'ABSTAIN').length;
+  let approve = counted.filter((c) => c.position === 'APPROVE').length;
+  let reject = counted.filter((c) => c.position === 'REJECT').length;
+  let abstain = counted.filter((c) => c.position === 'ABSTAIN').length;
   const quorum = critical ? CRITICAL_QUORUM : ORDINARY_QUORUM;
 
   const independence = independenceOf(
@@ -249,11 +264,20 @@ function verdict({ receipts, critical = false, checkPassed = null } = {}) {
     flags.push('both-checkers-gave-the-same-reason');
   }
 
+  // Two counted approvals from one vendor are one vendor's opinion twice. The seats are what
+  // is counted; the vendor floor is what stops a panel being a monologue.
+  const approvingVendors = new Set(
+    counted.filter((c) => c.position === 'APPROVE').map((c) => c.receipt.vendor).filter(Boolean),
+  );
+
   let outcome;
   if (counted.length < quorum) outcome = 'NOT_PANEL';
   else if (reject >= 2) outcome = 'REJECT';
-  else if (approve >= 2 && reject === 0) outcome = 'PASSAGE';
+  else if (approve >= quorum && reject === 0 && approvingVendors.size >= 2) outcome = 'PASSAGE';
   else outcome = 'DEADLOCK';
+  if (approve >= quorum && reject === 0 && approvingVendors.size < 2) {
+    flags.push('every-approval-came-from-one-vendor');
+  }
 
   // The check has the last word on landing and only on landing: the votes are still counted
   // and still reported, because what the seats said about a failure is the most useful thing
@@ -263,11 +287,11 @@ function verdict({ receipts, critical = false, checkPassed = null } = {}) {
     flags.push('the-unit-s-own-check-did-not-pass');
   }
 
-  return { outcome, lands: outcome === 'PASSAGE', approve, reject, abstain, counted: counted.length, quorum, independence, adjustments, uncounted, flags };
+  return { outcome, lands: outcome === 'PASSAGE', approve, reject, abstain, counted: counted.length, quorum, approvingVendors: approvingVendors.size, independence, adjustments, uncounted, flags };
 }
 
 module.exports = {
   AGREEMENT_ONLY, CRITICAL_QUORUM, FILLER, MIN_EVIDENCE_CHARS, MIN_EVIDENCE_WORDS,
-  ORDINARY_QUORUM, POSITIONS, ROLES,
+  COUNTING_ROLES, ORDINARY_QUORUM, POSITIONS, ROLES,
   evidenceIn, hasAnchor, independenceOf, judgeEvidence, plainWords, positionIn, receiptCounts, verdict,
 };

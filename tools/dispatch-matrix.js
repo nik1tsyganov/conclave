@@ -144,6 +144,22 @@ function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
       const vendors = new Set(checks.map((row) => row.vendor));
       if (vendors.size < (policy.minimumReviewVendors || 2)) throw policyError(`class ${author.class} requires two independent review vendors`);
     }
+    // A plan that cannot pass must not seal.
+    //
+    // run-finalize judges with position-tally, where an ELECTOR is a vendor, the author's
+    // vendor is recused, and passage needs two approvals from distinct eligible electors.
+    // Two checking seats on one vendor are therefore one elector and one vote, however many
+    // seats answer. Measured 2026-09-18: a plan with two openai checkers ran green end to end
+    // - every seat PASS, activation PASS - and tallied NOT_PANEL / quorumFloor with
+    // approveCount 1. Nothing had refused it, so the run spent three live dispatches to
+    // discover an arithmetic fact that was true before the first one started.
+    const electors = new Set(checks.map((row) => row.vendor).filter((v) => v !== author.vendor));
+    // Only the wasteful case refuses. A plan with a single checking seat may be a deliberate
+    // partial run and is left alone; two or more seats that collapse to fewer than two electors
+    // are seats that were dispatched and could never have counted.
+    if (checks.length >= 2 && electors.size < 2) {
+      throw policyError(`unit ${author.unitId} seats ${checks.length} checker(s) on ${electors.size === 0 ? 'the author\'s own vendor' : `one vendor (${[...electors][0]})`}, so at most ${electors.size} elector can vote and passage needs 2: give it two checking seats on different vendors, neither of them ${author.vendor}`);
+    }
   }
 
   if (plan.conclaveConvened === true && implement.length > 0) {
