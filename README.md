@@ -1,10 +1,84 @@
-# CONCLAVE
+<div align="center">
 
-CONCLAVE runs OpenAI, Anthropic, and Google engineering seats through a sealed, checked dispatch plan. The arbiter is the Jev decision engine (TypeSafe System One): it proposes the task class, the seats, whether to convene, and the panel tally as probability distributions, and deterministic code gates every proposal. The hosting session runs the tools and holds no vote: a Claude Code session, a Cursor chat, Synara, or an app with its own interface such as Droppy Code.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
+  <img src="assets/banner.svg" alt="CONCLAVE — one seat builds, two check it, the votes are counted in code" width="820">
+</picture>
+
+<br>
+
+[![npm](https://img.shields.io/npm/v/conclave-mcp?style=flat-square&label=conclave-mcp&labelColor=252b27&color=903e28)](https://www.npmjs.com/package/conclave-mcp)
+[![licence](https://img.shields.io/badge/licence-AGPL--3.0-903e28?style=flat-square&labelColor=252b27)](LICENSE)
+[![verification](https://img.shields.io/github/actions/workflow/status/nik1tsyganov/conclave/verify.yml?branch=main&style=flat-square&label=883%20checks&labelColor=252b27&color=3c6b4f)](../../actions/workflows/verify.yml)
+[![node](https://img.shields.io/badge/node-%E2%89%A520-252b27?style=flat-square&labelColor=252b27&color=5b5750)](package.json)
+
+</div>
+
+---
+
+A tri-vendor review panel. One seat builds a unit of work; two others check it in sessions of
+their own, on different vendors; the votes are counted in deterministic code rather than by
+asking a model what the panel decided.
+
+> [!IMPORTANT]
+> An approval carrying no reason of its own counts as an **abstention**. A vote counts only
+> from a seat that proved its vendor session, its token count and the model that actually
+> answered. A unit whose own check failed does not land, whatever the seats voted.
+
+```bash
+npx conclave-mcp        # the rules, over MCP, for a host that runs its own seats
+```
+
+The arbiter is the Jev decision engine (TypeSafe System One): it proposes the task class, the
+seats, whether to convene, and the panel tally as probability distributions, and deterministic
+code gates every proposal. The hosting session runs the tools and holds no vote — a Claude Code
+session, a Cursor chat, VS Code, Synara, or an app with its own interface such as Droppy Code.
 
 > The model proposes. Deterministic policy decides what is legal.
 
-Runs on macOS since 2026-09-16 (branch `port/macos`, merged to `main`). The first fully green nine-seat run, `conclave-mac-2026-09-16-r11`, took three units through implement, verify, and review across all three vendors with vendor-native proof on every receipt.
+## One unit, from block to smoke
+
+```mermaid
+flowchart LR
+  B["the lead's block"] --> R{route}
+  R -->|builds| P["PONENS<br/><small>tree changes</small>"]
+  R -->|verifies| S["SCRUTATOR<br/><small>read-only</small>"]
+  R -->|reviews| A["ADVOCATUS<br/><small>read-only</small>"]
+  P -- receipt --> C["counted in code"]
+  S -- receipt --> C
+  A -- receipt --> C
+  C --> G{"the unit's own check"}
+  G -->|passes| W["PASSAGE<br/>fumata bianca"]
+  G -->|fails| N["CHECK_FAILED<br/>fumata nera"]
+```
+
+The builder's receipt reaches the count and is never a vote: its tree moved, and a changed tree
+is what the write audit is looking for.
+
+<details>
+<summary><b>What a run actually prints</b></summary>
+
+```
+$ node tools/conclave-cli-preflight.js
+  ok    runtime:contracts   /path/to/conclave
+  ok    binary:openai · binary:anthropic · binary:google
+  ok    rules:root          <checkout>/standing-rules
+  ok    rules:fingerprint   CONCLAVE-CLI-STANDING v2
+  ok    rules:R01-R22       complete, unique, indexed
+
+$ node tools/run-drive.js --run-dir <run> --phase implement
+  { "phase": "implement",
+    "results": [ { "dispatchId": "d1", "status": "PASS", "modelObserved": "gpt-5.6-sol" } ] }
+
+$ node tools/run-drive.js --run-dir <run> --phase verify
+  { "phase": "verify",
+    "results": [ { "dispatchId": "v2", "status": "PASS", "modelObserved": "gemini-3.8-flash-medium" } ] }
+```
+
+A seat that cannot show its session, its tokens and the model that answered is failed for
+missing proof, not counted as an abstention.
+
+</details>
 
 ## System
 

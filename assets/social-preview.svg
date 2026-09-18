@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <pattern id="h" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="7" stroke="#e8e3d9" stroke-width="1" opacity="0.3"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="640" fill="#1a1714"/>
+  <g fill="none" stroke="#e8e3d9" opacity="0.14" stroke-width="1.2">
+    <circle cx="1010" cy="330" r="330"/><circle cx="1010" cy="330" r="250"/><circle cx="1010" cy="330" r="168"/>
+    <path d="M1010 -20v700M660 330h620"/><path d="M777 97l466 466M1243 97L777 563"/>
+  </g>
+  <g transform="translate(1010 330)" fill="none" stroke="#e8e3d9" opacity="0.7">
+    <ellipse rx="210" ry="72" stroke-width="2.6"/>
+    <ellipse rx="72" ry="210" stroke-width="2.6"/>
+    <circle r="185" stroke-width="1.4" stroke-dasharray="4 9"/>
+    <circle r="48" fill="url(#h)" stroke-width="2"/>
+    <circle r="13" fill="#e8e3d9" stroke="none"/>
+  </g>
+  <g fill="#c97a5a" stroke="none">
+    <circle cx="1220" cy="330" r="10"/><circle cx="1010" cy="120" r="10"/><circle cx="1010" cy="540" r="10"/>
+  </g>
+
+  <g transform="translate(84 96)">
+    <g fill="none" stroke="#e8e3d9" stroke-width="9" stroke-linecap="square">
+      <path d="M8 0v44M28 0v44M48 0v44"/><path d="M3 62h50" stroke="#c97a5a"/>
+    </g>
+  </g>
+  <text x="176" y="152" font-family="Georgia, 'Times New Roman', 'Liberation Serif', serif"
+        font-size="76" letter-spacing="16" fill="#e8e3d9">CONCLAVE</text>
+  <path d="M84 232h560" stroke="#e8e3d9" stroke-width="2.4"/>
+
+  <text x="84" y="316" font-family="Georgia, 'Times New Roman', 'Liberation Serif', serif" font-size="40" fill="#e8e3d9">One seat builds.</text>
+  <text x="84" y="372" font-family="Georgia, 'Times New Roman', 'Liberation Serif', serif" font-size="40" fill="#e8e3d9">Two check it, in sessions of their own.</text>
+  <text x="84" y="428" font-family="Georgia, 'Times New Roman', 'Liberation Serif', serif" font-size="40" fill="#c97a5a">The votes are counted in code.</text>
+
+  <path d="M84 492h560" stroke="#e8e3d9" stroke-width="1" opacity="0.4"/>
+  <text x="84" y="534" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" letter-spacing="4" fill="#9a938a">NIHIL CREDITUR &#183; OMNIA PROBANTUR</text>
+  <text x="84" y="572" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" letter-spacing="2.6" fill="#9a938a">npx conclave-mcp &#183; AGPL-3.0</text>
+</svg>

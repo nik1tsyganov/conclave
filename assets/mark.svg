@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="CONCLAVE">
+  <title>CONCLAVE</title>
+  <desc>Three vertical strokes for three seats; one horizontal stroke for the count. The gap is deliberate: a seat response does not become a counted vote merely by existing.</desc>
+  <g fill="none" stroke="#252b27" stroke-width="2.6" stroke-linecap="square">
+    <path d="M5 3v11M12 3v11M19 3v11"/>
+    <path d="M3.5 20h17" stroke="#903e28"/>
+  </g>
+</svg>

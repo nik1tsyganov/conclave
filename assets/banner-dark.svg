@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 340" width="1200" height="340" role="img" aria-label="CONCLAVE — one seat builds, two check it, the votes are counted in code">
+  <title>CONCLAVE</title>
+  <defs>
+    <pattern id="h" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="6" stroke="#e8e3d9" stroke-width="1" opacity="0.28"/>
+    </pattern>
+    <clipPath id="frame"><rect x="0" y="0" width="1200" height="340"/></clipPath>
+  </defs>
+  <rect width="1200" height="340" fill="#1a1714"/>
+  <g clip-path="url(#frame)" fill="none" stroke="#e8e3d9" opacity="0.16" stroke-width="1">
+    <circle cx="1010" cy="170" r="250"/><circle cx="1010" cy="170" r="186"/><circle cx="1010" cy="170" r="122"/>
+    <path d="M1010 -80v500M760 170h500"/>
+    <path d="M833 -7l354 354M1187 -7L833 347"/>
+  </g>
+  <g transform="translate(1010 170)" fill="none" stroke="#e8e3d9" opacity="0.62">
+    <ellipse rx="150" ry="52" stroke-width="2"/>
+    <ellipse rx="52" ry="150" stroke-width="2"/>
+    <circle r="132" stroke-width="1.2" stroke-dasharray="3 7"/>
+    <circle r="34" fill="url(#h)" stroke-width="1.6"/>
+    <circle r="9" fill="#e8e3d9" stroke="none"/>
+  </g>
+  <g fill="#c97a5a" stroke="none">
+    <circle cx="1160" cy="170" r="7"/><circle cx="1010" cy="20" r="7"/><circle cx="1010" cy="320" r="7"/>
+  </g>
+
+  <g transform="translate(78 92)">
+    <g fill="none" stroke="#e8e3d9" stroke-width="7" stroke-linecap="square">
+      <path d="M6 0v34M22 0v34M38 0v34"/>
+      <path d="M2 48h40" stroke="#c97a5a"/>
+    </g>
+  </g>
+  <text x="152" y="132" font-family="Georgia, 'Times New Roman', 'Liberation Serif', serif"
+        font-size="60" letter-spacing="13" fill="#e8e3d9">CONCLAVE</text>
+  <path d="M78 176h620" stroke="#e8e3d9" stroke-width="2"/>
+  <text x="78" y="216" font-family="Georgia, 'Times New Roman', 'Liberation Serif', serif"
+        font-size="25" fill="#9a938a">One seat builds. Two check it, in sessions of their own.</text>
+  <text x="78" y="252" font-family="Georgia, 'Times New Roman', 'Liberation Serif', serif"
+        font-size="25" fill="#9a938a">The votes are counted in code.</text>
+  <text x="78" y="300" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+        font-size="16" letter-spacing="3.4" fill="#c97a5a">NIHIL CREDITUR &#183; OMNIA PROBANTUR</text>
+</svg>
