@@ -1,6 +1,6 @@
 {
   "name": "conclave-cursor-plugin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "commonjs",
   "description": "Code-enforced CONCLAVE tri-vendor Cursor and CLI runtime",
   "bin": {
