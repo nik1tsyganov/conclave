@@ -187,6 +187,16 @@ function seatContextText(ctx) {
 // Do not read global skills or use other tools ... CONCLAVE-authorized" block, placed in a
 // system prompt, tripped Opus 5's safeguard classifier ([reasoning_extraction]) on every
 // launch on 2026-09-16 (bisected against the exact launch; this wording passed 3/3).
+//
+// It is not only wording. Bisected again 2026-09-18 against a real verify seat: this
+// compact prompt passes on its own, and so does every pair. Opus refuses only when FOUR
+// things ride together — --safe-mode, --json-schema, --append-system-prompt and a --tools
+// restriction — and Fable passes that identical launch. So the shape of the launch is what
+// the classifier answers, not a sentence in it, and no rewording fixes it. The schema is
+// load-bearing (vendor-native.js requires exactly it for the response protocol) and so is
+// --safe-mode (it is what keeps a seat a leaf), which leaves the model as the only free
+// choice. Routing a role off Opus is a seat-table change and belongs to the owner; until
+// then the refusal is reported as terminal rather than retried (launch-retry.js).
 function anthropicSystemText(ctx) {
   return `Read the seat contract at ${ctx.seatContractPath} in full with the Read tool before any task work. ` +
     'Complete every instruction read it lists before product work, with the Read tool rather than shell commands, and read nothing else first. ' +

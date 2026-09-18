@@ -11,13 +11,22 @@ const MAX_ATTEMPTS = 3; // the first launch plus two retries
 // deliberately narrow; a new signature needs a live failure that reproduced it.
 
 const SIGNATURES = Object.freeze([
-  { id: 'safeguard-refusal', re: /safeguards flagged this message/i },
   { id: 'network-reconnect', re: /Reconnecting\.\.\. waiting for network/i },
   { id: 'auth-missing', re: /not logged in|not signed in|authentication required|unauthenticated|not logged into/i },
   { id: 'spawn-error', re: /\bENOENT\b|\bEACCES\b|spawn [^\n]* failed/i },
   { id: 'database-locked', re: /database is locked|SQLITE_BUSY/i },
   { id: 'no-answer', re: /did not answer|did not start a session/i },
 ]);
+
+// A vendor safeguard refusal is a never-started failure too, and it used to sit in the list
+// above. It does not belong there: the other signatures are transient — a network blip, a
+// locked database — and the same command works on the next attempt. A safeguard classifier
+// answers the same way to the same launch every time, so "re-run the same dispatch command"
+// is advice that cannot work, and following it spends the bucket three times to learn nothing.
+// Measured 2026-09-18: Opus 5 refused a verify seat, and the refusal reproduced on every
+// launch carrying the same four flags (--safe-mode, --json-schema, --append-system-prompt and
+// a --tools restriction) while Fable passed that identical launch.
+const REFUSAL = Object.freeze({ id: 'safeguard-refusal', re: /safeguards flagged this message|"api_refusal_category"/i });
 
 const TOOL_MARKERS = Object.freeze({
   anthropic: /"type":\s*"tool_use"/g,
@@ -37,6 +46,15 @@ function classifyLaunchFailure({ code, message = '', vendor, stdout = '', stderr
   const text = [message, stderr, stdout, capture, nativeLog].map((t) => String(t || '')).join('\n');
   const toolCalls = countToolCalls(vendor, `${stdout}\n${stderr}\n${capture}\n${nativeLog}`);
   if (toolCalls > 0) return { retryable: false, reason: 'the child made tool calls; the seat ran', signature: null, toolCalls };
+  if (REFUSAL.re.test(text)) {
+    return {
+      retryable: false,
+      signature: REFUSAL.id,
+      toolCalls,
+      reason: 'the vendor refused this launch and will refuse it again: a safeguard classifier answers the same '
+        + 'way to the same command. Seal a new plan routing this role to another model, or change the launch.',
+    };
+  }
   const hit = SIGNATURES.find((s) => s.re.test(text));
   if (!hit) return { retryable: false, reason: 'no never-started signature matched', signature: null, toolCalls };
   return { retryable: true, reason: hit.id, signature: hit.id, toolCalls };
@@ -47,4 +65,4 @@ function retryDelayMs(attempt, index = 0) {
   return attempt * 2000 + (index % 4) * 500;
 }
 
-module.exports = { MAX_ATTEMPTS, SIGNATURES, classifyLaunchFailure, countToolCalls, retryDelayMs };
+module.exports = { MAX_ATTEMPTS, REFUSAL, SIGNATURES, classifyLaunchFailure, countToolCalls, retryDelayMs };

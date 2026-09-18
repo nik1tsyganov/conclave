@@ -92,3 +92,30 @@ test('a Google seat that attempted a tool (soft-denied in the native log) is nev
   assert.deepEqual([verdict.retryable, verdict.toolCalls > 0], [false, true]);
   assert.equal(classifyLaunchFailure({ code: 'LAUNCH_FAIL', vendor: 'google', stderr: 'You are not logged into Antigravity.' }).signature, 'auth-missing');
 });
+
+// Measured 2026-09-18: an Opus 5 verify seat refused, and the refusal reproduced on every
+// launch carrying the same four flags while Fable passed that identical launch. A classifier
+// answers the same way to the same command, so this is terminal however it is worded.
+test('a vendor safeguard refusal is terminal, and says what to do instead of re-running', () => {
+  const observed = 'API Error: Opus 5\'s safeguards flagged this message (https://www.anthropic.com/legal/aup). '
+    + 'This sometimes happens with safe, normal conversations. Claude Code can\'t respond to this message with Opus 5.\n'
+    + 'Details: `[reasoning_extraction]`';
+  const verdict = classifyLaunchFailure({ code: 'LAUNCH_FAIL', vendor: 'anthropic', message: observed });
+  assert.equal(verdict.retryable, false);
+  assert.equal(verdict.signature, 'safeguard-refusal');
+  assert.match(verdict.reason, /refuse it again/);
+  assert.match(verdict.reason, /another model/);
+});
+
+test('the machine-readable refusal category is caught too, not only the sentence', () => {
+  const row = '{"type":"system","subtype":"model_refusal_no_fallback","api_refusal_category":"reasoning_extraction"}';
+  const verdict = classifyLaunchFailure({ code: 'LAUNCH_FAIL', vendor: 'anthropic', message: '', nativeLog: row });
+  assert.equal(verdict.retryable, false);
+  assert.equal(verdict.signature, 'safeguard-refusal');
+});
+
+test('a transient never-started failure is still retryable', () => {
+  const verdict = classifyLaunchFailure({ code: 'LAUNCH_FAIL', vendor: 'anthropic', message: 'Reconnecting... waiting for network' });
+  assert.equal(verdict.retryable, true);
+  assert.equal(verdict.signature, 'network-reconnect');
+});

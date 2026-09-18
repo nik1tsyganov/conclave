@@ -275,6 +275,10 @@ const TOOLS = [
         plan: { type: 'string', description: 'Path to the plan JSON.' },
         runDir: { type: 'string', description: 'A new directory for the sealed run.' },
         availability: { type: 'string', description: 'Path to the availability record, when the plan needs one.' },
+        jevClassification: { type: 'string', description: 'Path to the arbiter classification record for this plan. Produce it with jev-plan-classify before sealing.' },
+        noJev: { type: 'string', description: 'A reason, recorded in the seal, for sealing without an arbiter classification. Pass this or jevClassification; a plan carrying neither is refused.' },
+        skillSourceRoot: { type: 'string', description: "The lean seat-skill source to bind into the seal. Defaults to the runtime's own seat-skills." },
+        classOverride: { type: 'string', description: 'A reason, recorded in the seal, for keeping a class the arbiter did not support. Sealing is refused without one when they disagree.' },
       },
       required: ['plan', 'runDir'],
       additionalProperties: false,
@@ -411,6 +415,15 @@ async function callTool(name, rawArgs) {
       const runDir = path.resolve(requireString(args.runDir, 'runDir'));
       const argv = ['--plan', path.resolve(plan), '--run-dir', runDir];
       if (args.availability) argv.push('--availability', path.resolve(requireString(args.availability, 'availability')));
+      // The sealer refuses a plan carrying neither an arbiter classification nor a recorded
+      // reason for going without one. Not passing these through made every seal impossible,
+      // which is a tool that cannot be used rather than one that is strict.
+      if (args.jevClassification) argv.push('--jev-classification', path.resolve(requireString(args.jevClassification, 'jevClassification')));
+      if (args.noJev) argv.push('--no-jev', requireString(args.noJev, 'noJev'));
+      if (args.classOverride) argv.push('--class-override', requireString(args.classOverride, 'classOverride'));
+      argv.push('--skill-source-root', args.skillSourceRoot
+        ? path.resolve(requireString(args.skillSourceRoot, 'skillSourceRoot'))
+        : path.join(ROOT, 'seat-skills'));
       const run = runTool('plan-seal.js', argv, { timeout: 600000 });
       return text({ ok: run.ok, runDir, stdout: run.stdout, stderr: run.stderr });
     }
