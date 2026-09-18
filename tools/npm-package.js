@@ -49,17 +49,18 @@ function build(outDir) {
   const manifest = {
     name: NAME,
     version: repo.version,
-    description: 'The rules of a tri-vendor review panel, over MCP: read a lead\'s block, route it, read a seat\'s reply, count the votes. Answers from JSON; calls no vendor and reads no credential.',
+    description: 'CONCLAVE: the rules of a tri-vendor code review panel, over MCP. One seat builds, two check it in sessions of their own, and the votes are counted in code. Route units to seats, read a seat\'s reply, count a panel — deterministic and offline, calling no model and reading no credential.',
     type: repo.type,
     bin: { 'conclave-mcp': 'mcp/server.js', 'conclave-panel': 'tools/conclave-panel.js' },
     files: [...FILES],
-    keywords: ['mcp', 'model-context-protocol', 'code-review', 'multi-vendor', 'conclave'],
+    keywords: ['mcp', 'model-context-protocol', 'code-review', 'multi-vendor', 'conclave', 'ai-agents', 'codex', 'claude', 'gemini'],
     engines: { node: '>=20' },
     author: repo.author,
     license: repo.license,
     // The shape npm wants, so publishing corrects nothing and warns about nothing.
     repository: { type: 'git', url: 'git+https://github.com/nik1tsyganov/conclave.git' },
-    homepage: 'https://github.com/nik1tsyganov/conclave',
+    homepage: 'https://github.com/nik1tsyganov/conclave#readme',
+    bugs: { url: 'https://github.com/nik1tsyganov/conclave/issues' },
   };
   fs.writeFileSync(path.join(outDir, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
   return { outDir, manifest, files: [...FILES, 'README.md', 'package.json'].sort() };
