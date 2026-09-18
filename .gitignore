@@ -4,3 +4,6 @@ telemetry/dispatches.jsonl
 telemetry/handoffs.jsonl
 tools/dispatch-log.jsonl
 conclave-dispatch-log.jsonl
+
+# Built extension packages; `vsce package` remakes them.
+hosts/vscode/*.vsix

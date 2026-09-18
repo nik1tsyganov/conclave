@@ -7,8 +7,16 @@ can do over the protocol, so a tool added, renamed or re-described in this repos
 in the editor with nothing rebuilt and nothing republished here. That is the reason this is
 an MCP server and not a port: there is no second copy of the rules to keep current.
 
-Measured on 2026-09-18, VS Code 1.138: `Starting server conclave` → `Connection state:
-Running` → `Discovered 10 tools`.
+Measured on 2026-09-18, VS Code 1.138, with the extension installed from its own `.vsix` and
+no hand-written `mcp.json` entry anywhere:
+
+    Starting server CONCLAVE (this checkout)
+    Connection state: Running
+    Discovered 10 tools
+
+The chat then answered `conclave_hosts` with six host modes including `vscode` — a host mode
+added to the runtime AFTER that `.vsix` was built. The extension holds no list; the editor
+learned it from the server, which is the whole promise.
 
 ## Where it looks for the server
 
@@ -19,6 +27,10 @@ First hit wins:
 2. `mcp/server.js` under a workspace folder, so working ON the runtime uses the copy being
    edited rather than a published one a version behind.
 3. `npx -y conclave-mcp`. No install step and no path to keep current.
+
+Rung 3 does not work yet: `conclave-mcp` is not published, so a workspace that is not a
+checkout gets npm's own `E404` in the server log. Publishing the package is what closes it;
+until then, open a checkout or set `conclave.serverPath`.
 
 `conclave.rulesOnly` serves the six tools that answer from JSON and refuses the four that
 drive a run. Leave it off in an editor you want to convene panels from.
