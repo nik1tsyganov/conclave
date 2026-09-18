@@ -63,7 +63,13 @@ const RULES_ONLY = Object.freeze([
 /// itself with the user's own logins, and wants the judgement and nothing more. Giving it a
 /// tool that could start a nine-seat run is surface it never asked for, and a tool list is
 /// something an agent reads and tries.
-const rulesOnly = process.argv.includes('--rules-only');
+///
+/// A distribution that ships the rules without the runtime is rules-only whether or not the
+/// flag was passed. Listing four tools that cannot run would be a list that lies, and an
+/// agent finds that out by calling one.
+const DRIVE_TOOLS = Object.freeze(['plan-seal.js', 'run-drive.js', 'dispatch-run.js', 'project-run-report.js']);
+const runtimePresent = DRIVE_TOOLS.every((script) => fs.existsSync(path.join(TOOLS_DIR, script)));
+const rulesOnly = process.argv.includes('--rules-only') || !runtimePresent;
 
 let initialized = false;
 
@@ -127,7 +133,12 @@ function text(value) {
 /// server down with it, and the host would see a dead pipe instead of the reason.
 function runTool(script, argv, { timeout = 120000 } = {}) {
   const file = path.join(TOOLS_DIR, script);
-  if (!fs.existsSync(file)) fail(`tool not found: ${script}`, -32603);
+  // A rules-only distribution ships the six tools that answer from JSON and none of the
+  // runtime that drives a run. Say that, rather than naming a file the caller cannot see.
+  if (!fs.existsSync(file)) {
+    fail(`${script} is not in this build. It serves the rules only: the tools that answer from JSON. `
+      + 'Driving a run needs the full runtime, which a host installs and runs itself.', -32601);
+  }
   const result = spawnSync(process.execPath, [file, ...argv], {
     cwd: ROOT,
     timeout,

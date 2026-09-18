@@ -14,8 +14,24 @@
     "dashboard": "node tools/conclave-dashboard.js",
     "drive": "node tools/run-drive.js"
   },
-  "keywords": ["conclave", "multi-vendor", "cursor", "dispatch"],
+  "keywords": [
+    "conclave",
+    "multi-vendor",
+    "cursor",
+    "dispatch"
+  ],
   "author": "Nikita Tsyganov",
   "license": "AGPL-3.0-only",
-  "repository": "https://github.com/nik1tsyganov/conclave.git"
+  "repository": "https://github.com/nik1tsyganov/conclave.git",
+  "files": [
+    "mcp/server.js",
+    "mcp/README.md",
+    "tools/dispatch-schema.js",
+    "tools/panel-rules.js",
+    "tools/panel-routing.js",
+    "tools/panel-block.js",
+    "tools/conclave-panel.js",
+    "LICENSE",
+    "ADDITIONAL-TERMS.md"
+  ]
 }

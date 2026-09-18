@@ -202,3 +202,25 @@ test('a line that is not JSON is a parse error and the server keeps going', () =
   assert.equal(answers[0].error.code, -32700);
   assert.equal(answers[1].result.serverInfo.name, 'conclave-mcp', 'the next message is still served');
 });
+
+// A published rules-only package has no driver beside it. It should say so in its tool list
+// rather than offering four tools whose first call fails (2026-09-18).
+test('a distribution without the runtime serves the rules tools only, with no flag', (t) => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'conclave-rules-only-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'mcp'));
+  fs.mkdirSync(path.join(root, 'tools'));
+  fs.copyFileSync(SERVER, path.join(root, 'mcp', 'server.js'));
+  for (const name of ['dispatch-schema.js', 'panel-rules.js', 'panel-routing.js', 'panel-block.js']) {
+    fs.copyFileSync(path.join(__dirname, '..', 'tools', name), path.join(root, 'tools', name));
+  }
+  const input = [HELLO, READY, { jsonrpc: '2.0', id: 2, method: 'tools/list' }]
+    .map((message) => JSON.stringify(message)).join('\n') + '\n';
+  const result = spawnSync(process.execPath, [path.join(root, 'mcp', 'server.js')], { input, encoding: 'utf8', timeout: 60000 });
+  assert.equal(result.error, undefined, String(result.error));
+  const answers = result.stdout.trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  const names = answers.find((row) => row.id === 2).result.tools.map((tool) => tool.name).sort();
+  assert.deepEqual(names, ['conclave_hosts', 'conclave_read_block', 'conclave_read_reply', 'conclave_route', 'conclave_tally', 'conclave_validate_row']);
+});
