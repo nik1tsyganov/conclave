@@ -236,6 +236,7 @@ function parseClaudeEvidence(captureText, expectedModel, expectedEffort, options
     const structuredResponse = options.responseProtocol === CLAUDE_RESPONSE_PROTOCOL
       ? validateClaudeStructuredResponse(parsedEvents) : null;
     let observedModels = new Set();
+    const substitutions = [];
     const usageModels = new Set();
     let sessionIds = new Set();
     let usage = null;
@@ -264,6 +265,19 @@ function parseClaudeEvidence(captureText, expectedModel, expectedEffort, options
             usageModels.add(mod);
           }
         }
+      } else if (ev.type === 'system' && ev.subtype === 'model_refusal_fallback') {
+        // The vendor answered on a model nobody asked for. It says so in a typed event, so the
+        // refusal below names it rather than reporting "conflicting evidence" and leaving an
+        // operator to grep the capture. Measured 2026-09-18: a checking seat asked for
+        // claude-fable-5-1, the model refused with category `cyber`, and the CLI retried the
+        // whole session on claude-opus-4-8.
+        substitutions.push({
+          from: typeof ev.original_model === 'string' ? ev.original_model : '?',
+          to: typeof ev.fallback_model === 'string' ? ev.fallback_model : '?',
+          trigger: typeof ev.trigger === 'string' ? ev.trigger : 'unknown',
+          scope: typeof ev.scope === 'string' ? ev.scope : 'unknown',
+          category: typeof ev.api_refusal_category === 'string' ? ev.api_refusal_category : null,
+        });
       } else if (ev.type === 'system' && ev.subtype === 'init') {
         if (ev.model && typeof ev.model === 'string') observedModels.add(ev.model);
         if (ev.session_id && typeof ev.session_id === 'string' && ev.session_id.trim() !== '') sessionIds.add(ev.session_id);
@@ -286,7 +300,14 @@ function parseClaudeEvidence(captureText, expectedModel, expectedEffort, options
     // modelUsage can include native utility calls (for example Haiku). It is an
     // identity fallback only for a terminal-only capture with exactly one model.
     if (observedModels.size === 0 && usageModels.size === 1) observedModels.add([...usageModels][0]);
-    if (observedModels.size > 1 || (observedModels.size === 0 && usageModels.size > 1)) throw proofError('Claude proof has conflicting model evidence');
+    if (observedModels.size > 1 || (observedModels.size === 0 && usageModels.size > 1)) {
+      if (substitutions.length > 0) {
+        const swap = substitutions[0];
+        const why = swap.category ? `${swap.trigger} (${swap.category})` : swap.trigger;
+        throw proofError(`the vendor substituted ${swap.to} for ${swap.from} on ${swap.trigger === 'refusal' ? 'a refusal' : 'a fallback'}, scope ${swap.scope}: ${why}. The seat did not run on the model the plan sealed, so its receipt cannot be counted. Route this role to another model, or change what the brief asks for.`);
+      }
+      throw proofError(`Claude proof has conflicting model evidence: ${[...observedModels].join(', ') || [...usageModels].join(', ')}`);
+    }
     if (observedModels.size === 1 && usageModels.size > 0 && !usageModels.has([...observedModels][0])) throw proofError('Claude terminal usage does not include the observed assistant model');
 
     if (!usage || usage.input_tokens === undefined) throw proofError('Claude proof missing valid numeric usage');

@@ -55,7 +55,8 @@
     "arbiterAnyVendor": true,
     "arbiterIndependencePreferred": "independent",
     "arbiterPluggable2026-09-18": "Any vendor and model may arbitrate. arbiterVendor/arbiterModel are the RECOMMENDED default, not the only legal declaration: pinning them refused a plan for naming a different engine while hiding the question that matters, which is whether the arbiter scores replies from its own vendor. tools/arbiter-policy.js refuses exactly one arrangement - the arbiter's own vendor+model also holding a seat, since a model cannot score the independence of its own reply - and marks a run 'seated' when the arbiter merely shares a vendor with a seat. A seated run is legal and its bias is reported by tools/panel-stats.js --bias. Prefer an arbiter from a vendor that holds no seat: both arbiters on record (jev, xai) were independent, so there is NO measured baseline for a seated one.",
-    "reviewLanes2026-09-18b": "standard-feature and bulk-mechanical had an implement lane and a verify lane and no review lane, so only one seat could ever vote on them against ORDINARY_QUORUM of 2: a plan sealed, and a perfect verify returned NOT_PANEL. The earlier checkingLanes pass fixed the four classes it was told about and left the two most ordinary ones. Each now mirrors its own verify lane. dispatch-matrix.test.js asserts the invariant rather than the instance: a class that can be built in must carry both checking lanes."
+    "reviewLanes2026-09-18b": "standard-feature and bulk-mechanical had an implement lane and a verify lane and no review lane, so only one seat could ever vote on them against ORDINARY_QUORUM of 2: a plan sealed, and a perfect verify returned NOT_PANEL. The earlier checkingLanes pass fixed the four classes it was told about and left the two most ordinary ones. Each now mirrors its own verify lane. dispatch-matrix.test.js asserts the invariant rather than the instance: a class that can be built in must carry both checking lanes.",
+    "checkingVendorBreadth2026-09-18": "bulk-mechanical drew every checking seat from openai and anthropic. When anthropic became unusable for checking seats - Fable refusing the launch with api_refusal_category 'cyber' and the CLI silently retrying the session on Opus 4.8, Opus itself refusing the checking launch shape - the class was left with ONE usable checking vendor against a requirement for two seats. A checking lane set that names only two vendors has no slack. Every buildable class now offers all three."
   },
   "vendors": {
     "openai": {
@@ -301,6 +302,12 @@
           "model": "opus",
           "effort": "medium",
           "priority": 3
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 4
         }
       ],
       "review": [
@@ -321,6 +328,12 @@
           "model": "opus",
           "effort": "medium",
           "priority": 3
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 4
         }
       ]
     },

@@ -16,7 +16,7 @@ const CLI_RUNTIME_TOOLS = Object.freeze([
   'run-finalize.js', 'panel-tally.js', 'project-run-report.js', 'plugin-surface.js',
   'runtime-paths.js', 'seat-policy.js', 'telemetry-append.js', 'vendor-binaries.js', 'json-file.js',
   'synara-catalog.js', 'conclave-synara-watch.js', 'host-helper-evidence.js', 'host-helper-worktree.js',
-  'instruction-read-evidence.js', 'evidence-read-access.js', 'arbiter-policy.js', 'panel-stats.js',
+  'instruction-read-evidence.js', 'evidence-read-access.js', 'arbiter-policy.js', 'panel-stats.js', 'lane-pick.js',
   'conclave-vault.js', 'conclave-vault-link.js', 'conclave-vault-sync.js', 'conclave-vault-analyze.js', 'conclave-skill-web.js',
   'dispatch-log.pass.jsonl', 'dispatch-log.fail.jsonl',
   // Added 2026-09-16 (macOS): Jev arbiter, run driver, dashboard, retry, telemetry rows.
