@@ -41,10 +41,11 @@ npx conclave-mcp        # the rules, over MCP, for a host that runs its own seat
 
 - **A vote you can audit.** Every counted approval carries a vendor session id, a token count and the model that actually answered. Missing any of the three, it does not count.
 - **Agreement is not evidence.** An approval with no reason of its own is recorded as an abstention, by rule, in code.
-- **The checker is never the builder.** A checking seat runs in its own session on a different vendor, read-only, with a write audit on its tree before and after.
-- **The test gates; it never votes.** A unit whose own check failed does not land, whatever the seats said.
+- **The checker is never the builder, and never the other checker's vendor.** Each seat runs in its own session, read-only, with a write audit on its tree before and after. Approvals are counted per seat under a floor of two distinct vendors: two approvals from one vendor are one vendor's opinion twice, and a plan arranged that way is refused before it spends a dispatch.
+- **The test gates; it never votes. So does the arbiter.** A unit whose own check failed does not land, whatever the seats said. The arbiter proposes the class and the seats and is counted in nothing — a judge gates or it votes, never both, and that is enforced by a test rather than a convention.
 - **The plan is sealed first.** Hashed with the matrix and the profiles it was checked against, before the first process starts. Each launch consumes one sealed entry.
 - **Nothing is inferred from silence.** An outcome word a build cannot read is a split, never a passage.
+- **No seat belongs to a vendor.** Any vendor, model and effort a class allows may hold any seat. Seating comes from lane priority and a live probe, not from position, and a seat may be pinned with the rest re-seating around it.
 - **Any MCP host can convene one.** A stdio server, so VS Code, Cursor, Zed, Claude Desktop and the JetBrains IDEs need no plugin written for them.
 - **Subscription capacity only.** No API-key billing path is configured or suggested; an exhausted bucket pauses the run rather than buying more.
 
