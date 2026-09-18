@@ -49,11 +49,13 @@ test('Fable alias maps to current 5.1 canonical family in the catalog', () => {
 });
 
 test('architecture planning is a read-only plan lane rather than implementation', () => {
+  // The Claude plan lane is Fable since 2026-09-18; a plan seat is a checking launch and
+  // Opus refuses those. What this test is about is the role, not the model.
   assert.strictEqual(routeAllowed(matrix, {
-    class: 'architecture-planning', role: 'plan', vendor: 'anthropic', model: 'opus', effort: 'high',
+    class: 'architecture-planning', role: 'plan', vendor: 'anthropic', model: 'fable', effort: 'high',
   }, evidence).ok, true);
   assert.strictEqual(routeAllowed(matrix, {
-    class: 'architecture-planning', role: 'implement', vendor: 'anthropic', model: 'opus', effort: 'high',
+    class: 'architecture-planning', role: 'implement', vendor: 'anthropic', model: 'fable', effort: 'high',
   }).ok, false);
 });
 
@@ -201,23 +203,12 @@ test('ordinary routes also require fresh native proof for their exact effort', (
   assert.match(routeAllowed(matrix, { class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }).reason, /probe-required/);
 });
 
-// Measured 2026-09-18: of the six classes that can be implemented, four have no verify and no
-// review lane, so work routed to them can be built and never checked. Two of those four also
-// carry requiresPanel and minimumReviewVendors, which makes them unsealable in EVERY
-// configuration: with checking seats, "class has no verify lane"; without them, "requires two
-// independent review vendors".
-//
-// They are listed rather than fixed because adding a lane is choosing which model holds a
-// seat, and that is an owner-approved seat-table change. This test stops the list growing
-// quietly, and fails when one is closed too — which is the moment to notice.
-const BUILT_BUT_UNCHECKABLE = Object.freeze({
-  'security-sensitive': 'requiresPanel, minimumReviewVendors 2 — unsealable in every configuration',
-  'extreme-end-to-end': 'requiresPanel, minimumReviewVendors 2 — unsealable in every configuration',
-  'debug-mystery': 'no checking lane; a fix lands on the builder\'s word',
-  'agentic-long-run': 'no checking lane; a fix lands on the builder\'s word',
-});
-
-test('every class that can be built can be checked, or is a named exception', () => {
+// Every class that can be built can be checked (2026-09-18). It was not so: four classes had
+// no verify and no review lane, and two of those also carried requiresPanel, which made them
+// refused in every configuration — with checking seats, "class has no verify lane"; without
+// them, "requires two independent review vendors". The lanes were added under owner
+// instruction. This test is what stops that coming back.
+test('every class that can be built can be checked', () => {
   const matrix = loadMatrix();
   const unchecked = [];
   for (const [name, klass] of Object.entries(matrix.classes)) {
@@ -225,20 +216,45 @@ test('every class that can be built can be checked, or is a named exception', ()
     const checks = ['verify', 'review'].filter((role) => Array.isArray(klass[role]) && klass[role].length > 0);
     if (checks.length === 0) unchecked.push(name);
   }
-  assert.deepEqual(
-    unchecked.sort(),
-    Object.keys(BUILT_BUT_UNCHECKABLE).sort(),
-    'the set of classes that can be built and never checked changed; update the list deliberately',
-  );
+  assert.deepEqual(unchecked, [], 'a class can be built and never checked');
 });
 
-test('a class demanding a panel is either able to seat one, or on that same list', () => {
+test('a class demanding a panel can seat one: two foreign vendors across its checking lanes', () => {
   const matrix = loadMatrix();
   for (const [name, klass] of Object.entries(matrix.classes)) {
     if (!klass.requiresPanel && !klass.minimumReviewVendors) continue;
-    const checks = ['verify', 'review'].filter((role) => Array.isArray(klass[role]) && klass[role].length > 0);
-    if (checks.length === 0) {
-      assert.ok(name in BUILT_BUT_UNCHECKABLE, `class ${name} demands a panel it cannot seat and is not on the list`);
+    const vendors = new Set([...(klass.verify || []), ...(klass.review || [])].map((lane) => lane.vendor));
+    const needed = klass.minimumReviewVendors || 2;
+    assert.ok(vendors.size >= needed, `class ${name} demands ${needed} review vendors and its checking lanes offer ${vendors.size}`);
+  }
+});
+
+// Opus refuses every CHECKING launch: cli-adapters adds --tools Read,Glob,Grep for
+// non-implement roles, which completes the four-flag conjunction it declines, and Fable
+// passes that identical launch. Opus stays legal — what refuses it is a classifier reading a
+// launch shape, not a property of the model — but the picker must never reach it first.
+test('a Claude checking lane that starts sits ahead of the one that refuses', () => {
+  const matrix = loadMatrix();
+  for (const [name, klass] of Object.entries(matrix.classes)) {
+    for (const role of ['verify', 'review', 'plan', 'research']) {
+      const claude = (klass[role] || []).filter((lane) => lane.vendor === 'anthropic');
+      const opus = claude.find((lane) => lane.model === 'opus');
+      if (!opus) continue;
+      const fable = claude.find((lane) => lane.model === 'fable');
+      assert.ok(fable, `${name}/${role} offers Opus as the only Claude checker, and Opus cannot start one`);
+      assert.ok(fable.priority < opus.priority, `${name}/${role} would reach Opus before Fable`);
+      assert.equal(fable.effort, opus.effort, `${name}/${role} changes the rung along with the model`);
+    }
+  }
+});
+
+test('priorities in a lane are a clean sequence, so inserting one renumbers the rest', () => {
+  const matrix = loadMatrix();
+  for (const [name, klass] of Object.entries(matrix.classes)) {
+    for (const role of ['implement', 'verify', 'review', 'plan', 'research']) {
+      const lanes = klass[role] || [];
+      if (!lanes.length) continue;
+      assert.deepEqual(lanes.map((lane) => lane.priority), lanes.map((_, i) => i + 1), `${name}/${role} priorities`);
     }
   }
 });

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 3,
-  "updated": "2026-09-16",
+  "updated": "2026-09-18",
   "arbiter": {
     "decisionEngine": {
       "engine": "jev",
@@ -48,7 +48,8 @@
     "unknownAvailabilityIsUnavailable": true,
     "frontierEscalationOnly": true,
     "arbiterRetired2026-09-16": "xai/grok-4.6 retired as arbiter by owner instruction. The arbiter is the Jev decision engine (arbiter.decisionEngine); the hosting session (hostMode cursor-cli, synara or claude-code, declared by conclave-whoami) runs the tools and holds no vote. A plan declares arbiter {vendor: \"jev\", model: \"jev-latest\", host: \"<session slug>\"}; plan-seal records the Jev classification per unit and refuses a plan whose class Jev cannot support unless an owner override reason is recorded.",
-    "catalogCulled2026-09-16": "Owner instruction: keep Astra and Sol (Codex), Fable and Opus (Claude), Gemini 3.1 Pro and Gemini 3.8 Flash (agy). Terra, Luna and Sonnet removed from every lane; Astra stays escalation-only where marked."
+    "catalogCulled2026-09-16": "Owner instruction: keep Astra and Sol (Codex), Fable and Opus (Claude), Gemini 3.1 Pro and Gemini 3.8 Flash (agy). Terra, Luna and Sonnet removed from every lane; Astra stays escalation-only where marked.",
+    "checkingLanes2026-09-18": "Owner instruction 2026-09-18, both halves measured. (a) Four classes \u2014 debug-mystery, agentic-long-run, security-sensitive and extreme-end-to-end \u2014 had no verify or review lane, so work routed to them could be built and never checked; the last two also carry requiresPanel and were refused in every configuration, with checking seats ('no verify lane') and without them ('requires two independent review vendors'). Each now mirrors its own implement rung across all three vendors. (b) Opus refuses every CHECKING launch: cli-adapters adds --tools Read,Glob,Grep for non-implement roles only, completing the four-flag conjunction it declines, and Fable passes that identical launch. Opus keeps its lanes \u2014 it is a legal model and a classifier's reading of a launch shape is not a property of the model \u2014 but a Fable lane now sits ahead of it everywhere it checks, so the deterministic picker never chooses a seat that cannot start. Its implement lane carries no --tools restriction and is unaffected."
   },
   "vendors": {
     "openai": {
@@ -145,27 +146,33 @@
       "plan": [
         {
           "vendor": "anthropic",
-          "model": "opus",
+          "model": "fable",
           "effort": "high",
           "priority": 1
+        },
+        {
+          "vendor": "anthropic",
+          "model": "opus",
+          "effort": "high",
+          "priority": 2
         },
         {
           "vendor": "openai",
           "model": "gpt-5.6-sol",
           "effort": "high",
-          "priority": 2
+          "priority": 3
         },
         {
           "vendor": "google",
           "model": "gemini-3.1-pro-high",
           "effort": "fused-high",
-          "priority": 3
+          "priority": 4
         },
         {
           "vendor": "openai",
           "model": "gpt-6-astra",
           "effort": "high",
-          "priority": 4,
+          "priority": 5,
           "requiresProbe": true,
           "escalationOnly": true
         }
@@ -203,15 +210,21 @@
         },
         {
           "vendor": "anthropic",
-          "model": "opus",
+          "model": "fable",
           "effort": "medium",
           "priority": 2
+        },
+        {
+          "vendor": "anthropic",
+          "model": "opus",
+          "effort": "medium",
+          "priority": 3
         },
         {
           "vendor": "google",
           "model": "gemini-3.1-pro-high",
           "effort": "fused-high",
-          "priority": 3
+          "priority": 4
         }
       ]
     },
@@ -247,9 +260,15 @@
         },
         {
           "vendor": "anthropic",
-          "model": "opus",
+          "model": "fable",
           "effort": "medium",
           "priority": 2
+        },
+        {
+          "vendor": "anthropic",
+          "model": "opus",
+          "effort": "medium",
+          "priority": 3
         }
       ]
     },
@@ -281,6 +300,46 @@
           "priority": 4,
           "requiresProbe": true,
           "escalationOnly": true
+        }
+      ],
+      "verify": [
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "high",
+          "priority": 1
+        },
+        {
+          "vendor": "anthropic",
+          "model": "fable",
+          "effort": "high",
+          "priority": 2
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 3
+        }
+      ],
+      "review": [
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "high",
+          "priority": 1
+        },
+        {
+          "vendor": "anthropic",
+          "model": "fable",
+          "effort": "high",
+          "priority": 2
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 3
         }
       ]
     },
@@ -343,6 +402,46 @@
           "effort": "high",
           "priority": 4
         }
+      ],
+      "verify": [
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "high",
+          "priority": 1
+        },
+        {
+          "vendor": "anthropic",
+          "model": "fable",
+          "effort": "high",
+          "priority": 2
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 3
+        }
+      ],
+      "review": [
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "high",
+          "priority": 1
+        },
+        {
+          "vendor": "anthropic",
+          "model": "fable",
+          "effort": "high",
+          "priority": 2
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 3
+        }
       ]
     },
     "security-sensitive": {
@@ -376,7 +475,47 @@
         }
       ],
       "minimumReviewVendors": 2,
-      "requiresPanel": true
+      "requiresPanel": true,
+      "verify": [
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "xhigh",
+          "priority": 1
+        },
+        {
+          "vendor": "anthropic",
+          "model": "fable",
+          "effort": "xhigh",
+          "priority": 2
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 3
+        }
+      ],
+      "review": [
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "xhigh",
+          "priority": 1
+        },
+        {
+          "vendor": "anthropic",
+          "model": "fable",
+          "effort": "xhigh",
+          "priority": 2
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 3
+        }
+      ]
     },
     "review-adversarial": {
       "title": "Adversarial review of existing changes to find latent defects",
@@ -389,21 +528,27 @@
         },
         {
           "vendor": "anthropic",
-          "model": "opus",
+          "model": "fable",
           "effort": "high",
           "priority": 2
+        },
+        {
+          "vendor": "anthropic",
+          "model": "opus",
+          "effort": "high",
+          "priority": 3
         },
         {
           "vendor": "google",
           "model": "gemini-3.1-pro-high",
           "effort": "fused-high",
-          "priority": 3
+          "priority": 4
         },
         {
           "vendor": "openai",
           "model": "gpt-6-astra",
           "effort": "high",
-          "priority": 4,
+          "priority": 5,
           "requiresProbe": true,
           "escalationOnly": true
         }
@@ -427,9 +572,15 @@
         },
         {
           "vendor": "anthropic",
-          "model": "opus",
+          "model": "fable",
           "effort": "medium",
           "priority": 3
+        },
+        {
+          "vendor": "anthropic",
+          "model": "opus",
+          "effort": "medium",
+          "priority": 4
         }
       ]
     },
@@ -486,7 +637,47 @@
           "priority": 3
         }
       ],
-      "requiresPanel": true
+      "requiresPanel": true,
+      "verify": [
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "high",
+          "priority": 1
+        },
+        {
+          "vendor": "anthropic",
+          "model": "fable",
+          "effort": "high",
+          "priority": 2
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 3
+        }
+      ],
+      "review": [
+        {
+          "vendor": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "high",
+          "priority": 1
+        },
+        {
+          "vendor": "anthropic",
+          "model": "fable",
+          "effort": "high",
+          "priority": 2
+        },
+        {
+          "vendor": "google",
+          "model": "gemini-3.1-pro-high",
+          "effort": "fused-high",
+          "priority": 3
+        }
+      ]
     }
   }
 }
