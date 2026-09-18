@@ -8,7 +8,7 @@ const { isDeepStrictEqual } = require('node:util');
 const { verifyStagedRules } = require('./cli-rules-stage.js');
 const { verifySeatSkills } = require('./cli-skill-stage.js');
 const { loadProfiles, validateSeat } = require('./seat-policy.js');
-const { ROLES } = require('./dispatch-schema.js');
+const { CLI_HOST_MODES, ROLES } = require('./dispatch-schema.js');
 const { canonicalPlainPath } = require('./runtime-paths.js');
 
 const VENDOR_MD = 'VENDOR.md';
@@ -22,7 +22,12 @@ const REQUIRED_MARKERS = Object.freeze([
 ]);
 
 const STRICT_MARKERS = Object.freeze([
-  { id: 'hostMode: cursor-cli', anyOf: ['hostMode: cursor-cli', 'hostMode `cursor-cli`', 'hostMode: synara', 'hostMode `synara`', 'hostMode: claude-code', 'hostMode `claude-code`'] },
+  // Read from dispatch-schema, which is the one list. This named three CLI hosts by hand
+  // until 2026-09-18, so a brief declaring hostMode vscode or droppy failed the structural
+  // check dispatch-run makes of every brief, long after both were hosts. `cursor` is absent
+  // on purpose: the legacy Cursor Task mode is a host but not a CLI host, so a strict brief
+  // may not claim it, and that distinction is why this reads CLI_HOST_MODES not HOST_MODES.
+  { id: `hostMode: one of ${CLI_HOST_MODES.join(', ')}`, anyOf: CLI_HOST_MODES.flatMap((mode) => [`hostMode: ${mode}`, `hostMode \`${mode}\``]) },
   { id: 'pointer-only', anyOf: ['pointer-only', 'pointer only', 'pointer delivery'] },
   { id: 'leaf seat', anyOf: ['leaf seat', 'no fan-out', 'MUST NOT sub-dispatch'] },
   { id: 'receipt/handoff', anyOf: ['receipt ACK', 'receipt-ack', 'handoff envelope', 'handoff-envelope'] },

@@ -11,13 +11,17 @@ const { checkBriefFile, checkBriefText, formatMissing, main, missingMarkers } = 
 const { FINGERPRINT, stageRules } = require('./cli-rules-stage.js');
 const { stageSeatSkills } = require('./cli-skill-stage.js');
 const { buildSeatProfile, loadProfiles } = require('./seat-policy.js');
+const { CLI_HOST_MODES } = require('./dispatch-schema.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const TEMPLATE_PATHS = [
   path.join(ROOT, '.cursor', 'skills', 'conclave', 'references', 'brief-rules-block.md'),
   path.join(ROOT, '.cursor', 'skills', 'conclave-cli', 'references', 'brief-rules-block.md'),
   path.join(ROOT, 'tools', 'templates', 'brief-rules-block.md'),
+  // The copy cli-rules-stage.js actually stages into a run, so a seat reads this one.
+  path.join(ROOT, 'standing-rules', 'BRIEF-RULES-BLOCK.md'),
 ];
+const HOST_MODE_MARKER = `hostMode: one of ${CLI_HOST_MODES.join(', ')}`;
 const ALL_MARKER_IDS = [
   'RULES/INDEX|conclave-cli-rules|STANDING', 'SEAT-CONTRACT', 'skills-manifest', 'WRITE AUDIT|R07',
 ];
@@ -135,14 +139,28 @@ test('strict briefs reject a placeholder scope and missing leaf instruction', ()
   assert.ok(result.missing.includes('leaf seat'));
 });
 
-test('strict briefs accept synara as a legal CLI hostMode', () => {
-  const body = legalBrief().replace('hostMode: cursor-cli', 'hostMode: synara');
-  assert.deepStrictEqual(checkBriefText(body, { requireStructural: true }), { ok: true, missing: [] });
+// Walks the list rather than quoting it. Until 2026-09-18 this marker named three CLI hosts
+// by hand, and dispatch-run checks every brief with it, so a vscode- or droppy-hosted run
+// could not write a brief that passed -- the one reachable copy of that drift.
+test('strict briefs accept every CLI hostMode the dispatch schema defines', () => {
+  for (const mode of CLI_HOST_MODES) {
+    for (const declaration of [`hostMode: ${mode}`, `hostMode \`${mode}\``]) {
+      const body = legalBrief().replace('hostMode: cursor-cli', declaration);
+      assert.deepStrictEqual(checkBriefText(body, { requireStructural: true }), { ok: true, missing: [] }, declaration);
+    }
+  }
+  for (const mode of ['vscode', 'droppy']) {
+    assert.ok(CLI_HOST_MODES.includes(mode), `${mode} is a CLI host, so a brief may declare it`);
+  }
 });
 
-test('strict briefs still fail when neither cursor-cli nor synara hostMode is named', () => {
-  const body = legalBrief().replace('hostMode: cursor-cli', 'hostMode: cursor');
-  assert.ok(checkBriefText(body, { requireStructural: true }).missing.includes('hostMode: cursor-cli'));
+test('strict briefs still fail when no CLI hostMode is named', () => {
+  // `cursor` is the legacy Cursor Task mode: a host, but not a CLI host, so a strict brief
+  // may not claim it. Keeping that rejection is why the marker reads CLI_HOST_MODES.
+  for (const mode of ['cursor', 'banana']) {
+    const body = legalBrief().replace('hostMode: cursor-cli', `hostMode: ${mode}`);
+    assert.ok(checkBriefText(body, { requireStructural: true }).missing.includes(HOST_MODE_MARKER), mode);
+  }
 });
 
 test('implement briefs must identify the implementation role', () => {
@@ -347,5 +365,16 @@ test('shipped templates pass text validation but cannot replace staged artifacts
   for (const templatePath of TEMPLATE_PATHS) {
     assert.strictEqual(checkBriefFile(templatePath).ok, true, templatePath);
     assert.strictEqual(checkBriefFile(templatePath, { requireStructural: true }).ok, false, templatePath);
+  }
+});
+
+// A .md cannot require the list, so a test holds the prose to it. Without this the code
+// would accept a hostMode the template never tells a lead they are allowed to write.
+test('every shipped template names every CLI hostMode a brief may declare', () => {
+  for (const templatePath of TEMPLATE_PATHS) {
+    const body = fs.readFileSync(templatePath, 'utf8');
+    for (const mode of CLI_HOST_MODES) {
+      assert.ok(body.includes(mode), `${templatePath} must name ${mode}`);
+    }
   }
 });
