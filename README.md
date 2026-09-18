@@ -108,6 +108,7 @@ The dependency-free explainer is in [site/](site/); open `site/index.html`. `too
 | `commands/conclave-cli.md` | Run procedure |
 | `.cursor/skills/conclave-cli/` | Runtime policy: dispatch matrix, seat profiles, run guide |
 | `.cursor/skills/conclave/`, `agents/` | Cursor Task host mode (legacy; CLI mode is the product) |
+| `hosts/` | What a host needs of its own: adapters and conformance suites |
 | `projects/` | Product-run notes; not product source |
 | `site/` | Visual explainer |
 
@@ -122,11 +123,14 @@ The hosting session runs the tools and holds no vote, so any host is legal. Four
 | `cursor-cli` | A Cursor chat driving the CLI runtime | Jev |
 | `synara` | Synara driving the same runtime | Jev |
 | `claude-code` | A Claude Code session driving it | none required |
-| `droppy` | Droppy Code's "Three Brains", a native Swift reimplementation | none; counted in code |
+| `droppy` | Droppy Code's "Three Brains", a native macOS app keeping its own seats | none; counted in code |
 
-`droppy` is the first host that is not a terminal session. It shares the row format and
-nothing else: see [droppy-host.md](.cursor/skills/conclave-cli/references/droppy-host.md) for what
-is the same, what is different and why its rows carry no `jev` block.
+`droppy` is the first host that is not a terminal session, and the first that keeps its own
+seats. It holds the window, the chats, the provider sessions and the patch, and asks this
+runtime only for the rules, over MCP with `--rules-only`. See [hosts/droppy/](hosts/droppy/)
+for the adapter and its conformance suite, and
+[droppy-host.md](.cursor/skills/conclave-cli/references/droppy-host.md) for what is the same,
+what is different and why its rows carry no `jev` block.
 
 ## MCP
 

@@ -1,0 +1,6 @@
+# Compiled suites and the generated source list. Every run rebuilds them.
+brains-tests
+decode-test
+applayer-tests
+telemetry-tests
+sources.txt
