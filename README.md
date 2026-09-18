@@ -186,7 +186,7 @@ Each launch consumes one sealed entry. A changed class, author, role, model, eff
 
 Completion is decided from committed receipts: `activation-check` replays every transaction from disk (proof, instruction reads, scope audit, artifact hashes, sealed policy) and reports execution PASS when all dispatches pass; approval needs foreign verification and review with APPROVE, or a panel quorum after author recusal. `panel-tally.js` counts the votes; `panel-tally-jev.js` asks the Jev engine whether each reply carries independent evidence and where the panel lands.
 
-Telemetry is derived from those receipts, never the other way round: one row per dispatch (model observed, proof id, tokens, duration), one row per unit (approval, panel and Jev verdicts, tokens, duration), and one row per run, all appended idempotently to `$CONCLAVE_VAULT_ROOT/projects/conclave/telemetry/`. `tools/ledger-row.js` renders a run into an engineering-ledger row.
+Telemetry is derived from those receipts, never the other way round. `run-finalize` writes it into the sealed run itself — `units.jsonl` (one row per unit: approval, panel and Jev verdicts, tokens, duration), `run-row.json` and `run-summary.json` — idempotently by plan hash. It is linked into `$CONCLAVE_VAULT_ROOT/projects/conclave/telemetry/` only when that root is set and is a real vault; without it the rows stay in the run and nothing is lost. `tools/ledger-row.js` renders a run into an engineering-ledger row.
 
 ## Statistics
 
