@@ -200,3 +200,57 @@ test('duplicate implementation units cannot fabricate distribution', () => {
 test('ordinary routes also require fresh native proof for their exact effort', () => {
   assert.match(routeAllowed(matrix, { class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }).reason, /probe-required/);
 });
+
+// Measured 2026-09-18: of the six classes that can be implemented, four have no verify and no
+// review lane, so work routed to them can be built and never checked. Two of those four also
+// carry requiresPanel and minimumReviewVendors, which makes them unsealable in EVERY
+// configuration: with checking seats, "class has no verify lane"; without them, "requires two
+// independent review vendors".
+//
+// They are listed rather than fixed because adding a lane is choosing which model holds a
+// seat, and that is an owner-approved seat-table change. This test stops the list growing
+// quietly, and fails when one is closed too — which is the moment to notice.
+const BUILT_BUT_UNCHECKABLE = Object.freeze({
+  'security-sensitive': 'requiresPanel, minimumReviewVendors 2 — unsealable in every configuration',
+  'extreme-end-to-end': 'requiresPanel, minimumReviewVendors 2 — unsealable in every configuration',
+  'debug-mystery': 'no checking lane; a fix lands on the builder\'s word',
+  'agentic-long-run': 'no checking lane; a fix lands on the builder\'s word',
+});
+
+test('every class that can be built can be checked, or is a named exception', () => {
+  const matrix = loadMatrix();
+  const unchecked = [];
+  for (const [name, klass] of Object.entries(matrix.classes)) {
+    if (!Array.isArray(klass.implement) || klass.implement.length === 0) continue;
+    const checks = ['verify', 'review'].filter((role) => Array.isArray(klass[role]) && klass[role].length > 0);
+    if (checks.length === 0) unchecked.push(name);
+  }
+  assert.deepEqual(
+    unchecked.sort(),
+    Object.keys(BUILT_BUT_UNCHECKABLE).sort(),
+    'the set of classes that can be built and never checked changed; update the list deliberately',
+  );
+});
+
+test('a class demanding a panel is either able to seat one, or on that same list', () => {
+  const matrix = loadMatrix();
+  for (const [name, klass] of Object.entries(matrix.classes)) {
+    if (!klass.requiresPanel && !klass.minimumReviewVendors) continue;
+    const checks = ['verify', 'review'].filter((role) => Array.isArray(klass[role]) && klass[role].length > 0);
+    if (checks.length === 0) {
+      assert.ok(name in BUILT_BUT_UNCHECKABLE, `class ${name} demands a panel it cannot seat and is not on the list`);
+    }
+  }
+});
+
+test('the classes that CAN be checked really can reach the quorum of two', () => {
+  const matrix = loadMatrix();
+  const reachable = Object.entries(matrix.classes).filter(([, klass]) => {
+    const lanes = [...(klass.verify || []), ...(klass.review || [])];
+    return new Set(lanes.map((lane) => lane.vendor)).size >= 2;
+  }).map(([name]) => name);
+  // Two counted votes need two checking seats on two vendors, so a class needs at least two
+  // distinct vendors across its checking lanes before any unit of it can pass.
+  assert.ok(reachable.includes('standard-feature'), 'standard-feature cannot reach quorum');
+  assert.ok(reachable.length >= 4, `only ${reachable.length} classes can reach a quorum of two`);
+});
