@@ -307,14 +307,34 @@ test('priorities in a lane are a clean sequence, so inserting one renumbers the 
   }
 });
 
-test('the classes that CAN be checked really can reach the quorum of two', () => {
+// The invariant, not the instance: anything you can BUILD in, you must be able to LAND in.
+//
+// This replaces a check that pooled the verify and review lanes together and counted distinct
+// VENDORS. standard-feature has three vendors in its verify lane alone, so it passed that
+// check for as long as it had no review lane at all - and a unit of the most ordinary class in
+// the system sealed, dispatched, and came back NOT_PANEL on a perfect verify, because one seat
+// cannot reach a quorum of two however many vendors it could have been drawn from.
+//
+// Two counted votes need two SEATS. Only verify and review produce a counted vote (implement
+// moves its own tree, so its receipt never counts), so a buildable class needs both lanes.
+test('every class that can be built in can also reach its quorum', () => {
   const matrix = loadMatrix();
-  const reachable = Object.entries(matrix.classes).filter(([, klass]) => {
-    const lanes = [...(klass.verify || []), ...(klass.review || [])];
-    return new Set(lanes.map((lane) => lane.vendor)).size >= 2;
-  }).map(([name]) => name);
-  // Two counted votes need two checking seats on two vendors, so a class needs at least two
-  // distinct vendors across its checking lanes before any unit of it can pass.
-  assert.ok(reachable.includes('standard-feature'), 'standard-feature cannot reach quorum');
-  assert.ok(reachable.length >= 4, `only ${reachable.length} classes can reach a quorum of two`);
+  const { ORDINARY_QUORUM } = require('./panel-rules.js');
+  const COUNTING_ROLES = ['verify', 'review'];
+  assert.equal(COUNTING_ROLES.length, ORDINARY_QUORUM,
+    'this invariant assumes one counted seat per checking role; revisit it if either number moves');
+
+  const buildable = Object.entries(matrix.classes).filter(([, klass]) => Array.isArray(klass.implement));
+  assert.ok(buildable.length > 0, 'the matrix must offer somewhere to build');
+
+  for (const [name, klass] of buildable) {
+    const missing = COUNTING_ROLES.filter((role) => !Array.isArray(klass[role]) || klass[role].length === 0);
+    assert.deepEqual(missing, [],
+      `${name} can be built but has no ${missing.join(' or ')} lane, so at most ${COUNTING_ROLES.length - missing.length} seat(s) can vote against a quorum of ${ORDINARY_QUORUM}`);
+
+    // and the two seats must be fillable by two different vendors, or the checks are not foreign
+    const vendors = new Set(COUNTING_ROLES.flatMap((role) => klass[role].map((lane) => lane.vendor)));
+    assert.ok(vendors.size >= 2,
+      `${name} draws every checking seat from ${[...vendors]}, so its two votes cannot be independent`);
+  }
 });
