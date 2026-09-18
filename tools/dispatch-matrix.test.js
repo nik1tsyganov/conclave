@@ -23,6 +23,14 @@ function availabilityFor(vendor, model, observedModel = model, observedAt) {
   return { vendors: { [vendor]: { models: { [model]: entry } } } };
 }
 function arbiter() { return { vendor: 'jev', model: 'jev-latest', host: 'test-host' }; }
+/// The classification validatePlan now returns for the default arbiter over the given seats.
+function jevOn(sharesVendorWith) {
+  return {
+    vendor: 'jev', model: 'jev-latest', independence: 'independent', sharesVendorWith,
+    matchesRecommendation: true, recommended: { vendor: 'jev', model: 'jev-latest' },
+    words: 'jev/jev-latest holds no seat in this run; its proposals are foreign to every reply it scores.',
+  };
+}
 
 test('Astra is fail-closed until exact fresh local model proof exists', () => {
   const route = { class: 'extreme-end-to-end', role: 'implement', vendor: 'openai', model: 'gpt-6-astra', effort: 'high', escalation: true, escalationReason: 'lower tier failed the required correctness check' };
@@ -76,7 +84,7 @@ test('every CLI hostMode is legal and banana is not', () => {
     assert.deepStrictEqual(validatePlan({
       hostMode, arbiter: arbiter(), conclaveConvened: true,
       dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }],
-    }, matrix), { ok: true, dispatches: 1, implementUnits: 1 }, hostMode);
+    }, matrix), { ok: true, dispatches: 1, implementUnits: 1, arbiter: jevOn([]) }, hostMode);
   }
   assert.ok(CLI_HOST_MODES.includes('droppy'), 'Droppy Code is a host');
   assert.throws(() => validatePlan({
@@ -95,18 +103,58 @@ test('implement cannot take evidenceReadDirs', () => {
   }, matrix), /implement cannot take evidenceReadDirs/);
 });
 
-test('Grok cannot occupy a seat', () => {
+test('a vendor the matrix does not carry cannot occupy a seat', () => {
+  // Until 2026-09-18 this was a hard-coded refusal of the then-arbiter's name. The catalog
+  // refuses it more fundamentally: xai has no lane and no model entry, arbiter or not.
   assert.throws(() => validatePlan({
     hostMode: 'cursor-cli', arbiter: arbiter(), conclaveConvened: false,
     dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'xai', model: 'grok-4.6', effort: 'high' }],
-  }, matrix), /may not occupy a seat/);
+  }, matrix), /route not in matrix/);
+});
+
+// Any vendor may arbitrate. What cannot happen is one model scoring the independence of its
+// own reply, which no bias statistic could repair after the fact.
+test('an arbiter that is also a seat, exactly, is refused', () => {
+  assert.throws(() => validatePlan({
+    hostMode: 'cursor-cli', arbiter: { vendor: 'openai', model: 'gpt-5.6-sol', host: 'test-host' }, conclaveConvened: false,
+    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }],
+  }, matrix), /cannot arbitrate a run it also sits in/);
+});
+
+test('an arbiter from a vendor that holds a seat is legal, and marked seated', () => {
+  const out = validatePlan({
+    hostMode: 'cursor-cli', arbiter: { vendor: 'openai', model: 'gpt-6-astra', host: 'test-host' }, conclaveConvened: false,
+    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }],
+  }, matrix);
+  assert.equal(out.ok, true, 'a seated arbiter is not refused');
+  assert.equal(out.arbiter.independence, 'seated');
+  assert.equal(out.arbiter.sharesVendorWith.length, 1, 'and the run records which seat it shares a vendor with');
+  assert.equal(out.arbiter.matchesRecommendation, false);
+});
+
+test('an arbiter from no seat vendor is independent, whoever it is', () => {
+  for (const [vendor, model] of [['jev', 'jev-latest'], ['deepseek', 'r2'], ['mistral', 'large-3']]) {
+    const out = validatePlan({
+      hostMode: 'cursor-cli', arbiter: { vendor, model, host: 'test-host' }, conclaveConvened: false,
+      dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }],
+    }, matrix);
+    assert.equal(out.arbiter.independence, 'independent', `${vendor}/${model} holds no seat`);
+    assert.equal(out.arbiter.vendor, vendor, 'and is recorded as itself, not coerced to the recommendation');
+  }
+});
+
+test('a plan with no arbiter at all is still refused', () => {
+  assert.throws(() => validatePlan({
+    hostMode: 'cursor-cli', conclaveConvened: false,
+    dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }],
+  }, matrix), /must declare an arbiter/);
 });
 
 test('single implementation unit is not rejected by the 60 percent floor', () => {
   assert.deepStrictEqual(validatePlan({
     hostMode: 'cursor-cli', arbiter: arbiter(), conclaveConvened: true,
     dispatches: [{ unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' }],
-  }, matrix), { ok: true, dispatches: 1, implementUnits: 1 });
+  }, matrix), { ok: true, dispatches: 1, implementUnits: 1, arbiter: jevOn([]) });
 });
 
 test('two implementation units in convened CONCLAVE require two vendors', () => {

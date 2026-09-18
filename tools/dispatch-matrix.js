@@ -9,6 +9,7 @@ const { CLI_HOST_MODES, isCliHostMode, ROLES } = require('./dispatch-schema.js')
 const { verifyProbe } = require('./probe-evidence.js');
 const { parseJsonBytes, readJsonFile } = require('./json-file.js');
 const { validateEvidenceReadDirs } = require('./evidence-read-access.js');
+const { classifyArbiter } = require('./arbiter-policy.js');
 
 const DEFAULT_MATRIX = require('./runtime-paths.js').resolveRuntimePaths().matrixPath;
 const DEFAULT_PROBE_MAX_AGE_MINUTES = 60;
@@ -73,20 +74,29 @@ function routeAllowed(matrix, route, availability = {}, nowMs = Date.now()) {
 function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
   if (!plan || typeof plan !== 'object' || Array.isArray(plan)) throw policyError('plan must be an object');
   if (!isCliHostMode(plan.hostMode)) throw policyError(`hostMode must be one of ${CLI_HOST_MODES.join(', ')}`);
-  // The arbiter is the Jev decision engine (2026-09-16); the host session only runs tools.
-  if (plan.arbiter?.vendor !== matrix.principles.arbiterVendor) throw policyError(`arbiter vendor must be ${matrix.principles.arbiterVendor}`);
-  if (plan.arbiter?.model !== matrix.principles.arbiterModel) throw policyError(`arbiter model must be ${matrix.principles.arbiterModel}`);
-  // Legacy sealed runs (pre-2026-09-16) carry an xai arbiter with an effort; their sealed matrix still names xai, so only a Jev matrix rejects the field.
-  if (matrix.principles.arbiterVendor === 'jev' && plan.arbiter.effort !== undefined) throw policyError('arbiter effort is not a Jev field; declare the host session in arbiter.host instead');
-  if (plan.arbiter.host !== undefined && (typeof plan.arbiter.host !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(plan.arbiter.host))) throw policyError('arbiter.host must be a slug');
+  if (plan.arbiter?.host !== undefined && (typeof plan.arbiter.host !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(plan.arbiter.host))) throw policyError('arbiter.host must be a slug');
   if (!Array.isArray(plan.dispatches) || plan.dispatches.length === 0) throw policyError('plan.dispatches must be non-empty');
+
+  // Any vendor may arbitrate (2026-09-18). `principles.arbiterVendor/Model` are the RECOMMENDED
+  // arbiter, not the only legal one: pinning them refused a plan for naming a different engine
+  // while hiding the question that actually matters, which is whether the arbiter is scoring
+  // replies from its own vendor. arbiter-policy refuses the one arrangement no statistic can
+  // repair — the arbiter's exact vendor+model also holding a seat — and marks the rest `seated`
+  // for tools/panel-stats.js --bias to price.
+  let arbiter;
+  try {
+    arbiter = classifyArbiter(plan.arbiter, plan.dispatches, {
+      vendor: matrix.principles.arbiterVendor, model: matrix.principles.arbiterModel,
+    });
+  } catch (err) { throw policyError(err.message); }
+  // A decision engine is not a chat model, so it has no effort to declare.
+  if (arbiter.vendor === 'jev' && plan.arbiter.effort !== undefined) throw policyError('arbiter effort is not a Jev field; declare the host session in arbiter.host instead');
 
   const implement = [];
   const ids = new Set();
   const authors = new Map();
   for (const route of plan.dispatches) {
     if (!route || typeof route !== 'object') throw policyError('invalid dispatch entry');
-    if (route.vendor === 'xai' || route.vendor === 'jev' || route.vendor === matrix.principles.arbiterVendor) throw policyError('the arbiter may not occupy a seat');
     if (!ROLES.includes(route.role)) throw policyError(`invalid role: ${route.role}`);
     const allowed = routeAllowed(matrix, route, availability, nowMs);
     if (!allowed.ok) throw policyError(allowed.reason);
@@ -153,7 +163,7 @@ function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
     }
   }
 
-  return { ok: true, dispatches: plan.dispatches.length, implementUnits: implement.length };
+  return { ok: true, dispatches: plan.dispatches.length, implementUnits: implement.length, arbiter };
 }
 
 function readValidatedPlan(file, expectedHash, matrix, availability = {}, nowMs = Date.now()) {
