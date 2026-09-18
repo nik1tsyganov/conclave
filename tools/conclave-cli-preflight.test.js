@@ -76,12 +76,22 @@ test('preflight uses bundled skills and v2 rules with file-only binary discovery
   assert.deepEqual(snapshot(f.root), before);
 });
 
-test('missing external rules root reports CONCLAVE_RULES_ROOT instead of throwing', t => {
+test('with nothing named, preflight falls to the shipped pack rather than failing', t => {
   const f = fixture(t);
   delete f.rulesRoot;
   const result = check(f);
+  assert.equal(result.ok, true);
+  assert.equal(result.findings.find(row => row.check === 'rules:root').value, fs.realpathSync(path.join(__dirname, '..', 'standing-rules')));
+});
+
+test('a named rules root that is not there is a reported finding, never a throw and never the shipped pack', t => {
+  const f = fixture(t);
+  f.rulesRoot = path.join(f.root, 'no-such-pack');
+  const result = check(f);
   assert.equal(result.ok, false);
-  assert.match(result.findings.find(row => row.check === 'rules:root').error, /CONCLAVE_RULES_ROOT/);
+  const finding = result.findings.find(row => row.check === 'rules:root');
+  assert.match(finding.error, /no-such-pack/);
+  assert.equal(finding.value, undefined);
 });
 
 test('explicit environment rules root is supported', t => {
