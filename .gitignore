@@ -7,3 +7,6 @@ conclave-dispatch-log.jsonl
 
 # Built extension packages; `vsce package` remakes them.
 hosts/vscode/*.vsix
+
+# Assembled npm package; `npm run package` remakes it.
+dist/

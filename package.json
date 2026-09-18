@@ -12,7 +12,8 @@
     "check": "npm test && node tools/release-check.js",
     "check:cross-repo": "node tools/cross-repo-check.js",
     "dashboard": "node tools/conclave-dashboard.js",
-    "drive": "node tools/run-drive.js"
+    "drive": "node tools/run-drive.js",
+    "package": "node tools/npm-package.js --out dist/conclave-mcp"
   },
   "keywords": [
     "conclave",
@@ -23,9 +24,9 @@
   "author": "Nikita Tsyganov",
   "license": "AGPL-3.0-only",
   "repository": "https://github.com/nik1tsyganov/conclave.git",
+  "private": true,
   "files": [
     "mcp/server.js",
-    "mcp/README.md",
     "tools/dispatch-schema.js",
     "tools/panel-rules.js",
     "tools/panel-routing.js",
