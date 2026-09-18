@@ -28,9 +28,10 @@ First hit wins:
    edited rather than a published one a version behind.
 3. `npx -y conclave-mcp`. No install step and no path to keep current.
 
-Rung 3 does not work yet: `conclave-mcp` is not published, so a workspace that is not a
-checkout gets npm's own `E404` in the server log. Publishing the package is what closes it;
-until then, open a checkout or set `conclave.serverPath`.
+All three are measured. A workspace that is a checkout logs `Starting server CONCLAVE (this
+checkout)` and `Discovered 10 tools`; a workspace that is not logs `Starting server CONCLAVE`
+and `Discovered 6 tools`, because the published package ships the rules without the runtime
+and so is rules-only whether or not the flag was passed.
 
 `conclave.rulesOnly` serves the six tools that answer from JSON and refuses the four that
 drive a run. Leave it off in an editor you want to convene panels from.

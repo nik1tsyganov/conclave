@@ -137,8 +137,13 @@ what is different and why its rows carry no `jev` block.
 ## MCP
 
 ```bash
-node mcp/server.js
+npx conclave-mcp          # the rules, from the registry
+node mcp/server.js        # the whole runtime, from a checkout
 ```
+
+[`conclave-mcp`](https://www.npmjs.com/package/conclave-mcp) is the rules half published on its
+own: ten files, no driver, no seat skills, no standing rules. It serves the six tools that
+answer from JSON and nothing that spends a vendor turn. A checkout serves all ten.
 
 A stdio MCP server, so any host that speaks MCP can convene a panel without a plugin written
 for it: VS Code, Cursor, Zed, Claude Desktop, the JetBrains IDEs. Registered and answering on
