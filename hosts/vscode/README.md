@@ -1,6 +1,22 @@
 # CONCLAVE for VS Code
 
-An extension that tells VS Code where the CONCLAVE MCP server is, and stops there.
+**You probably do not need this.** VS Code reads MCP servers itself, and one command is the
+whole setup:
+
+```bash
+code --add-mcp '{"name":"conclave","command":"npx","args":["-y","conclave-mcp"]}'
+```
+
+Point it at a checkout instead of the package and you get all ten tools rather than the six
+the published package serves. Either way there is nothing to install and nothing to keep in
+step with a release.
+
+This extension exists for two narrower reasons: a Marketplace listing, for people who find
+things that way rather than by reading a README; and picking the server automatically, so the
+CONCLAVE repository open in a window uses the copy being edited while every other window uses
+the published one. Neither is worth publishing until the first matters.
+
+What it does otherwise: tells VS Code where the CONCLAVE MCP server is, and stops there.
 
 It contributes no command, no view and no tool of its own. VS Code asks the server what it
 can do over the protocol, so a tool added, renamed or re-described in this repository appears
