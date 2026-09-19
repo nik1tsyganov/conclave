@@ -155,9 +155,16 @@ function finalize({ runDir }) {
   const finalizeResult = tool('run-finalize.js', ['--run-dir', run.root]);
   const activation = tool('activation-check.js', ['--run-dir', run.root]);
   let summary = null; try { summary = JSON.parse(activation.out.slice(activation.out.indexOf('{'))); } catch {}
+  // A byte cap through the middle of a JSON payload produces something no reader can parse,
+  // and the reader then cannot tell a severed record from a missing one. Cap only what does
+  // not parse: a verdict record is bounded by its own content, and this one had been cut
+  // mid-string for long enough that its column read as an error rather than a verdict.
+  const verdictText = (name, unitId) => {
+    const text = tool(name, ['--run-dir', run.root, '--unit-id', unitId]).out;
+    try { JSON.parse(text); return text; } catch { return text.slice(0, 600); }
+  };
   const units = [...new Set(run.plan.dispatches.map(e => e.unitId))].map(unitId => ({ unitId,
-    tally: tool('panel-tally.js', ['--run-dir', run.root, '--unit-id', unitId]).out.slice(0, 600),
-    jev: tool('panel-tally-jev.js', ['--run-dir', run.root, '--unit-id', unitId]).out.slice(0, 600) }));
+    tally: verdictText('panel-tally.js', unitId), jev: verdictText('panel-tally-jev.js', unitId) }));
   return { finalize: { exit: finalizeResult.exit, error: finalizeResult.exit === 0 ? null : finalizeResult.err || finalizeResult.out.slice(-300) },
     activation: summary ? { executionStatus: summary.executionStatus, approvalStatus: summary.approvalStatus, outcomes: summary.outcomes.map(o => `${o.dispatchId}:${o.status}`), units: summary.units } : { raw: activation.out.slice(-600), err: activation.err },
     units };
