@@ -208,15 +208,48 @@ test('the routable and unroutable classes together are exactly the matrix classe
   assert.deepEqual(known, inMatrix,
     'a class added to the dispatch matrix must be added here too, as routable or as unroutable');
   assert.equal(new Set(known).size, known.length, 'and named once');
+  // Routability is decided per lane, never over a pooled list: pooling implement and verify
+  // let a class with vendors in one lane and none in the other pass for routable, which is
+  // how a buildable class with no review lane once shipped unlandable.
+  const matrixIds = Object.keys(matrix.classes);
+  assert.ok(matrixIds.length > 0, 'the matrix must name classes, or every lane check below is vacuous');
   for (const id of routing.CLASSES) {
-    const lanes = [...(matrix.classes[id].implement || []), ...(matrix.classes[id].verify || [])];
-    assert.ok(lanes.length > 0, `${id} is routable here, so the matrix must give it a lane`);
+    const lanes = matrix.classes[id];
+    const verdict = routing.routability(lanes);
+    assert.ok(verdict.routable, `${id} is routable here, so the matrix must agree (${verdict.reason || 'no reason given'})`);
+    assert.ok((lanes.verify || []).length > 0, `${id} is routable here, so the matrix must give it a verify lane`);
+    if ((lanes.implement || []).length > 0) {
+      assert.ok((lanes.review || []).length > 0, `${id} can be built, so the matrix must give it a review lane too`);
+    }
     assert.ok(routing.BUILDER_PREFERENCE[id], `${id} is routable here, so it needs a builder preference`);
   }
   for (const id of routing.UNROUTABLE_CLASSES) {
-    const lanes = [...(matrix.classes[id].implement || []), ...(matrix.classes[id].verify || [])];
-    assert.equal(lanes.length, 0, `${id} is refused here, so the matrix must give it no lane`);
+    const verdict = routing.routability(matrix.classes[id]);
+    assert.equal(verdict.routable, false, `${id} is refused here, so the matrix must agree`);
+    assert.equal(routing.UNROUTABLE_REASON[id], verdict.reason,
+      `${id}: the refusal must name the lane the matrix actually lacks`);
   }
+});
+
+// A class that can be built but not reviewed is the trap this rule closes: its plans seal,
+// its seats run, and run-finalize can never land the unit for want of a review lane.
+test('a buildable class missing a checking lane is not routable, and the refusal names the lane', () => {
+  const noReview = routing.routability({ implement: ['openai'], verify: ['anthropic'], review: [] });
+  assert.equal(noReview.routable, false, 'implement + verify without review cannot route');
+  assert.match(noReview.reason, /implement lane but no review lane/, 'the refusal names the missing lane');
+
+  const noVerify = routing.routability({ implement: ['openai'], verify: [], review: ['anthropic'] });
+  assert.equal(noVerify.routable, false, 'implement + review without verify cannot route');
+  assert.match(noVerify.reason, /implement lane but no verify lane/);
+
+  // The exemption: a class this runtime does not build keeps a verify lane's routability.
+  assert.equal(routing.routability({ verify: ['openai'] }).routable, true, 'verify-only still routes');
+  assert.equal(routing.routability({ review: ['openai'] }).routable, false, 'a review lane alone never did route');
+  assert.ok(routing.CLASSES.includes('test-verification'), 'the verify-only class the exemption exists for');
+
+  // And the refusal a lead reads names the class and the lane it lacks.
+  assert.throws(() => routing.classNamed('review-adversarial'),
+    /review-adversarial is a matrix class with no implement or verify lane, so this panel cannot seat it/);
 });
 
 test('a seat the caller left out is filled in rather than refused', () => {
