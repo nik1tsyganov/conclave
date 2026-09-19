@@ -9,6 +9,11 @@ const { loadProfiles } = require('./seat-policy.js');
 const { checkBriefFile } = require('./cli-brief-rules-check.js');
 
 const ROOT = path.resolve(__dirname, '..');
+// These two model pins are a deliberate canary, confirmed with the owner on
+// 2026-09-19. Both models probe PASS today. When a vendor retires one of
+// them, this check is SUPPOSED to fail: probe the successor and re-pin it
+// here instead of removing the assertion.
+const PINNED_MODELS = { openai: 'gpt-6-astra', anthropic: 'claude-fable-5-1' };
 const REQUIRED = [
   '.cursor-plugin/plugin.json',
   '.cursor/skills/conclave-cli/SKILL.md',
@@ -65,10 +70,18 @@ function main(io = process) {
     return 1;
   }
   const matrix = loadMatrix();
+  const openaiModelsFound = Object.keys(matrix.vendors?.openai?.models || {});
+  const anthropicCanonicalFound = matrix.vendors?.anthropic?.models?.fable?.canonical;
+  if (!matrix.vendors?.openai?.models?.[PINNED_MODELS.openai]) {
+    io.stderr.write(`RELEASE_CHECK_FAIL pinned model canary: expected openai model '${PINNED_MODELS.openai}', found: ${openaiModelsFound.join(', ') || '(none)'}. This pin is a deliberate canary: probe the successor and re-pin it in PINNED_MODELS, do not remove the assertion.\n`);
+    return 1;
+  }
+  if (anthropicCanonicalFound !== PINNED_MODELS.anthropic) {
+    io.stderr.write(`RELEASE_CHECK_FAIL pinned model canary: expected anthropic canonical '${PINNED_MODELS.anthropic}', found '${anthropicCanonicalFound}'. This pin is a deliberate canary: probe the successor and re-pin it in PINNED_MODELS, do not remove the assertion.\n`);
+    return 1;
+  }
   if (
     matrix.schemaVersion < 3 ||
-    !matrix.vendors?.openai?.models?.['gpt-6-astra'] ||
-    matrix.vendors?.anthropic?.models?.fable?.canonical !== 'claude-fable-5-1' ||
     !Array.isArray(matrix.classes?.['architecture-planning']?.plan) ||
     !Array.isArray(matrix.classes?.['research-synthesis']?.research)
   ) {

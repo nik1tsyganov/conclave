@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 500" width="920" height="500" role="img" aria-labelledby="ttl dsc">
+<!-- The clickable twin of this diagram is the route plate in site/index.html.
+     tools/site-plate-drift.test.js fails if the two drift on role names or rules. -->
 <title id="ttl">CONCLAVE: one unit, from block to smoke</title>
 <desc id="dsc">A unit travels from the host's block, through routing, to one building seat and two checking seats. Their receipts are counted in code, and the unit's own check gates the landing. An arbiter proposes off to one side and is counted in nothing.</desc>
 <!-- Named by ROLE, never by vendor or model: the catalog turns over and a diagram cannot chase it.
