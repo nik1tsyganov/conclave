@@ -79,6 +79,33 @@ function snapshotWorkspace(root) {
   }
   return { root, files, git, coverage: 'workspace files, Git HEAD/index/config/worktree pointer; vendor home is not isolated' };
 }
+// The diff a checking seat reads to confirm a unit changed nothing beyond its scope.
+// A directory without a git baseline and a genuinely clean tree must never produce the
+// same evidence: the first makes "nothing else changed" unverifiable, the second proves
+// it. A missing baseline is reported to the seat, not thrown — the capture continues.
+function workspaceDiffText(cwd) {
+  const opts = { encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } };
+  const probe = spawnSync('git', ['-C', cwd, 'rev-parse', '--is-inside-work-tree'], opts);
+  const noBaseline = (reason) => [
+    '# NO GIT BASELINE',
+    `# cwd: ${cwd}`,
+    `# ${reason}`,
+    '# no before/after delta exists for this unit.',
+    '# a criterion of the form "nothing else changed" cannot be verified from this evidence; treat it as unverifiable, not satisfied.',
+    '',
+  ].join('\n');
+  if (probe.error) return noBaseline(`git could not be executed: ${probe.error.message}`);
+  if (probe.status !== 0 || probe.stdout.trim() !== 'true') return noBaseline('this directory is not a git work tree.');
+  const run = (args) => {
+    const proc = spawnSync('git', ['-C', cwd, ...args], opts);
+    if (proc.error || proc.status !== 0) {
+      const detail = (proc.stderr || (proc.error && proc.error.message) || '').trim();
+      return `\n# git ${args.join(' ')} failed${proc.status === null ? '' : ` (exit ${proc.status})`}: ${detail}\n`;
+    }
+    return proc.stdout || '';
+  };
+  return `$ git diff --stat && git diff && git status --porcelain\n${run(['diff', '--stat'])}${run(['diff'])}${run(['status', '--porcelain'])}`;
+}
 function compareWorkspace(before, after, scope = []) {
   const names = [...new Set([...Object.keys(before.files), ...Object.keys(after.files)])].sort();
   const changedFiles = names.filter((name) => JSON.stringify(before.files[name]) !== JSON.stringify(after.files[name])).map((name) => ({
@@ -171,4 +198,4 @@ function verifyArtifacts(state, { pins = policyPins(state) } = {}) {
   return { policyDrift: drift };
 }
 
-module.exports = { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, appendUniqueRow, policyPins, assertPlainPath, compareWorkspace, hash, hashFile, inside, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, verifyArtifacts, verifyCommittedRow, writeJson };
+module.exports = { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, appendUniqueRow, policyPins, assertPlainPath, compareWorkspace, hash, hashFile, inside, reserveTransaction, runtimeManifest, snapshotWorkspace, transactionKey, verifyArtifacts, verifyCommittedRow, workspaceDiffText, writeJson };

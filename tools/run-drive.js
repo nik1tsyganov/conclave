@@ -19,7 +19,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { readSealedRun } = require('./plan-seal.js');
 const { runDispatch } = require('./dispatch-run.js');
-const { transactionKey, AWAITING_ATTESTATION } = require('./dispatch-evidence.js');
+const { transactionKey, workspaceDiffText, AWAITING_ATTESTATION } = require('./dispatch-evidence.js');
 
 const PHASES = ['implement', 'verify', 'review', 'evidence', 'finalize'];
 
@@ -138,8 +138,10 @@ function captureEvidence({ runDir, tests }) {
     if (!dirs.length) throw new Error(`no evidenceReadDirs for ${unitId}`);
     const proc = spawnSync('/bin/sh', ['-c', test.command], { cwd, encoding: 'utf8', maxBuffer: 16e6 });
     const testOutput = `# lead-captured test evidence, unit ${unitId}, plan ${run.plan.planId}, ${new Date().toISOString()}\n# cwd: ${cwd}\n$ ${test.command}\n${proc.stdout || ''}${proc.stderr || ''}exit=${proc.status}\n`;
-    const git = (args) => spawnSync('git', args, { cwd, encoding: 'utf8' }).stdout || '';
-    const diff = `$ git diff --stat && git diff && git status --porcelain\n${git(['diff', '--stat'])}${git(['diff'])}${git(['status', '--porcelain'])}`;
+    // Not an inline git call: in a directory that is not a work tree every git invocation
+    // returns empty on stdout, and an absent baseline became byte-identical to a clean tree.
+    // A verify seat abstained on exactly that, writing "coherence is not a delta".
+    const diff = workspaceDiffText(cwd);
     for (const dir of dirs) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, 'test-output.txt'), testOutput); fs.writeFileSync(path.join(dir, 'diff.txt'), diff); }
     out.push({ unitId, exit: proc.status, dirs });
   }
