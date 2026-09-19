@@ -222,7 +222,24 @@ async function tallyPositions({ replies }, opts = {}) {
     out.jev = { score: score.score, legend: score.legend, probabilities: score.probabilities, confidence: score.confidence };
     // Jev returns the legend as an object keyed by level; compare the level nearest the score.
     const nearest = score.legend && typeof score.legend === 'object' ? String(score.legend[String(Math.round(Number(score.score)))] || '') : String(score.legend || '');
-    if (nearest && !nearest.startsWith(verdict === 'PASSAGE' ? 'APPROVE' : verdict)) out.flags.push('jev-score-disagrees-with-tally');
+    if (nearest && !nearest.startsWith(verdict === 'PASSAGE' ? 'APPROVE' : verdict)) {
+      out.flags.push('jev-score-disagrees-with-tally');
+      // The counted verdict stays; the disagreement must be visible without
+      // opening flags, so the record says it is contested and names both readings.
+      const level = String(Math.round(Number(score.score)));
+      const reading = ['APPROVE', 'REJECT', 'DEADLOCK'].find((p) => nearest.startsWith(p)) || 'UNKNOWN';
+      const probability = score.probabilities && typeof score.probabilities === 'object' ? Number(score.probabilities[level]) || 0 : null;
+      const downgraded = counted.filter((c) => c.downgraded && c.declared === 'APPROVE').length;
+      out.degraded = true;
+      out.contested = {
+        counted: { verdict, counts },
+        holistic: { reading, score: score.score, label: nearest, probability, confidence: score.confidence },
+        reason: downgraded > 0
+          ? `the per-reply evidence gate downgraded ${downgraded} approval${downgraded === 1 ? '' : 's'} that the holistic reading accepted, so the two disagree`
+          : 'the counted verdict and the holistic reading of the same replies disagree',
+        summary: `${verdict} (contested: holistic ${reading} p=${probability === null ? 'n/a' : probability.toFixed(2)})`,
+      };
+    }
     if (unanimous && result.answers.overlappingReasoning.noul >= EVIDENCE_GATE) out.flags.push('suspiciously-clean-consensus');
     out.usage = result.usage;
   } else {

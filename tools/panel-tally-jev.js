@@ -51,7 +51,7 @@ async function main(argv = process.argv.slice(2)) {
     }
     const result = await tallyUnit({ runDir: opts.runDir, unitId: opts.unitId, provenancePath: opts.provenance });
     const { file, ...rest } = result; void rest;
-    process.stdout.write(`${JSON.stringify({ ok: true, file, verdict: result.verdict, counts: result.counts, jev: result.jev || null, flags: result.flags, degraded: result.degraded })}\n`);
+    process.stdout.write(`${JSON.stringify({ ok: true, file, verdict: result.verdict, summary: result.contested ? result.contested.summary : result.verdict, counts: result.counts, jev: result.jev || null, flags: result.flags, degraded: result.degraded })}\n`);
     return 0;
   } catch (error) { process.stderr.write(`JEV_TALLY_FAIL: ${error.message}\n`); return 1; }
 }

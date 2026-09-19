@@ -162,7 +162,7 @@ describe('conveneThirdFamily and netBenefit', () => {
 
 describe('tallyPositions', () => {
   const evidence = (map) => (questions) => {
-    const answers = { verdict: { score: 1.8, legend: map.legend || 'APPROVE: taken together the replies establish that the artifact meets its brief', probabilities: { 0: 0.1, 1: 0.1, 2: 0.8 }, confidence: 0.7 } };
+    const answers = { verdict: { score: map.score ?? 1.8, legend: map.legend || 'APPROVE: taken together the replies establish that the artifact meets its brief', probabilities: map.probabilities || { 0: 0.1, 1: 0.1, 2: 0.8 }, confidence: map.confidence ?? 0.7 } };
     for (const id of Object.keys(questions)) {
       if (id.startsWith('evidence_')) answers[id] = { noul: map[id.slice('evidence_'.length)] };
       if (id === 'overlappingReasoning') answers[id] = { noul: map.overlap ?? 0.1 };
@@ -235,5 +235,44 @@ describe('tallyPositions', () => {
     assert.strictEqual(r.notRun, 'TYPESAFE_API_KEY not set');
     assert.strictEqual(r.jev, undefined);
     assert.deepStrictEqual(r.flags, ['approve-without-evidence-counted-as-abstain', 'evidence-check-deterministic-only']);
+  });
+
+  it('a verdict the holistic score contradicts is degraded and names both readings', async () => {
+    // Live 2026-09-19: the gate downgraded one APPROVE to ABSTAIN (DEADLOCK by
+    // count) while the holistic score read APPROVE at p=1.00; the record said both.
+    const f = fake(evidence({
+      A: 0.9, B: 0.06,
+      score: 2,
+      legend: { 0: 'REJECT: no', 1: 'DEADLOCK: no', 2: 'APPROVE: taken together the replies establish that the artifact meets its brief' },
+      probabilities: { 0: 0, 1: 0, 2: 1 },
+      confidence: 1,
+    }));
+    const r = await tallyPositions({ replies: [
+      { seat: 'A', position: 'APPROVE', independentEvidence: 'ran the tests' },
+      { seat: 'B', position: 'APPROVE', independentEvidence: 'agreed' },
+    ] }, f);
+    assert.strictEqual(r.verdict, 'DEADLOCK', 'the machine-readable verdict stays the counted one');
+    assert.strictEqual(r.degraded, true);
+    assert.deepStrictEqual(r.flags.sort(), ['approve-without-evidence-counted-as-abstain', 'jev-score-disagrees-with-tally']);
+    assert.deepStrictEqual(r.contested.counted, { verdict: 'DEADLOCK', counts: { APPROVE: 1, REJECT: 0, ABSTAIN: 1 } });
+    assert.deepStrictEqual(r.contested.holistic, {
+      reading: 'APPROVE', score: 2,
+      label: 'APPROVE: taken together the replies establish that the artifact meets its brief',
+      probability: 1, confidence: 1,
+    });
+    assert.match(r.contested.reason, /evidence gate downgraded 1 approval/);
+    assert.strictEqual(r.contested.summary, 'DEADLOCK (contested: holistic APPROVE p=1.00)');
+  });
+
+  it('a verdict the holistic score agrees with carries no contested key and is not degraded', async () => {
+    const f = fake(evidence({ A: 0.9, B: 0.8 }));
+    const r = await tallyPositions({ replies: [
+      { seat: 'A', position: 'APPROVE', independentEvidence: 'ran the tests' },
+      { seat: 'B', position: 'APPROVE', independentEvidence: 'checked the bounds' },
+    ] }, f);
+    assert.strictEqual(r.verdict, 'PASSAGE');
+    assert.strictEqual('contested' in r, false);
+    assert.strictEqual(r.degraded, false);
+    assert.deepStrictEqual(r.flags, []);
   });
 });
