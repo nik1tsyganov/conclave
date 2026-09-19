@@ -250,7 +250,7 @@ test('complete prior author evidence is available to both checking seats through
   assert.equal(inspectRun(run.runDir).executions.length, 3);
 });
 
-test('OpenAI evidence grants leave the exact scratch argv and environment unchanged', t => {
+test('OpenAI evidence grants add read grants to the scratch profile and leave the environment unchanged', t => {
   const root = temporary(t, 'conclave-evidence-scratch-'); const runDir = path.join(root, 'run');
   const output = path.join(runDir, 'out/d1'); fs.mkdirSync(output, { recursive: true });
   const briefPath = path.join(output, 'BRIEF.md'); fs.writeFileSync(briefPath, 'ACK evidence\n');
@@ -259,8 +259,36 @@ test('OpenAI evidence grants leave the exact scratch argv and environment unchan
     briefPath, seatContractPath: path.join(output, 'SEAT-CONTRACT.md'), skillRoot: path.join(output, 'skills'), capturePath: path.join(output, 'capture.txt'),
     env: { CONCLAVE_CODEX_BIN: process.execPath, CONCLAVE_DEV_ROOT: '/opt/conclave/src' }, mustExistBinary: false };
   const before = buildLaunch(opts); const after = buildLaunch({ ...opts, evidenceReadDirs: [evidence] });
-  assert.deepEqual(after.args, before.args); assert.deepEqual(after.env, before.env);
+  assert.deepEqual(after.env, before.env);
   assert.deepEqual(after.evidenceReadDirs, [canonicalPlainPath(evidence)]);
+  // Only the permissions profile line may change; every other arg is byte-identical.
+  assert.deepEqual(after.args.filter(arg => !arg.startsWith('permissions.')), before.args.filter(arg => !arg.startsWith('permissions.')));
+  const profile = after.args.find(arg => arg.startsWith('permissions.'));
+  assert.ok(profile.includes(`${JSON.stringify(canonicalPlainPath(evidence))} = "read"`), 'the bound evidence directory is granted read');
+  assert.equal((profile.match(/"write"/g) || []).length, 1, 'the scratch write grant survives alongside the read grant');
+});
+
+test('OpenAI checking launch is refused unless every bound evidence directory is granted read', t => {
+  const root = temporary(t, 'conclave-openai-read-access-'); const runDir = path.join(root, 'run');
+  const output = path.join(runDir, 'out/d1'); fs.mkdirSync(output, { recursive: true });
+  const briefPath = path.join(output, 'BRIEF.md'); fs.writeFileSync(briefPath, 'ACK evidence\n');
+  const seatContractPath = path.join(output, 'SEAT-CONTRACT.md'); fs.writeFileSync(seatContractPath, 'seat contract');
+  const skillRoot = path.join(output, 'skills'); fs.mkdirSync(skillRoot, { recursive: true });
+  const evidence = path.join(root, 'evidence'); fs.mkdirSync(evidence);
+  const opts = { vendor: 'openai', role: 'verify', cwd: '/opt/conclave/src/synthetic-product', runDir, dispatchId: 'd1', readonlyScratch: true,
+    briefPath, seatContractPath, skillRoot, capturePath: path.join(output, 'capture.txt'),
+    env: { CONCLAVE_CODEX_BIN: process.execPath, CONCLAVE_DEV_ROOT: '/opt/conclave/src' }, mustExistBinary: false };
+  const entry = { vendor: 'openai', role: 'verify', evidenceReadDirs: [evidence] };
+  const dirs = [canonicalPlainPath(evidence)];
+  const context = { cwd: opts.cwd, briefPath, skillRoot, seatContractPath };
+  const granted = buildLaunch({ ...opts, evidenceReadDirs: [evidence] });
+  validateEvidenceReadLaunch(granted, entry, dirs, context);
+  // The pre-fix defect shape: a valid scratch launch whose argv never grants the bound directory.
+  const ungranted = buildLaunch(opts);
+  ungranted.evidenceReadDirs = dirs;
+  assert.throws(() => validateEvidenceReadLaunch(ungranted, entry, dirs, context), /missing a read grant/);
+  const noProfile = { ...granted, args: granted.args.filter(arg => !String(arg).startsWith('permissions.')) };
+  assert.throws(() => validateEvidenceReadLaunch(noProfile, entry, dirs, context), /permissions profile/);
 });
 
 test('replay checks sealed directory grants even after a launch artifact hash is refreshed', async t => {

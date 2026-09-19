@@ -177,6 +177,15 @@ test('three implementation units in convened CONCLAVE require all three vendors'
       { unitId: 'u3', class: 'standard-feature', role: 'implement', vendor: 'google', model: 'gemini-3.8-flash-medium', effort: 'fused-medium' },
     ],
   }, matrix, availability));
+  // The requirement, not only the happy path: two vendors across three units must refuse.
+  assert.throws(() => validatePlan({
+    hostMode: 'cursor-cli', arbiter: arbiter(), conclaveConvened: true,
+    dispatches: [
+      { unitId: 'u1', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' },
+      { unitId: 'u2', class: 'standard-feature', role: 'implement', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium' },
+      { unitId: 'u3', class: 'standard-feature', role: 'implement', vendor: 'anthropic', model: 'fable', effort: 'medium' },
+    ],
+  }, matrix, availability), /requires 3 implement vendors/);
 });
 
 test('review-only CONCLAVE panel is legal without fake implementation rows', () => {
@@ -269,12 +278,21 @@ test('every class that can be built can be checked', () => {
 
 test('a class demanding a panel can seat one: two foreign vendors across its checking lanes', () => {
   const matrix = loadMatrix();
+  let panelClasses = 0;
   for (const [name, klass] of Object.entries(matrix.classes)) {
     if (!klass.requiresPanel && !klass.minimumReviewVendors) continue;
+    panelClasses += 1;
+    // Per lane before any pooling: finalization needs a foreign seat from EACH counting
+    // role, so one rich lane cannot cover an empty one (the 2026-09-18 pooled-count defect).
+    for (const role of ['verify', 'review']) {
+      assert.ok(Array.isArray(klass[role]) && klass[role].length > 0,
+        `class ${name} demands a panel but has no ${role} lane, so its units can never land`);
+    }
     const vendors = new Set([...(klass.verify || []), ...(klass.review || [])].map((lane) => lane.vendor));
     const needed = klass.minimumReviewVendors || 2;
     assert.ok(vendors.size >= needed, `class ${name} demands ${needed} review vendors and its checking lanes offer ${vendors.size}`);
   }
+  assert.ok(panelClasses > 0, 'no class demands a panel, so this invariant examined nothing');
 });
 
 // Opus refused every CHECKING launch while cli-adapters added --tools Read,Glob,Grep for

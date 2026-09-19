@@ -114,5 +114,7 @@ test('join-manifest records CONCLAVE ids and watchdog reports a join orphan', ()
   assert.ok(findings.some((row) => row.kind === 'join-orphan' && row.dispatchId === 'd2'));
   const scanned = watch({ runRoots: [root], hooks: [] });
   assert.equal(scanned.notify, true);
-  assert.ok(scanned.findings.some((row) => row.kind === 'join-orphan' || row.kind === 'dead-running'));
+  // Both kinds are present in this fixture; an either/or matcher would pass if watch dropped one.
+  assert.ok(scanned.findings.some((row) => row.kind === 'join-orphan' && row.dispatchId === 'd2'));
+  assert.ok(scanned.findings.some((row) => row.kind === 'dead-running' && row.dispatchId === 'd2'));
 });

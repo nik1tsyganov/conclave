@@ -94,7 +94,9 @@ describe('position-tally rules', () => {
     const result = tally(trio('ABSTAIN', 'APPROVE', 'ABSTAIN'));
     assert.strictEqual(result.approveCount, 1);
     assert.strictEqual(result.abstainCount, 2);
-    assert.ok(!result.counted.some((row) => row.position === 'ABSTAIN' && row.position === 'APPROVE'));
+    // Was `row.position === 'ABSTAIN' && row.position === 'APPROVE'`, which cannot be true, so
+    // the assertion could never fail; this now fails if an abstention is counted as an approval.
+    assert.deepStrictEqual(result.counted.map((row) => row.position), ['ABSTAIN', 'APPROVE', 'ABSTAIN']);
   });
 
   it('passes when a third elector is missing but two APPROVE are present', () => {

@@ -50,6 +50,95 @@ test('OpenAI non-implement roles are read-only while implementer is workspace-wr
   assert.ok(openaiLaunch({ ...common, role: 'implement' }).args.includes('workspace-write'));
 });
 
+test('OpenAI checking launches grant each bound evidence directory read access', (t) => {
+  const f = fixture(t);
+  const evidenceA = path.join(f.dir, 'evidence-a');
+  const evidenceB = path.join(f.dir, 'evidence-b');
+  fs.mkdirSync(evidenceA);
+  fs.mkdirSync(evidenceB);
+  const common = {
+    briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
+    cwd: '/opt/conclave/src/product-a', model: 'gpt-5.6-sol', effort: 'high', capturePath: path.join(f.dir, 'capture.txt'),
+    env: fakeBins, mustExistBinary: false,
+  };
+  const launch = openaiLaunch({ ...common, role: 'verify', evidenceReadDirs: [evidenceA, evidenceB] });
+  const profile = launch.args.find(arg => arg.startsWith('permissions.'));
+  assert.ok(profile, 'a permissions profile replaces the bare sandbox flag');
+  assert.ok(profile.startsWith('permissions.conclave_evidence_read={'), 'whole table replaces inherited named-profile grants');
+  assert.match(profile, /extends = ":read-only"/);
+  assert.match(profile, /network = \{ enabled = false \}/);
+  assert.ok(profile.includes(`${JSON.stringify(launch.evidenceReadDirs[0])} = "read"`), 'first evidence directory is granted read');
+  assert.ok(profile.includes(`${JSON.stringify(launch.evidenceReadDirs[1])} = "read"`), 'second evidence directory is granted read');
+  assert.ok(!profile.includes('"write"'), 'no write grant without a scratch policy');
+  assert.ok(launch.args.includes(`default_permissions=${JSON.stringify('conclave_evidence_read')}`));
+  assert.ok(!launch.args.includes('-s'));
+  assert.strictEqual(launch.requestedSandbox, 'custom permissions');
+
+  const bare = openaiLaunch({ ...common, role: 'verify' });
+  assert.ok(bare.args.includes('-s'), 'a checking seat without evidence keeps the sandbox flag');
+  assert.ok(bare.args.includes('read-only'));
+  assert.ok(!bare.args.some(arg => arg.startsWith('permissions.')));
+  assert.strictEqual(bare.requestedSandbox, 'read-only');
+});
+
+test('OpenAI implement launches carry no evidence profile', (t) => {
+  const f = fixture(t);
+  const launch = openaiLaunch({
+    briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
+    cwd: '/opt/conclave/src/product-a', model: 'gpt-5.6-sol', effort: 'high', role: 'implement',
+    capturePath: path.join(f.dir, 'capture.txt'), env: fakeBins, mustExistBinary: false,
+  });
+  assert.ok(launch.args.includes('-s'));
+  assert.ok(launch.args.includes('workspace-write'));
+  assert.ok(!launch.args.some(arg => arg.startsWith('permissions.')));
+  assert.strictEqual(launch.requestedSandbox, 'workspace-write');
+});
+
+test('OpenAI checking launch with a scratch policy carries both the write grant and evidence read grants', (t) => {
+  const f = fixture(t);
+  const runDir = path.join(f.dir, 'run');
+  const output = path.join(runDir, 'out', 'd1');
+  fs.mkdirSync(output, { recursive: true });
+  const briefPath = path.join(output, 'BRIEF.md');
+  const seatContractPath = path.join(output, 'SEAT-CONTRACT.md');
+  fs.writeFileSync(briefPath, 'ACK test brief\nTask details remain in this file.\n', 'utf8');
+  fs.writeFileSync(seatContractPath, 'seat contract', 'utf8');
+  const evidence = path.join(f.dir, 'evidence');
+  fs.mkdirSync(evidence);
+  const launch = openaiLaunch({
+    briefPath, seatContractPath, skillRoot: f.skillRoot,
+    cwd: '/opt/conclave/src/product-a', model: 'gpt-5.6-sol', effort: 'high', role: 'verify',
+    runDir, dispatchId: 'd1', readonlyScratch: true, capturePath: path.join(output, 'capture.txt'),
+    evidenceReadDirs: [evidence], env: fakeBins, mustExistBinary: false,
+  });
+  const profile = launch.args.find(arg => arg.startsWith('permissions.'));
+  assert.ok(profile.startsWith('permissions.conclave_readonly_scratch={'), 'the scratch profile name is kept');
+  assert.match(profile, /extends = ":read-only"/);
+  assert.match(profile, /network = \{ enabled = false \}/);
+  assert.strictEqual((profile.match(/"write"/g) || []).length, 1, 'exactly one write grant');
+  assert.ok(profile.includes(`${JSON.stringify(launch.scratchPermissions.scratchPath)} = "write"`), 'the scratch write grant survives');
+  assert.ok(profile.includes(`${JSON.stringify(launch.evidenceReadDirs[0])} = "read"`), 'the evidence read grant rides the same profile');
+  assert.ok(!launch.args.includes('-s'));
+});
+
+test('Google and Claude launches are untouched by the OpenAI evidence profile', (t) => {
+  const f = fixture(t);
+  const evidence = path.join(f.dir, 'evidence');
+  fs.mkdirSync(evidence);
+  const common = {
+    briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
+    cwd: '/opt/conclave/src/product-a', env: fakeBins, mustExistBinary: false,
+  };
+  const google = googleLaunch({ ...common, model: 'gemini-3.1-pro-high', role: 'verify', evidenceReadDirs: [evidence] });
+  assert.ok(google.args.includes('--sandbox'));
+  assert.ok(google.args.includes(google.evidenceReadDirs[0]), 'google still grants via --add-dir');
+  assert.ok(!google.args.some(arg => String(arg).startsWith('permissions.')));
+  const claude = anthropicLaunch({ ...common, model: 'fable', effort: 'xhigh', role: 'verify', evidenceReadDirs: [evidence] });
+  assert.ok(claude.args.includes(claude.evidenceReadDirs[0]), 'claude still grants via --add-dir');
+  assert.strictEqual(claude.args[claude.args.indexOf('--allowedTools') + 1], 'Read,Glob,Grep');
+  assert.ok(!claude.args.some(arg => String(arg).startsWith('permissions.')));
+});
+
 test('Google non-implement roles use sandbox while implementer uses write bypass', (t) => {
   const f = fixture(t);
   const common = {
@@ -86,7 +175,8 @@ test('Claude non-implement roles do not inherit implement bypassPermissions', (t
     assert.ok(!fs.readFileSync(launch.stdinFile, 'utf8').includes('ACK test brief'), 'the pointer carries no brief content');
     assert.ok(!launch.env.ANTHROPIC_API_KEY);
     if (role !== 'implement') {
-      assert.ok(!launch.args.includes('--tools'), 'the --tools restriction completes the refused launch shape (2026-09-19)');
+      // Catches a read-only role regaining the retired --tools restriction (removed 2026-09-19).
+      assert.ok(!launch.args.includes('--tools'), 'read-only roles must not carry the retired --tools restriction');
       assert.strictEqual(launch.args[launch.args.indexOf('--allowedTools') + 1], 'Read,Glob,Grep');
       assert.ok(!launch.args.includes('plan'), 'plan mode requires a separate approval turn');
       for (const forbidden of ['bypassPermissions', 'manual', 'auto', 'acceptEdits', 'plan']) assert.throws(() => anthropicLaunch({ ...common, role, reviewPermissionMode: forbidden }), /read-only Claude roles require/);

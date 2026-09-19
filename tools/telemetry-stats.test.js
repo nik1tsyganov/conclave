@@ -47,7 +47,18 @@ test('three implement rows openai/google/anthropic print ~33% each and null tota
   assert.strictEqual(out.tokens.totalTokens.count, 2);
   assert.strictEqual(out.tokens.totalTokens.sum, 300);
   assert.strictEqual(out.tokens.totalTokens.mean, 150);
-  
+
+  // Catches a share denominator that is not the role total: each vendor must print 33.3%.
+  const human = spawnSync(process.execPath, [
+    path.join(__dirname, 'telemetry-stats.js'),
+    '--log',
+    logFile
+  ], { encoding: 'utf8' });
+  assert.strictEqual(human.status, 0);
+  for (const vendor of ['openai', 'google', 'anthropic']) {
+    assert.ok(human.stdout.includes(`${vendor}: 1 (33.3%)`), `human output must show ${vendor} at 33.3%`);
+  }
+
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 

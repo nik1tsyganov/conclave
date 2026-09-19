@@ -90,6 +90,7 @@ test('the streamed reader never sends out more, or fewer, than the whole reading
     reply('[]'),
     `${FENCE}conclave\n[{"unit":"U1","brief":"only a block"}]\n${FENCE}`,
     reply('[{"unit":"U1","brief":"Write ```swift inside"},{"unit":"U2","brief":"second"}]'),
+    'no block here at all',
   ];
   for (const text of replies) {
     let highest = 0;
@@ -98,7 +99,9 @@ test('the streamed reader never sends out more, or fewer, than the whole reading
       highest = Math.max(highest, streamed ? streamed.units.length : 0);
     }
     const whole = block.units(text);
-    assert.equal(highest, whole === null ? highest : whole.length, `agreement on: ${text.slice(0, 40)}`);
+    // Was `whole === null ? highest : ...`, which compared highest to itself and could never
+    // fail; a reply with no block must stream no units, so the null case expects zero.
+    assert.equal(highest, whole === null ? 0 : whole.length, `agreement on: ${text.slice(0, 40)}`);
   }
 });
 

@@ -324,7 +324,7 @@ describe('handoff-envelope', () => {
       const validated = run(['--validate', '--row', JSON.stringify(row)]);
       assert.strictEqual(validated.status, 0, validated.stderr);
       assert.match(validated.stdout, /HANDOFF VALID cli-h\/reviewer/);
-      assert.strictEqual(existsOrEmpty(log), true);
+      assert.strictEqual(notWritten(log), true);
 
       const appended = run(['--row', JSON.stringify(row), '--log', log]);
       assert.strictEqual(appended.status, 0, appended.stderr);
@@ -340,7 +340,8 @@ describe('handoff-envelope', () => {
   });
 });
 
-function existsOrEmpty(filePath) {
+// Catches a --validate run that writes the log: true only when the file stays unreadable.
+function notWritten(filePath) {
   try {
     readFileSync(filePath);
     return false;

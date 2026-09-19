@@ -71,7 +71,10 @@ test('preflight uses bundled skills and v2 rules with file-only binary discovery
   assert.deepEqual(result.arbiterSkills, ['conclave-mode']);
   assert.equal(result.findings.some(row => row.check.startsWith('arbiter-skill:')), false);
   const canonicalRuntimeRoot = fs.realpathSync.native(f.runtimeRoot);
-  assert.ok(result.findings.filter(row => row.check.startsWith('seat-skill:')).every(row => row.value.startsWith(canonicalRuntimeRoot + path.sep)));
+  const seatFindings = result.findings.filter(row => row.check.startsWith('seat-skill:'));
+  // every() is vacuous on an empty list, so pin the expected findings before checking their values.
+  assert.deepEqual(seatFindings.map(row => row.check).sort(), ['seat-skill:seat-openai', 'seat-skill:testing']);
+  assert.ok(seatFindings.every(row => row.value.startsWith(canonicalRuntimeRoot + path.sep)));
   assert.deepEqual(result.findings.find(row => row.check === 'rules:R01-R22').observed, Array.from({ length: 22 }, (_, n) => `R${String(n + 1).padStart(2, '0')}`));
   assert.deepEqual(snapshot(f.root), before);
 });
