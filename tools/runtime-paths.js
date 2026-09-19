@@ -9,6 +9,10 @@ const DEFAULT_ROOT = path.resolve(__dirname, '..');
 
 const CLI_RUNTIME_TOOLS = Object.freeze([
   'activation-check.js', 'hog-check.js', 'host-resolver.js', 'position-tally.js',
+  // position-tally and run-finalize import the quorum constants and the criticality test
+  // rather than keeping a second copy, so both must ship with the runtime. Neither has
+  // requires of its own. A manifest entry is only correct if what it names can load.
+  'panel-rules.js', 'panel-routing.js',
   'cli-adapters.js', 'cli-brief-rules-check.js', 'cli-idle.js', 'cli-pointer.js',
   'cli-process.js', 'cli-proof.js', 'cli-rules-stage.js', 'cli-runner.js', 'cli-skill-stage.js',
   'dispatch-evidence.js', 'dispatch-matrix.js', 'dispatch-run.js', 'dispatch-schema.js', 'conclave-cli-preflight.js', 'conclave-whoami.js',

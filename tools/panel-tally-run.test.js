@@ -11,10 +11,15 @@ const { finalizeRun, inspectRun, tallyUnit } = require('./run-finalize.js');
 
 const verifier = { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'opus', effort: 'medium', authorVendor: 'openai' };
 const reviewer = { unitId: 'u1', role: 'review', class: 'review-adversarial', vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', authorVendor: 'openai' };
-function panel(t, extra, critical = false) {
+function panel(t, extras, critical = false) {
   const author = critical ? { unitId: 'u1', class: 'security-sensitive', model: 'gpt-5.6-sol', effort: 'xhigh' } : { unitId: 'u1' };
-  return createSealedRun(t, [author, verifier, reviewer, extra], { conclaveConvened: critical });
+  return createSealedRun(t, [author, verifier, reviewer, ...[extras].flat()], { conclaveConvened: critical });
 }
+// A critical unit needs THREE counted approvals, and reaches them the way panel-routing seats
+// them: its verifier reads the unit again as a reviewer, in a session of its own. That is a
+// different role, so it is a separate vote, while a second VERIFIER on the same vendor is the
+// same question asked twice and still collapses to one.
+const thirdChecker = { ...reviewer, class: 'standard-feature', vendor: 'anthropic', model: 'opus', effort: 'medium', dispatchId: 'third-checker' };
 const dispatch = (run, id, native) => completeSyntheticDispatch({ ...run.opts, dispatchId: id }, native);
 function cliTally(run) {
   const result = spawnSync(process.execPath, [path.join(__dirname, 'panel-tally.js'), '--run-dir', run.runDir, '--unit-id', 'u1'], {
@@ -25,28 +30,32 @@ function cliTally(run) {
 }
 
 for (const critical of [false, true]) test(`${critical ? 'critical' : 'ordinary'} approval counts agreeing concurrent verifiers once and retains each proof`, async t => {
-  const run = panel(t, { ...verifier, dispatchId: 'extra-verifier' }, critical);
+  const extras = [{ ...verifier, dispatchId: 'extra-verifier' }, ...(critical ? [thirdChecker] : [])];
+  const seats = 4 + (critical ? 1 : 0);
+  const run = panel(t, extras, critical);
   const native = fakeVendor();
   await dispatch(run, 'd1', native);
   await Promise.all([dispatch(run, 'd2', native), dispatch(run, 'extra-verifier', native)]);
   await dispatch(run, 'd3', native);
+  if (critical) await dispatch(run, 'third-checker', native);
   assert.equal(finalizeRun(run.runDir).ok, true);
   const inspected = inspectRun(run.runDir);
-  assert.equal(inspected.executions.length, 4);
-  assert.equal(new Set(inspected.executions.map(row => row.state.receipt.proofId)).size, 4);
-  assert.equal(new Set(inspected.executions.map(row => row.proof.sessionId || row.proof.conversationId)).size, 4);
+  assert.equal(inspected.executions.length, seats);
+  assert.equal(new Set(inspected.executions.map(row => row.state.receipt.proofId)).size, seats);
+  assert.equal(new Set(inspected.executions.map(row => row.proof.sessionId || row.proof.conversationId)).size, seats);
   const result = cliTally(run);
   assert.equal(result.status, 0, result.stderr);
   const tally = JSON.parse(result.stdout);
-  assert.equal(tally.approveCount, 2);
-  assert.deepEqual(tally.counted.map(row => row.elector).sort(), ['anthropic', 'google']);
-  assert.equal(native.calls(), 4);
+  assert.equal(tally.approveCount, critical ? 3 : 2);
+  assert.deepEqual(tally.counted.map(row => row.elector).sort(),
+    critical ? ['anthropic', 'anthropic', 'google'] : ['anthropic', 'google']);
+  assert.equal(native.calls(), seats);
 
   // A second agreeing vote cannot hide corrupt evidence from its own dispatch.
   fs.appendFileSync(path.join(run.runDir, 'out/extra-verifier/proof.json'), '\n');
   assert.equal(finalizeRun(run.runDir).ok, false);
   assert.equal(cliTally(run).status, 1);
-  assert.equal(native.calls(), 4);
+  assert.equal(native.calls(), seats);
 });
 
 for (const position of ['REJECT', 'ABSTAIN']) test(`conflicting ${position} from a repeated reviewer vendor cannot be collapsed into approval`, async t => {

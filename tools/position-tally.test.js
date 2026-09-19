@@ -11,11 +11,12 @@ const { tmpdir } = require('node:os');
 const {
   tally,
   TallyError,
-  PASSAGE_THRESHOLD,
-  QUORUM_FLOOR,
+  ORDINARY_QUORUM,
+  CRITICAL_QUORUM,
   DEGRADED_VENDOR,
   VERDICT,
 } = require('./position-tally.js');
+const panelRules = require('./panel-rules.js');
 
 const node = process.execPath;
 const cli = path.join(__dirname, 'position-tally.js');
@@ -39,9 +40,11 @@ function runCli(args, extra = {}) {
 }
 
 describe('position-tally rules', () => {
-  it('uses a 2-of-3 passage threshold and a matching quorum floor', () => {
-    assert.strictEqual(PASSAGE_THRESHOLD, 2);
-    assert.strictEqual(QUORUM_FLOOR, 2);
+  it('imports the quorum constants from panel-rules rather than redeclaring them', () => {
+    assert.strictEqual(ORDINARY_QUORUM, 2);
+    assert.strictEqual(CRITICAL_QUORUM, 3);
+    assert.strictEqual(ORDINARY_QUORUM, panelRules.ORDINARY_QUORUM);
+    assert.strictEqual(CRITICAL_QUORUM, panelRules.CRITICAL_QUORUM);
     assert.strictEqual(DEGRADED_VENDOR, 'anthropic');
   });
 
@@ -55,11 +58,12 @@ describe('position-tally rules', () => {
     assert.deepStrictEqual(result.eligibleElectors, ['anthropic', 'openai', 'google']);
   });
 
-  it('passes on exactly two APPROVE among three electors', () => {
+  it('records two APPROVE with one REJECT as REJECT — a checker objected', () => {
     const result = tally(trio('APPROVE', 'APPROVE', 'REJECT'));
-    assert.strictEqual(result.verdict, VERDICT.PASSAGE);
+    assert.strictEqual(result.verdict, VERDICT.REJECT);
     assert.strictEqual(result.approveCount, 2);
     assert.strictEqual(result.rejectCount, 1);
+    assert.strictEqual(result.passed, false);
   });
 
   it('counts ABSTAIN away from passage so two APPROVE still pass', () => {
@@ -77,16 +81,16 @@ describe('position-tally rules', () => {
     assert.strictEqual(result.passed, false);
   });
 
-  it('deadlocks a mixed trio below the threshold', () => {
+  it('records a mixed trio with a REJECT as REJECT, not DEADLOCK', () => {
     const result = tally(trio('APPROVE', 'REJECT', 'ABSTAIN'));
-    assert.strictEqual(result.verdict, VERDICT.DEADLOCK);
+    assert.strictEqual(result.verdict, VERDICT.REJECT);
     assert.strictEqual(result.approveCount, 1);
     assert.strictEqual(result.rejectCount, 1);
     assert.strictEqual(result.abstainCount, 1);
   });
 
-  it('deadlocks three REJECT and three ABSTAIN — no panel REJECTED verdict', () => {
-    assert.strictEqual(tally(trio('REJECT', 'REJECT', 'REJECT')).verdict, VERDICT.DEADLOCK);
+  it('rejects three REJECT and deadlocks three ABSTAIN', () => {
+    assert.strictEqual(tally(trio('REJECT', 'REJECT', 'REJECT')).verdict, VERDICT.REJECT);
     assert.strictEqual(tally(trio('ABSTAIN', 'ABSTAIN', 'ABSTAIN')).verdict, VERDICT.DEADLOCK);
   });
 
@@ -133,6 +137,84 @@ describe('position-tally rules', () => {
   });
 });
 
+describe('position-tally critical quorum and per-seat counting', () => {
+  it('does not pass a critical unit on two approvals — one below CRITICAL_QUORUM', () => {
+    const result = tally({
+      ballots: [ballot('anthropic', 'APPROVE'), ballot('openai', 'APPROVE')],
+      critical: true,
+    });
+    assert.strictEqual(result.passed, false);
+    assert.strictEqual(result.verdict, VERDICT.NOT_PANEL);
+    assert.strictEqual(result.threshold, CRITICAL_QUORUM);
+    assert.strictEqual(result.approveCount, 2);
+  });
+
+  it('passes a critical unit on exactly three counted approvals across two distinct vendors', () => {
+    const result = tally({
+      ballots: [ballot('anthropic', 'APPROVE'), ballot('openai', 'APPROVE'), ballot('openai', 'APPROVE')],
+      critical: true,
+    });
+    assert.strictEqual(result.verdict, VERDICT.PASSAGE);
+    assert.strictEqual(result.passed, true);
+    assert.strictEqual(result.approveCount, 3);
+    assert.strictEqual(result.approvingVendors, 2);
+  });
+
+  it('derives criticality from the unit class through panel-routing', () => {
+    const twoApprovals = [ballot('anthropic', 'APPROVE'), ballot('openai', 'APPROVE')];
+    assert.strictEqual(tally({ ballots: twoApprovals, unitClass: 'security-sensitive' }).passed, false);
+    assert.strictEqual(tally({ ballots: twoApprovals, unitClass: 'standard-feature' }).passed, true);
+  });
+
+  it('still passes a non-critical unit on exactly two approvals', () => {
+    const result = tally([ballot('anthropic', 'APPROVE'), ballot('openai', 'APPROVE')]);
+    assert.strictEqual(result.verdict, VERDICT.PASSAGE);
+    assert.strictEqual(result.threshold, ORDINARY_QUORUM);
+    assert.strictEqual(result.critical, false);
+  });
+
+  it('counts a second seat on an already-voting vendor toward the threshold', () => {
+    const result = tally({
+      ballots: [ballot('openai', 'APPROVE'), ballot('openai', 'APPROVE'), ballot('google', 'APPROVE')],
+      critical: true,
+    });
+    assert.strictEqual(result.verdict, VERDICT.PASSAGE);
+    assert.strictEqual(result.counted.length, 3);
+    assert.strictEqual(result.approvingVendors, 2);
+  });
+
+  it('still measures the vendor floor across distinct vendors at quorum', () => {
+    const result = tally({
+      ballots: [ballot('openai', 'APPROVE'), ballot('openai', 'APPROVE'), ballot('openai', 'APPROVE')],
+      critical: true,
+    });
+    assert.strictEqual(result.verdict, VERDICT.DEADLOCK);
+    assert.strictEqual(result.approveCount, 3);
+    assert.strictEqual(result.approvingVendors, 1);
+    assert.strictEqual(result.passed, false);
+  });
+
+  it('records a single REJECT with one approval as REJECT, not DEADLOCK or NOT_PANEL', () => {
+    const result = tally([ballot('anthropic', 'APPROVE'), ballot('openai', 'REJECT')]);
+    assert.strictEqual(result.verdict, VERDICT.REJECT);
+    assert.strictEqual(result.passed, false);
+  });
+
+  it('records a lone REJECT ballot as REJECT — an objection, not a failure to convene', () => {
+    const result = tally([ballot('anthropic', 'REJECT')]);
+    assert.strictEqual(result.verdict, VERDICT.REJECT);
+    assert.strictEqual(result.rejectCount, 1);
+    assert.strictEqual(result.passed, false);
+  });
+
+  it('still reports NOT_PANEL for a unit with no ballots at all', () => {
+    const result = tally({ ballots: [], critical: true });
+    assert.strictEqual(result.verdict, VERDICT.NOT_PANEL);
+    assert.strictEqual(result.reason, 'quorumFloor');
+    assert.strictEqual(result.degraded, true);
+  });
+});
+
 describe('position-tally degraded duo (cursor-cli Claude fail)', () => {
   it('passes when both remaining electors APPROVE and ignores a Claude APPROVE', () => {
     const result = tally({
@@ -159,12 +241,12 @@ describe('position-tally degraded duo (cursor-cli Claude fail)', () => {
     assert.strictEqual(result.abstainCount, 1);
   });
 
-  it('deadlocks a degraded duo on APPROVE + REJECT', () => {
+  it('records a degraded duo on APPROVE + REJECT as REJECT', () => {
     const result = tally({
       ballots: [ballot('openai', 'APPROVE'), ballot('google', 'REJECT')],
       degradedVendor: 'anthropic',
     });
-    assert.strictEqual(result.verdict, VERDICT.DEADLOCK);
+    assert.strictEqual(result.verdict, VERDICT.REJECT);
     assert.strictEqual(result.rejectCount, 1);
   });
 
@@ -210,7 +292,7 @@ describe('position-tally vote roles and recusal', () => {
     const result = tally([
       { vendor: 'anthropic', role: 'implement', position: 'APPROVE' },
       { vendor: 'openai', role: 'review', position: 'APPROVE' },
-      { vendor: 'google', role: 'verify', position: 'REJECT' },
+      { vendor: 'google', role: 'verify', position: 'ABSTAIN' },
     ]);
     assert.strictEqual(result.verdict, VERDICT.PASSAGE);
     assert.strictEqual(result.approveCount, 2);
@@ -263,11 +345,7 @@ describe('position-tally vote roles and recusal', () => {
     );
   });
 
-  it('rejects a duplicate elector, unknown position, and unknown role', () => {
-    assert.throws(
-      () => tally([ballot('openai', 'APPROVE'), ballot('openai', 'REJECT')]),
-      /duplicate elector: openai/,
-    );
+  it('rejects an unknown position and unknown role', () => {
     assert.throws(() => tally([ballot('openai', 'YES')]), /invalid position/);
     assert.throws(() => tally([ballot('openai', 'APPROVE', 'scribe')]), /invalid role/);
   });
@@ -275,15 +353,23 @@ describe('position-tally vote roles and recusal', () => {
 
 describe('position-tally CLI', () => {
   it('exits 0 and prints PASSAGE for a passing trio', () => {
-    const r = runCli(['--ballots', JSON.stringify(trio('APPROVE', 'APPROVE', 'REJECT')), '--json']);
+    const r = runCli(['--ballots', JSON.stringify(trio('APPROVE', 'APPROVE', 'ABSTAIN')), '--json']);
     assert.strictEqual(r.status, 0, r.stderr);
     const out = JSON.parse(r.stdout);
     assert.strictEqual(out.verdict, 'PASSAGE');
     assert.strictEqual(out.approveCount, 2);
   });
 
+  it('exits 1 and prints REJECT when any counted ballot rejects', () => {
+    const r = runCli(['--ballots', JSON.stringify(trio('APPROVE', 'APPROVE', 'REJECT')), '--json']);
+    assert.strictEqual(r.status, 1);
+    const out = JSON.parse(r.stdout);
+    assert.strictEqual(out.verdict, 'REJECT');
+    assert.strictEqual(out.passed, false);
+  });
+
   it('exits 1 for DEADLOCK', () => {
-    const r = runCli(['--ballots', JSON.stringify(trio('APPROVE', 'ABSTAIN', 'REJECT'))]);
+    const r = runCli(['--ballots', JSON.stringify(trio('APPROVE', 'ABSTAIN', 'ABSTAIN'))]);
     assert.strictEqual(r.status, 1);
     assert.match(r.stdout, /verdict: DEADLOCK/);
   });
