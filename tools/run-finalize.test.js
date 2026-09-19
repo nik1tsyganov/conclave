@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const { completeSyntheticDispatch, createSealedRun, fakeVendor } = require('./test-fixtures.js');
 const { runDispatch } = require('./dispatch-run.js');
+const { captureEvidence } = require('./run-drive.js');
 const { finalizeRun, inspectRun, tallyUnit } = require('./run-finalize.js');
 
 function panelRun(t, options = {}) {
@@ -34,6 +35,29 @@ test('execution success is distinct from a rejected review', async (t) => {
   const run = panelRun(t); await complete(run, 'REJECT');
   const result = finalizeRun(run.runDir);
   assert.equal(result.executionStatus, 'PASS'); assert.equal(result.approvalStatus, 'FAIL'); assert.equal(result.ok, false);
+});
+
+// The check result below comes from the real captured artifact: captureEvidence runs the
+// plan-named check host-side, exactly as the driver does after the implement phase, and
+// finalize reads the exit line back out of the evidence directory the seats were bound to.
+test('a unit whose own check failed does not land even when every checker approved', async (t) => {
+  const run = createSealedRun(t, [
+    { unitId: 'u1', check: { command: 'exit 7' } },
+    { unitId: 'u1', role: 'verify', class: 'test-verification', vendor: 'anthropic', model: 'opus', effort: 'medium', authorVendor: 'openai', evidenceForUnit: true },
+    { unitId: 'u1', role: 'review', class: 'review-adversarial', vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', authorVendor: 'openai', evidenceForUnit: true },
+  ], { conclaveConvened: true });
+  await completeSyntheticDispatch({ ...run.opts, dispatchId: 'd1' }, fakeVendor());
+  const captured = captureEvidence({ runDir: run.runDir });
+  assert.equal(captured.results[0].exit, 7);
+  for (const row of run.dispatches.slice(1)) await completeSyntheticDispatch({ ...run.opts, dispatchId: row.dispatchId }, fakeVendor());
+  const result = finalizeRun(run.runDir);
+  assert.equal(result.units[0].status, 'FAIL');
+  assert.match(result.units[0].reason, /own check did not pass|CHECK_FAILED/);
+  assert.equal(result.executionStatus, 'PASS', 'the seats executed; the landing is what fails');
+  assert.equal(result.ok, false);
+  const decision = tallyUnit(inspectRun(run.runDir), 'u1');
+  assert.equal(decision.verdict, 'CHECK_FAILED');
+  assert.equal(decision.approveCount, 2, 'the approvals are still counted and still reported');
 });
 
 test('a rejecting verifier prevents review and approval', async (t) => {

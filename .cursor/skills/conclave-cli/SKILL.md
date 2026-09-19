@@ -53,7 +53,7 @@ Claude implementation retains `--permission-mode bypassPermissions` with `--safe
 
 Review/verify entries require correct `authorVendor` provenance and another vendor. Ordinary implementation approval needs foreign verification and review, with every review returning native APPROVE.
 
-Critical `requiresPanel` classes need `conclaveConvened: true` and two distinct foreign review/verify vendors on the same unit and worktree. Critical approval requires at least two eligible native APPROVE positions after author recusal.
+Critical `requiresPanel` classes need `conclaveConvened: true` and two distinct foreign review/verify vendors on the same unit and worktree. Critical approval requires at least three counted native APPROVE seats after author recusal, spanning at least two distinct vendors.
 
 Astra requires `escalation: true` and a reason with at least 16 characters and three distinct words. Greater capability never increases write scope.
 

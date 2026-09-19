@@ -36,6 +36,10 @@
  * elector cast a counted POSITION, or the counted ballots below quorum
  * carry no rejection, verdict is NOT_PANEL with degraded=true and reason
  * quorumFloor — fail closed, not DEADLOCK. Else DEADLOCK.
+ * Own-check gate (shared with panel-rules.verdict): an optional checkPassed
+ * input. When it is false and the ballots would otherwise pass, the verdict
+ * is CHECK_FAILED and the unit does not land; the counts are still reported.
+ * An absent checkPassed means the unit named no check — never failing closed.
  *
  * Electors are the three vendors (anthropic / openai / google). The Grok
  * arbiter never votes. implementer / reviewer / verifier are gate roles
@@ -79,6 +83,7 @@ const VERDICT = Object.freeze({
   REJECT: 'REJECT',
   DEADLOCK: 'DEADLOCK',
   NOT_PANEL: 'NOT_PANEL',
+  CHECK_FAILED: 'CHECK_FAILED',
 });
 
 class TallyError extends Error {
@@ -261,6 +266,14 @@ function tally(input) {
     verdict = VERDICT.DEADLOCK;
     reason = duoDegraded ? 'degraded-claude' : null;
   }
+  // The unit's own check has the last word on landing and only on landing, mirroring
+  // panel-rules.verdict: the ballots are still counted and still reported, because what the
+  // seats said about a failing unit is the most useful thing the host can show. An absent
+  // checkPassed means the unit named no check, not that one failed.
+  if (options.checkPassed === false && verdict === VERDICT.PASSAGE) {
+    verdict = VERDICT.CHECK_FAILED;
+    reason = 'checkFailed';
+  }
   const passed = verdict === VERDICT.PASSAGE;
 
   return {
@@ -394,6 +407,7 @@ function loadInput(parsed) {
     authorVendor: parsed.authorVendor || loaded.authorVendor,
     critical: parsed.critical || loaded.critical === true,
     unitClass: loaded.unitClass,
+    checkPassed: loaded.checkPassed,
     json: parsed.json,
   };
 }
@@ -425,7 +439,9 @@ function usage() {
     'Passage: >=quorum counted APPROVE seats (2 ordinary, 3 with --critical) across >=2 distinct',
     'vendors. ABSTAIN never toward passage. One REJECT => DEADLOCK (go again); two => REJECT.',
     'No counted ballots, or below quorum with no rejection => NOT_PANEL degraded=true reason=quorumFloor.',
-    'Else DEADLOCK. Electors: anthropic | openai | google. Arbiter cannot vote.',
+    'Else DEADLOCK. checkPassed:false in a JSON object input turns a would-be PASSAGE into',
+    'CHECK_FAILED; the ballots are still counted and reported. Electors: anthropic | openai |',
+    'google. Arbiter cannot vote.',
     'Exit 0 PASSAGE, 1 REJECT, DEADLOCK or NOT_PANEL (fail closed), 2 invalid input.',
   ].join('\n');
 }

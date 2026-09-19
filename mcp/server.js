@@ -34,8 +34,8 @@ const ROOT = path.resolve(__dirname, '..');
 const TOOLS_DIR = path.join(ROOT, 'tools');
 
 const { CLI_HOST_MODES, HOST_MODES, ROLES, VENDORS, validateDispatchRow } = require(path.join(TOOLS_DIR, 'dispatch-schema.js'));
-// The panel's own rules, not the older elector count in `position-tally.js`: that one answers
-// a different question, about a bench of vendors rather than one unit's three seats.
+// The panel's own rules. `position-tally.js` answers a different question, about a bench of
+// vendors with recusals rather than one unit's seats; both count per seat under a two-vendor floor.
 const panelRules = require(path.join(TOOLS_DIR, 'panel-rules.js'));
 const panelRouting = require(path.join(TOOLS_DIR, 'panel-routing.js'));
 const panelBlock = require(path.join(TOOLS_DIR, 'panel-block.js'));

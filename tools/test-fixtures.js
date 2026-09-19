@@ -106,8 +106,28 @@ function createSealedRun(t, entries = [{}], options = {}) {
 function fakeVendor(action = () => {}, response = 'ACK fixture\nPOSITION: APPROVE\nDone.') {
   let calls = 0;
   const transcripts = new Map();
+  // A checking seat bound to evidence directories must produce a launch that GRANTS them, in
+  // the vendor's own syntax: evidence-read-access validates the argv against the sealed entry,
+  // and a fake that skips the grants cannot drive a checking seat at all. Mirrors the shapes in
+  // cli-adapters.js — per-vendor, because a read grant does not look the same on each CLI.
+  const evidenceArgs = (opts) => {
+    const dirs = opts.evidenceReadDirs || [];
+    if (!dirs.length) return [];
+    if (opts.vendor === 'openai') {
+      const filesystem = dirs.map(dir => `${JSON.stringify(dir.replaceAll('\\', '/'))} = "read"`).join(', ');
+      return ['-c', `permissions.conclave_evidence_read={ extends = ":read-only", filesystem = { ${filesystem} }, network = { enabled = false } }`];
+    }
+    const granted = [...new Set([opts.cwd, path.dirname(opts.briefPath), opts.skillRoot,
+      path.dirname(opts.seatContractPath), ...dirs])];
+    return granted.flatMap(dir => ['--add-dir', dir]);
+  };
   const buildLaunch = (opts) => ({ ...opts, vendor: opts.vendor, role: opts.role, binary: process.execPath,
-    args: opts.vendor === 'anthropic' ? ['--json-schema', JSON.stringify(require('./vendor-native.js').CLAUDE_RESPONSE_SCHEMA)] : [],
+    args: [
+      ...(opts.vendor === 'anthropic' ? ['--json-schema', JSON.stringify(require('./vendor-native.js').CLAUDE_RESPONSE_SCHEMA)] : []),
+      ...evidenceArgs(opts),
+      ...(opts.vendor === 'google' && (opts.evidenceReadDirs || []).length ? ['--sandbox'] : []),
+      ...(opts.vendor === 'anthropic' && (opts.evidenceReadDirs || []).length ? ['--permission-mode', 'dontAsk', '--allowedTools', 'Read,Glob,Grep'] : []),
+    ],
     requestedSandbox: opts.requestedSandbox || (opts.role === 'implement' ? 'workspace-write' : 'read-only') });
   const runLaunch = async (launch) => {
     calls++;
