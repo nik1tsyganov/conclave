@@ -65,4 +65,30 @@ function validateEvidenceReadLaunch(launch, entry, dirs, context) {
   if (entry.vendor === 'anthropic' && (launch.args.includes('--dangerously-skip-permissions') || launch.args.includes('--tools') || ['--permission-mode', '--allowedTools'].some((flag, index) => launch.args.filter(arg => arg === flag).length !== 1 || launch.args[launch.args.indexOf(flag) + 1] !== ['dontAsk', 'Read,Glob,Grep'][index]))) fail('Claude checking access must remain read-only');
 }
 
-module.exports = { validateEvidenceReadDirs, snapshotEvidenceReads, validateEvidenceReadLaunch };
+// OBSERVATION of a transcript, not proof of comprehension: a seat can open a file
+// and still not think about it, and a seat can name a file in prose without opening
+// it. The value is that a zero here means it certainly did not read it. Never
+// throws: a missing directory, an unreadable file or an absent capture yields
+// seen: false and a totalCount reflecting what could be found, so this can never
+// fail a run.
+function observeEvidenceReads({ captureText, dirs } = {}) {
+  const text = typeof captureText === 'string' ? captureText : '';
+  const files = [];
+  for (const dir of Array.isArray(dirs) ? dirs : []) {
+    let names;
+    try { names = fs.readdirSync(dir); } catch { continue; }
+    for (const name of names) {
+      const file = path.join(dir, name);
+      try { if (!fs.statSync(file).isFile()) continue; } catch { continue; }
+      let match = null;
+      if (text.includes(file)) match = 'path';
+      // Basename fallback only for distinctive names (diff.txt, test-output.txt):
+      // a short or extensionless name matches prose too cheaply to mean anything.
+      else if (name.length >= 8 && path.extname(name) && text.includes(name)) match = 'name';
+      files.push({ path: file, name, seen: match !== null, match });
+    }
+  }
+  return { files, seenCount: files.filter(file => file.seen).length, totalCount: files.length };
+}
+
+module.exports = { validateEvidenceReadDirs, snapshotEvidenceReads, validateEvidenceReadLaunch, observeEvidenceReads };

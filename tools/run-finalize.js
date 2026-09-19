@@ -13,7 +13,7 @@ const { tally } = require('./position-tally.js');
 const { canonicalPlainPath, pathsOverlap } = require('./runtime-paths.js');
 const { INSTRUCTION_READ_PROTOCOL, verifyInstructionReadEvidence } = require('./instruction-read-evidence.js');
 const { buildSeatProfile, loadProfiles } = require('./seat-policy.js');
-const { validateEvidenceReadDirs, snapshotEvidenceReads, validateEvidenceReadLaunch } = require('./evidence-read-access.js');
+const { validateEvidenceReadDirs, snapshotEvidenceReads, validateEvidenceReadLaunch, observeEvidenceReads } = require('./evidence-read-access.js');
 const { resolveVaultRoot } = require('./conclave-vault.js');
 const { linkRunToVault } = require('./conclave-vault-link.js');
 
@@ -424,6 +424,11 @@ function readJevTally(run, unitId) {
   if (!fs.existsSync(file)) return null;
   try { const t = JSON.parse(fs.readFileSync(file, 'utf8')); return { verdict: t.verdict, counts: t.counts || null, score: t.jev?.score ?? null, confidence: t.jev?.confidence ?? null, flags: t.flags || [], degraded: t.degraded === true }; } catch { return null; }
 }
+// Telemetry accessor for the per-seat native capture; any failure yields null so
+// the observation below can never affect finalization.
+function readCaptureText(execution) {
+  try { return execution ? fs.readFileSync(path.join(execution.state.evidenceDir, 'capture.txt'), 'utf8') : null; } catch { return null; }
+}
 function buildUnitRows(run, result, rows) {
   return result.units.map((unit) => {
     const entries = run.plan.dispatches.filter((entry) => entry.unitId === unit.unitId);
@@ -435,7 +440,10 @@ function buildUnitRows(run, result, rows) {
       const outcome = result.outcomes.find((o) => o.dispatchId === entry.dispatchId);
       return { dispatchId: entry.dispatchId, role: entry.role, vendor: entry.vendor, model: entry.model, modelObserved: row?.modelObserved || null, status: outcome?.status || 'NOT_RUN',
         tokens: row?.vendorSideTokens ?? null, durationMs: execution ? Math.max(0, Date.parse(execution.state.completedAt) - Date.parse(execution.state.startedAt)) : null,
-        position: execution && ['verify', 'review'].includes(entry.role) ? (() => { try { return nativePosition(execution.response); } catch { return null; } })() : null };
+        position: execution && ['verify', 'review'].includes(entry.role) ? (() => { try { return nativePosition(execution.response); } catch { return null; } })() : null,
+        // Telemetry only: whether the seat's transcript mentions the evidence files it
+        // was granted. Nothing downstream branches on this field.
+        evidenceRead: entry.evidenceReadDirs?.length ? observeEvidenceReads({ captureText: readCaptureText(execution), dirs: entry.evidenceReadDirs }) : null };
     });
     let panel = null;
     try { const t = tallyUnit(run, unit.unitId); panel = { verdict: t.verdict, passed: t.passed, approve: t.approveCount, reject: t.rejectCount, abstain: t.abstainCount }; } catch (error) { panel = { verdict: 'NOT_PANEL', reason: error.message }; }

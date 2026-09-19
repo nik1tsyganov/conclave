@@ -6,7 +6,7 @@ const path = require('node:path');
 const test = require('node:test');
 const { temporary, createSealedRun, fakeVendor } = require('./test-fixtures.js');
 const { buildLaunch } = require('./cli-adapters.js');
-const { validateEvidenceReadDirs, snapshotEvidenceReads, validateEvidenceReadLaunch } = require('./evidence-read-access.js');
+const { validateEvidenceReadDirs, snapshotEvidenceReads, validateEvidenceReadLaunch, observeEvidenceReads } = require('./evidence-read-access.js');
 const { sealPlan, readSealedRun } = require('./plan-seal.js');
 const { runDispatch } = require('./dispatch-run.js');
 const { inspectRun } = require('./run-finalize.js');
@@ -295,3 +295,50 @@ for (const vendor of ['google', 'anthropic']) {
     assert.equal(native.calls(), 0);
   });
 }
+
+function observeFixture(t) {
+  const root = temporary(t, 'conclave-evidence-observe-');
+  const evidence = path.join(root, 'evidence'); fs.mkdirSync(evidence);
+  fs.writeFileSync(path.join(evidence, 'diff.txt'), 'diff body');
+  fs.writeFileSync(path.join(evidence, 'test-output.txt'), 'ok');
+  return evidence;
+}
+
+test('observeEvidenceReads counts an absolute path mention as a path match', t => {
+  const evidence = observeFixture(t);
+  const seen = observeEvidenceReads({ captureText: `I opened ${path.join(evidence, 'diff.txt')} and checked it`, dirs: [evidence] });
+  assert.equal(seen.totalCount, 2);
+  assert.equal(seen.seenCount, 1);
+  const row = seen.files.find(file => file.name === 'diff.txt');
+  assert.deepEqual({ path: row.path, name: row.name, seen: row.seen, match: row.match }, { path: path.join(evidence, 'diff.txt'), name: 'diff.txt', seen: true, match: 'path' });
+  assert.equal(seen.files.find(file => file.name === 'test-output.txt').seen, false);
+});
+
+test('observeEvidenceReads falls back to a distinctive basename as a name match', t => {
+  const evidence = observeFixture(t);
+  const seen = observeEvidenceReads({ captureText: 'the diff.txt shows no other changes', dirs: [evidence] });
+  assert.equal(seen.seenCount, 1);
+  const row = seen.files.find(file => file.name === 'diff.txt');
+  assert.equal(row.seen, true);
+  assert.equal(row.match, 'name');
+});
+
+test('observeEvidenceReads records an unmentioned file as unseen', t => {
+  const evidence = observeFixture(t);
+  const seen = observeEvidenceReads({ captureText: 'POSITION: APPROVE\nnothing else to say', dirs: [evidence] });
+  assert.equal(seen.totalCount, 2);
+  assert.equal(seen.seenCount, 0);
+  assert.ok(seen.files.every(file => file.seen === false && file.match === null));
+});
+
+test('observeEvidenceReads never throws on a missing directory or absent capture', t => {
+  const evidence = observeFixture(t);
+  const missing = observeEvidenceReads({ captureText: 'diff.txt', dirs: [path.join(evidence, 'gone')] });
+  assert.deepEqual(missing, { files: [], seenCount: 0, totalCount: 0 });
+  for (const captureText of ['', null, undefined]) {
+    const seen = observeEvidenceReads({ captureText, dirs: [evidence] });
+    assert.equal(seen.totalCount, 2);
+    assert.equal(seen.seenCount, 0);
+    assert.ok(seen.files.every(file => file.seen === false && file.match === null));
+  }
+});
