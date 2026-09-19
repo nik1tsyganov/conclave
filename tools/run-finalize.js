@@ -10,6 +10,7 @@ const { ATTESTATION_PROTOCOL, AWAITING_ATTESTATION, assertPlainPath, compareWork
 const { verifyNativeProof, verifyProof } = require('./cli-proof.js');
 const { CLAUDE_RESPONSE_PROTOCOL, finalResponse, validateClaudeResponseLaunch } = require('./vendor-native.js');
 const { tally } = require('./position-tally.js');
+const { isCritical } = require('./panel-routing.js');
 const { canonicalPlainPath, pathsOverlap } = require('./runtime-paths.js');
 const { INSTRUCTION_READ_PROTOCOL, verifyInstructionReadEvidence } = require('./instruction-read-evidence.js');
 const { buildSeatProfile, loadProfiles } = require('./seat-policy.js');
@@ -324,19 +325,34 @@ function tallyUnit(run, unitId) {
   if (!planned.length) throw new Error('unit absent from sealed plan');
   const authorVendor = planned.find((entry) => entry.role === 'implement')?.vendor || planned.find((entry) => entry.authorVendor)?.authorVendor;
   if (!authorVendor) throw new Error('panel author provenance is missing');
-  const ballotsByVendor = new Map();
+  const ballots = [];
+  const positionByVendor = new Map();
+  const seenByVendorRole = new Set();
   for (const execution of run.executions.filter(({ entry }) => entry.unitId === unitId && ['review', 'verify'].includes(entry.role))) {
     const current = snapshotWorkspace(execution.entry.cwd);
     if (!compareWorkspace(execution.after, current, []).ok) throw new Error('worktree changed after panel evidence');
     const ballot = { vendor: execution.entry.vendor, position: nativePosition(execution.response), role: execution.entry.role,
       evidenceRead: execution.entry.evidenceReadDirs?.length ? observeEvidenceReads({ captureText: readCaptureText(execution), dirs: execution.entry.evidenceReadDirs }) : null };
-    const prior = ballotsByVendor.get(ballot.vendor);
-    if (prior && prior.position !== ballot.position) throw new Error(`conflicting positions from ${ballot.vendor}`);
-    // Every checking row was validated above; agreeing rows still provide only one vendor vote.
-    if (!prior) ballotsByVendor.set(ballot.vendor, ballot);
+    const prior = positionByVendor.get(ballot.vendor);
+    if (prior && prior !== ballot.position) throw new Error(`conflicting positions from ${ballot.vendor}`);
+    positionByVendor.set(ballot.vendor, ballot.position);
+    // One vote per vendor per ROLE, not one per vendor. Two concurrent verifiers on a vendor
+    // are that vendor's single answer to the verify question and collapse to one ballot. Its
+    // reviewer is a separate question and counts separately, which is what makes a critical
+    // quorum of three reachable with two vendors: panel-routing deliberately gives a critical
+    // unit a third checker by having its verifier read the unit again as a reviewer.
+    if (seenByVendorRole.has(`${ballot.vendor}\u0000${ballot.role}`)) continue;
+    seenByVendorRole.add(`${ballot.vendor}\u0000${ballot.role}`);
+    ballots.push(ballot);
   }
-  const ballots = [...ballotsByVendor.values()];
-  return { unitId, authorVendor, ...tally({ ballots, authorVendor }) };
+  // isCritical normalises through classNamed, which REFUSES a class panel-routing cannot seat
+  // — correct at seal time, where an unknown class must never be silently downgraded, but a
+  // tally must not crash on a legitimate matrix class that simply has no panel seating (for
+  // example review-adversarial). The seal has already refused anything illegitimate long
+  // before a tally runs, so a class outside that table is not a critical unit.
+  let critical = false;
+  try { critical = isCritical(planned[0].class); } catch { critical = false; }
+  return { unitId, authorVendor, ...tally({ ballots, authorVendor, critical }) };
 }
 
 function assessRun(run) {

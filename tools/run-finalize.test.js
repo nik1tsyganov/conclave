@@ -61,11 +61,14 @@ test('missing and corrupt terminal evidence cannot activate', async (t) => {
   assert.equal(result.outcomes[1].status, 'INVALID');
 });
 
-test('critical class requires independent planned vendors and two native votes', async (t) => {
+// The name this test used to carry — "two native votes" — was the defect: a critical class
+// carries CRITICAL_QUORUM = 3, and a unit that lands on two approvals has had exactly the
+// scrutiny an ordinary one gets. Two seats are necessary and not sufficient.
+test('critical class requires a convened panel and is not satisfied by two votes', async (t) => {
   assert.throws(() => createSealedRun(t, [{ class: 'security-sensitive', model: 'gpt-5.6-sol', effort: 'xhigh' }]), /requires a panel/);
   const run = panelRun(t, { author: { class: 'security-sensitive', model: 'gpt-5.6-sol', effort: 'xhigh' } });
   await complete(run);
-  assert.equal(finalizeRun(run.runDir).ok, true);
+  assert.equal(finalizeRun(run.runDir).ok, false);
 });
 
 test('ballots cannot be supplied by the arbiter or inferred from prose', async (t) => {

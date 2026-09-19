@@ -25,6 +25,9 @@ const crypto = require('node:crypto');
 
 const ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
 const DEFAULT_MODEL = 'jev-latest';
+// The default alias resolves to this version; calibrated gates depend on it.
+// The API response carries the resolved version in its `model` field.
+const PINNED_MODEL = 'jev-1.13.0';
 const RETRY_STATUS = new Set([429, 529]);
 const MAX_ATTEMPTS = 3;
 const BACKOFF_MS = 500;
@@ -85,6 +88,10 @@ async function systemOne({
   let parsed = null;
   try { parsed = JSON.parse(text); } catch { parsed = null; }
 
+  if (parsed && parsed.model && parsed.model !== PINNED_MODEL) {
+    process.stderr.write(`warning: resolved model "${parsed.model}" differs from pinned "${PINNED_MODEL}"; calibrated gates must be re-measured\n`);
+  }
+
   if (provenancePath) {
     const row = {
       ts: new Date().toISOString(),
@@ -103,4 +110,4 @@ async function systemOne({
   return { ok: true, answers: parsed.answers, usage: parsed.usage || null, model: parsed.model || model };
 }
 
-module.exports = { systemOne, ENDPOINT, DEFAULT_MODEL, MAX_ATTEMPTS, sha256, redact };
+module.exports = { systemOne, ENDPOINT, DEFAULT_MODEL, PINNED_MODEL, RETRY_STATUS, MAX_ATTEMPTS, sha256, redact };

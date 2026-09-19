@@ -11,12 +11,27 @@
  *   agents/gemini-reviewer.md + agents/gemini-verifier.md (protocol 6 scope).
  * conclave-mode SKILL lives at ~/.claude and is not vendored here.
  *
- * Passage: >=2 APPROVE among eligible electors.
- * ABSTAIN never counts toward passage.
- * Quorum floor (shared with CONCLAVE tally-panel): when fewer than 2
- * eligible electors cast a counted POSITION, verdict is NOT_PANEL with
- * degraded=true and reason quorumFloor — fail closed, not DEADLOCK.
- * Else DEADLOCK. There is no panel REJECTED verdict.
+ * The counting rules come from tools/panel-rules.js, the canonical
+ * implementation: the quorum constants are imported from there, not
+ * redeclared, so the two can never drift again.
+ *
+ * Passage: >= quorum counted APPROVE ballots, where quorum is
+ * ORDINARY_QUORUM (2) for a normal unit and CRITICAL_QUORUM (3) for a
+ * critical one, and the approving ballots span at least two distinct
+ * vendors. ABSTAIN never counts toward passage.
+ * Ballots are counted PER SEAT, not per vendor: a second seat on a vendor
+ * that has already voted contributes its own vote toward the threshold,
+ * while the two-distinct-vendor floor still applies to the approving set.
+ * That is what makes a critical quorum of three reachable with two
+ * vendors — panel-routing seats a critical unit's verifier twice, in a
+ * session of its own, for exactly this reason.
+ * Any counted REJECT is a REJECT verdict, whatever the approval count: a
+ * checker that objects has refused to let the work land, which is a
+ * different fact from a panel that could not convene.
+ * Quorum floor (shared with CONCLAVE tally-panel): when no eligible
+ * elector cast a counted POSITION, or the counted ballots below quorum
+ * carry no rejection, verdict is NOT_PANEL with degraded=true and reason
+ * quorumFloor — fail closed, not DEADLOCK. Else DEADLOCK.
  *
  * Electors are the three vendors (anthropic / openai / google). The Grok
  * arbiter never votes. implementer / reviewer / verifier are gate roles
@@ -32,6 +47,8 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { CRITICAL_QUORUM, ORDINARY_QUORUM } = require('./panel-rules.js');
+const { isCritical } = require('./panel-routing.js');
 
 const ELECTORS = Object.freeze(['anthropic', 'openai', 'google']);
 const POSITIONS = Object.freeze(['APPROVE', 'ABSTAIN', 'REJECT']);
@@ -52,11 +69,10 @@ const FORBIDDEN_ELECTORS = Object.freeze([
   'camerlengo-8',
   'lead',
 ]);
-const PASSAGE_THRESHOLD = 2;
-const QUORUM_FLOOR = 2;
 const DEGRADED_VENDOR = 'anthropic';
 const VERDICT = Object.freeze({
   PASSAGE: 'PASSAGE',
+  REJECT: 'REJECT',
   DEADLOCK: 'DEADLOCK',
   NOT_PANEL: 'NOT_PANEL',
 });
@@ -125,16 +141,6 @@ function normalizeBallot(raw) {
   return { elector, position, role };
 }
 
-function uniqueElectors(ballots) {
-  const seen = new Set();
-  for (const ballot of ballots) {
-    if (seen.has(ballot.elector)) {
-      throw new TallyError(`duplicate elector: ${ballot.elector}`);
-    }
-    seen.add(ballot.elector);
-  }
-}
-
 function resolveEligible(options) {
   const ineligible = new Map();
 
@@ -171,8 +177,15 @@ function tally(input) {
     throw new TallyError('ballots must be an array');
   }
 
+  // Criticality comes from the unit's class through panel-routing's isCritical, the same
+  // normalisation routing used to seat the unit; a caller may also pass the boolean directly.
+  let critical = options.critical === true;
+  if (options.unitClass !== undefined && options.unitClass !== null) {
+    critical = isCritical(options.unitClass);
+  }
+  const quorum = critical ? CRITICAL_QUORUM : ORDINARY_QUORUM;
+
   const ballots = options.ballots.map(normalizeBallot);
-  uniqueElectors(ballots);
 
   const { eligible, ineligible } = resolveEligible(options);
   const counted = [];
@@ -210,37 +223,48 @@ function tally(input) {
     }
   }
 
+  // The seats are what is counted; the vendor floor is what stops a panel being a monologue.
+  // Two counted approvals from one vendor are one vendor's opinion twice, so passage requires
+  // two distinct vendors among the approving seats even when the seat count meets quorum.
+  const approvingVendors = new Set(counted.filter((ballot) => ballot.position === 'APPROVE').map((ballot) => ballot.elector));
+
   const missing = eligible.filter((elector) => !counted.some((ballot) => ballot.elector === elector));
   const duoDegraded = [...ineligible.values()].includes('degraded-claude');
-  const quorumMet = counted.length >= QUORUM_FLOOR;
-  const passed = quorumMet && approveCount >= PASSAGE_THRESHOLD;
 
   let verdict;
   let reason = null;
   let degraded = duoDegraded;
-  if (!quorumMet) {
-    // Shared CONCLAVE quorum floor: a seat-down panel is not a panel.
-    // Destructive gates stay fail closed — never PASSAGE, never a false DEADLOCK.
+  if (counted.length === 0 || (counted.length < quorum && rejectCount === 0)) {
+    // Shared CONCLAVE quorum floor: a seat-down panel is not a panel. A counted rejection
+    // is not a missing panel, though — a checker that objected refused the work, and that
+    // is recorded as REJECT below, not as a failure to convene.
     verdict = VERDICT.NOT_PANEL;
     degraded = true;
     reason = 'quorumFloor';
-  } else if (passed) {
+  } else if (rejectCount > 0) {
+    // A rejection stands whatever else the ballots say.
+    verdict = VERDICT.REJECT;
+    reason = duoDegraded ? 'degraded-claude' : null;
+  } else if (approveCount >= quorum && approvingVendors.size >= 2) {
     verdict = VERDICT.PASSAGE;
     reason = duoDegraded ? 'degraded-claude' : null;
   } else {
     verdict = VERDICT.DEADLOCK;
     reason = duoDegraded ? 'degraded-claude' : null;
   }
+  const passed = verdict === VERDICT.PASSAGE;
 
   return {
     verdict,
     degraded,
     reason,
-    threshold: PASSAGE_THRESHOLD,
-    quorumFloor: QUORUM_FLOOR,
+    critical,
+    threshold: quorum,
+    quorumFloor: quorum,
     approveCount,
     abstainCount,
     rejectCount,
+    approvingVendors: approvingVendors.size,
     eligibleElectors: eligible,
     ineligible: [...ineligible.entries()].map(([elector, reason]) => ({ elector, reason })),
     missingElectors: missing,
@@ -264,6 +288,7 @@ function parseArgs(args) {
     degraded: false,
     degradedVendor: undefined,
     authorVendor: undefined,
+    critical: false,
     json: false,
     help: false,
   };
@@ -292,6 +317,8 @@ function parseArgs(args) {
       parsed.degradedVendor = takeValue(args, i);
       parsed.degraded = true;
       i += 1;
+    } else if (arg === '--critical') {
+      parsed.critical = true;
     } else {
       throw new TallyError(`unknown argument ${arg}`);
     }
@@ -356,6 +383,8 @@ function loadInput(parsed) {
     degraded: parsed.degraded || loaded.degraded === true,
     degradedVendor: parsed.degradedVendor || loaded.degradedVendor,
     authorVendor: parsed.authorVendor || loaded.authorVendor,
+    critical: parsed.critical || loaded.critical === true,
+    unitClass: loaded.unitClass,
     json: parsed.json,
   };
 }
@@ -367,6 +396,7 @@ function formatText(result) {
     `verdict: ${result.verdict}`,
     `degraded: ${result.degraded}`,
     `reason: ${result.reason || '-'}`,
+    `critical: ${result.critical}`,
     `approve: ${result.approveCount}`,
     `abstain: ${result.abstainCount}`,
     `reject: ${result.rejectCount}`,
@@ -380,13 +410,14 @@ function formatText(result) {
 
 function usage() {
   return [
-    'Usage: node tools/position-tally.js --ballots \'<json>\' [--degraded] [--author-vendor <vendor>] [--json]',
-    '       node tools/position-tally.js --file <path> [--degraded] [--author-vendor <vendor>] [--json]',
+    'Usage: node tools/position-tally.js --ballots \'<json>\' [--critical] [--degraded] [--author-vendor <vendor>] [--json]',
+    '       node tools/position-tally.js --file <path> [--critical] [--degraded] [--author-vendor <vendor>] [--json]',
     '',
-    'Passage: >=2 APPROVE among eligible electors. ABSTAIN never toward passage.',
-    'Counted eligible ballots < 2 => NOT_PANEL degraded=true reason=quorumFloor. Else DEADLOCK.',
-    'Electors: anthropic | openai | google. Arbiter cannot vote.',
-    'Exit 0 PASSAGE, 1 DEADLOCK or NOT_PANEL (fail closed), 2 invalid input.',
+    'Passage: >=quorum counted APPROVE seats (2 ordinary, 3 with --critical) across >=2 distinct',
+    'vendors. ABSTAIN never toward passage. Any counted REJECT => REJECT.',
+    'No counted ballots, or below quorum with no rejection => NOT_PANEL degraded=true reason=quorumFloor.',
+    'Else DEADLOCK. Electors: anthropic | openai | google. Arbiter cannot vote.',
+    'Exit 0 PASSAGE, 1 REJECT, DEADLOCK or NOT_PANEL (fail closed), 2 invalid input.',
   ].join('\n');
 }
 
@@ -421,8 +452,8 @@ module.exports = {
   POSITIONS,
   GATE_ROLES,
   FORBIDDEN_ELECTORS,
-  PASSAGE_THRESHOLD,
-  QUORUM_FLOOR,
+  ORDINARY_QUORUM,
+  CRITICAL_QUORUM,
   DEGRADED_VENDOR,
   VERDICT,
   TallyError,
