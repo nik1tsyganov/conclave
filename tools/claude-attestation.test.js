@@ -222,7 +222,13 @@ test('missing corrupt or downgraded attestation evidence cannot become a complet
     if (mutation === 'capture') rewriteArtifact(run, 'attestation.json', text => JSON.stringify({ ...JSON.parse(text), captureSha256: '0'.repeat(64) }));
     if (mutation === 'protocol') rewriteArtifact(run, 'launch.json', text => { const value = JSON.parse(text); delete value.attestationProtocol; return JSON.stringify(value); });
     assert.equal(inspectRun(run.runDir).outcomes[0].status, 'INVALID');
-    await assert.rejects(runDispatch(command(run), native));
+    // Pin the rejection reason per mutation: a bare assert.rejects also passes on an unrelated crash.
+    // Deleting the file and changing its bytes are different refusals and must stay so: a
+    // deleted artifact surfaces as ENOENT naming the file, a mutated one as the hash check
+    // catching that committed evidence moved under the receipt.
+    const expected = { missing: /attestation\.json/, hash: /committed evidence changed/,
+      capture: /post-run attestation/, protocol: /attestation protocol/ };
+    await assert.rejects(runDispatch(command(run), native), expected[mutation]);
     assert.equal(native.calls(), 1);
   }
 });

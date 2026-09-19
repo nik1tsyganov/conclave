@@ -185,6 +185,24 @@ test('disjoint write scopes in one worktree seal', t => {
   assert.equal(run.sealed.planId, 'fixture-run');
 });
 
+test('a brief edited after its hash was bound cannot seal', t => {
+  const run = createSealedRun(t);
+  fs.appendFileSync(run.planObject.dispatches[0].brief, '\nchanged after hashing');
+  assert.throws(
+    () => sealPlan({ noJev: 'test fixture', plan: run.planSource, runDir: path.join(run.root, 'rebrief'), availability: run.availability, skillSourceRoot: run.opts.skillSourceRoot }),
+    /brief file\/hash mismatch/,
+  );
+  assert.equal(fs.existsSync(path.join(run.root, 'rebrief')), false);
+});
+
+test('a run directory that already holds a seal cannot be sealed again', t => {
+  const run = createSealedRun(t);
+  assert.throws(
+    () => sealPlan({ noJev: 'test fixture', plan: run.planSource, runDir: run.runDir, availability: run.availability, skillSourceRoot: run.opts.skillSourceRoot }),
+    /already has a sealed plan/,
+  );
+});
+
 test('a single implement unit has no pair to collide with', t => {
   const run = createSealedRun(t, [IMPLEMENT_U1]);
   assert.equal(run.sealed.planId, 'fixture-run');

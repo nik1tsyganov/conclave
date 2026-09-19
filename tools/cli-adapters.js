@@ -19,6 +19,7 @@ const DEFAULTS = Object.freeze({
 });
 const READ_ONLY_ROLES = new Set(['review', 'verify', 'plan', 'research']);
 const OPENAI_SCRATCH_PROTOCOL = 'conclave-openai-readonly-scratch-v1';
+const OPENAI_EVIDENCE_READ_PROFILE = 'conclave_evidence_read';
 
 function roleSandbox(role) {
   if (role === 'implement') return 'workspace-write';
@@ -57,11 +58,21 @@ function openaiScratchEnv(policy) {
   };
 }
 
-function openaiArgs({ role, model, effort, cwd, capturePath }, policy) {
-  const permissionArgs = policy ? [
-    '-c', `default_permissions=${JSON.stringify(policy.profile)}`,
+function openaiArgs({ role, model, effort, cwd, capturePath, evidenceReadDirs }, policy) {
+  // A checking role's bound evidence directories ride as read grants in the
+  // permissions profile; without them the seat cannot open the evidence it is
+  // judging (OpenAI verify seat abstained, 2026-09-19). The worktree itself is
+  // already covered by -C, so only the sealed evidence dirs need a grant.
+  const readDirs = READ_ONLY_ROLES.has(role) && Array.isArray(evidenceReadDirs) ? evidenceReadDirs : [];
+  const profile = policy ? policy.profile : OPENAI_EVIDENCE_READ_PROFILE;
+  const filesystem = [
+    ...(policy ? [[policy.scratchPath, 'write']] : []),
+    ...readDirs.map(dir => [dir, 'read']),
+  ].map(([file, permission]) => `${JSON.stringify(file.replaceAll('\\', '/'))} = "${permission}"`).join(', ');
+  const permissionArgs = policy || readDirs.length ? [
+    '-c', `default_permissions=${JSON.stringify(profile)}`,
     // Replace the entire named profile so a global rule cannot add another grant.
-    '-c', `permissions.${policy.profile}={ extends = ":read-only", filesystem = { ${JSON.stringify(policy.scratchPath.replaceAll('\\', '/'))} = "write" }, network = { enabled = false } }`,
+    '-c', `permissions.${profile}={ extends = ":read-only", filesystem = { ${filesystem} }, network = { enabled = false } }`,
   ] : ['-s', roleSandbox(role)];
   // Headless codex otherwise routes through the host's local proxy. Read from
   // process.env so the launch and its later scratch re-validation agree.
@@ -82,7 +93,9 @@ function validateOpenaiScratchLaunch(launch, expected) {
   if (!expected.cwd || !launch || launch.vendor !== 'openai' || launch.role !== expected.role || launch.cwd !== hostResolve(expected.cwd)) {
     throw new Error('OpenAI scratch launch identity mismatch');
   }
-  const bound = { ...expected, cwd: hostResolve(expected.cwd) };
+  // evidenceReadDirs come from the launch, which validateEvidenceReadLaunch has
+  // already deep-compared against the sealed entry; the proof options never carry them.
+  const bound = { ...expected, cwd: hostResolve(expected.cwd), evidenceReadDirs: expected.evidenceReadDirs ?? launch.evidenceReadDirs };
   const policy = openaiScratchPolicy(bound);
   const scratchEnv = openaiScratchEnv(policy);
   if (!isDeepStrictEqual(launch.scratchPermissions, policy) || !isDeepStrictEqual(launch.scratchEnv, scratchEnv)) {
@@ -266,7 +279,7 @@ function openaiLaunch(opts) {
     binary: resolveVendorBinary('openai', { env: opts.env, home: opts.home, mustExist: opts.mustExistBinary !== false }),
     args: openaiArgs({ ...ctx, capturePath: opts.capturePath }, policy),
     cwd: ctx.cwd, env, stdinFile: pointerFile, stdio: ['pipe', 'pipe', 'pipe'],
-    pointerFile, requestedSandbox: policy ? 'custom permissions' : roleSandbox(ctx.role), skillRoot: ctx.skillRoot, seatContractPath: ctx.seatContractPath,
+    pointerFile, requestedSandbox: (policy || ctx.evidenceReadDirs.length) ? 'custom permissions' : roleSandbox(ctx.role), skillRoot: ctx.skillRoot, seatContractPath: ctx.seatContractPath,
     ...(ctx.evidenceReadDirs.length ? { evidenceReadDirs: ctx.evidenceReadDirs } : {}),
     ...(policy ? { scratchPermissions: policy, scratchEnv } : {}),
   };

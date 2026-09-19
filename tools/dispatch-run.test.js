@@ -138,6 +138,8 @@ test('read-only or out-of-scope writes fail and cannot produce successful teleme
 });
 
 test('nonzero child, missing capture and malformed proof produce terminal failures', async (t) => {
+  // Each scenario must fail for its own reason; a pooled matcher would let one cover another.
+  const matchers = { exit: /vendor child failed/, capture: /vendor capture missing or empty/, proof: /proof/i };
   for (const failure of ['exit', 'capture', 'proof']) {
     const run = createSealedRun(t);
     const native = fakeVendor();
@@ -149,7 +151,7 @@ test('nonzero child, missing capture and malformed proof produce terminal failur
       if (failure === 'proof') result.stderr = 'requested gpt-5.6-sol';
       return result;
     };
-    await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1' }, native), /failed|capture|proof/i);
+    await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1' }, native), matchers[failure]);
     assert.equal(inspectRun(run.runDir).outcomes[0].status, 'FAIL');
   }
 });
@@ -196,6 +198,8 @@ test('no-op implementation does not manufacture an implementation unit', async (
 });
 
 test('Git config edits, source rules/skills edits and hard-link scope escape all fail', async (t) => {
+  // Each tamper kind must fail with its own audit message, not any of the four.
+  const matchers = { 'git-config': /git state/, 'source-rules': /rules source/, 'source-skills': /skill source/, 'hard-link': /hard links/ };
   for (const kind of ['git-config', 'source-rules', 'source-skills', 'hard-link']) {
     const run = createSealedRun(t);
     if (kind === 'git-config') require('node:child_process').execFileSync('git', ['init', run.cwd], { stdio: 'pipe' });
@@ -209,7 +213,7 @@ test('Git config edits, source rules/skills edits and hard-link scope escape all
         fs.linkSync(outside, path.join(launch.cwd, 'result.txt')); fs.writeFileSync(path.join(launch.cwd, 'result.txt'), 'changed outside');
       }
     });
-    await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1' }, native), /git state|rules source|skill source|hard links/);
+    await assert.rejects(runDispatch({ ...run.opts, dispatchId: 'd1' }, native), matchers[kind]);
     assert.equal(inspectRun(run.runDir).outcomes[0].status, 'FAIL');
   }
 });

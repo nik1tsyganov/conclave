@@ -205,6 +205,32 @@ test('a critical unit needs three counted votes', () => {
     receipt('advocatus', 'google', 'review', 'APPROVE', 'I read the callers in app.py and none passes a tuple.')];
   assert.equal(rules.verdict({ receipts }).outcome, 'PASSAGE');
   assert.equal(rules.verdict({ receipts, critical: true }).outcome, 'NOT_PANEL', 'two is short of the critical quorum');
+
+  // The boundary from above: exactly three counted approvals carry it, two of three do not.
+  const third = receipt('ponens', 'openai', 'review', 'APPROVE', 'I ran the six tests in stats_test.py and they all pass.');
+  assert.equal(rules.verdict({ receipts: [...receipts, third], critical: true }).outcome, 'PASSAGE');
+  const twoOfThree = [...receipts, receipt('ponens', 'openai', 'review', 'REJECT', 'The caller in app.py breaks.')];
+  assert.equal(rules.verdict({ receipts: twoOfThree, critical: true }).outcome, 'DEADLOCK', 'two approvals of three is below the critical quorum');
+});
+
+test('two reasoned approvals from one vendor do not carry a unit', () => {
+  // The floor is two distinct approving vendors; one vendor's opinion twice is a monologue.
+  const v = rules.verdict({ receipts: [BUILDER,
+    receipt('scrutator', 'anthropic', 'verify', 'APPROVE', GOOD),
+    receipt('advocatus', 'anthropic', 'review', 'APPROVE', 'I read the callers in app.py and none passes a tuple.')] });
+  assert.equal(v.outcome, 'DEADLOCK', 'one vendor cannot meet the two-vendor floor');
+  assert.equal(v.lands, false);
+  assert.ok(v.flags.includes('every-approval-came-from-one-vendor'));
+});
+
+test('a builder that casts a vote is not a counted seat', () => {
+  // Only verify and review produce a vote; a ballot on the implement receipt is ignored.
+  const v = rules.verdict({ receipts: [
+    receipt('ponens', 'openai', 'implement', 'APPROVE', GOOD),
+    receipt('scrutator', 'anthropic', 'verify', 'APPROVE', GOOD),
+    receipt('advocatus', 'google', 'review', 'APPROVE', 'I read the callers in app.py and none passes a tuple.')] });
+  assert.equal(v.approve, 2, "the builder's ballot is not a third approval");
+  assert.equal(v.counted, 2);
 });
 
 test('a failing check stops a landing whatever the seats voted', () => {

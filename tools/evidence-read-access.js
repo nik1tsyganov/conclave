@@ -55,7 +55,20 @@ function snapshotEvidenceReads(dirs) {
 function validateEvidenceReadLaunch(launch, entry, dirs, context) {
   if (!entry.evidenceReadDirs?.length) return;
   if (!isDeepStrictEqual(launch.evidenceReadDirs, dirs)) fail('launch directories differ from sealed entry');
-  if (entry.vendor === 'openai') return; // The exact read-only/scratch profile is validated by native proof.
+  if (entry.vendor === 'openai') {
+    // OpenAI grants ride in the permissions profile's filesystem map. Native proof
+    // validates the profile's identity, not its contents: a launch that never granted
+    // a bound directory passed every gate and the seat abstained (2026-09-19).
+    const profiles = launch.args.filter(arg => typeof arg === 'string' && arg.startsWith('permissions.'));
+    if (profiles.length !== 1 || !profiles[0].includes('extends = ":read-only"') || !profiles[0].includes('network = { enabled = false }')) {
+      fail('OpenAI checking launch must carry exactly one read-only permissions profile');
+    }
+    const filesystem = profiles[0].replaceAll('\\', '/');
+    for (const dir of dirs) {
+      if (!filesystem.includes(`${JSON.stringify(dir.replaceAll('\\', '/'))} = "read"`)) fail('OpenAI launch argv is missing a read grant for a bound evidence directory');
+    }
+    return;
+  }
   const expected = [...new Set([context.cwd, path.dirname(context.briefPath), context.skillRoot, path.dirname(context.seatContractPath), ...dirs])];
   const granted = [];
   if (launch.args.some(arg => typeof arg === 'string' && /^--(?:add-dir|sandbox|permission-mode|tools|allowedTools)=/.test(arg))) fail('alternate native grant syntax is forbidden');
