@@ -25,9 +25,13 @@
  * That is what makes a critical quorum of three reachable with two
  * vendors — panel-routing seats a critical unit's verifier twice, in a
  * session of its own, for exactly this reason.
- * Any counted REJECT is a REJECT verdict, whatever the approval count: a
- * checker that objects has refused to let the work land, which is a
- * different fact from a panel that could not convene.
+ * One rejection and two rejections mean different things (owner, 2026-09-19).
+ * A single dissent says approach the problem again from a different angle:
+ * the unit does not land, but one checker's objection is not a finding that
+ * the work is wrong, so the verdict is DEADLOCK — unsettled, go again. Two
+ * or more rejections say the work is wrong overall, and that is REJECT.
+ * Either way a rejection is a fact about the artifact and is never recorded
+ * as a panel that could not convene.
  * Quorum floor (shared with CONCLAVE tally-panel): when no eligible
  * elector cast a counted POSITION, or the counted ballots below quorum
  * carry no rejection, verdict is NOT_PANEL with degraded=true and reason
@@ -47,7 +51,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { CRITICAL_QUORUM, ORDINARY_QUORUM } = require('./panel-rules.js');
+const { CRITICAL_QUORUM, ORDINARY_QUORUM, REJECT_THRESHOLD } = require('./panel-rules.js');
 const { isCritical } = require('./panel-routing.js');
 
 const ELECTORS = Object.freeze(['anthropic', 'openai', 'google']);
@@ -241,10 +245,15 @@ function tally(input) {
     verdict = VERDICT.NOT_PANEL;
     degraded = true;
     reason = 'quorumFloor';
-  } else if (rejectCount > 0) {
-    // A rejection stands whatever else the ballots say.
+  } else if (rejectCount >= REJECT_THRESHOLD) {
+    // Two dissenting checkers are a finding: the work is wrong overall.
     verdict = VERDICT.REJECT;
     reason = duoDegraded ? 'degraded-claude' : null;
+  } else if (rejectCount > 0) {
+    // One dissent does not condemn the work, and does not let it land either. The panel is
+    // unsettled and the unit goes round again from a different angle.
+    verdict = VERDICT.DEADLOCK;
+    reason = duoDegraded ? 'degraded-claude' : 'single-rejection';
   } else if (approveCount >= quorum && approvingVendors.size >= 2) {
     verdict = VERDICT.PASSAGE;
     reason = duoDegraded ? 'degraded-claude' : null;
@@ -414,7 +423,7 @@ function usage() {
     '       node tools/position-tally.js --file <path> [--critical] [--degraded] [--author-vendor <vendor>] [--json]',
     '',
     'Passage: >=quorum counted APPROVE seats (2 ordinary, 3 with --critical) across >=2 distinct',
-    'vendors. ABSTAIN never toward passage. Any counted REJECT => REJECT.',
+    'vendors. ABSTAIN never toward passage. One REJECT => DEADLOCK (go again); two => REJECT.',
     'No counted ballots, or below quorum with no rejection => NOT_PANEL degraded=true reason=quorumFloor.',
     'Else DEADLOCK. Electors: anthropic | openai | google. Arbiter cannot vote.',
     'Exit 0 PASSAGE, 1 REJECT, DEADLOCK or NOT_PANEL (fail closed), 2 invalid input.',

@@ -58,9 +58,9 @@ describe('position-tally rules', () => {
     assert.deepStrictEqual(result.eligibleElectors, ['anthropic', 'openai', 'google']);
   });
 
-  it('records two APPROVE with one REJECT as REJECT — a checker objected', () => {
+  it('records two APPROVE with one REJECT as DEADLOCK — one dissent means go again', () => {
     const result = tally(trio('APPROVE', 'APPROVE', 'REJECT'));
-    assert.strictEqual(result.verdict, VERDICT.REJECT);
+    assert.strictEqual(result.verdict, VERDICT.DEADLOCK);
     assert.strictEqual(result.approveCount, 2);
     assert.strictEqual(result.rejectCount, 1);
     assert.strictEqual(result.passed, false);
@@ -81,9 +81,9 @@ describe('position-tally rules', () => {
     assert.strictEqual(result.passed, false);
   });
 
-  it('records a mixed trio with a REJECT as REJECT, not DEADLOCK', () => {
+  it('records a mixed trio with one REJECT as DEADLOCK, and never as passage', () => {
     const result = tally(trio('APPROVE', 'REJECT', 'ABSTAIN'));
-    assert.strictEqual(result.verdict, VERDICT.REJECT);
+    assert.strictEqual(result.verdict, VERDICT.DEADLOCK);
     assert.strictEqual(result.approveCount, 1);
     assert.strictEqual(result.rejectCount, 1);
     assert.strictEqual(result.abstainCount, 1);
@@ -194,16 +194,22 @@ describe('position-tally critical quorum and per-seat counting', () => {
     assert.strictEqual(result.passed, false);
   });
 
-  it('records a single REJECT with one approval as REJECT, not DEADLOCK or NOT_PANEL', () => {
+  // One dissent is unsettled, not condemned, and is never a panel that failed to convene.
+  it('records a single REJECT with one approval as DEADLOCK, not NOT_PANEL', () => {
     const result = tally([ballot('anthropic', 'APPROVE'), ballot('openai', 'REJECT')]);
-    assert.strictEqual(result.verdict, VERDICT.REJECT);
+    assert.strictEqual(result.verdict, VERDICT.DEADLOCK);
     assert.strictEqual(result.passed, false);
   });
 
-  it('records a lone REJECT ballot as REJECT — an objection, not a failure to convene', () => {
+  it('records a lone REJECT ballot as DEADLOCK — an objection, not a failure to convene', () => {
     const result = tally([ballot('anthropic', 'REJECT')]);
+    assert.strictEqual(result.verdict, VERDICT.DEADLOCK);
+  });
+
+  it('records two REJECT ballots as REJECT — two dissents are a finding', () => {
+    const result = tally([ballot('anthropic', 'REJECT'), ballot('openai', 'REJECT')]);
     assert.strictEqual(result.verdict, VERDICT.REJECT);
-    assert.strictEqual(result.rejectCount, 1);
+    assert.strictEqual(result.rejectCount, 2);
     assert.strictEqual(result.passed, false);
   });
 
@@ -241,12 +247,12 @@ describe('position-tally degraded duo (cursor-cli Claude fail)', () => {
     assert.strictEqual(result.abstainCount, 1);
   });
 
-  it('records a degraded duo on APPROVE + REJECT as REJECT', () => {
+  it('records a degraded duo on APPROVE + REJECT as DEADLOCK — one dissent', () => {
     const result = tally({
       ballots: [ballot('openai', 'APPROVE'), ballot('google', 'REJECT')],
       degradedVendor: 'anthropic',
     });
-    assert.strictEqual(result.verdict, VERDICT.REJECT);
+    assert.strictEqual(result.verdict, VERDICT.DEADLOCK);
     assert.strictEqual(result.rejectCount, 1);
   });
 
@@ -360,8 +366,8 @@ describe('position-tally CLI', () => {
     assert.strictEqual(out.approveCount, 2);
   });
 
-  it('exits 1 and prints REJECT when any counted ballot rejects', () => {
-    const r = runCli(['--ballots', JSON.stringify(trio('APPROVE', 'APPROVE', 'REJECT')), '--json']);
+  it('exits 1 and prints REJECT when two counted ballots reject', () => {
+    const r = runCli(['--ballots', JSON.stringify(trio('APPROVE', 'REJECT', 'REJECT')), '--json']);
     assert.strictEqual(r.status, 1);
     const out = JSON.parse(r.stdout);
     assert.strictEqual(out.verdict, 'REJECT');

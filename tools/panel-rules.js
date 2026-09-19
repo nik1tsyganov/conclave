@@ -27,6 +27,10 @@ const COUNTING_ROLES = Object.freeze(['verify', 'review']);
 /// its reviews, which is what the extra seat is for.
 const ORDINARY_QUORUM = 2;
 const CRITICAL_QUORUM = 3;
+// One dissent and two dissents are different findings (owner, 2026-09-19). A single checker
+// objecting means approach the problem again from a different angle — the unit does not land,
+// but one objection is not a verdict that the work is wrong. Two mean it is wrong overall.
+const REJECT_THRESHOLD = 2;
 
 /// Under this an evidence line is an acknowledgement rather than an observation.
 const MIN_EVIDENCE_CHARS = 24;
@@ -281,7 +285,7 @@ function verdict({ receipts, critical = false, checkPassed = null } = {}) {
 
   let outcome;
   if (counted.length < quorum) outcome = 'NOT_PANEL';
-  else if (reject >= 2) outcome = 'REJECT';
+  else if (reject >= REJECT_THRESHOLD) outcome = 'REJECT';
   else if (approve >= quorum && reject === 0 && approvingVendors.size >= 2) outcome = 'PASSAGE';
   else outcome = 'DEADLOCK';
   if (approve >= quorum && reject === 0 && approvingVendors.size < 2) {
@@ -300,7 +304,7 @@ function verdict({ receipts, critical = false, checkPassed = null } = {}) {
 }
 
 module.exports = {
-  AGREEMENT_ONLY, CRITICAL_QUORUM, FILLER, MIN_EVIDENCE_CHARS, MIN_EVIDENCE_WORDS,
+  AGREEMENT_ONLY, CRITICAL_QUORUM, REJECT_THRESHOLD, FILLER, MIN_EVIDENCE_CHARS, MIN_EVIDENCE_WORDS,
   COUNTING_ROLES, ORDINARY_QUORUM, POSITIONS, ROLES,
   evidenceIn, hasAnchor, independenceOf, judgeEvidence, plainWords, positionIn, receiptCounts, verdict,
 };
