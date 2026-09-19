@@ -87,9 +87,9 @@ function seatPanel(classId, available, { prefer = {}, matrix = loadMatrix() } = 
   const order = [...roles.filter((r) => prefer[r]), ...roles.filter((r) => !prefer[r])];
   for (const role of order) {
     // Every seat excludes every vendor already seated, the builder included. The builder is
-    // recused from the count, so a checking seat on its vendor would be an elector that cannot
-    // vote; and two checking seats on one vendor are one elector casting both votes. All three
-    // distinct is the only arrangement that can reach two approving vendors.
+    // recused from the count, so a checking seat on its vendor could not count; and two checking
+    // seats on one vendor are one vendor's opinion twice — counted per seat, but short of the
+    // two-vendor floor. All three distinct is the only arrangement that can reach two approving vendors.
     const exclude = [...taken];
     const wanted = prefer[role];
     const picked = pickLane(classId, role, available, { excludeVendors: exclude, matrix });

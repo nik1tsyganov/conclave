@@ -169,7 +169,10 @@ async function netBenefit({ classId, unitCount = null, bestSingleVendor }, routi
 // Deliberation protocol 1, 5, 6: independent replies; agreement costs
 // evidence (an APPROVE without independent evidence counts as ABSTAIN);
 // quorum floor of two eligible seats; passage needs two APPROVE, two REJECT
-// rejects, anything else is DEADLOCK. Recusal is declared by the lead before
+// rejects, anything else is DEADLOCK. This is the ordinary floor for the Jev
+// proposal only — the binding count is panel-rules.js, which adds the critical
+// quorum of three and the two-distinct-vendor floor under the approvals.
+// Recusal is declared by the lead before
 // dispatch, so a recused seat never appears in replies.
 async function tallyPositions({ replies }, opts = {}) {
   const eligible = replies.filter((r) => POSITIONS.includes(r.position));

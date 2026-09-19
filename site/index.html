@@ -778,8 +778,8 @@ footer a { color: var(--primary); }
         disqualifies its receipt — the two checkers below are the whole vote. This is the
         ordinary case, so it cannot reach the quorum of three a critical unit needs. It also seats
         one vendor per checker, so it never has to show the floor underneath: <b>two approvals from
-        one vendor are one vendor&#8217;s opinion twice, and deadlock.</b> A panel needs two approving
-        vendors, not two approving seats. The arbiter that proposes the seats never appears in a
+        one vendor are one vendor&#8217;s opinion twice, and deadlock.</b> Approvals are counted per
+        seat; a passage needs two approving seats spanning two approving vendors. The arbiter that proposes the seats never appears in a
         tally at all — that is now a test, not a convention.</p>
 
       <figure class="figs rise">
@@ -1064,7 +1064,7 @@ footer a { color: var(--primary); }
         <li><b>Proof of the seat</b><span>The vendor session, the token count, and the model that actually answered. Missing any of the three, the vote does not count.</span></li>
         <li><b>An unchanged tree</b><span>Both trees or neither. A missing write audit is a check that did not run, and a check that did not run allows nothing.</span></li>
         <li><b>The gate, never a vote</b><span>A unit whose own check failed does not land, whatever the seats said. The check gates the act; it never joins the count.</span></li>
-        <li><b>Two seats, two vendors</b><span>Approvals are counted per seat, with a floor of two distinct vendors beneath them. Two checkers on one vendor are one elector voting twice, and a plan arranged that way is refused before it spends a dispatch. The builder is recused, so a checking seat on its vendor could not vote either.</span></li>
+        <li><b>Two seats, two vendors</b><span>Approvals are counted per seat, with a floor of two distinct vendors beneath them. Two checkers on one vendor are one vendor&#8217;s opinion twice, and a plan arranged that way is refused before it spends a dispatch. The builder is recused, so a checking seat on its vendor could not vote either.</span></li>
         <li><b>Silence is refusal</b><span>An outcome this build cannot read is a split. A newer runtime can never land work in an older one that cannot tell what it meant.</span></li>
       </ol>
     </div>

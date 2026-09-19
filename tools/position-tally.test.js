@@ -357,6 +357,42 @@ describe('position-tally vote roles and recusal', () => {
   });
 });
 
+describe('position-tally own-check gate', () => {
+  it('turns a would-be PASSAGE into CHECK_FAILED when the unit check failed', () => {
+    const result = tally({ ballots: trio('APPROVE', 'APPROVE', 'APPROVE'), checkPassed: false });
+    assert.strictEqual(result.verdict, VERDICT.CHECK_FAILED);
+    assert.strictEqual(result.passed, false);
+    assert.strictEqual(result.reason, 'checkFailed');
+    // The votes are still counted and still reported.
+    assert.strictEqual(result.approveCount, 3);
+    assert.strictEqual(result.rejectCount, 0);
+  });
+
+  it('passes the same ballots when the check passed', () => {
+    const result = tally({ ballots: trio('APPROVE', 'APPROVE', 'APPROVE'), checkPassed: true });
+    assert.strictEqual(result.verdict, VERDICT.PASSAGE);
+    assert.strictEqual(result.passed, true);
+  });
+
+  it('is unchanged when the unit named no check', () => {
+    const result = tally(trio('APPROVE', 'APPROVE', 'APPROVE'));
+    assert.strictEqual(result.verdict, VERDICT.PASSAGE);
+    assert.strictEqual(result.passed, true);
+  });
+
+  it('leaves a REJECT alone — the gate only ever takes passage away', () => {
+    const result = tally({ ballots: trio('APPROVE', 'REJECT', 'REJECT'), checkPassed: false });
+    assert.strictEqual(result.verdict, VERDICT.REJECT);
+    assert.strictEqual(result.passed, false);
+  });
+
+  it('leaves a DEADLOCK alone', () => {
+    const result = tally({ ballots: trio('APPROVE', 'ABSTAIN', 'ABSTAIN'), checkPassed: false });
+    assert.strictEqual(result.verdict, VERDICT.DEADLOCK);
+    assert.strictEqual(result.passed, false);
+  });
+});
+
 describe('position-tally CLI', () => {
   it('exits 0 and prints PASSAGE for a passing trio', () => {
     const r = runCli(['--ballots', JSON.stringify(trio('APPROVE', 'APPROVE', 'ABSTAIN')), '--json']);

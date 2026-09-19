@@ -108,7 +108,7 @@ After the panel returns POSITION ballots, tally them with the shared passage too
 node $HOME/src/conclave\tools\position-tally.js --ballots '<json>' --json
 ```
 
-Passage is `>=2 APPROVE` among eligible electors; `ABSTAIN` never toward passage. Counted eligible ballots below 2 is `NOT_PANEL` (`degraded=true`, `reason=quorumFloor`) — fail closed, shared with CONCLAVE. Else `DEADLOCK`. `--author-vendor` recuses the implement author. `--degraded` is the cursor-cli Claude fail path only. Idle Advocatus is `FAILED activation`, not a duo. See README.md for the CONCLAVE alignment note.
+Ballots are counted per seat, not per vendor. Passage is `>=2 APPROVE` seats (`>=3` with `--critical`) spanning >=2 distinct vendors; `ABSTAIN` never toward passage. One `REJECT` is `DEADLOCK`, not `REJECT`: a single checker's objection means the unit does not land and goes round again from a different angle — it is not a finding that the work is wrong. Two or more `REJECT` means the work is wrong overall (owner, 2026-09-19). No counted ballots, or below quorum with no rejection, is `NOT_PANEL` (`degraded=true`, `reason=quorumFloor`) — fail closed, shared with CONCLAVE; a rejection is never `NOT_PANEL`. Else `DEADLOCK`. `--author-vendor` recuses the implement author. `--degraded` is the cursor-cli Claude fail path only. Idle Advocatus is `FAILED activation`, not a duo. See README.md for the CONCLAVE alignment note.
 
 ## After implement
 

@@ -150,10 +150,11 @@ function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
     }
     // A plan that cannot pass must not seal.
     //
-    // run-finalize judges with position-tally, where an ELECTOR is a vendor, the author's
-    // vendor is recused, and passage needs two approvals from distinct eligible electors.
-    // Two checking seats on one vendor are therefore one elector and one vote, however many
-    // seats answer. Measured 2026-09-18: a plan with two openai checkers ran green end to end
+    // run-finalize judges with position-tally, where the author's vendor is recused and
+    // ballots are counted PER SEAT: passage needs two counted approvals whose seats span two
+    // distinct vendors. Two checking seats on one vendor are one vendor's opinion twice -
+    // the seats may be counted, but the two-vendor floor under them is not met. Measured
+    // 2026-09-18: a plan with two openai checkers ran green end to end
     // - every seat PASS, activation PASS - and tallied NOT_PANEL / quorumFloor with
     // approveCount 1. Nothing had refused it, so the run spent three live dispatches to
     // discover an arithmetic fact that was true before the first one started.

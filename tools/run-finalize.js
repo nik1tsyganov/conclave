@@ -320,6 +320,29 @@ function nativePosition(response) {
   return matches[0][1];
 }
 
+/// The unit's own check result, from the host's captured record rather than any seat's
+/// claim. captureEvidence (run-drive) runs the plan-named check itself after the implement
+/// phase and writes the same test-output.txt — command, output and a final exit=N line —
+/// into every evidence directory bound to the unit, and evidence-read-access snapshots those
+/// directories around each dispatch, so what finalize reads is what the seats were shown.
+/// A unit that named no check has no record and no gate: undefined. A named check whose
+/// record is missing, unparseable, or disagrees between copies fails closed.
+function unitCheckPassed(run, unitId) {
+  const entries = run.plan.dispatches.filter((entry) => entry.unitId === unitId);
+  if (!entries.some((entry) => entry.check && entry.check.command)) return undefined;
+  const dirs = [...new Set(entries.flatMap((entry) => entry.evidenceReadDirs || []))];
+  const exits = [];
+  for (const dir of dirs) {
+    let text;
+    try { text = fs.readFileSync(path.join(dir, 'test-output.txt'), 'utf8'); } catch { return false; }
+    const matches = [...text.matchAll(/^exit=(\d+)[ \t]*$/gm)];
+    if (!matches.length) return false;
+    exits.push(Number(matches[matches.length - 1][1]));
+  }
+  if (!exits.length || new Set(exits).size !== 1) return false;
+  return exits[0] === 0;
+}
+
 function tallyUnit(run, unitId) {
   const planned = run.plan.dispatches.filter((entry) => entry.unitId === unitId);
   if (!planned.length) throw new Error('unit absent from sealed plan');
@@ -352,7 +375,7 @@ function tallyUnit(run, unitId) {
   // before a tally runs, so a class outside that table is not a critical unit.
   let critical = false;
   try { critical = isCritical(planned[0].class); } catch { critical = false; }
-  return { unitId, authorVendor, ...tally({ ballots, authorVendor, critical }) };
+  return { unitId, authorVendor, ...tally({ ballots, authorVendor, critical, checkPassed: unitCheckPassed(run, unitId) }) };
 }
 
 function assessRun(run) {
@@ -385,6 +408,9 @@ function assessRun(run) {
         const decision = tallyUnit(run, unitId);
         if (!decision.passed) throw new Error(`panel ${decision.verdict}`);
       }
+      // A panel unit already failed above as `panel CHECK_FAILED`; this is the same gate for
+      // a class whose approval never goes through the tally.
+      if (unitCheckPassed(run, unitId) === false) throw new Error('the unit\'s own check did not pass');
     } catch (error) { status = 'FAIL'; reason = error.message; }
     units.push({ unitId, status, reason });
   }

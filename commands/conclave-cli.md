@@ -97,7 +97,7 @@ Native observed model/effort evidence, brief acknowledgment, scope audit, receip
 
 Every Google probe and dispatch pins `--log-file` to `native-cli.log` in its unique evidence directory. Use that per-run source for proof collection; default second-resolution home logs can collide during parallel calls.
 
-Run `run-finalize.js --run-dir <run-dir>`. When `CONCLAVE_VAULT_ROOT` is set, finalize links telemetry into the vault and writes analysis. Execution PASS is separate from approval. Ordinary implementation approval requires foreign verification and review, with every review returning native APPROVE. Critical approval requires at least two native APPROVE votes after author recusal.
+Run `run-finalize.js --run-dir <run-dir>`. When `CONCLAVE_VAULT_ROOT` is set, finalize links telemetry into the vault and writes analysis. Execution PASS is separate from approval. Ordinary implementation approval requires foreign verification and review, with every review returning native APPROVE. Critical approval requires at least three counted native APPROVE seats after author recusal, spanning at least two distinct vendors.
 
 Run `panel-tally.js --run-dir <run-dir> --unit-id <unit>` for receipt-bound panel votes. Then run `panel-tally-jev.js --run-dir <run-dir> --unit-id <unit>` (2026-09-16): the Jev decision engine scores each eligible reply for independent evidence (an APPROVE without evidence counts as ABSTAIN) and proposes the panel verdict distribution; code still counts the votes. Output: `<run-dir>/jev-tally-<unit>.json` plus a provenance row. Each eligible review response must end with exactly one `POSITION: APPROVE`, `POSITION: REJECT`, or `POSITION: ABSTAIN` line. Never handwrite ballots or waive deterministic failure.
 
