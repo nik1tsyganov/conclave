@@ -33,7 +33,7 @@ async function drivePhase({ runDir, phase, rulesRoot, availability, skillSourceR
   const entries = run.plan.dispatches.filter(e => e.role === phase);
   if (!entries.length) throw new Error(`no ${phase} dispatches in the sealed plan`);
   const base = { plan: run.planPath, runDir: run.root, rulesRoot, availability: availability || run.availablePath, skillSourceRoot: skillSourceRoot || run.seal.skillSource?.sourceRoot };
-  const results = await Promise.all(entries.map(async entry => {
+  const runEntry = async entry => {
     const state = transaction(run, entry);
     if (state?.status === 'PASS') return { dispatchId: entry.dispatchId, status: 'PASS', replayed: true };
     try {
@@ -41,7 +41,46 @@ async function drivePhase({ runDir, phase, rulesRoot, availability, skillSourceR
       if (result.ok) return { dispatchId: entry.dispatchId, status: 'PASS', modelObserved: result.receipt?.modelObserved };
       return { dispatchId: entry.dispatchId, status: result.status, responsePath: result.responsePath, captureSha256: result.captureSha256 };
     } catch (error) { return { dispatchId: entry.dispatchId, status: 'FAIL', code: error.code, error: error.message }; }
-  }));
+  };
+  // An implement entry's dependsOn is honoured in waves: a unit is launched only once every
+  // unit it builds on has a recorded PASS, and a unit still blocked when nothing more can
+  // run is never launched. Entries without dependsOn are eligible in the first wave, so a
+  // plan that declares none runs exactly one flat wave, as before.
+  const dependencyPassed = (unitId) => {
+    const implement = run.plan.dispatches.find(e => e.unitId === unitId && e.role === 'implement');
+    return implement ? transaction(run, implement)?.status === 'PASS' : false;
+  };
+  let results;
+  const blocked = [];
+  const skipped = [];
+  if (phase === 'implement') {
+    results = [];
+    const remaining = [...entries];
+    while (remaining.length) {
+      const wave = remaining.filter(entry => (entry.dependsOn || []).every(dependencyPassed));
+      if (!wave.length) break;
+      results.push(...await Promise.all(wave.map(runEntry)));
+      for (const entry of wave) remaining.splice(remaining.indexOf(entry), 1);
+    }
+    for (const entry of remaining) {
+      blocked.push({ dispatchId: entry.dispatchId, unitId: entry.unitId, status: 'BLOCKED_BY_DEPENDENCY', blockedBy: (entry.dependsOn || []).filter(unitId => !dependencyPassed(unitId)) });
+    }
+    results.push(...blocked);
+  } else if (phase === 'verify' || phase === 'review') {
+    // A unit whose build was blocked by an unmet dependency was never built, so its
+    // checking seats are not launched: there is nothing to check. A unit whose build
+    // ran and FAILED is still checked — a REJECT there is a real verdict.
+    const runnable = [];
+    for (const entry of entries) {
+      const implement = run.plan.dispatches.find(e => e.unitId === entry.unitId && e.role === 'implement');
+      const unmet = (implement?.dependsOn || []).filter(unitId => !dependencyPassed(unitId));
+      if (unmet.length) skipped.push({ dispatchId: entry.dispatchId, unitId: entry.unitId, status: 'SKIPPED_UNIT_NOT_BUILT', blockedBy: unmet });
+      else runnable.push(entry);
+    }
+    results = [...await Promise.all(runnable.map(runEntry)), ...skipped];
+  } else {
+    results = await Promise.all(entries.map(runEntry));
+  }
   // A unit that named a check has it run here, host-side, and written into the evidence
   // directory its checking seats are bound to. Doing it after implement and before anyone
   // drives verify is what makes a checking seat able to answer without running anything
@@ -54,6 +93,8 @@ async function drivePhase({ runDir, phase, rulesRoot, availability, skillSourceR
     results,
     ...(captured.length ? { evidence: captured } : {}),
     pending: results.filter(r => r.status === AWAITING_ATTESTATION).map(r => r.dispatchId),
+    ...(phase === 'implement' ? { blocked: blocked.map(r => r.dispatchId) } : {}),
+    ...(phase === 'verify' || phase === 'review' ? { skipped: skipped.map(r => r.dispatchId) } : {}),
   };
 }
 

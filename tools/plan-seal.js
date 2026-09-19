@@ -88,6 +88,108 @@ function requireUnitCheckEvidence(plan, runDir) {
   }
 }
 
+/// A unit that builds on another unit must name it, and the named graph must be able to run.
+///
+/// This refuses rather than repairs. Dropping an unsatisfiable edge would seal a plan whose
+/// seats then build in an order the author never agreed to, and picking an order is the
+/// driver's job, not the sealer's.
+///
+/// Without it, the omission is invisible until a caller in one unit reaches a symbol another
+/// unit never added: the dependent unit lands first and the plan has landed half a feature.
+function requireUnitDependencies(plan) {
+  const implementUnits = new Set(plan.dispatches.filter((entry) => entry.role === 'implement').map((entry) => entry.unitId));
+  const dependencies = new Map();
+  for (const entry of plan.dispatches) {
+    if (entry.role !== 'implement' || !Array.isArray(entry.dependsOn) || !entry.dependsOn.length) continue;
+    for (const dependency of entry.dependsOn) {
+      if (dependency === entry.unitId) throw new Error(`unit ${entry.unitId} depends on itself`);
+      if (!implementUnits.has(dependency)) throw new Error(`unit ${entry.unitId} depends on ${dependency}, which has no implement entry in the plan`);
+    }
+    dependencies.set(entry.unitId, entry.dependsOn);
+  }
+  // Iterative depth-first cycle detection; a recursion into authored data needs a visited set.
+  const state = new Map();
+  for (const start of dependencies.keys()) {
+    if (state.has(start)) continue;
+    const pathStack = [start];
+    const stack = [[start, 0]];
+    state.set(start, 1);
+    while (stack.length) {
+      const top = stack[stack.length - 1];
+      const deps = dependencies.get(top[0]) || [];
+      if (top[1] < deps.length) {
+        const next = deps[top[1]++];
+        if (state.get(next) === 1) {
+          const cycle = [...pathStack.slice(pathStack.indexOf(next)), next];
+          throw new Error(`unit dependency cycle: ${cycle.join(' -> ')}`);
+        }
+        if (!state.has(next) && dependencies.has(next)) {
+          state.set(next, 1);
+          pathStack.push(next);
+          stack.push([next, 0]);
+        }
+      } else {
+        state.set(top[0], 2);
+        pathStack.pop();
+        stack.pop();
+      }
+    }
+  }
+}
+
+/// Two implement units that can run at the same time may not write the same file.
+///
+/// This refuses rather than repairs. Which unit should own the file is the author's call,
+/// and a sealer that silently picked one would be signing an order nobody declared.
+///
+/// A declared dependsOn exempts the pair, directly or transitively: the dependency waves
+/// then order the writes, and the second unit edits what the first produced.
+///
+/// Without it, the omission is invisible until the wave runs: both seats snapshot the
+/// worktree, both write the file, and the second to finish sees no change of its own and
+/// dies with `SCOPE_FAIL: implementation produced no covered file change` - a message that
+/// reads as a seat that did nothing when in fact two seats collided.
+function requireDistinctWriteScopes(plan) {
+  // requireUnitDependencies has already run: the graph is acyclic and every named
+  // dependency exists, so a plain iterative walk over the same map reaches a fixpoint.
+  const dependencies = new Map();
+  const byCwd = new Map();
+  for (const entry of plan.dispatches) {
+    if (entry.role !== 'implement') continue;
+    if (Array.isArray(entry.dependsOn) && entry.dependsOn.length) dependencies.set(entry.unitId, entry.dependsOn);
+    const cwd = canonicalPlainPath(entry.cwd);
+    const group = byCwd.get(cwd) || [];
+    group.push(entry);
+    byCwd.set(cwd, group);
+  }
+  const reaches = (from, target) => {
+    const visited = new Set([from]);
+    const stack = [...(dependencies.get(from) || [])];
+    while (stack.length) {
+      const next = stack.pop();
+      if (next === target) return true;
+      if (visited.has(next)) continue;
+      visited.add(next);
+      stack.push(...(dependencies.get(next) || []));
+    }
+    return false;
+  };
+  for (const group of byCwd.values()) {
+    for (let i = 0; i < group.length; i += 1) {
+      const scope = new Set((group[i].writeScope || []).map((file) => path.normalize(file)));
+      for (let j = i + 1; j < group.length; j += 1) {
+        const shared = (group[j].writeScope || []).map((file) => path.normalize(file)).find((file) => scope.has(file));
+        if (!shared) continue;
+        if (reaches(group[i].unitId, group[j].unitId) || reaches(group[j].unitId, group[i].unitId)) continue;
+        throw new Error(
+          `units ${group[i].unitId} (${group[i].dispatchId}) and ${group[j].unitId} (${group[j].dispatchId}) both write ${shared} `
+          + 'in the same worktree and may run concurrently: declare a dependsOn between them to make the shared file legal',
+        );
+      }
+    }
+  }
+}
+
 function sealPlan({ plan, runDir, availability, synaraCatalog, skillSourceRoot, noJev, classOverride, jevClassification }) {
   if (!plan || !runDir) throw new Error('--plan and --run-dir are required');
   const available = loadAvailability(availability);
@@ -111,6 +213,10 @@ function sealPlan({ plan, runDir, availability, synaraCatalog, skillSourceRoot, 
   if (fs.existsSync(sealPath)) throw new Error('run directory already has a sealed plan; use a new run directory');
   // A unit that names a check must say where its checkers read the result.
   requireUnitCheckEvidence(validated.plan, root);
+  // A unit's dependencies must be units the plan itself builds, in a graph that can run.
+  requireUnitDependencies(validated.plan);
+  // Concurrent units in one worktree may not write the same file.
+  requireDistinctWriteScopes(validated.plan);
   for (const entry of validated.plan.dispatches) {
     if (!entry.brief || hashFile(entry.brief) !== entry.briefSha256) throw new Error(`brief file/hash mismatch: ${entry.dispatchId}`);
     const cwd = canonicalPlainPath(entry.cwd);
@@ -183,4 +289,4 @@ function main(argv = process.argv.slice(2)) {
   } catch (error) { process.stderr.write(`PLAN_SEAL_FAIL: ${error.message}\n`); return 1; }
 }
 if (require.main === module) process.exitCode = main();
-module.exports = { main, readSealedRun, requireUnitCheckEvidence, sealPlan };
+module.exports = { main, readSealedRun, requireDistinctWriteScopes, requireUnitCheckEvidence, requireUnitDependencies, sealPlan };

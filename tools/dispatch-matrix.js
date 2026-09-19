@@ -116,6 +116,10 @@ function validatePlan(plan, matrix, availability = {}, nowMs = Date.now()) {
     for (const name of route.writeScope) {
       if (typeof name !== 'string' || !name || name.includes('\\') || name.split('/').some((part) => part === '..' || part === '.' || part === '.git' || !part) || path.isAbsolute(name) || /[:*?\x00-\x1f]/.test(name)) throw policyError(`invalid writeScope path: ${name}`);
     }
+    if (route.dependsOn !== undefined) {
+      if (route.role !== 'implement') throw policyError(`dependsOn is implement-only: ${route.dispatchId}`);
+      if (!Array.isArray(route.dependsOn) || route.dependsOn.some((unitId) => typeof unitId !== 'string' || !unitId)) throw policyError(`dependsOn must be an array of non-empty unitIds: ${route.dispatchId}`);
+    }
     if (route.escalation !== undefined && typeof route.escalation !== 'boolean') throw policyError('escalation must be a boolean');
     if (route.escalation === true && (typeof route.escalationReason !== 'string' || route.escalationReason.trim().length < 16)) throw policyError('escalationReason required');
     if (route.role === 'implement') {

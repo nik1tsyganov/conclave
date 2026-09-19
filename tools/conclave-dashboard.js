@@ -225,10 +225,12 @@ function createSnapshot(runDir, { nowMs = Date.now() } = {}) {
   const summary = read.json('run-summary.json', true)?.value;
   const latest = newest(dispatches.map(row => row.lastEventAt));
   const unitIds = new Set(dispatches.map(row => row.unitId));
-  const completeUnits = summary && Array.isArray(summary.units) && summary.units.length === unitIds.size && summary.units.every(unit => object(unit) && unitIds.has(unit.unitId) && ['PASS', 'FAIL', 'NOT_REQUIRED'].includes(unit.status)) && new Set(summary.units.map(unit => unit.unitId)).size === unitIds.size;
+  const completeUnits = summary && Array.isArray(summary.units) && summary.units.length === unitIds.size && summary.units.every(unit => object(unit) && unitIds.has(unit.unitId) && ['PASS', 'FAIL', 'NOT_REQUIRED', 'BLOCKED'].includes(unit.status)) && new Set(summary.units.map(unit => unit.unitId)).size === unitIds.size;
   // Check consistency inside the saved summary; this does not reassess evidence or votes.
   const savedExecution = Array.isArray(summary?.outcomes) && summary.outcomes.every(row => row?.status === 'PASS') ? 'PASS' : 'FAIL';
-  const savedApproval = completeUnits ? (summary.units.some(unit => unit.status === 'FAIL') ? 'FAIL' : summary.units.every(unit => unit.status === 'NOT_REQUIRED') ? 'NOT_REQUIRED' : 'PASS') : null;
+  // BLOCKED counts with FAIL, as it does in run-finalize's own roll-up: a unit that never
+  // built has not been approved, and reading it as anything else would land half a feature.
+  const savedApproval = completeUnits ? (summary.units.some(unit => ['FAIL', 'BLOCKED'].includes(unit.status)) ? 'FAIL' : summary.units.every(unit => unit.status === 'NOT_REQUIRED') ? 'NOT_REQUIRED' : 'PASS') : null;
   const consistentSummary = summary && summary.executionStatus === savedExecution && summary.approvalStatus === savedApproval && summary.ok === (savedExecution === 'PASS' && savedApproval !== 'FAIL');
   const summaryBound = summary && bound && completeUnits && consistentSummary && summary.schemaVersion === 1 && summary.planId === plan.planId && summary.planHash === seal.planHash && timestamp(summary.finalizedAt) && Date.parse(summary.finalizedAt) >= Date.parse(seal.sealedAt) && Date.parse(summary.finalizedAt) <= nowMs && (!latest || Date.parse(summary.finalizedAt) >= Date.parse(latest)) && Array.isArray(summary.outcomes) && summary.outcomes.length === dispatches.length && dispatches.every(row => {
     const matches = summary.outcomes.filter(outcome => outcome?.dispatchId === row.id && outcome.unitId === row.unitId && outcome.role === row.role && outcome.vendor === row.vendor && outcome.planId === plan.planId && outcome.planHash === seal.planHash);

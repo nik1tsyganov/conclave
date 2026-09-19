@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const { readSealedRun, sealPlan } = require('./plan-seal.js');
-const { createSealedRun, fakeVendor } = require('./test-fixtures.js');
+const { briefFixture, createSealedRun, fakeVendor } = require('./test-fixtures.js');
 const { runDispatch } = require('./dispatch-run.js');
 const { hashFile, writeJson } = require('./dispatch-evidence.js');
 const { canonicalPlainPath } = require('./runtime-paths.js');
@@ -140,4 +140,52 @@ test('jev-plan-classify writes a record bound to each unit brief from a fake eng
   assert.equal(sealed.jevClassify.units[entry.unitId].agrees, true);
   const notRun = async () => ({ ok: false, notRun: 'TYPESAFE_API_KEY not set' });
   await assert.rejects(classifyPlan({ plan: run.planSource, out: path.join(run.root, 'x.json'), systemOne: notRun }), /Jev NOT_RUN/);
+});
+
+// Two implement units need two vendors: the matrix's 60% distribution floor refuses
+// a 2/2 single-vendor split before the write-scope check under test is reached.
+const IMPLEMENT_U1 = { unitId: 'u1', vendor: 'openai', model: 'gpt-5.6-sol', effort: 'medium', role: 'implement', class: 'standard-feature' };
+const IMPLEMENT_U2 = { unitId: 'u2', vendor: 'google', model: 'gemini-3.1-pro-high', effort: 'fused-high', role: 'implement', class: 'debug-mystery' };
+
+// writeScope paths are already required to be normalised ('./result.txt' is refused earlier
+// as an invalid writeScope path), so the collision is always between plain spellings.
+test('concurrent implement units in one worktree may not write the same file', t => {
+  assert.throws(
+    () => createSealedRun(t, [IMPLEMENT_U1, IMPLEMENT_U2]),
+    /units u1 \(d1\) and u2 \(d2\) both write result\.txt in the same worktree and may run concurrently: declare a dependsOn between them/,
+  );
+});
+
+test('a declared dependency makes the shared file legal', t => {
+  const run = createSealedRun(t, [IMPLEMENT_U1, { ...IMPLEMENT_U2, dependsOn: ['u1'] }]);
+  assert.equal(run.sealed.planId, 'fixture-run');
+});
+
+test('the dependency exemption is transitive across a chain', t => {
+  const u3 = { unitId: 'u3', vendor: 'anthropic', model: 'fable', effort: 'medium', role: 'implement', class: 'standard-feature', dependsOn: ['u2'] };
+  const run = createSealedRun(t, [IMPLEMENT_U1, { ...IMPLEMENT_U2, dependsOn: ['u1'] }, u3]);
+  assert.equal(run.sealed.planId, 'fixture-run');
+});
+
+test('the same path in different worktrees does not collide', t => {
+  // Both seats must be in the first sealed run so the skill fixture stages the skills for
+  // both; the reseal then changes only one entry's cwd and the two write scopes.
+  const run = createSealedRun(t, [{ ...IMPLEMENT_U1, writeScope: ['a.txt'] }, { ...IMPLEMENT_U2, writeScope: ['b.txt'] }]);
+  const other = path.join(run.root, 'other-work'); fs.mkdirSync(other);
+  const plan = { ...run.planObject, dispatches: [
+    { ...run.planObject.dispatches[0], writeScope: ['result.txt'] },
+    { ...run.planObject.dispatches[1], cwd: other, writeScope: ['result.txt'] }] };
+  writeJson(run.planSource, plan);
+  const sealed = sealPlan({ noJev: 'test fixture', plan: run.planSource, runDir: path.join(run.root, 'run-two'), availability: run.availability, skillSourceRoot: run.opts.skillSourceRoot });
+  assert.equal(sealed.planId, 'fixture-run');
+});
+
+test('disjoint write scopes in one worktree seal', t => {
+  const run = createSealedRun(t, [{ ...IMPLEMENT_U1, writeScope: ['a.txt'] }, { ...IMPLEMENT_U2, writeScope: ['b.txt'] }]);
+  assert.equal(run.sealed.planId, 'fixture-run');
+});
+
+test('a single implement unit has no pair to collide with', t => {
+  const run = createSealedRun(t, [IMPLEMENT_U1]);
+  assert.equal(run.sealed.planId, 'fixture-run');
 });

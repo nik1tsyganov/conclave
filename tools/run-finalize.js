@@ -345,6 +345,16 @@ function assessRun(run) {
     const entries = run.plan.dispatches.filter((entry) => entry.unitId === unitId);
     const author = entries.find((entry) => entry.role === 'implement');
     const checked = run.executions.filter(({ entry }) => entry.unitId === unitId && ['review', 'verify'].includes(entry.role));
+    // A unit whose build was blocked by an unmet dependency never built: name that,
+    // not the missing-review failure its absent checking seats would suggest.
+    const unmet = (author?.dependsOn || []).filter((dependency) => {
+      const implement = run.plan.dispatches.find((entry) => entry.unitId === dependency && entry.role === 'implement');
+      return !implement || run.outcomes.find((row) => row.dispatchId === implement.dispatchId)?.status !== 'PASS';
+    });
+    if (unmet.length) {
+      units.push({ unitId, status: 'BLOCKED', reason: `unit ${unitId} never built: dependency ${unmet.join(', ')} did not pass`, blockedBy: unmet });
+      continue;
+    }
     let status = author || checked.length ? 'PASS' : 'NOT_REQUIRED';
     let reason = null;
     try {
@@ -362,7 +372,7 @@ function assessRun(run) {
     units.push({ unitId, status, reason });
   }
   const executionStatus = run.outcomes.every((row) => row.status === 'PASS') ? 'PASS' : 'FAIL';
-  const approvalStatus = units.some((unit) => unit.status === 'FAIL') ? 'FAIL' : units.every((unit) => unit.status === 'NOT_REQUIRED') ? 'NOT_REQUIRED' : 'PASS';
+  const approvalStatus = units.some((unit) => unit.status === 'FAIL' || unit.status === 'BLOCKED') ? 'FAIL' : units.every((unit) => unit.status === 'NOT_REQUIRED') ? 'NOT_REQUIRED' : 'PASS';
   return { schemaVersion: 1, planId: run.plan.planId, planHash: run.seal.planHash, executionStatus, approvalStatus, ok: executionStatus === 'PASS' && approvalStatus !== 'FAIL', outcomes: run.outcomes, units, finalizedAt: new Date().toISOString() };
 }
 
