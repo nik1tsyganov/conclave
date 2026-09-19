@@ -37,6 +37,19 @@ function notRun(reason) {
   return { ok: false, notRun: reason, answers: {}, usage: null };
 }
 
+/// Strips the key from any text before it reaches a receipt, a log or a verdict.
+///
+/// Measured 2026-09-19 in the sibling jev-mcp client: an invalid header value makes
+/// undici echo the whole `Bearer <key>` back inside err.message, and a proxy can echo a
+/// key into an error body. Both land in `notRun` reasons here, and a notRun reason is
+/// written into CONCLAVE telemetry, so a credential could ride out on a committed file.
+function redact(text) {
+  const key = process.env.TYPESAFE_API_KEY;
+  let out = String(text);
+  if (key && key.length > 4) out = out.split(key).join('[redacted]');
+  return out.replace(/Bearer\s+\S+/g, 'Bearer [redacted]');
+}
+
 async function systemOne({
   state,
   questions,
@@ -61,7 +74,7 @@ async function systemOne({
         body,
       });
     } catch (err) {
-      return notRun(`network: ${err.message}`);
+      return notRun(`network: ${redact(err.message)}`);
     }
     status = response.status;
     text = await response.text();
@@ -85,9 +98,9 @@ async function systemOne({
     fs.appendFileSync(provenancePath, `${JSON.stringify(row)}\n`, 'utf8');
   }
 
-  if (status !== 200) return notRun(`HTTP ${status}: ${String(text).slice(0, 200)}`);
+  if (status !== 200) return notRun(`HTTP ${status}: ${redact(String(text)).slice(0, 200)}`);
   if (!parsed || typeof parsed.answers !== 'object') return notRun('response had no answers object');
   return { ok: true, answers: parsed.answers, usage: parsed.usage || null, model: parsed.model || model };
 }
 
-module.exports = { systemOne, ENDPOINT, DEFAULT_MODEL, MAX_ATTEMPTS, sha256 };
+module.exports = { systemOne, ENDPOINT, DEFAULT_MODEL, MAX_ATTEMPTS, sha256, redact };
