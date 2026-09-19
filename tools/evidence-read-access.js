@@ -60,9 +60,9 @@ function validateEvidenceReadLaunch(launch, entry, dirs, context) {
   const granted = [];
   if (launch.args.some(arg => typeof arg === 'string' && /^--(?:add-dir|sandbox|permission-mode|tools|allowedTools)=/.test(arg))) fail('alternate native grant syntax is forbidden');
   for (let i = 0; i < launch.args.length; i++) if (launch.args[i] === '--add-dir') granted.push(launch.args[++i]);
-  if (!isDeepStrictEqual(granted.map(canonicalPlainPath).map(identity).sort(), expected.map(canonicalPlainPath).map(identity).sort())) fail('native directory grants differ from bound paths');
+  if (!isDeepStrictEqual([...new Set(granted.map(canonicalPlainPath).map(identity))].sort(), expected.map(canonicalPlainPath).map(identity).sort())) fail('native directory grants differ from bound paths');
   if (entry.vendor === 'google' && (launch.args.filter(arg => arg === '--sandbox').length !== 1 || launch.args.some(arg => ['--dangerously-skip-permissions', '--yolo'].includes(arg)))) fail('Google checking access must remain sandboxed');
-  if (entry.vendor === 'anthropic' && (launch.args.includes('--dangerously-skip-permissions') || ['--permission-mode', '--tools', '--allowedTools'].some((flag, index) => launch.args.filter(arg => arg === flag).length !== 1 || launch.args[launch.args.indexOf(flag) + 1] !== ['dontAsk', 'Read,Glob,Grep', 'Read,Glob,Grep'][index]))) fail('Claude checking access must remain read-only');
+  if (entry.vendor === 'anthropic' && (launch.args.includes('--dangerously-skip-permissions') || launch.args.includes('--tools') || ['--permission-mode', '--allowedTools'].some((flag, index) => launch.args.filter(arg => arg === flag).length !== 1 || launch.args[launch.args.indexOf(flag) + 1] !== ['dontAsk', 'Read,Glob,Grep'][index]))) fail('Claude checking access must remain read-only');
 }
 
 module.exports = { validateEvidenceReadDirs, snapshotEvidenceReads, validateEvidenceReadLaunch };

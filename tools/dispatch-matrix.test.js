@@ -277,10 +277,12 @@ test('a class demanding a panel can seat one: two foreign vendors across its che
   }
 });
 
-// Opus refuses every CHECKING launch: cli-adapters adds --tools Read,Glob,Grep for
-// non-implement roles, which completes the four-flag conjunction it declines, and Fable
-// passes that identical launch. Opus stays legal — what refuses it is a classifier reading a
-// launch shape, not a property of the model — but the picker must never reach it first.
+// Opus refused every CHECKING launch while cli-adapters added --tools Read,Glob,Grep for
+// non-implement roles, completing the four-flag conjunction it declines. That flag was
+// dropped on 2026-09-19, so the shape Opus refused is no longer the shape it is sent, and
+// whether it still refuses is unmeasured. Opus stays legal — what refused it is a classifier
+// reading a launch shape, not a property of the model — and until a probe says otherwise the
+// picker must still never reach it first.
 test('a Claude checking lane that starts sits ahead of the one that refuses', () => {
   const matrix = loadMatrix();
   for (const [name, klass] of Object.entries(matrix.classes)) {

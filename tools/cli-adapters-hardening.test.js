@@ -86,7 +86,7 @@ test('Claude non-implement roles do not inherit implement bypassPermissions', (t
     assert.ok(!fs.readFileSync(launch.stdinFile, 'utf8').includes('ACK test brief'), 'the pointer carries no brief content');
     assert.ok(!launch.env.ANTHROPIC_API_KEY);
     if (role !== 'implement') {
-      assert.strictEqual(launch.args[launch.args.indexOf('--tools') + 1], 'Read,Glob,Grep');
+      assert.ok(!launch.args.includes('--tools'), 'the --tools restriction completes the refused launch shape (2026-09-19)');
       assert.strictEqual(launch.args[launch.args.indexOf('--allowedTools') + 1], 'Read,Glob,Grep');
       assert.ok(!launch.args.includes('plan'), 'plan mode requires a separate approval turn');
       for (const forbidden of ['bypassPermissions', 'manual', 'auto', 'acceptEdits', 'plan']) assert.throws(() => anthropicLaunch({ ...common, role, reviewPermissionMode: forbidden }), /read-only Claude roles require/);
@@ -182,4 +182,103 @@ test('Google launches drop inherited Synara Antigravity capture environment', (t
   assert.ok(!Object.prototype.hasOwnProperty.call(launch.env, 'SYNARA_ANTIGRAVITY_EVENTS'));
   assert.ok(!Object.prototype.hasOwnProperty.call(launch.env, 'SYNARA_ANTIGRAVITY_HOOK_DECISION'));
   assert.strictEqual(launch.env.AGY_CLI_DISABLE_AUTO_UPDATE, 'true');
+});
+
+test('Google grants both the spelled and resolved form of a symlinked directory, without duplicates', (t) => {
+  const f = fixture(t);
+  const real = path.join(f.dir, 'real-workspace');
+  fs.mkdirSync(real);
+  const link = path.join(f.dir, 'linked-workspace');
+  fs.symlinkSync(real, link, 'dir');
+  const launch = googleLaunch({
+    briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
+    cwd: link, model: 'gemini-3.1-pro-high', role: 'verify',
+    env: { ...fakeBins, CONCLAVE_DEV_ROOT: link }, mustExistBinary: false,
+  });
+  const grants = [];
+  for (let i = 0; i < launch.args.length; i++) if (launch.args[i] === '--add-dir') grants.push(launch.args[i + 1]);
+  const resolved = fs.realpathSync(link);
+  assert.notStrictEqual(resolved, link);
+  assert.ok(grants.includes(link), 'the spelled path is granted');
+  assert.ok(grants.includes(resolved), 'the resolved path is granted');
+  assert.strictEqual(new Set(grants).size, grants.length, 'no --add-dir value appears twice');
+});
+
+test('Claude verify and review launches carry no --tools restriction but stay read-only', (t) => {
+  const f = fixture(t);
+  const common = {
+    briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
+    cwd: '/opt/conclave/src/product-a', model: 'fable', effort: 'xhigh', env: fakeBins, mustExistBinary: false,
+  };
+  for (const role of ['verify', 'review']) {
+    const launch = anthropicLaunch({ ...common, role });
+    assert.ok(!launch.args.includes('--tools'), 'no --tools element at all');
+    assert.strictEqual(launch.args[launch.args.indexOf('--allowedTools') + 1], 'Read,Glob,Grep');
+    assert.strictEqual(launch.args[launch.args.indexOf('--disallowedTools') + 1], 'Agent,Task');
+    assert.strictEqual(launch.permissionMode, 'dontAsk');
+  }
+});
+
+test('Google checking seats with captured evidence are pointed at it and warned off running commands', (t) => {
+  const f = fixture(t);
+  const evidenceDir = path.join(f.dir, 'evidence');
+  fs.mkdirSync(evidenceDir);
+  const common = {
+    briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
+    cwd: '/opt/conclave/src/product-a', model: 'gemini-3.1-pro-high', env: fakeBins, mustExistBinary: false,
+  };
+  const checking = googleLaunch({ ...common, role: 'verify', evidenceReadDirs: [evidenceDir] });
+  const prompt = checking.args[checking.args.indexOf('-p') + 1];
+  assert.ok(prompt.includes(checking.evidenceReadDirs[0]), 'the absolute evidence directory is named');
+  assert.ok(prompt.includes('test-output.txt'));
+  assert.ok(prompt.includes('diff.txt'));
+  assert.match(prompt, /run nothing yourself/);
+  assert.ok(prompt.includes('voids your result'), 'the consequence of running a command is stated');
+
+  const implement = googleLaunch({ ...common, role: 'implement' });
+  const implementPrompt = implement.args[implement.args.indexOf('-p') + 1];
+  assert.ok(!implementPrompt.includes('run nothing yourself'), 'implement seats keep their working pointers');
+
+  const bare = googleLaunch({ ...common, role: 'review' });
+  const barePrompt = bare.args[bare.args.indexOf('-p') + 1];
+  assert.ok(!barePrompt.includes('run nothing yourself'), 'a checking seat without captured evidence is unchanged');
+
+  for (const build of [openaiLaunch, anthropicLaunch]) {
+    const other = build({ ...common, role: 'verify', evidenceReadDirs: [evidenceDir], capturePath: path.join(f.dir, 'capture.txt') });
+    const otherPointer = fs.readFileSync(other.stdinFile, 'utf8');
+    assert.ok(!otherPointer.includes('run nothing yourself'), `${other.vendor} pointer is unchanged`);
+  }
+});
+
+test('Google checking pointer with evidence wording stays within the 2000-character limit', (t) => {
+  const f = fixture(t);
+  const long = 'segment-' + 'x'.repeat(24);
+  const briefDir = path.join(f.dir, long, long);
+  fs.mkdirSync(briefDir, { recursive: true });
+  const briefPath = path.join(briefDir, 'BRIEF.md');
+  const seatContractPath = path.join(briefDir, 'SEAT-CONTRACT.md');
+  fs.writeFileSync(briefPath, 'ACK test brief\nTask details remain in this file.\n', 'utf8');
+  fs.writeFileSync(seatContractPath, 'seat contract', 'utf8');
+  const launch = googleLaunch({
+    briefPath, seatContractPath, skillRoot: f.skillRoot,
+    cwd: path.join('/opt/conclave/src', long, 'worktree'),
+    model: 'gemini-3.1-pro-high', role: 'review',
+    evidenceReadDirs: [path.join('/opt/conclave/runs', long, 'out', long)],
+    env: fakeBins, mustExistBinary: false,
+  });
+  const prompt = launch.args[launch.args.indexOf('-p') + 1];
+  assert.ok(prompt.length <= 2000);
+});
+
+test('Claude implement launch is unchanged: bypassPermissions and no tool restriction', (t) => {
+  const f = fixture(t);
+  const launch = anthropicLaunch({
+    briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
+    cwd: '/opt/conclave/src/product-a', model: 'fable', effort: 'xhigh', role: 'implement',
+    env: fakeBins, mustExistBinary: false,
+  });
+  assert.ok(!launch.args.includes('--allowedTools'));
+  assert.ok(!launch.args.includes('--tools'));
+  assert.strictEqual(launch.permissionMode, 'bypassPermissions');
+  assert.strictEqual(launch.args[launch.args.indexOf('--permission-mode') + 1], 'bypassPermissions');
 });
