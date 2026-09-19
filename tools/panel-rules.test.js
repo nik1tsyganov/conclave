@@ -117,6 +117,67 @@ test('an approval with nothing behind it is an abstention', () => {
   assert.ok(v.flags.includes('approve-without-evidence-counted-as-abstain'));
 });
 
+test('an approval from a seat that opened none of its granted evidence is an abstention', () => {
+  const unread = { files: [], seenCount: 0, totalCount: 2 };
+  const v = rules.verdict({ receipts: [BUILDER,
+    receipt('scrutator', 'anthropic', 'verify', 'APPROVE', GOOD),
+    receipt('advocatus', 'google', 'review', 'APPROVE', 'I read the callers in app.py and none passes a tuple.', { evidenceRead: unread })] });
+  assert.deepEqual([v.approve, v.abstain], [1, 1]);
+  assert.equal(v.outcome, 'DEADLOCK', 'an unread approval does not carry it');
+  assert.equal(v.adjustments.length, 1);
+  assert.deepEqual(v.adjustments[0], { slot: 'advocatus', role: 'review', declared: 'APPROVE', counted: 'ABSTAIN', reason: 'approved without opening the evidence it was granted' });
+});
+
+test('reading some or all of the granted evidence counts normally', () => {
+  for (const seenCount of [1, 2]) {
+    const v = rules.verdict({ receipts: [BUILDER,
+      receipt('scrutator', 'anthropic', 'verify', 'APPROVE', GOOD),
+      receipt('advocatus', 'google', 'review', 'APPROVE', 'I read the callers in app.py and none passes a tuple.', { evidenceRead: { files: [], seenCount, totalCount: 2 } })] });
+    assert.equal(v.outcome, 'PASSAGE', `seenCount ${seenCount} of 2: partial reading is a judgment, zero is a fact`);
+    assert.equal(v.adjustments.length, 0);
+  }
+});
+
+test('a seat granted nothing cannot be penalised for reading nothing', () => {
+  for (const evidenceRead of [null, { files: [], seenCount: 0, totalCount: 0 }]) {
+    const v = rules.verdict({ receipts: [BUILDER,
+      receipt('scrutator', 'anthropic', 'verify', 'APPROVE', GOOD),
+      receipt('advocatus', 'google', 'review', 'APPROVE', 'I read the callers in app.py and none passes a tuple.', { evidenceRead })] });
+    assert.equal(v.outcome, 'PASSAGE', `evidenceRead ${JSON.stringify(evidenceRead)} is exempt`);
+    assert.equal(v.adjustments.length, 0);
+  }
+});
+
+test('a rejection is never downgraded, even with zero evidence reads', () => {
+  const v = rules.verdict({ receipts: [BUILDER,
+    receipt('scrutator', 'anthropic', 'verify', 'APPROVE', GOOD),
+    receipt('advocatus', 'google', 'review', 'REJECT', 'It drops the empty case.', { evidenceRead: { files: [], seenCount: 0, totalCount: 2 } })] });
+  assert.equal(v.reject, 1, 'a checker that objects has still refused to let the work land');
+  assert.equal(v.adjustments.length, 0);
+});
+
+test('the unsupported-evidence downgrade fires independently of the evidence-read one', () => {
+  const v = rules.verdict({ receipts: [BUILDER,
+    receipt('scrutator', 'anthropic', 'verify', 'APPROVE', GOOD),
+    receipt('advocatus', 'google', 'review', 'APPROVE', 'looks good to me', { evidenceRead: { files: [], seenCount: 2, totalCount: 2 } })] });
+  assert.equal(v.adjustments.length, 1);
+  assert.equal(v.adjustments[0].reason, 'agreed without a reason');
+});
+
+// The two replies from the live run on 2026-09-19 that motivated the rule: one seat read
+// the diff it was granted, the other certified NOTHING ELSE without opening it.
+test('the live-run replies count the way they should have', () => {
+  const readItAll = 'The worktree holds no remaining MAX_RETRY reference and five RETRY_CEILING references, the diff changes only those five identifier lines in the two named files with no new files, and the captured suite passed 3 of 3 with exit 0.';
+  const readNothing = 'The mechanical rename of MAX_RETRY to RETRY_CEILING is complete and correct across all usages in the target files, no unrelated changes were made, and all tests pass.';
+  const v = rules.verdict({ receipts: [BUILDER,
+    receipt('scrutator', 'anthropic', 'verify', 'APPROVE', readItAll, { evidenceRead: { files: [], seenCount: 2, totalCount: 2 } }),
+    receipt('advocatus', 'google', 'review', 'APPROVE', readNothing, { evidenceRead: { files: [], seenCount: 0, totalCount: 2 } })] });
+  assert.deepEqual([v.approve, v.abstain], [1, 1]);
+  assert.equal(v.adjustments.length, 1);
+  assert.equal(v.adjustments[0].slot, 'advocatus');
+  assert.equal(v.adjustments[0].reason, 'approved without opening the evidence it was granted');
+});
+
 test('a rejection stands whatever its reason', () => {
   const v = rules.verdict({ receipts: [BUILDER,
     receipt('scrutator', 'anthropic', 'verify', 'REJECT', 'no'),

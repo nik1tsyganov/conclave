@@ -15,4 +15,4 @@ TELEMETRY: Derived from verified terminal receipts (R17), not handwritten succes
 PROOF: R18 vendor-native proof. Model substitution or input tampering fails. No model may waive deterministic failures.
 ```
 
-The runtime owns staging, hashing, model proof, write auditing and receipt creation. This prose does not grant tools or establish proof by itself. For panel review, end the final response with exactly one POSITION: APPROVE, POSITION: REJECT or POSITION: ABSTAIN line.
+The runtime owns staging, hashing, model proof, write auditing and receipt creation. This prose does not grant tools or establish proof by itself. For panel review, end the final response with exactly one POSITION: APPROVE, POSITION: REJECT or POSITION: ABSTAIN line. A checking seat given an evidence directory must read the files in it before answering, and its EVIDENCE line should cite what it read: a path, a line, a count, or a named captured artifact. An approval from a seat which opened none of the evidence it was granted is recorded as an abstention.

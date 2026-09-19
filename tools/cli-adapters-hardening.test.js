@@ -250,6 +250,33 @@ test('Google checking seats with captured evidence are pointed at it and warned 
   }
 });
 
+test('Google seats get the same explicit first-read recipe the other vendors get', (t) => {
+  const f = fixture(t);
+  const evidenceDir = path.join(f.dir, 'evidence');
+  fs.mkdirSync(evidenceDir);
+  const common = {
+    briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
+    cwd: '/opt/conclave/src/product-a', model: 'gemini-3.1-pro-high', env: fakeBins, mustExistBinary: false,
+  };
+  const checking = googleLaunch({ ...common, role: 'verify', evidenceReadDirs: [evidenceDir] });
+  const prompt = checking.args[checking.args.indexOf('-p') + 1];
+  assert.ok(prompt.includes(`FIRST use the view_file tool with AbsolutePath exactly ${f.seatContractPath} and no other tool.`));
+  assert.ok(prompt.includes("Then use that contract's exact one-file view_file recipes."));
+  assert.ok(prompt.indexOf('FIRST use the view_file tool') < prompt.indexOf('Only after every required instruction read is complete'),
+    'the recipe leads the pointer; the evidence note stays at the end');
+
+  // dispatch-run.js runs verifyInstructionReadEvidence on every dispatch with no role
+  // branch, so builders face the same gate and need the same recipe.
+  const implement = googleLaunch({ ...common, role: 'implement' });
+  const implementPrompt = implement.args[implement.args.indexOf('-p') + 1];
+  assert.ok(implementPrompt.includes(`FIRST use the view_file tool with AbsolutePath exactly ${f.seatContractPath} and no other tool.`));
+
+  const openai = openaiLaunch({ ...common, role: 'verify', effort: 'high', capturePath: path.join(f.dir, 'capture.txt') });
+  assert.ok(fs.readFileSync(openai.stdinFile, 'utf8').includes('FIRST use the exec code tool with exactly this JavaScript:'), 'openai recipe is unchanged');
+  const claude = anthropicLaunch({ ...common, role: 'verify', effort: 'xhigh', capturePath: path.join(f.dir, 'capture.txt') });
+  assert.ok(fs.readFileSync(claude.stdinFile, 'utf8').includes('FIRST use the Read tool with file_path exactly'), 'anthropic recipe is unchanged');
+});
+
 test('Google checking pointer with evidence wording stays within the 2000-character limit', (t) => {
   const f = fixture(t);
   const long = 'segment-' + 'x'.repeat(24);
@@ -268,6 +295,8 @@ test('Google checking pointer with evidence wording stays within the 2000-charac
   });
   const prompt = launch.args[launch.args.indexOf('-p') + 1];
   assert.ok(prompt.length <= 2000);
+  assert.ok(prompt.indexOf('FIRST use the view_file tool') < prompt.indexOf('Only after every required instruction read is complete'),
+    'the recipe leads and the evidence note trails even with long absolute paths');
 });
 
 test('Claude implement launch is unchanged: bypassPermissions and no tool restriction', (t) => {

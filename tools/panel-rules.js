@@ -241,6 +241,15 @@ function verdict({ receipts, critical = false, checkPassed = null } = {}) {
         counted.push({ receipt, position: 'ABSTAIN' });
         continue;
       }
+      // Zero reads of a non-empty grant is a fact, not a judgment: the seat certified
+      // criteria it could not have checked. A null observation (nothing was granted), an
+      // empty directory and partial reading are all exempt - only exactly zero counts.
+      const reads = receipt.evidenceRead;
+      if (reads !== null && typeof reads === 'object' && reads.totalCount > 0 && reads.seenCount === 0) {
+        adjustments.push({ slot: receipt.slot, role: receipt.role, declared: 'APPROVE', counted: 'ABSTAIN', reason: 'approved without opening the evidence it was granted' });
+        counted.push({ receipt, position: 'ABSTAIN' });
+        continue;
+      }
     }
     counted.push({ receipt, position: receipt.position });
   }

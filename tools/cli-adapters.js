@@ -219,6 +219,8 @@ function seatPointerText(ctx) {
     recipe = `FIRST use the exec code tool with exactly this JavaScript: const r = await tools.exec_command(${JSON.stringify(command)}); text(r.output); Then use the exact one-file read recipes in that contract. `;
   } else if (ctx.vendor === 'anthropic') {
     recipe = `FIRST use the Read tool with file_path exactly ${ctx.seatContractPath} and no other tool. Then use that contract's exact one-file Read recipes. Do not cat or Bash instruction files. `;
+  } else if (ctx.vendor === 'google') {
+    recipe = `FIRST use the view_file tool with AbsolutePath exactly ${ctx.seatContractPath} and no other tool. Then use that contract's exact one-file view_file recipes. `;
   }
   // Google's evidence note rides at the END, after the instruction-read obligation. Placed in
   // front it displaced that obligation: the 2026-09-19 review seat went straight to the staged

@@ -328,7 +328,8 @@ function tallyUnit(run, unitId) {
   for (const execution of run.executions.filter(({ entry }) => entry.unitId === unitId && ['review', 'verify'].includes(entry.role))) {
     const current = snapshotWorkspace(execution.entry.cwd);
     if (!compareWorkspace(execution.after, current, []).ok) throw new Error('worktree changed after panel evidence');
-    const ballot = { vendor: execution.entry.vendor, position: nativePosition(execution.response), role: execution.entry.role };
+    const ballot = { vendor: execution.entry.vendor, position: nativePosition(execution.response), role: execution.entry.role,
+      evidenceRead: execution.entry.evidenceReadDirs?.length ? observeEvidenceReads({ captureText: readCaptureText(execution), dirs: execution.entry.evidenceReadDirs }) : null };
     const prior = ballotsByVendor.get(ballot.vendor);
     if (prior && prior.position !== ballot.position) throw new Error(`conflicting positions from ${ballot.vendor}`);
     // Every checking row was validated above; agreeing rows still provide only one vendor vote.
