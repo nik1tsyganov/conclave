@@ -389,6 +389,75 @@ test('Google checking pointer with evidence wording stays within the 2000-charac
     'the recipe leads and the evidence note trails even with long absolute paths');
 });
 
+// The general shape of "do not run anything": a run/execute verb under a negation, or a
+// run verb applied to nothing. Derived from what seatPointerText emits today ("Read those
+// files and run nothing yourself; ..."), but deliberately not that literal sentence, so a
+// reworded vendor-neutral prohibition still fails these tests. The negation must sit
+// immediately before the verb, so legitimate pointer wording ("Do not read global skills
+// or use other tools", "FIRST use the exec code tool") cannot satisfy it by accident.
+const COMMAND_PROHIBITION = /\b(?:run|execute|invoke|launch)\s+(?:nothing|no\b|not\b)|\b(?:do not|don't|never|must not|avoid|refrain from|without)\s+(?:run|running|execute|executing|invoke|invoking|launch|launching)\b/i;
+
+test('the run-nothing evidence note is emitted only for Google checking seats with captured evidence', (t) => {
+  const f = fixture(t);
+  const evidenceDir = path.join(f.dir, 'evidence');
+  fs.mkdirSync(evidenceDir);
+  const common = {
+    briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
+    cwd: '/opt/conclave/src/product-a', model: 'gemini-3.1-pro-high', env: fakeBins, mustExistBinary: false,
+  };
+  // agy declines a headless command without a prompt and reports success, so this seat
+  // must be told to judge from host-captured evidence and run nothing (2026-09-19).
+  const checking = googleLaunch({ ...common, role: 'verify', evidenceReadDirs: [evidenceDir] });
+  const prompt = checking.args[checking.args.indexOf('-p') + 1];
+  assert.ok(prompt.includes(evidenceDir), 'the evidence directory is named');
+  assert.ok(prompt.includes('test-output.txt') && prompt.includes('diff.txt'), 'the captured evidence files are named');
+  assert.match(prompt, COMMAND_PROHIBITION, 'the google checking seat is told not to run anything');
+});
+
+test('the run-nothing evidence note never reaches an OpenAI checking seat', (t) => {
+  const f = fixture(t);
+  const evidenceDir = path.join(f.dir, 'evidence');
+  fs.mkdirSync(evidenceDir);
+  const common = {
+    briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
+    cwd: '/opt/conclave/src/product-a', model: 'gpt-5.6-sol', effort: 'high',
+    capturePath: path.join(f.dir, 'capture.txt'), env: fakeBins, mustExistBinary: false,
+  };
+  // Reason this pin exists: on 2026-09-19 an OpenAI verify seat read a vendor-neutral
+  // run-nothing note as a ban on its exec tool - which IS its file-read mechanism - and
+  // abstained without inspecting anything, blocking the unit from quorum. A vendor-neutral
+  // note silently disables this seat, so this test must keep failing any such change.
+  const launch = openaiLaunch({ ...common, role: 'verify', evidenceReadDirs: [evidenceDir] });
+  const pointer = fs.readFileSync(launch.stdinFile, 'utf8');
+  assert.ok(!COMMAND_PROHIBITION.test(pointer), 'no instruction forbidding commands reaches the OpenAI seat');
+  assert.ok(pointer.includes('FIRST use the exec code tool'), 'the exec read mechanism instruction survives');
+
+  // Teeth check: the same matcher must catch the note the product emits for google today,
+  // so the assertion above cannot pass vacuously through an over-narrow pattern.
+  const google = googleLaunch({ ...common, model: 'gemini-3.1-pro-high', role: 'verify', evidenceReadDirs: [evidenceDir] });
+  assert.match(google.args[google.args.indexOf('-p') + 1], COMMAND_PROHIBITION);
+});
+
+test('the run-nothing evidence note never reaches an Anthropic checking seat', (t) => {
+  const f = fixture(t);
+  const evidenceDir = path.join(f.dir, 'evidence');
+  fs.mkdirSync(evidenceDir);
+  const common = {
+    briefPath: f.briefPath, seatContractPath: f.seatContractPath, skillRoot: f.skillRoot,
+    cwd: '/opt/conclave/src/product-a', model: 'fable', effort: 'xhigh',
+    capturePath: path.join(f.dir, 'capture.txt'), env: fakeBins, mustExistBinary: false,
+  };
+  // Claude reads with the Read tool, so the note would not break it, but the pinned rule
+  // is that the note is scoped to the one vendor that requires it (google). The same
+  // 2026-09-19 abstention is what a vendor-neutral wording would risk elsewhere.
+  const launch = anthropicLaunch({ ...common, role: 'verify', evidenceReadDirs: [evidenceDir] });
+  const pointer = fs.readFileSync(launch.stdinFile, 'utf8');
+  assert.ok(!COMMAND_PROHIBITION.test(pointer), 'no instruction forbidding commands reaches the Anthropic seat');
+
+  const google = googleLaunch({ ...common, model: 'gemini-3.1-pro-high', role: 'verify', evidenceReadDirs: [evidenceDir] });
+  assert.match(google.args[google.args.indexOf('-p') + 1], COMMAND_PROHIBITION, 'the matcher still has teeth');
+});
+
 test('Claude implement launch is unchanged: bypassPermissions and no tool restriction', (t) => {
   const f = fixture(t);
   const launch = anthropicLaunch({

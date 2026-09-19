@@ -13,8 +13,11 @@
 
 const SLOTS = Object.freeze(['ponens', 'scrutator', 'advocatus']);
 const SEAT_VENDORS = Object.freeze(['openai', 'anthropic', 'google']);
-/// The classes this panel can route: every dispatch-matrix class that declares an implement
-/// or verify lane. Kept by hand and not derived, because `tools/panel-routing.js` ships in the
+/// The classes this panel can route: every dispatch-matrix class that declares a verify lane
+/// — but a class this runtime builds (an implement lane) only when it declares BOTH checking
+/// lanes, verify and review. A buildable class without a review lane seals plans whose units
+/// can never land, because run-finalize requires a successful seat from each checking role.
+/// Kept by hand and not derived, because `tools/panel-routing.js` ships in the
 /// `conclave-mcp` package and `dispatch-matrix.json` does not — a require would break the
 /// published module at import. `panel-routing.test.js` asserts these two lists against the
 /// matrix instead, so a class added there and forgotten here fails the suite rather than being
@@ -24,12 +27,23 @@ const CLASSES = Object.freeze([
   'test-verification', 'agentic-long-run', 'extreme-end-to-end',
 ]);
 
-/// Matrix classes with no implement or verify lane. They are legal to name in a plan and this
-/// panel cannot seat them, so naming one is refused with its own reason rather than quietly
-/// becoming ordinary feature work.
+/// Matrix classes this panel cannot seat, each refused with the lane it lacks named. Today
+/// that is every class with no implement and no verify lane; a class that gained an implement
+/// lane while missing a checking lane would join them. They are legal to name in a plan and
+/// this panel cannot seat them, so naming one is refused with its own reason rather than
+/// quietly becoming ordinary feature work.
 const UNROUTABLE_CLASSES = Object.freeze([
   'architecture-planning', 'long-context-analysis', 'review-adversarial', 'research-synthesis',
 ]);
+
+/// Why each unroutable class is refused, so the refusal names the missing lane instead of
+/// surfacing later as a unit that can never land.
+const UNROUTABLE_REASON = Object.freeze({
+  'architecture-planning': 'no implement or verify lane',
+  'long-context-analysis': 'no implement or verify lane',
+  'review-adversarial': 'no implement or verify lane',
+  'research-synthesis': 'no implement or verify lane',
+});
 
 /// Units one block may ask for. Past this the lead hears which ones did not go out.
 const MAX_UNITS = 8;
@@ -55,6 +69,23 @@ const CHECKER_PREFERENCE = Object.freeze({
   default: ['openai', 'anthropic', 'google'],
 });
 
+/// The routability rule the hand-kept lists above encode, stated once so the test can hold
+/// those lists to the matrix. `lanes` is a matrix class entry: role names to vendor arrays.
+/// A class this runtime builds is routable only with both checking lanes; a class with no
+/// implement lane is not built here and keeps a verify lane's worth of routability. The
+/// reason names the missing lane, because the refusal is the point: legible at routing,
+/// not an unlandable unit at finalize.
+function routability(lanes) {
+  const has = (role) => Array.isArray(lanes[role]) && lanes[role].length > 0;
+  if (has('implement')) {
+    if (!has('verify')) return { routable: false, reason: 'an implement lane but no verify lane' };
+    if (!has('review')) return { routable: false, reason: 'an implement lane but no review lane' };
+    return { routable: true };
+  }
+  if (has('verify')) return { routable: true };
+  return { routable: false, reason: 'no implement or verify lane' };
+}
+
 /// A class named in a block, however the lead spelled it.
 ///
 /// Naming NOTHING and naming something WRONG are different facts and answered differently. A
@@ -72,7 +103,7 @@ function classNamed(raw) {
   const key = trimmed.toLowerCase().replace(/[\s_]+/g, '-');
   if (CLASSES.includes(key)) return key;
   if (UNROUTABLE_CLASSES.includes(key)) {
-    throw new RangeError(`${key} is a matrix class with no implement or verify lane, so this panel cannot seat it. Routable classes: ${CLASSES.join(', ')}`);
+    throw new RangeError(`${key} is a matrix class with ${UNROUTABLE_REASON[key]}, so this panel cannot seat it. Routable classes: ${CLASSES.join(', ')}`);
   }
   throw new RangeError(`unknown task class ${JSON.stringify(raw)}. Routable classes: ${CLASSES.join(', ')}`);
 }
@@ -231,7 +262,7 @@ function route({ units, seats, readyVendors, criticalTwoReviews = true } = {}) {
 
 module.exports = {
   BUILDER_PREFERENCE, CHECKER_PREFERENCE, CLASSES, MAX_UNITS, SEAT_VENDORS, SLOTS,
-  UNROUTABLE_CLASSES,
+  UNROUTABLE_CLASSES, UNROUTABLE_REASON,
   VENDORS_FOR_FULL_INDEPENDENCE,
-  classNamed, isCritical, normalizedPath, ordered, readiness, route,
+  classNamed, isCritical, normalizedPath, ordered, readiness, routability, route,
 };
